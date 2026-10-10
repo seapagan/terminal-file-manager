@@ -101,7 +101,9 @@ class RealScannerRegressionTests(unittest.TestCase):
             CHECKER.main()
         return output.getvalue()
 
-    @unittest.skipIf(os.name == "nt", "POSIX filenames may contain arbitrary bytes")
+    @unittest.skipUnless(
+        sys.platform == "linux", "raw invalid-byte filenames require a Linux filesystem"
+    )
     def test_raw_filenames_remain_distinct_and_diagnostics_are_ascii_safe(self) -> None:
         """Raw FF/FE and literal replacement characters never alias or break XML."""
         source = "fn complex(x: i32) {\n" + "if x > 0 {}\n" * 10 + "}\n"

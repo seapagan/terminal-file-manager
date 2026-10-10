@@ -592,8 +592,10 @@ class EnforcementTests(unittest.TestCase):
                 status = report.main()
 
             self.assertEqual(status, 1)
-            self.assertIn("## Package checks ❌", markdown.read_text())
-            self.assertIn("Missing required paths", markdown.read_text())
+            self.assertIn("## Package checks ❌", markdown.read_text(encoding="utf-8"))
+            self.assertIn(
+                "Missing required paths", markdown.read_text(encoding="utf-8")
+            )
 
 
 if __name__ == "__main__":
