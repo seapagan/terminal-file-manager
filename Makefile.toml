@@ -1,0 +1,388 @@
+[config]
+skip_core_tasks = true
+
+[env]
+COMPLEXITY_LIZARD_VERSION = { value = "1.23.0", condition = { env_not_set = ["COMPLEXITY_LIZARD_VERSION"] } }
+COMPLEXITY_MAX_CCN = { value = "10", condition = { env_not_set = ["COMPLEXITY_MAX_CCN"] } }
+COMPLEXITY_MAX_FUNCTION_NLOC = { value = "50", condition = { env_not_set = ["COMPLEXITY_MAX_FUNCTION_NLOC"] } }
+COMPLEXITY_MAX_PARAMETERS = { value = "8", condition = { env_not_set = ["COMPLEXITY_MAX_PARAMETERS"] } }
+COMPLEXITY_MAX_FILE_NLOC = { value = "500", condition = { env_not_set = ["COMPLEXITY_MAX_FILE_NLOC"] } }
+
+[tasks.python-format]
+description = "Check Python support-code formatting"
+command = "ruff"
+args = ["format", "--check", "."]
+
+
+[tasks.python-lint]
+description = "Lint Python support code"
+command = "ruff"
+args = ["check", "."]
+
+
+[tasks.python-type]
+description = "Type-check Python support code strictly"
+command = "mypy"
+args = ["--strict", "--python-version", "3.10", "--exclude-gitignore", "."]
+
+
+[tasks.python-test]
+description = "Test Python support code"
+command = "python3"
+args = ["-B", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py"]
+
+[tasks.python-test.windows]
+command = "python"
+
+[tasks.complexity]
+description = "Report Codacy-aligned Rust and Python complexity findings without failing verification"
+command = "python3"
+args = ["scripts/check_complexity.py"]
+
+[tasks.complexity.windows]
+command = "python"
+
+[tasks.format]
+description = "Check Rust formatting"
+command = "cargo"
+args = ["fmt", "--all", "--", "--check"]
+
+[tasks.fmt]
+alias = "format"
+
+[tasks.check]
+description = "Check every target and feature with the lockfile"
+command = "cargo"
+args = ["check", "--all-targets", "--all-features", "--locked"]
+
+[tasks.clippy]
+description = "Run Clippy with warnings denied"
+command = "cargo"
+args = ["clippy", "--all-targets", "--all-features", "--locked", "--", "-D", "warnings"]
+
+[tasks.test]
+description = "Run unit and integration tests with nextest"
+command = "cargo"
+args = ["nextest", "run", "--all-targets", "--all-features", "--locked"]
+
+[tasks.doctest]
+description = "Run rustdoc examples (nextest does not run doctests)"
+command = "cargo"
+args = ["test", "--doc", "--all-features", "--locked"]
+
+[tasks.doc]
+description = "Build documentation with warnings denied"
+env = { RUSTDOCFLAGS = "-D warnings" }
+command = "cargo"
+args = ["doc", "--no-deps", "--all-features", "--locked"]
+
+[tasks.build]
+description = "Build every target and feature"
+command = "cargo"
+args = ["build", "--all-targets", "--all-features", "--locked"]
+
+[tasks.release-build]
+description = "Build the optimized release binary"
+command = "cargo"
+args = ["build", "--release", "--locked"]
+
+[tasks.package]
+description = "Verify packaging from the clean committed tree"
+command = "cargo"
+args = ["package", "--locked"]
+
+[tasks.package-list]
+description = "List files included in the crate package"
+command = "cargo"
+args = ["package", "--list", "--locked"]
+
+[tasks.msrv-version]
+description = "Read and validate the exact package MSRV from Cargo.toml"
+script_runner = "@duckscript"
+script = '''
+metadata_output = exec cargo metadata --manifest-path Cargo.toml --no-deps --format-version 1 --locked
+assert_eq ${metadata_output.code} 0 "Cannot determine package.rust-version from Cargo.toml: ${metadata_output.stderr}"
+metadata = json_parse ${metadata_output.stdout}
+assert_eq ${metadata.packages.length} 1 "Expected one package in Cargo.toml to determine the MSRV"
+msrv = set ${metadata.packages[0].rust_version}
+missing = is_empty ${msrv}
+assert_false ${missing} "Cargo.toml package.rust-version must declare an exact stable major.minor.patch version"
+echo Validating Cargo.toml package.rust-version: ${msrv}
+version = semver_parse ${msrv}
+exact_version = set "${version.major}.${version.minor}.${version.patch}"
+assert_eq ${msrv} ${exact_version} "Cargo.toml package.rust-version must declare an exact stable major.minor.patch version"
+set_env TFM_MSRV ${msrv}
+echo Manifest MSRV: ${msrv}
+output_file = get_env GITHUB_OUTPUT
+output_missing = is_empty ${output_file}
+if not ${output_missing}
+    appendfile ${output_file} "version=${msrv}\n"
+end
+'''
+
+[tasks.msrv]
+description = "Verify every supported path with the exact manifest-declared toolchain"
+dependencies = ["msrv-version"]
+env = { RUSTDOCFLAGS = "-D warnings" }
+script_runner = "@duckscript"
+script = '''
+msrv = get_env TFM_MSRV
+exec --fail-on-error cargo +${msrv} fmt --all -- --check
+exec --fail-on-error cargo +${msrv} check --all-targets --all-features --locked
+exec --fail-on-error cargo +${msrv} clippy --all-targets --all-features --locked -- -D warnings
+exec --fail-on-error cargo +${msrv} test --all-targets --all-features --locked
+exec --fail-on-error cargo +${msrv} test --doc --all-features --locked
+exec --fail-on-error cargo +${msrv} doc --no-deps --all-features --locked
+exec --fail-on-error cargo +${msrv} build --all-targets --all-features --locked
+exec --fail-on-error cargo +${msrv} package --locked
+'''
+
+[tasks.audit]
+description = "Audit locked dependencies for known vulnerabilities"
+command = "cargo"
+args = ["audit"]
+
+[tasks.deny]
+description = "Check dependency advisories, licenses, bans, and sources"
+command = "cargo"
+args = ["deny", "--locked", "check"]
+
+[tasks.shellcheck-present]
+private = true
+command = "shellcheck"
+args = ["--version"]
+
+[tasks.actions-lint]
+description = "Validate GitHub Actions syntax and embedded shell with ShellCheck"
+dependencies = ["shellcheck-present"]
+command = "actionlint"
+
+[tasks.zizmor]
+description = "Audit workflow security with the pedantic persona"
+command = "zizmor"
+args = ["--persona=pedantic", ".github/workflows"]
+
+[tasks.prepare-coverage]
+private = true
+script_runner = "@duckscript"
+script = ["mkdir target/llvm-cov"]
+
+[tasks.coverage]
+description = "Write remapped LCOV for the executable coverage baseline"
+dependencies = ["prepare-coverage"]
+command = "cargo"
+args = [
+    "llvm-cov", "nextest", "--all-targets", "--all-features", "--locked",
+    "--no-fail-fast", "--remap-path-prefix",
+    "--lcov", "--output-path=target/llvm-cov/coverage.lcov",
+]
+
+[tasks.coverage-html]
+description = "Generate a local HTML coverage report"
+command = "cargo"
+args = [
+    "llvm-cov", "nextest", "--all-targets", "--all-features", "--locked",
+    "--no-fail-fast", "--remap-path-prefix", "--html",
+]
+
+[tasks.test-html]
+alias = "coverage-html"
+
+[tasks.verify-fast]
+description = "Run fast native Rust, documentation, build and package checks"
+dependencies = [
+    "format", "check", "clippy", "test", "doctest", "doc", "build",
+    "release-build", "package-list", "package",
+]
+
+[tasks.verify-common]
+description = "Run platform-independent foundation verification"
+dependencies = [
+    "python-format", "python-lint", "python-type", "python-test", "complexity",
+    "format", "check", "clippy", "maintainability", "test", "doctest", "doc", "build",
+    "release-build", "package-list", "package",
+    "msrv", "audit", "deny", "actions-lint", "zizmor", "coverage",
+]
+
+[tasks._xwin-prerequisites]
+private = true
+dependencies = ["_require-linux"]
+script = '''
+set -eu
+for tool in cargo-xwin clang-cl lld-link llvm-lib rustup; do
+    command -v "$tool" >/dev/null 2>&1 || {
+        echo "error: verify-xwin requires $tool on PATH" >&2
+        exit 1
+    }
+done
+cargo xwin --version
+cargo clippy --version
+rustup target list --installed | grep -qx x86_64-pc-windows-msvc || {
+    echo "error: verify-xwin requires rustup target add x86_64-pc-windows-msvc for the active toolchain" >&2
+    exit 1
+}
+'''
+
+[tasks.xwin-check]
+description = "Cross-check the Windows MSVC target from Linux"
+dependencies = ["_require-linux", "_xwin-prerequisites"]
+command = "cargo"
+args = [
+  "xwin",
+  "check",
+  "--target",
+  "x86_64-pc-windows-msvc",
+  "--all-targets",
+  "--all-features",
+  "--locked",
+]
+
+[tasks.xwin-clippy]
+description = "Run strict Clippy for the Windows MSVC target from Linux"
+dependencies = ["_require-linux", "_xwin-prerequisites"]
+command = "cargo"
+args = [
+  "xwin",
+  "clippy",
+  "--target",
+  "x86_64-pc-windows-msvc",
+  "--all-targets",
+  "--all-features",
+  "--locked",
+  "--",
+  "-D",
+  "warnings",
+]
+
+[tasks.xwin-build]
+description = "Cross-build the Windows MSVC target from Linux"
+dependencies = ["_require-linux", "_xwin-prerequisites"]
+command = "cargo"
+args = [
+  "xwin",
+  "build",
+  "--target",
+  "x86_64-pc-windows-msvc",
+  "--all-targets",
+  "--all-features",
+  "--locked",
+]
+
+[tasks.verify-xwin]
+description = "Run all Linux-hosted Windows MSVC cross-target checks"
+dependencies = ["_require-linux", "xwin-check", "xwin-clippy", "xwin-build"]
+
+[tasks.verify-linux]
+description = "Run complete native Linux and Windows MSVC cross-verification"
+dependencies = ["_require-linux", "verify-common", "bootstrap-test", "inventory-test", "verify-xwin"]
+
+[tasks.verify-macos]
+description = "Run complete native macOS verification"
+dependencies = ["_require-macos", "verify-common"]
+
+[tasks.verify-windows]
+description = "Run complete native Windows verification"
+dependencies = ["_require-windows", "verify-common"]
+
+[tasks.verify]
+description = "Run the complete local foundation verification gate"
+linux_alias = "verify-linux"
+mac_alias = "verify-macos"
+windows_alias = "verify-windows"
+
+[tasks.maintainability]
+description = "Detect maintainability and quality drift with strict Clippy checks"
+command = "cargo"
+args = [
+  "clippy",
+  "--all-targets",
+  "--all-features",
+  "--locked",
+  "--",
+  "-D",
+  "warnings",
+  "-W",
+  "clippy::too_many_lines",
+  "-W",
+  "clippy::too_many_arguments",
+  "-W",
+  "clippy::cognitive_complexity",
+  "-W",
+  "clippy::large_stack_arrays",
+  "-W",
+  "clippy::large_types_passed_by_value",
+]
+
+
+[tasks.quality]
+alias = "verify"
+
+[tasks.maintainability-advisory]
+description = "Report only Clippy line-count and argument-count diagnostics"
+command = "cargo"
+args = [
+  "clippy", "--all-targets", "--all-features", "--locked", "--",
+  "-W", "clippy::too_many_lines", "-W", "clippy::too_many_arguments",
+]
+
+[tasks._require-host]
+private = true
+script_runner = "@duckscript"
+script = '''
+host_is_valid = set false
+if equals ${REQUIRED_HOST} unix
+    if not equals ${CARGO_MAKE_RUST_TARGET_OS} windows
+        host_is_valid = set true
+    end
+else
+    if equals ${CARGO_MAKE_RUST_TARGET_OS} ${REQUIRED_HOST}
+        host_is_valid = set true
+    end
+end
+
+if equals ${host_is_valid} false
+    echo "error: this task requires ${REQUIRED_HOST_DESCRIPTION}; current host is ${CARGO_MAKE_RUST_TARGET_OS}"
+    exit 1
+end
+'''
+
+[tasks._require-unix]
+extend = "_require-host"
+env = { "REQUIRED_HOST" = "unix", "REQUIRED_HOST_DESCRIPTION" = "a Unix host" }
+
+[tasks._require-windows]
+extend = "_require-host"
+env = { "REQUIRED_HOST" = "windows", "REQUIRED_HOST_DESCRIPTION" = "Windows" }
+
+[tasks._require-linux]
+extend = "_require-host"
+env = { "REQUIRED_HOST" = "linux", "REQUIRED_HOST_DESCRIPTION" = "Linux" }
+
+[tasks._require-macos]
+extend = "_require-host"
+env = { "REQUIRED_HOST" = "macos", "REQUIRED_HOST_DESCRIPTION" = "macOS" }
+
+
+[tasks.bootstrap-shellcheck]
+description = "Check the Linux Rustup bootstrap regression harness"
+dependencies = ["shellcheck-present"]
+command = "shellcheck"
+args = ["tests/ci/rustup-bootstrap.sh"]
+
+[tasks.bootstrap-test]
+description = "Reject corrupt Rustup downloads before execution on every Linux target"
+dependencies = ["_require-linux", "bootstrap-shellcheck"]
+command = "bash"
+args = ["tests/ci/rustup-bootstrap.sh"]
+
+[tasks.inventory-test]
+description = "Verify exact release asset inventory and nonempty assets"
+dependencies = ["_require-linux", "inventory-shellcheck"]
+command = "bash"
+args = ["tests/ci/release-inventory.sh"]
+
+[tasks.inventory-shellcheck]
+description = "Lint the release inventory regression harness"
+dependencies = ["shellcheck-present"]
+command = "shellcheck"
+args = ["tests/ci/release-inventory.sh"]
