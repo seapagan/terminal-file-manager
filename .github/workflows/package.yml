@@ -1,0 +1,152 @@
+name: Source Package
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  RUST_VERSION: 1.99.0
+
+jobs:
+  package:
+    name: Publishability
+    runs-on: ubuntu-24.04
+
+    outputs:
+      report_ready: ${{ steps.package_report_ready.outputs.ready }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: seapagan/setup-rust@a91f5a34c552642ece0e8cef8b5e9226f41a3c0b # v1.0.0
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          prefix-key: v1-${{ runner.os }}-rust-${{ env.RUST_VERSION }}
+          shared-key: package-publishability
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Install Python for reporting
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14.8'
+
+      - name: Install task runner
+        uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
+        with:
+          tool: cargo-make@0.37.24
+
+      - name: Test package report helper
+        run: python -B -m unittest discover -s tests -p 'test_package_report*.py'
+
+      - name: Build verified package
+        shell: bash
+        run: |
+          rm -rf target/package
+          rm -f package-report.json package-comment.md
+          cargo make package
+
+      - name: List package contents
+        run: cargo make package-list
+
+      - name: Analyse package
+        run: >-
+          python scripts/package_report.py analyse
+          target/package
+          package-report.json
+          package-comment.md
+
+      - name: Add package report to job summary
+        shell: bash
+        run: cat package-comment.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload package comment
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package-publishability-comment
+          path: |
+            package-comment.md
+            package-report.json
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Mark package report ready
+        id: package_report_ready
+        shell: bash
+        run: echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce package policy
+        run: >-
+          python scripts/package_report.py enforce
+          package-report.json
+
+  package-report:
+    name: PR report
+    if: >-
+      always() &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.package.outputs.report_ready == 'true'
+    needs: package
+    runs-on: ubuntu-24.04
+
+    permissions:
+      actions: read # Download the pre-rendered package comment artifact.
+      pull-requests: write # Create or update the package-status PR comment.
+
+    steps:
+      - name: Download package comment
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-publishability-comment
+
+      - name: Verify package comment
+        shell: bash
+        run: test -s package-comment.md
+
+      - name: Create or update sticky comment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          marker='<!-- tfm-package-checks -->'
+          gh api --paginate \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments?per_page=100" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\") | select((.body | split(\"\\n\")[0]) == \"$marker\") | .id" \
+            > package-comment-ids.txt
+          comment_id="$(sed -n '1p' package-comment-ids.txt)"
+          body="$(< package-comment.md)"
+
+          if [[ -n "$comment_id" ]]; then
+            gh api --method PATCH \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" \
+              --raw-field body="$body"
+          else
+            gh api --method POST \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+              --raw-field body="$body"
+          fi
