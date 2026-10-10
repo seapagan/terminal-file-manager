@@ -1,0 +1,40 @@
+[package]
+name = "terminal-file-manager"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95.0"
+description = "A terminal file manager foundation"
+readme = "README.md"
+repository = "https://github.com/seapagan/terminal-file-manager"
+license = "MIT OR Apache-2.0"
+keywords = ["cli", "file-manager", "terminal"]
+categories = ["command-line-utilities"]
+include = [
+  "LICENSE-APACHE",
+  "LICENSE-MIT",
+  "README.md",
+  "src/**",
+  "tests/*.rs",
+]
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/terminal-file-manager-v{ version }-{ target }.{ archive-format }"
+bin-dir = "{ bin }{ binary-ext }"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-fmt = "zip"
+
+[package.metadata.binstall.overrides.aarch64-pc-windows-msvc]
+pkg-fmt = "zip"
+
+[[bin]]
+name = "tfm"
+path = "src/main.rs"
+
+[dependencies]
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[lints.rust]
+unsafe_code = "deny"
