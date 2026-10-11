@@ -48,10 +48,12 @@ cargo make verify
 `verify` selects `verify-linux`, `verify-macos` or `verify-windows` for the
 current host. Each runs every platform-independent gate; Linux also requires
 the Rustup-bootstrap and release-inventory regressions, plus `verify-xwin`.
-The two shell regressions run in Linux CI. Host guards reject explicit use on an incompatible
+Distribution regressions also run on their native hosts: ELF/Mach-O and Unix
+installers on Linux, Mach-O and Unix installers on macOS, PE and Windows
+installers on Windows. Host guards reject explicit use on an incompatible
 host. `quality` follows the same routing. `verify-fast` runs the native Rust,
 documentation, build and clean-package checks without the support/security
-suite or xwin cross-verification. `fmt` is a check-only alias for `format`;
+suite, distribution regressions or xwin cross-verification. `fmt` is a check-only alias for `format`;
 `release-build` builds the optimized binary, and `package-list` reports the locked crate inventory.
 
 The full gate checks formatting, all targets/features, Clippy and rustdoc with
@@ -87,8 +89,33 @@ Windows verification and has no dedicated xwin job.
 
 Release archives use `terminal-file-manager-vX.Y.Z-<target>.tar.gz` on Unix and
 `.zip` on Windows, with exact-name `.sha256` sidecars. Archives contain the
-`tfm` / `tfm.exe` executable. Binary verifiers and installers remain M0-C work;
-the full eight-target rehearsal cannot pass until its required verifiers exist.
+`tfm` / `tfm.exe`, `LICENSE-MIT`, `LICENSE-APACHE` and `README.md` as four
+root-level regular files. C1 verifiers and C2 installers have regression tasks;
+full eight-target rehearsal and real release-asset installer proof remain C3.
+No public TFM binary release is implied.
+
+`cargo make installers-shellcheck` follows all Unix harness sources;
+`cargo make unix-installer-test` retains the 58 inherited control-flow cases
+and adds security cases plus real native Rust executable fixtures. `rustc`
+is a test prerequisite, not an installer dependency. Tests use private PATH
+shims and local assets; they never download public releases. Hashing uses
+`sha256sum` on Linux and `shasum -a 256` on macOS.
+
+Windows full verification runs `cargo make windows-installer-test` with
+PowerShell 7 and `cargo make windows-installer-test-legacy` with Windows
+PowerShell 5.1. Both require the named shell; missing tools fail. Their native
+success group uses the local `release-build` output. The security suite covers
+ZIP/sidecar/PE rejection, destination checks and replacement/recovery; running
+it with Linux PowerShell proves parser behavior and simulated transactions only.
+Native Windows CI invokes the two shell tasks independently.
+
+Consumer installers verify architecture and exact `tfm --version` before
+replacement. Version validation is synchronous without a deadline; no Bash,
+Python, GNU timeout or process-tree supervisor is required. Native installer
+acceptance checks prompt version termination. Destination checks are best-effort
+pathname rechecks, not universal race prevention. Windows uses destination-local
+exclusive staging, no-overwrite move for fresh installs and `File.Replace` plus
+an owned backup for replacements; failed recovery retains its path for recovery.
 
 CI runs the native Rust checks on Linux, macOS, and Windows with current
 stable Rust. A separate Linux job derives and verifies the exact MSRV from

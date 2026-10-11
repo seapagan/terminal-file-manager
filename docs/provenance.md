@@ -42,3 +42,35 @@ blocks are unchanged. Fake readelf output, synthetic PE bytes and injected file
 descriptions prove parser/control-flow behavior; they do not prove foreign-native
 execution, real stripping or an eight-target rehearsal. Installers and real-asset
 rehearsal proof remain separate milestones.
+
+## M0-C2: installer port and approved corrections
+
+The complete [Unix installer](https://github.com/seapagan/labeldeck/blob/8c0fdea354bf0b0bd8abafb293af78c34ac9fe1d/install.sh),
+[PowerShell installer](https://github.com/seapagan/labeldeck/blob/8c0fdea354bf0b0bd8abafb293af78c34ac9fe1d/install.ps1),
+[Unix suite](https://github.com/seapagan/labeldeck/blob/8c0fdea354bf0b0bd8abafb293af78c34ac9fe1d/tests/installers/unix.sh)
+and [Windows suite](https://github.com/seapagan/labeldeck/blob/8c0fdea354bf0b0bd8abafb293af78c34ac9fe1d/tests/installers/windows.ps1)
+were copied before adaptation; latest relevant file revisions remain
+`ae92a29b276bc04d88c901c098521c433d08f342`. Every original assertion is retained;
+the Unix harness separates its full inherited case sequence from new security
+cases to keep files within the existing maintainability limit.
+
+Mechanical changes distinguish `terminal-file-manager` archives from the `tfm`
+command and use TFM environment names. Approved D2–D8 changes enforce archive
+member/type policy, destination checks, strict sidecars, HTTPS/stable tags,
+executable identity, Windows transactional replacement, portable fixture hashing,
+correct native test paths/version fixtures and fail-fast native CI routing.
+[Keyhold's Unix suite](https://github.com/seapagan/keyhold/blob/0cbd7108cd46aae929b5d39b77ecf3290fa913e9/tests/installers/unix.sh)
+supplies checksum-first/sentinel and detector-independent libc override assertions
+(last relevant revision `cd037693aa268956bb963aba19faf3b97d777270`).
+
+Windows native architecture discovery uses
+[IsWow64Process2](https://learn.microsoft.com/en-us/windows/win32/api/wow64apiset/nf-wow64apiset-iswow64process2):
+[GetNativeSystemInfo alone](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getnativesysteminfo)
+can return an emulated architecture. Replacement uses the Framework-compatible
+[File.Replace overload](https://learn.microsoft.com/en-us/dotnet/api/system.io.file.replace?view=netframework-4.8.1)
+with a same-directory owned backup. Native proof remains pending.
+
+The revised C2 timeout approval preserves synchronous exact version validation
+without a deadline or a new consumer runtime. No release matrix, bootstrap,
+inventory, action/tool pin, canonical QC or publication infrastructure changes.
+Checksums establish downloaded-byte integrity, not publisher authenticity.

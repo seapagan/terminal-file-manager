@@ -274,15 +274,15 @@ dependencies = ["_require-linux", "xwin-check", "xwin-clippy", "xwin-build"]
 
 [tasks.verify-linux]
 description = "Run complete native Linux and Windows MSVC cross-verification"
-dependencies = ["_require-linux", "verify-common", "bootstrap-test", "inventory-test", "verify-xwin", "release-shellcheck", "release-verification-test"]
+dependencies = ["_require-linux", "verify-common", "bootstrap-test", "inventory-test", "verify-xwin", "release-shellcheck", "release-verification-test", "installers-shellcheck", "unix-installer-test"]
 
 [tasks.verify-macos]
 description = "Run complete native macOS verification"
-dependencies = ["_require-macos", "verify-common", "release-shellcheck", "release-verification-test"]
+dependencies = ["_require-macos", "verify-common", "release-shellcheck", "release-verification-test", "installers-shellcheck", "unix-installer-test"]
 
 [tasks.verify-windows]
 description = "Run complete native Windows verification"
-dependencies = ["_require-windows", "verify-common", "release-verification-test"]
+dependencies = ["_require-windows", "verify-common", "release-verification-test", "windows-installer-test", "windows-installer-test-legacy"]
 
 [tasks.verify]
 description = "Run the complete local foundation verification gate"
@@ -422,3 +422,37 @@ description = "Run binary verification regressions for the current native host"
 linux_alias = "release-verification-linux"
 mac_alias = "release-verification-macos"
 windows_alias = "release-pe-test"
+
+[tasks.installers-shellcheck]
+description = "Lint the POSIX consumer installer and Unix regression harness"
+dependencies = ["_require-unix", "shellcheck-present"]
+command = "shellcheck"
+args = ["-x", "install.sh", "tests/installers/unix.sh", "tests/installers/macho-header.sh"]
+
+[tasks.unix-installer-test]
+description = "Test Unix installer controls and real native executable fixtures offline"
+dependencies = ["_require-unix"]
+command = "sh"
+args = ["tests/installers/unix.sh"]
+
+[tasks.windows-installer-security-test]
+description = "Test archive, checksum, destination and transaction controls on Windows"
+dependencies = ["_require-windows"]
+command = "pwsh"
+args = ["-NoProfile", "-File", "tests/installers/windows-security.ps1"]
+
+[tasks.windows-installer-test]
+description = "Run the complete Windows installer suites using PowerShell 7+"
+dependencies = ["_require-windows", "release-build", "windows-installer-security-test"]
+command = "pwsh"
+args = ["-NoProfile", "-File", "tests/installers/windows.ps1"]
+
+[tasks.windows-installer-security-test-legacy]
+extend = "windows-installer-security-test"
+command = "powershell"
+
+[tasks.windows-installer-test-legacy]
+description = "Run the complete Windows installer suites using Windows PowerShell 5.1"
+dependencies = ["_require-windows", "release-build", "windows-installer-security-test-legacy"]
+command = "powershell"
+args = ["-NoProfile", "-File", "tests/installers/windows.ps1"]

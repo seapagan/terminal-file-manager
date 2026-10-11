@@ -47,6 +47,34 @@ interim evidence. Hosted/native results are not implied by configuration files.
   unproven until separately authorized hosted execution. Stop for C1 review
   before installer implementation.
 
+### M0-C2: secure consumer installers (D2–D8)
+
+- Retain all 58 Labeldeck Unix control-flow cases and 13 portable PowerShell
+  cases, plus its native success group. Separate synthetic header/control-flow
+  fixtures from real native binary successes. Use platform-native fixture hashes;
+  reject checksum errors before extraction, header inspection or execution.
+- Require stable tags, HTTPS remote transport, exact one-record/two-field/name
+  sidecars and exactly four root-level regular archive members. Reject unsafe
+  names, duplicates, links and special types before extracting into owned staging.
+- Validate native executable architecture with bounded reads, then require exact
+  successful `tfm --version`. Per the revised C2 decision, this is synchronous
+  without a deadline; no extra supervisor/runtime prerequisite. Native acceptance
+  must check prompt termination. No descendant-containment claim is made.
+- Reject linked/reparse/non-directory ancestors and unsafe final objects;
+  recheck destination identity before commit. Preserve old bytes on precommit
+  failure. Pathname checks narrow races but cannot eliminate every path race.
+- Windows retains PowerShell 5.1/7+, native x64/ARM64 discovery under emulation,
+  exclusive destination-local staging, no-overwrite fresh move and `File.Replace`
+  with an owned backup. Failed recovery retains the last good copy and reports
+  its exact path. Native locking, read-only, denied paths and reparse tests must
+  run on Windows before transaction semantics are accepted.
+- Full host verification includes installer tests and Unix ShellCheck alongside
+  every M0-B/C1 gate; `verify-fast` and local compulsory Linux xwin are unchanged.
+  Native CI uses independent Windows invocations. No hosted xwin is added.
+- Linux execution is available-host proof only. Native macOS, Windows 5.1/7+, ARM64
+  emulation/installation, real release archives and hosted eight-target proof
+  remain pending. Stop for C2 review before C3/D9/D10.
+
 ### Remaining distribution proof
 
 M0-C adds actual executable binary verifiers/installers with full reference

@@ -63,6 +63,18 @@ jobs:
       - name: Test native-host binary verification
         run: cargo make release-verification-test
 
+      - name: Test Unix installer on the native host
+        if: runner.os != 'Windows'
+        run: cargo make unix-installer-test
+
+      - name: Test Windows installer with PowerShell 7
+        if: runner.os == 'Windows'
+        run: cargo make windows-installer-test
+
+      - name: Test Windows installer with PowerShell 5.1
+        if: runner.os == 'Windows'
+        run: cargo make windows-installer-test-legacy
+
   msrv:
     name: Exact declared MSRV
     runs-on: ubuntu-24.04
@@ -164,6 +176,9 @@ jobs:
 
       - name: Lint binary verification scripts
         run: cargo make release-shellcheck
+
+      - name: Lint POSIX installer and regression harness
+        run: cargo make installers-shellcheck
 
       - name: Verify support code, dependencies, workflows, and coverage
         run: |
