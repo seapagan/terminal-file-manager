@@ -11,23 +11,23 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 
 function Die([string]$Message) {
-    Write-Error $Message -ErrorAction Stop
+    Write-Error -Message $Message -ErrorAction Stop
     exit 1
 }
 
-if (-not (Test-Path $Binary)) { Die "binary not found: $Binary" }
+if (-not (Test-Path -Path $Binary)) { Die -Message "binary not found: $Binary" }
 
-$bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $Binary).Path)
-if ($bytes.Length -lt 64) { Die 'file is too small to be a PE binary' }
-if ($bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) { Die 'binary is not a PE image (no MZ signature)' }
+$bytes = [System.IO.File]::ReadAllBytes((Resolve-Path -Path $Binary).Path)
+if ($bytes.Length -lt 64) { Die -Message 'file is too small to be a PE binary' }
+if ($bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) { Die -Message 'binary is not a PE image (no MZ signature)' }
 
 $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
 if ($peOffset -lt 0 -or ($peOffset + 6) -gt $bytes.Length) {
-    Die 'PE header offset is out of bounds'
+    Die -Message 'PE header offset is out of bounds'
 }
 if ($bytes[$peOffset] -ne 0x50 -or $bytes[$peOffset + 1] -ne 0x45 -or
     $bytes[$peOffset + 2] -ne 0 -or $bytes[$peOffset + 3] -ne 0) {
-    Die 'binary does not carry a PE signature'
+    Die -Message 'binary does not carry a PE signature'
 }
 
 $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
@@ -37,7 +37,7 @@ $expected = switch ($Arch) {
 }
 
 if ($machine -ne $expected) {
-    Die "expected $Arch PE (machine 0x$($expected.ToString('X4'))), found machine 0x$($machine.ToString('X4'))"
+    Die -Message "expected $Arch PE (machine 0x$($expected.ToString('X4'))), found machine 0x$($machine.ToString('X4'))"
 }
 
-Write-Host "verified $Arch PE binary: $Binary"
+Write-Information -MessageData "verified $Arch PE binary: $Binary" -InformationAction Continue
