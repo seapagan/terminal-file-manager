@@ -87,6 +87,10 @@ jobs:
             arch: aarch64
 
     steps:
+      - name: Preserve checkout bytes (Windows)
+        if: matrix.kind == 'windows'
+        shell: pwsh
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -95,6 +99,7 @@ jobs:
         shell: pwsh
         run: |
           $hash = (Get-FileHash probes/m0-dependencies/Cargo.lock -Algorithm SHA256).Hash.ToLower()
+          Write-Output "probe lockfile SHA256: $hash"
           if ($hash -ne 'd94748671869250b4b8468c9e96608893d61dbf6b109d9f832fc0f13d61ca7bd') {
             throw 'The reviewed probe graph changed; re-review dependency exceptions and evidence.'
           }
@@ -171,7 +176,7 @@ jobs:
             sw_vers
             clang --version
             ld -version_details
-            as -version
+            as --version
             xcrun --show-sdk-version
             xcrun --show-sdk-path
             cargo tree --workspace --locked -e features --target "$TARGET" --manifest-path "$PROBE_MANIFEST"
