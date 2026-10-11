@@ -10,52 +10,9 @@ $securitySkipped = 0
 # A test-only exception boundary permits independent negative assertions.
 function Die([string]$Message) { throw $Message }
 
-# Temporary native diagnostics; no installation or assertion policy changes.
-$script:diagnosticActive = $false
-function Write-DiagnosticError([object]$Record) {
-    $exception = $Record.Exception
-    while ($exception) {
-        Write-Host ("DIAG exception={0}; HRESULT=0x{1:X8}; message={2}" -f
-            $exception.GetType().FullName, $exception.HResult, $exception.Message)
-        $exception = $exception.InnerException
-    }
-    Write-Host "DIAG stack=$($Record.ScriptStackTrace)"
-}
-
-function Write-DiagnosticFiles([string]$Directory) {
-    foreach ($item in (Get-ChildItem -LiteralPath $Directory -Force -File)) {
-        try {
-            $hash = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash
-            Write-Host "DIAG file=$($item.Name); length=$($item.Length); SHA256=$hash"
-        } catch { Write-DiagnosticError $_ }
-    }
-}
-
-function Write-DiagnosticRecovery([string]$Directory, [string]$OldHash) {
-    foreach ($item in (Get-ChildItem -LiteralPath $Directory -Force -Filter '.tfm-*')) {
-        try {
-            $hash = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash
-            Write-Host "DIAG backup=$($item.Name); original-bytes=$($hash -eq $OldHash)"
-            if ($hash -eq $OldHash) {
-                # Probe recovery with owned copies; preserve the failed fixture.
-                $copy = Join-Path $securityRoot 'diagnostic-backup-copy'
-                $final = Join-Path $securityRoot 'diagnostic-recovery-final'
-                [IO.File]::Copy($item.FullName, $copy, $false)
-                [IO.File]::WriteAllText($final, 'new tfm')
-                & $script:diagnosticRestore $copy $final $OldHash
-                $restored = (Get-FileHash -LiteralPath $final -Algorithm SHA256).Hash
-                Write-Host "DIAG recovery-after-process-exit=$($restored -eq $OldHash); SHA256=$restored"
-            }
-        } catch { Write-DiagnosticError $_ }
-    }
-}
-
 function Assert-Rejected([scriptblock]$Action, [string]$Reason) {
     $rejected = $false
-    try { & $Action } catch {
-        $rejected = $true
-        if ($script:diagnosticActive) { Write-DiagnosticError $_ }
-    }
+    try { & $Action } catch { $rejected = $true }
     if (-not $rejected) { throw "accepted unsafe input: $Reason" }
     $script:securityPasses++
 }
@@ -270,6 +227,40 @@ try {
     Get-ChildItem $destination -Force -Filter '.tfm-*' | Remove-Item -Force
     [IO.File]::WriteAllText((Join-Path $destination 'tfm.exe'), 'old tfm')
 
+    # A cleanup failure occurs after replacement succeeds. Recover the original
+    # or retain its verified bytes with an explicit recovery-required failure.
+    $originalCleanup = (Get-Item Function:\Remove-BackupFile).ScriptBlock
+    function Remove-BackupFile([string]$Backup) { throw 'injected backup cleanup failure' }
+    try {
+        $cleanupError = ''
+        try { Commit-Candidate $exe $destination }
+        catch { $cleanupError = $_.Exception.Message }
+        Assert-Equal ($cleanupError.Contains('replacement succeeded')) $true 'cleanup failure misreported replacement'
+        Assert-Equal ($cleanupError.Contains('original installation restored')) $true 'cleanup recovery missing'
+        Assert-OldBytes $destination
+        Assert-Equal @(Get-ChildItem $destination -Force -Filter '.tfm-*').Count 0 'cleanup recovery leftovers'
+        $originalRestore = (Get-Item Function:\Restore-Backup).ScriptBlock
+        function Restore-Backup([string]$Backup, [string]$Final, [string]$OldHash) {
+            throw 'injected cleanup recovery failure'
+        }
+        try {
+            $oldHash = (Get-FileHash (Join-Path $destination 'tfm.exe') -Algorithm SHA256).Hash
+            $cleanupError = ''
+            try { Commit-Candidate $exe $destination }
+            catch { $cleanupError = $_.Exception.Message }
+            $retained = @(Get-ChildItem $destination -Force -Filter '.tfm-*')
+            Assert-Equal $retained.Count 1 'cleanup recovery backup count'
+            Assert-Equal ($cleanupError.Contains('replacement succeeded')) $true 'partial commit status missing'
+            Assert-Equal ($cleanupError.Contains('recovery required')) $true 'recovery requirement missing'
+            Assert-Equal ($cleanupError.Contains($retained[0].FullName)) $true 'cleanup recovery location missing'
+            Assert-Equal (Get-FileHash $retained[0].FullName -Algorithm SHA256).Hash $oldHash 'cleanup original backup hash'
+            Assert-Equal ([IO.File]::ReadAllText((Join-Path $destination 'tfm.exe'))) 'new tfm' 'cleanup candidate state'
+        } finally { Set-Item Function:\Restore-Backup $originalRestore }
+        Restore-Backup $retained[0].FullName (Join-Path $destination 'tfm.exe') $oldHash
+        Assert-OldBytes $destination
+        Assert-Equal @(Get-ChildItem $destination -Force -Filter '.tfm-*').Count 0 'manual recovery leftovers'
+    } finally { Set-Item Function:\Remove-BackupFile $originalCleanup }
+
     if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
         $runningSource = Join-Path $securityRoot 'running.rs'
         [IO.File]::WriteAllText($runningSource, @'
@@ -286,49 +277,16 @@ fn main() {
         $runningFinal = Join-Path $runningDir 'tfm.exe'
         [IO.File]::Copy($runningExe, $runningFinal)
         $runningHash = (Get-FileHash $runningFinal -Algorithm SHA256).Hash
-        $script:diagnosticReplace = (Get-Item Function:\Replace-File).ScriptBlock
-        $script:diagnosticRestore = (Get-Item Function:\Restore-Backup).ScriptBlock
-        function Replace-File([string]$Stage, [string]$Final, [string]$Backup) {
-            Write-Host "DIAG File.Replace enter; backup=$([IO.Path]::GetFileName($Backup))"
-            try {
-                & $script:diagnosticReplace $Stage $Final $Backup
-                Write-Host 'DIAG File.Replace returned successfully'
-            } catch { Write-DiagnosticError $_; throw }
-            finally { Write-DiagnosticFiles (Split-Path -Parent $Final) }
-        }
-        function Restore-Backup([string]$Backup, [string]$Final, [string]$OldHash) {
-            Write-Host 'DIAG production recovery entered'
-            try {
-                & $script:diagnosticRestore $Backup $Final $OldHash
-                Write-Host 'DIAG production recovery returned successfully'
-            } catch { Write-DiagnosticError $_; throw }
-            finally { Write-DiagnosticFiles (Split-Path -Parent $Final) }
-        }
-        $installerPath = (Resolve-Path (Join-Path $PSScriptRoot '../../install.ps1')).Path
-        $cleanupLine = (Select-String -LiteralPath $installerPath -SimpleMatch `
-            'if ($backup) { [IO.File]::Delete($backup); $backup = $null }').LineNumber
-        $cleanupBreakpoint = Set-PSBreakpoint -Script $installerPath -Line $cleanupLine -Action {
-            Write-Host 'DIAG backup cleanup entered: File.Delete(backup)'
-        }
-        $script:diagnosticActive = $true
-        Write-Host "DIAG original SHA256=$runningHash"
-        Write-Host "DIAG candidate SHA256=$((Get-FileHash $exe -Algorithm SHA256).Hash)"
         $runningProcess = [Diagnostics.Process]::Start($runningFinal)
         try {
-            Write-Host "DIAG running PID=$($runningProcess.Id); HasExited=$($runningProcess.HasExited)"
+            Assert-Equal $runningProcess.HasExited $false 'running fixture exited before preflight'
+            Assert-Rejected { Assert-ReplaceableFile $runningFinal } 'running executable preflight'
             Assert-Rejected { Commit-Candidate $exe $runningDir } 'running existing executable'
-            Write-DiagnosticFiles $runningDir
             Assert-Equal (Get-FileHash $runningFinal -Algorithm SHA256).Hash $runningHash 'running executable bytes'
+            Assert-Equal @(Get-ChildItem $runningDir -Force -Filter '.tfm-*').Count 0 'running preflight cleanup'
         } finally {
             if (-not $runningProcess.HasExited) { $runningProcess.Kill(); $runningProcess.WaitForExit() }
             $runningProcess.Dispose()
-            Write-Host 'DIAG owned running process stopped'
-            Write-DiagnosticFiles $runningDir
-            Write-DiagnosticRecovery $runningDir $runningHash
-            $script:diagnosticActive = $false
-            Remove-PSBreakpoint $cleanupBreakpoint
-            Set-Item Function:\Replace-File $script:diagnosticReplace
-            Set-Item Function:\Restore-Backup $script:diagnosticRestore
         }
         $nativeTarget = Get-Target
         $savedArchitecture = $env:PROCESSOR_ARCHITECTURE
@@ -338,7 +296,10 @@ fn main() {
         } finally { $env:PROCESSOR_ARCHITECTURE = $savedArchitecture }
         $final = Join-Path $destination 'tfm.exe'
         $lock = [IO.File]::Open($final, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
-        try { Assert-Rejected { Commit-Candidate $exe $destination } 'locked existing binary' }
+        try {
+            Assert-Rejected { Assert-ReplaceableFile $final } 'explicit locked-file preflight'
+            Assert-Rejected { Commit-Candidate $exe $destination } 'locked existing binary'
+        }
         finally { $lock.Dispose() }
         Assert-OldBytes $destination
         [IO.File]::SetAttributes($final, [IO.FileAttributes]::ReadOnly)
@@ -362,8 +323,8 @@ fn main() {
         Assert-Rejected { Commit-Candidate $exe (Join-Path $linked 'child') } 'reparse ancestor'
         Assert-OldBytes $destination
     } else {
-        $securitySkipped = 13
-        Write-Host 'SKIP: thirteen native Windows running-file/architecture/lock/read-only/denied-path/junction assertions; transaction successes above are Unix simulations.'
+        $securitySkipped = 17
+        Write-Host 'SKIP: seventeen native Windows running-file/preflight/architecture/lock/read-only/denied-path/junction assertions; transaction successes above are Unix simulations.'
     }
 } finally {
     Remove-Item -LiteralPath $securityRoot -Recurse -Force -ErrorAction SilentlyContinue

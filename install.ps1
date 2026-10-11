@@ -359,6 +359,36 @@ function Replace-File([string]$Stage, [string]$Final, [string]$Backup) {
     [IO.File]::Replace($Stage, $Final, $Backup)
 }
 
+function Assert-ReplaceableFile([string]$Final) {
+    # Non-truncating preflight rejects mapped images and incompatible sharing.
+    # The handle must close before Replace; pathname races remain best-effort.
+    $stream = [IO.File]::Open($Final, [IO.FileMode]::Open,
+        [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    $stream.Dispose()
+}
+
+function Remove-BackupFile([string]$Backup) {
+    [IO.File]::Delete($Backup)
+}
+
+function Complete-BackupCleanup([string]$Backup, [string]$Final, [string]$OldHash) {
+    try { Remove-BackupFile $Backup; return }
+    catch { $cleanupError = $_.Exception.Message }
+    try { Restore-Backup $Backup $Final $OldHash }
+    catch {
+        $verified = $false
+        try {
+            $verified = (Test-Path -LiteralPath $Backup -PathType Leaf) -and
+                (Get-FileHash -LiteralPath $Backup -Algorithm SHA256).Hash -eq $OldHash
+        } catch { $verified = $false }
+        if ($verified) {
+            Die "replacement succeeded; backup cleanup failed; recovery required; SHA256-verified original retained at ${Backup}: $($_.Exception.Message)"
+        }
+        Die "replacement succeeded; backup cleanup failed; recovery required; inspect recovery material at ${Backup}; expected original SHA256 ${OldHash}: $($_.Exception.Message)"
+    }
+    Die "replacement succeeded; backup cleanup failed; original installation restored: $cleanupError"
+}
+
 function Commit-Candidate([string]$Candidate, [string]$InstallDir) {
     $installDir = Assert-DirectoryPath $InstallDir
     $final = Join-Path $installDir 'tfm.exe'
@@ -374,6 +404,7 @@ function Commit-Candidate([string]$Candidate, [string]$InstallDir) {
         Assert-RegularFile $stage
         if ($before -eq 'absent') { [IO.File]::Move($stage, $final) }
         else {
+            Assert-ReplaceableFile $final
             $oldHash = (Get-FileHash -LiteralPath $final -Algorithm SHA256).Hash
             $backup = New-OwnedFile $installDir
             try { Replace-File $stage $final $backup }
@@ -395,12 +426,12 @@ function Commit-Candidate([string]$Candidate, [string]$InstallDir) {
             if ($backup) { Restore-Backup $backup $final $oldHash }
             Die 'replacement did not preserve candidate bytes'
         }
-        if ($backup) { [IO.File]::Delete($backup); $backup = $null }
+        if ($backup) { Complete-BackupCleanup $backup $final $oldHash; $backup = $null }
     } finally {
         [IO.File]::Delete($stage)
         # Keep any backup on failure, including a recovery failure. Never delete
         # the last good copy merely to make the directory look clean.
-        if ($backup) { Write-Warning "recovery material retained at $backup" }
+        if ($backup -and (Get-PathItem $backup)) { Write-Warning "recovery material retained at $backup" }
     }
 }
 
