@@ -93,8 +93,8 @@ class ReleaseAssetsTests(unittest.TestCase):
     def sidecar(self) -> Path:
         """Refresh a strict record so malicious content reaches validation."""
         path = Path(f"{self.archive}.sha256")
-        path.write_text(
-            f"{assets.digest_file(self.archive)}  {self.archive.name}\n", "ascii"
+        path.write_bytes(
+            f"{assets.digest_file(self.archive)}  {self.archive.name}\n".encode("ascii")
         )
         return path
 
@@ -202,6 +202,34 @@ class ReleaseAssetsTests(unittest.TestCase):
                 with self.assertRaises(assets.AssetError):
                     self.check()
         sidecar.write_bytes(record.rstrip(b"\n"))
+        self.check()
+
+    def test_fixture_sidecar_ascii_lf_record(self) -> None:
+        """Fixture records retain exact wire bytes under Windows text defaults."""
+
+        def windows_text(
+            path: Path,
+            data: str,
+            encoding: str | None = None,
+            errors: str | None = None,
+            newline: str | None = None,
+        ) -> int:
+            with path.open(
+                "w",
+                encoding=encoding,
+                errors=errors,
+                newline="\r\n" if newline is None else newline,
+            ) as stream:
+                return stream.write(data)
+
+        with mock.patch.object(
+            Path, "write_text", autospec=True, side_effect=windows_text
+        ):
+            self.write()
+        expected = f"{assets.digest_file(self.archive)}  {self.archive.name}\n".encode(
+            "ascii"
+        )
+        self.assertEqual(Path(f"{self.archive}.sha256").read_bytes(), expected)
         self.check()
 
     def test_checksum_corruption_and_missing_sidecar(self) -> None:
