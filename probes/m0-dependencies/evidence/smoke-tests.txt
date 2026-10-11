@@ -1,0 +1,26 @@
+   Compiling yazi-sftp v26.9.1 (/home/seapagan/data/work/own/terminal-file-manager/probes/m0-dependencies/vendor/yazi-sftp)
+   Compiling tfm-m0-dependency-probe v0.0.0 (/home/seapagan/data/work/own/terminal-file-manager/probes/m0-dependencies)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.15s
+     Running unittests src/main.rs (/tmp/tfm-m0-dependencies-20261011/target/debug/deps/tfm_m0_dependency_probe-0638f22e5a93ba33)
+
+running 2 tests
+test tests::ssh_banner_smoke ... ok
+test tests::crypto_and_terminal_smoke ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (/tmp/tfm-m0-dependencies-20261011/target/debug/deps/yazi_sftp-06af7d84d422cfc2)
+
+running 3 tests
+test probe::tests::handle_requests_preserve_bytes ... ok
+test probe::tests::handle_response_preserves_bytes ... ok
+test probe::tests::remote_paths_preserve_bytes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests yazi_sftp
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

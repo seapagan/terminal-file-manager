@@ -1,0 +1,4 @@
+static musl ELF verified: no PT_INTERP, no NEEDED entries, musl __init_libc present
+size before stripping: 4113648 bytes
+size after stripping: 3377088 bytes
+static ELF verified: no PT_INTERP, no NEEDED entries

@@ -1,0 +1,39 @@
+{
+  "gnu": [
+    "warning: constant `MAXIMUM_DECOMPRESSED_PACKET_LEN` is never used",
+    "warning: direct cast of function item into an integer",
+    "warning: field `0` is never read",
+    "warning: function pointer comparisons do not produce meaningful results since their addresses are not guaranteed to be unique",
+    "warning: generic-array@0.14.9: generic-array 0.14 is deprecated; please upgrade to generic-array 1.x",
+    "warning: hiding a lifetime that's elided elsewhere is confusing",
+    "warning: implicit autoref creates a reference to the dereference of a raw pointer",
+    "warning: rustix@1.1.5: ignoring 'hints.mostly-unused', pass `-Zprofile-hint-mostly-unused` to enable it",
+    "warning: unexpected `cfg` condition name: `relaxed_coherence`",
+    "warning: unnecessary parentheses around closure body",
+    "warning: unused import: `std::ascii::AsciiExt`",
+    "warning: unused variable: `sec`",
+    "warning: use of deprecated constant `libc::INT_MAX`: Use `c_int::MAX` instead.",
+    "warning: use of deprecated method `ctutils::Choice::to_bool_vartime`: use `Choice::to_bool` instead",
+    "warning: use of deprecated method `ctutils::Choice::to_u8_vartime`: use `Choice::to_u8` instead",
+    "warning: use of deprecated trait `std::ascii::AsciiExt`: use inherent methods instead"
+  ],
+  "musl": [
+    "warning: constant `MAXIMUM_DECOMPRESSED_PACKET_LEN` is never used",
+    "warning: direct cast of function item into an integer",
+    "warning: field `0` is never read",
+    "warning: function pointer comparisons do not produce meaningful results since their addresses are not guaranteed to be unique",
+    "warning: generic-array@0.14.9: generic-array 0.14 is deprecated; please upgrade to generic-array 1.x",
+    "warning: hiding a lifetime that's elided elsewhere is confusing",
+    "warning: implicit autoref creates a reference to the dereference of a raw pointer",
+    "warning: rustix@1.1.5: ignoring 'hints.mostly-unused', pass `-Zprofile-hint-mostly-unused` to enable it",
+    "warning: unexpected `cfg` condition name: `relaxed_coherence`",
+    "warning: unnecessary parentheses around closure body",
+    "warning: unused import: `std::ascii::AsciiExt`",
+    "warning: unused variable: `sec`",
+    "warning: use of deprecated constant `libc::INT_MAX`: Use `c_int::MAX` instead.",
+    "warning: use of deprecated method `ctutils::Choice::to_bool_vartime`: use `Choice::to_bool` instead",
+    "warning: use of deprecated method `ctutils::Choice::to_u8_vartime`: use `Choice::to_u8` instead",
+    "warning: use of deprecated trait `std::ascii::AsciiExt`: use inherent methods instead",
+    "warning: use of deprecated type alias `libc::time_t`: This type is changed to 64-bit in musl 1.2.0, we'll follow that change in the future release. See #1848 for more info."
+  ]
+}

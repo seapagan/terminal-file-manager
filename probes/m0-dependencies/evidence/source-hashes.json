@@ -1,0 +1,302 @@
+[
+  {
+    "file": "Cargo.toml",
+    "upstream_path": "yazi-sftp/Cargo.toml",
+    "upstream_sha256": "f14c49b15f01f5d281a75769384962040b8feb43b8e908430d93233c696046b1",
+    "snapshot_sha256": "ea8823948e963aba051471cc6c28177e04eea4bd03948464d983562cde34cd76"
+  },
+  {
+    "file": "LICENSE",
+    "upstream_path": "yazi-sftp/LICENSE",
+    "upstream_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "snapshot_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+  },
+  {
+    "file": "LICENSE-MIT",
+    "upstream_path": "LICENSE",
+    "upstream_sha256": "e66519d3d006dc76760d00d40361d24d2b97ba80ab93438885e78bc5a70bdd9c",
+    "snapshot_sha256": "e66519d3d006dc76760d00d40361d24d2b97ba80ab93438885e78bc5a70bdd9c"
+  },
+  {
+    "file": "README.md",
+    "upstream_path": "yazi-sftp/README.md",
+    "upstream_sha256": "443773f463cf8c38ec740bc57a2816c4070629602219dce7e2aefec6d2e09114",
+    "snapshot_sha256": "443773f463cf8c38ec740bc57a2816c4070629602219dce7e2aefec6d2e09114"
+  },
+  {
+    "file": "src/de.rs",
+    "upstream_path": "yazi-sftp/src/de.rs",
+    "upstream_sha256": "bad8162063f2a424a2edeca04e458de90e7059fa62d6ccfc16f1c6ee9aaabdb5",
+    "snapshot_sha256": "bad8162063f2a424a2edeca04e458de90e7059fa62d6ccfc16f1c6ee9aaabdb5"
+  },
+  {
+    "file": "src/error.rs",
+    "upstream_path": "yazi-sftp/src/error.rs",
+    "upstream_sha256": "f5ea62dcc649cb0418d2f18c24a1e27139f714284f59a2a500aaa580287b7ecb",
+    "snapshot_sha256": "f5ea62dcc649cb0418d2f18c24a1e27139f714284f59a2a500aaa580287b7ecb"
+  },
+  {
+    "file": "src/fs/attrs.rs",
+    "upstream_path": "yazi-sftp/src/fs/attrs.rs",
+    "upstream_sha256": "62017c4d5dd0fbba1f1c6e7501657b43455ff98401f776ca7212140296fde6c5",
+    "snapshot_sha256": "62017c4d5dd0fbba1f1c6e7501657b43455ff98401f776ca7212140296fde6c5"
+  },
+  {
+    "file": "src/fs/dir_entry.rs",
+    "upstream_path": "yazi-sftp/src/fs/dir_entry.rs",
+    "upstream_sha256": "6faa315888b63293a69abe2f8087cc6e2893b1b4c988c50885888b4663bfa634",
+    "snapshot_sha256": "6faa315888b63293a69abe2f8087cc6e2893b1b4c988c50885888b4663bfa634"
+  },
+  {
+    "file": "src/fs/file.rs",
+    "upstream_path": "yazi-sftp/src/fs/file.rs",
+    "upstream_sha256": "1485c7661a634ea4b3f0c93f36168c8f8f870463ba87aaa941424957ac39ddf5",
+    "snapshot_sha256": "8d6a3ba32383eb58c69c12d929b87561b917b2b39a0fb6638e91331527b36702"
+  },
+  {
+    "file": "src/fs/flags.rs",
+    "upstream_path": "yazi-sftp/src/fs/flags.rs",
+    "upstream_sha256": "5436dd8338034b81f6956a8680c23f7b87e307281d2ea004576d6c9a615f18a7",
+    "snapshot_sha256": "5436dd8338034b81f6956a8680c23f7b87e307281d2ea004576d6c9a615f18a7"
+  },
+  {
+    "file": "src/fs/mod.rs",
+    "upstream_path": "yazi-sftp/src/fs/mod.rs",
+    "upstream_sha256": "a114bb9f14063436c3218255a7773dcd38740a778285b96dbe53e5849d36328d",
+    "snapshot_sha256": "a114bb9f14063436c3218255a7773dcd38740a778285b96dbe53e5849d36328d"
+  },
+  {
+    "file": "src/fs/read_dir.rs",
+    "upstream_path": "yazi-sftp/src/fs/read_dir.rs",
+    "upstream_sha256": "d0e399df87c2e850ef47509eae8900f388dcad7e93c55a5c05fd0e3a30b29b98",
+    "snapshot_sha256": "07d8497729663a810fbdce063526571fabdccde59ae5b23dd39e668048a9a917"
+  },
+  {
+    "file": "src/id.rs",
+    "upstream_path": "yazi-sftp/src/id.rs",
+    "upstream_sha256": "9d8e65eb5ef6e7b53d0cf5fc090bb693d513fd2bb8770885971252356a6efcce",
+    "snapshot_sha256": "9d8e65eb5ef6e7b53d0cf5fc090bb693d513fd2bb8770885971252356a6efcce"
+  },
+  {
+    "file": "src/lib.rs",
+    "upstream_path": "yazi-sftp/src/lib.rs",
+    "upstream_sha256": "550107a27bc24ee2e74894943711f085a2bd07915cbdd6cca018548b6beb219b",
+    "snapshot_sha256": "cf2bf03806e6b3c01675a89d3ae7a298489be8999d01646a0a66bb21f50a401d"
+  },
+  {
+    "file": "src/macros.rs",
+    "upstream_path": "yazi-sftp/src/macros.rs",
+    "upstream_sha256": "dff87ba31a2cc369add0eb925138d9b25d682a62e955bdc784922c9d352a20bc",
+    "snapshot_sha256": "dff87ba31a2cc369add0eb925138d9b25d682a62e955bdc784922c9d352a20bc"
+  },
+  {
+    "file": "src/operator.rs",
+    "upstream_path": "yazi-sftp/src/operator.rs",
+    "upstream_sha256": "66f599e0a2a5fb6e987f6b3b186c1e7d57dd53c07ab30e5dbd3b4ec6fef4e046",
+    "snapshot_sha256": "db838059b2fc1472a0dd65f438767b61ab9a40a74718a0cf47add8a86d0a68d1"
+  },
+  {
+    "file": "src/packet.rs",
+    "upstream_path": "yazi-sftp/src/packet.rs",
+    "upstream_sha256": "f65f945f0e98d670a126c919a3b0164ea78b24742f9b2bbfe7ff1f6f7d7a205e",
+    "snapshot_sha256": "f65f945f0e98d670a126c919a3b0164ea78b24742f9b2bbfe7ff1f6f7d7a205e"
+  },
+  {
+    "file": "src/path.rs",
+    "upstream_path": "yazi-sftp/src/path.rs",
+    "upstream_sha256": "dd2a051c85c8b4e2469af7fe7f14f1b1bd72628428bb4630407d3ca55650eb01",
+    "snapshot_sha256": "5634b23531f081f5ecb5fcdb3527816916b86bee4030733cbf02f5e76bd836b7"
+  },
+  {
+    "file": "src/probe.rs",
+    "upstream_path": null,
+    "upstream_sha256": null,
+    "snapshot_sha256": "3b3ed360d145f3246774aadcfcb1c6ec716594d55f77215c7c5ff07bf09c8187"
+  },
+  {
+    "file": "src/receiver.rs",
+    "upstream_path": "yazi-sftp/src/receiver.rs",
+    "upstream_sha256": "af8285416ec68349f5e2202709311a795dfd110ce1c45432f8d00fb0df85f056",
+    "snapshot_sha256": "af8285416ec68349f5e2202709311a795dfd110ce1c45432f8d00fb0df85f056"
+  },
+  {
+    "file": "src/requests/close.rs",
+    "upstream_path": "yazi-sftp/src/requests/close.rs",
+    "upstream_sha256": "e7267070e773801847bfa5598ef5e1356f7988217ee0fdb45387c87e1a180f32",
+    "snapshot_sha256": "3544becf5d272bd93b1c1ef822bd86db2ccd1a1de9fa1c1df16ba4f2b8de4804"
+  },
+  {
+    "file": "src/requests/extended.rs",
+    "upstream_path": "yazi-sftp/src/requests/extended.rs",
+    "upstream_sha256": "6f9bdcabf5de34e7403563352295a675d0b5869de3641fc78a3af31fdd8d7b2f",
+    "snapshot_sha256": "6daebf7c10f700c17053e2dc390fd13905672a63370bcaba497109a59913e7a2"
+  },
+  {
+    "file": "src/requests/fstat.rs",
+    "upstream_path": "yazi-sftp/src/requests/fstat.rs",
+    "upstream_sha256": "c0ba404f96da6cbc2f0af67de43f870e94221156ddf09d2e0149f51c7b8fc721",
+    "snapshot_sha256": "b9442c643275b879a64b48f49fd6fede7f8a9ea9ebdf6bc2c7267a43ef0efb2f"
+  },
+  {
+    "file": "src/requests/init.rs",
+    "upstream_path": "yazi-sftp/src/requests/init.rs",
+    "upstream_sha256": "01991f55275834656b18955dc914e9067fdc76acea08b9014c9ef7e095f5dae7",
+    "snapshot_sha256": "01991f55275834656b18955dc914e9067fdc76acea08b9014c9ef7e095f5dae7"
+  },
+  {
+    "file": "src/requests/lstat.rs",
+    "upstream_path": "yazi-sftp/src/requests/lstat.rs",
+    "upstream_sha256": "4f9d39b4d249a2961215e4ba548d8cbbbd6d96a785fac5a6323e9bb8d8305d8e",
+    "snapshot_sha256": "4f9d39b4d249a2961215e4ba548d8cbbbd6d96a785fac5a6323e9bb8d8305d8e"
+  },
+  {
+    "file": "src/requests/mkdir.rs",
+    "upstream_path": "yazi-sftp/src/requests/mkdir.rs",
+    "upstream_sha256": "46db216373ce62a4636f6e1c086778db72c8615639bb205a2bcc1351b71f52d2",
+    "snapshot_sha256": "46db216373ce62a4636f6e1c086778db72c8615639bb205a2bcc1351b71f52d2"
+  },
+  {
+    "file": "src/requests/mod.rs",
+    "upstream_path": "yazi-sftp/src/requests/mod.rs",
+    "upstream_sha256": "54e19b8684e19a0ce4315641cbeb47ea15132082127b3fe191bb1b23e5025260",
+    "snapshot_sha256": "54e19b8684e19a0ce4315641cbeb47ea15132082127b3fe191bb1b23e5025260"
+  },
+  {
+    "file": "src/requests/open.rs",
+    "upstream_path": "yazi-sftp/src/requests/open.rs",
+    "upstream_sha256": "b264aee203d9c1f896a7a0293c15b309ce3a086e392b5c3eaed77e5967e364fd",
+    "snapshot_sha256": "b264aee203d9c1f896a7a0293c15b309ce3a086e392b5c3eaed77e5967e364fd"
+  },
+  {
+    "file": "src/requests/open_dir.rs",
+    "upstream_path": "yazi-sftp/src/requests/open_dir.rs",
+    "upstream_sha256": "f55fcb3f3fb3078864fb28564a4a39e0c7f6687b552a0dd4a569ac2eaa9e8e2f",
+    "snapshot_sha256": "f55fcb3f3fb3078864fb28564a4a39e0c7f6687b552a0dd4a569ac2eaa9e8e2f"
+  },
+  {
+    "file": "src/requests/read.rs",
+    "upstream_path": "yazi-sftp/src/requests/read.rs",
+    "upstream_sha256": "56a1df05e7d69fb010ad53dbf259c51039b5ee61a05a7e8c42eb1d8f637fff85",
+    "snapshot_sha256": "1347b5b32d9cccfb497b22051cff137fef701a2d010899f805de7b837febd06d"
+  },
+  {
+    "file": "src/requests/read_dir.rs",
+    "upstream_path": "yazi-sftp/src/requests/read_dir.rs",
+    "upstream_sha256": "566d97bf492744100ca95d277c7d2a1a31f6a4bd26ef3578a2fb3448a3ad7190",
+    "snapshot_sha256": "cd344703f33d9b57076caaa55ac921e3849edb0d5338ff554e159e04fe0e4b60"
+  },
+  {
+    "file": "src/requests/readlink.rs",
+    "upstream_path": "yazi-sftp/src/requests/readlink.rs",
+    "upstream_sha256": "fa3e2f3026c3ea6585cbc28ba358c8e1b6c21fcf1c600ae96b55810536054f03",
+    "snapshot_sha256": "fa3e2f3026c3ea6585cbc28ba358c8e1b6c21fcf1c600ae96b55810536054f03"
+  },
+  {
+    "file": "src/requests/realpath.rs",
+    "upstream_path": "yazi-sftp/src/requests/realpath.rs",
+    "upstream_sha256": "f0891ffe646e615f079129a68a664a952c079e2aeaec7b11a9575dc55f3e5293",
+    "snapshot_sha256": "f0891ffe646e615f079129a68a664a952c079e2aeaec7b11a9575dc55f3e5293"
+  },
+  {
+    "file": "src/requests/remove.rs",
+    "upstream_path": "yazi-sftp/src/requests/remove.rs",
+    "upstream_sha256": "b90a75f93c72143c9e95d94024979eb6ae5f8b0a5da02d5069d3914332b6e751",
+    "snapshot_sha256": "b90a75f93c72143c9e95d94024979eb6ae5f8b0a5da02d5069d3914332b6e751"
+  },
+  {
+    "file": "src/requests/rename.rs",
+    "upstream_path": "yazi-sftp/src/requests/rename.rs",
+    "upstream_sha256": "62618175c4f7efcbea82ce9131a81852d58665ebacfa1adbe52b09c5d26302d5",
+    "snapshot_sha256": "62618175c4f7efcbea82ce9131a81852d58665ebacfa1adbe52b09c5d26302d5"
+  },
+  {
+    "file": "src/requests/rmdir.rs",
+    "upstream_path": "yazi-sftp/src/requests/rmdir.rs",
+    "upstream_sha256": "fc237cd35e79b015306163065fc3475e9e157741a461bbee62fb251af6f596ab",
+    "snapshot_sha256": "fc237cd35e79b015306163065fc3475e9e157741a461bbee62fb251af6f596ab"
+  },
+  {
+    "file": "src/requests/set_stat.rs",
+    "upstream_path": "yazi-sftp/src/requests/set_stat.rs",
+    "upstream_sha256": "3cd1baf4495ca6b98542a59b768a5bb95a219e8c448cddb7f1b7069d19fef0ae",
+    "snapshot_sha256": "cdfb66768f3b4114a8c93f34ec6946a41ecce0ea22b82e1827ca1f03cb4d6b4e"
+  },
+  {
+    "file": "src/requests/stat.rs",
+    "upstream_path": "yazi-sftp/src/requests/stat.rs",
+    "upstream_sha256": "b140b22e536f1fd6eec27f076fda104f55741c4794cca0c01ecf8b31ca6e4b8d",
+    "snapshot_sha256": "b140b22e536f1fd6eec27f076fda104f55741c4794cca0c01ecf8b31ca6e4b8d"
+  },
+  {
+    "file": "src/requests/symlink.rs",
+    "upstream_path": "yazi-sftp/src/requests/symlink.rs",
+    "upstream_sha256": "9fa9627b99840d75f35de5ea502508b161777df2966070416d441fda31aa753b",
+    "snapshot_sha256": "9fa9627b99840d75f35de5ea502508b161777df2966070416d441fda31aa753b"
+  },
+  {
+    "file": "src/requests/write.rs",
+    "upstream_path": "yazi-sftp/src/requests/write.rs",
+    "upstream_sha256": "8901609a212949a556f9625969868e7335220b48bbb089696f9bd9fe92c6ed6d",
+    "snapshot_sha256": "d7e0749e6b38fa6ab9e8fb1b4d0549bd252110eaf59383264286cac0e360c78d"
+  },
+  {
+    "file": "src/responses/attrs.rs",
+    "upstream_path": "yazi-sftp/src/responses/attrs.rs",
+    "upstream_sha256": "0e5e392355dd0f163fba096f12154230b4082db6aa35937855087610b0420b3a",
+    "snapshot_sha256": "0e5e392355dd0f163fba096f12154230b4082db6aa35937855087610b0420b3a"
+  },
+  {
+    "file": "src/responses/data.rs",
+    "upstream_path": "yazi-sftp/src/responses/data.rs",
+    "upstream_sha256": "aeea674d6be10acef583abb85b1157e93295a0fcf211d55212af3d9905ed44fe",
+    "snapshot_sha256": "aeea674d6be10acef583abb85b1157e93295a0fcf211d55212af3d9905ed44fe"
+  },
+  {
+    "file": "src/responses/extended.rs",
+    "upstream_path": "yazi-sftp/src/responses/extended.rs",
+    "upstream_sha256": "08e0f6adc81dd529f040102dd116408aff1c80fdaf30483f5bae42d5bff4f808",
+    "snapshot_sha256": "08e0f6adc81dd529f040102dd116408aff1c80fdaf30483f5bae42d5bff4f808"
+  },
+  {
+    "file": "src/responses/handle.rs",
+    "upstream_path": "yazi-sftp/src/responses/handle.rs",
+    "upstream_sha256": "f415404bfa251b707450e0bfc935812da2241449b95f2b2c74d5e8425ffbbc21",
+    "snapshot_sha256": "e8a63fe2abf860ce1484511c4e670e3f54c2a5ecac4409c76232922dcecdfdb6"
+  },
+  {
+    "file": "src/responses/mod.rs",
+    "upstream_path": "yazi-sftp/src/responses/mod.rs",
+    "upstream_sha256": "fb7766f91026b35eda1d4058b5e09b6aab6a9801dbca1cc55efab7d8d76a8eb0",
+    "snapshot_sha256": "fb7766f91026b35eda1d4058b5e09b6aab6a9801dbca1cc55efab7d8d76a8eb0"
+  },
+  {
+    "file": "src/responses/name.rs",
+    "upstream_path": "yazi-sftp/src/responses/name.rs",
+    "upstream_sha256": "2a9c8fc563364e4efe441d56955fc59486addaccb93fe2b10e7686fe977c2fb0",
+    "snapshot_sha256": "2a9c8fc563364e4efe441d56955fc59486addaccb93fe2b10e7686fe977c2fb0"
+  },
+  {
+    "file": "src/responses/status.rs",
+    "upstream_path": "yazi-sftp/src/responses/status.rs",
+    "upstream_sha256": "2c44e35e06b830de5e71c8b5cb1e0efcb2d9fb26aea492ea2b844c7a29aabffa",
+    "snapshot_sha256": "2c44e35e06b830de5e71c8b5cb1e0efcb2d9fb26aea492ea2b844c7a29aabffa"
+  },
+  {
+    "file": "src/responses/version.rs",
+    "upstream_path": "yazi-sftp/src/responses/version.rs",
+    "upstream_sha256": "e26e0c817445d4388ef9f04b169b508ec2d240e268fb04288f8c84b0f50366a5",
+    "snapshot_sha256": "e26e0c817445d4388ef9f04b169b508ec2d240e268fb04288f8c84b0f50366a5"
+  },
+  {
+    "file": "src/ser.rs",
+    "upstream_path": "yazi-sftp/src/ser.rs",
+    "upstream_sha256": "fd7d97665d68b9b61f941fa6d6dda8fb150bd3bacbd696ee70225567b8404dbc",
+    "snapshot_sha256": "fd7d97665d68b9b61f941fa6d6dda8fb150bd3bacbd696ee70225567b8404dbc"
+  },
+  {
+    "file": "src/session.rs",
+    "upstream_path": "yazi-sftp/src/session.rs",
+    "upstream_sha256": "352b6aeb37dacf8eeb3a6d4b7eaeb42c8c3ad37df3fecd383dcb41cc84370063",
+    "snapshot_sha256": "352b6aeb37dacf8eeb3a6d4b7eaeb42c8c3ad37df3fecd383dcb41cc84370063"
+  }
+]

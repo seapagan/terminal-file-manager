@@ -1,0 +1,21 @@
+{
+  "checked": "2026-10-11",
+  "revision": "8dd895c695a5950330c2623eb43debf323b60654",
+  "licences": [
+    {
+      "local": "LICENSE",
+      "upstream": "yazi-sftp/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "exact_bytes_match_archive_live_source_and_package": true
+    },
+    {
+      "local": "LICENSE-MIT",
+      "upstream": "LICENSE",
+      "sha256": "e66519d3d006dc76760d00d40361d24d2b97ba80ab93438885e78bc5a70bdd9c",
+      "exact_bytes_match_archive_live_source_and_package": true
+    }
+  ],
+  "all_snapshot_hashes_match": true,
+  "lockfile_unchanged": true,
+  "package_file_count": 53
+}

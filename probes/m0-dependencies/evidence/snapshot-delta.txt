@@ -1,0 +1,293 @@
+--- upstream/yazi-sftp/Cargo.toml
++++ snapshot/yazi-sftp/Cargo.toml
+@@ -1,22 +1,31 @@
+ [package]
+-name                   = "yazi-sftp"
+-description            = "Yazi SFTP client"
+-authors                = [ "AspectUnk", "sxyazi <sxyazi@gmail.com>" ]
+-version.workspace      = true
+-edition.workspace      = true
+-license.workspace      = true
+-homepage.workspace     = true
+-repository.workspace   = true
+-rust-version.workspace = true
+-
+-[lints]
+-workspace = true
++name = "yazi-sftp"
++description = "Yazi SFTP client (isolated TFM M0 snapshot)"
++authors = ["AspectUnk", "sxyazi <sxyazi@gmail.com>"]
++version = "26.9.1"
++edition = "2024"
++license = "MIT"
++homepage = "https://yazi-rs.github.io"
++repository = "https://github.com/sxyazi/yazi"
++rust-version = "1.95.0"
++publish = false
+ 
+ [dependencies]
+-bitflags    = { workspace = true }
+-hashbrown   = { workspace = true }
+-parking_lot = { workspace = true }
+-russh       = { workspace = true }
+-serde       = { workspace = true }
+-tokio       = { workspace = true }
+-typed-path  = { workspace = true }
++bitflags = { version = "=2.13.2", features = ["serde"] }
++hashbrown = { version = "=0.17.1", features = ["serde"] }
++parking_lot = "=0.12.5"
++russh = { version = "=0.64.1", default-features = false, features = ["ring"] }
++serde = { version = "=1.0.229", features = ["derive"] }
++tokio = { version = "=1.53.2", default-features = false, features = ["rt-multi-thread", "io-util", "net", "sync", "time", "macros"] }
++typed-path = "=0.12.3"
++
++[lints.clippy]
++format_push_string = "warn"
++if_same_then_else = "allow"
++implicit_clone = "warn"
++len_without_is_empty = "allow"
++missing_safety_doc = "allow"
++module_inception = "allow"
++option_map_unit_fn = "allow"
++unit_arg = "allow"
++use_self = "warn"
+--- upstream/yazi-sftp/src/fs/file.rs
++++ snapshot/yazi-sftp/src/fs/file.rs
+@@ -7,7 +7,7 @@
+ pub struct File {
+ 	session: Arc<Session>,
+ 
+-	handle: String,
++	handle: Vec<u8>,
+ 	cursor: u64,
+ 	closed: bool,
+ 
+@@ -34,7 +34,7 @@
+ }
+ 
+ impl File {
+-	pub(crate) fn new(session: &Arc<Session>, handle: impl Into<String>) -> Self {
++	pub(crate) fn new(session: &Arc<Session>, handle: impl Into<Vec<u8>>) -> Self {
+ 		Self {
+ 			session: session.clone(),
+ 
+--- upstream/yazi-sftp/src/fs/read_dir.rs
++++ snapshot/yazi-sftp/src/fs/read_dir.rs
+@@ -5,7 +5,7 @@
+ pub struct ReadDir {
+ 	session: Arc<Session>,
+ 	dir:     Arc<typed_path::UnixPathBuf>,
+-	handle:  String,
++	handle:  Vec<u8>,
+ 
+ 	name:   responses::Name<'static>,
+ 	cursor: usize,
+@@ -17,7 +17,7 @@
+ }
+ 
+ impl ReadDir {
+-	pub(crate) fn new(session: &Arc<Session>, dir: SftpPath, handle: String) -> Self {
++	pub(crate) fn new(session: &Arc<Session>, dir: SftpPath, handle: Vec<u8>) -> Self {
+ 		Self {
+ 			session: session.clone(),
+ 			dir: Arc::new(dir.into_owned()),
+--- upstream/yazi-sftp/src/lib.rs
++++ snapshot/yazi-sftp/src/lib.rs
+@@ -22,3 +22,6 @@
+ pub use receiver::*;
+ pub(crate) use ser::*;
+ pub use session::*;
++
++// Probe-only access to the unchanged private wire codec.
++pub mod probe;
+--- upstream/yazi-sftp/src/operator.rs
++++ snapshot/yazi-sftp/src/operator.rs
+@@ -35,15 +35,15 @@
+ 		Ok(File::new(&self.0, handle.handle))
+ 	}
+ 
+-	pub(crate) fn close(&self, handle: &str) -> Result<Receiver, Error> {
++	pub(crate) fn close(&self, handle: &[u8]) -> Result<Receiver, Error> {
+ 		self.send_sync(requests::Close::new(handle))
+ 	}
+ 
+-	pub(crate) fn read(&self, handle: &str, offset: u64, len: u32) -> Result<Receiver, Error> {
++	pub(crate) fn read(&self, handle: &[u8], offset: u64, len: u32) -> Result<Receiver, Error> {
+ 		self.send_sync(requests::Read::new(handle, offset, len))
+ 	}
+ 
+-	pub(crate) fn write(&self, handle: &str, offset: u64, data: &[u8]) -> Result<Receiver, Error> {
++	pub(crate) fn write(&self, handle: &[u8], offset: u64, data: &[u8]) -> Result<Receiver, Error> {
+ 		self.send_sync(requests::Write::new(handle, offset, data))
+ 	}
+ 
+@@ -55,7 +55,7 @@
+ 		Ok(attrs.attrs)
+ 	}
+ 
+-	pub(crate) async fn fstat(&self, handle: &str) -> Result<Attrs, Error> {
++	pub(crate) async fn fstat(&self, handle: &[u8]) -> Result<Attrs, Error> {
+ 		let attrs: responses::Attrs = self.send(requests::Fstat::new(handle)).await?;
+ 		Ok(attrs.attrs)
+ 	}
+@@ -68,7 +68,7 @@
+ 		status.into()
+ 	}
+ 
+-	pub(crate) async fn fsetstat(&self, handle: &str, attrs: &Attrs) -> Result<(), Error> {
++	pub(crate) async fn fsetstat(&self, handle: &[u8], attrs: &Attrs) -> Result<(), Error> {
+ 		let status: responses::Status = self.send(requests::FSetStat::new(handle, attrs)).await?;
+ 		status.into()
+ 	}
+@@ -172,7 +172,7 @@
+ 		status.into()
+ 	}
+ 
+-	pub(crate) fn fsync(&self, handle: &str) -> Result<Receiver, Error> {
++	pub(crate) fn fsync(&self, handle: &[u8]) -> Result<Receiver, Error> {
+ 		if self.extensions.lock().get("fsync@openssh.com").is_none_or(|s| s != "1") {
+ 			return Err(Error::Unsupported);
+ 		}
+--- upstream/yazi-sftp/src/path.rs
++++ snapshot/yazi-sftp/src/path.rs
+@@ -68,6 +68,8 @@
+ 
+ // --- Traits
+ pub trait AsSftpPath<'a> {
++	// Preserve the imported Yazi API; allowance applies only to this method.
++	#[allow(clippy::wrong_self_convention)]
+ 	fn as_sftp_path(self) -> SftpPath<'a>;
+ }
+ 
+--- upstream/yazi-sftp/src/requests/close.rs
++++ snapshot/yazi-sftp/src/requests/close.rs
+@@ -5,11 +5,11 @@
+ #[derive(Debug, Deserialize, Serialize)]
+ pub struct Close<'a> {
+ 	pub(crate) id: u32,
+-	handle:        Cow<'a, str>,
++	handle:        Cow<'a, [u8]>,
+ }
+ 
+ impl<'a> Close<'a> {
+-	pub(crate) fn new(handle: impl Into<Cow<'a, str>>) -> Self {
++	pub(crate) fn new(handle: impl Into<Cow<'a, [u8]>>) -> Self {
+ 		Self { id: 0, handle: handle.into() }
+ 	}
+ 
+--- upstream/yazi-sftp/src/requests/extended.rs
++++ snapshot/yazi-sftp/src/requests/extended.rs
+@@ -53,11 +53,11 @@
+ // --- Fsync
+ #[derive(Debug, Deserialize, Serialize)]
+ pub struct ExtendedFsync<'a> {
+-	handle: Cow<'a, str>,
++	handle: Cow<'a, [u8]>,
+ }
+ 
+ impl<'a> ExtendedFsync<'a> {
+-	pub(crate) fn new(handle: impl Into<Cow<'a, str>>) -> Self { Self { handle: handle.into() } }
++	pub(crate) fn new(handle: impl Into<Cow<'a, [u8]>>) -> Self { Self { handle: handle.into() } }
+ }
+ 
+ impl ExtendedData for ExtendedFsync<'_> {
+--- upstream/yazi-sftp/src/requests/fstat.rs
++++ snapshot/yazi-sftp/src/requests/fstat.rs
+@@ -5,11 +5,11 @@
+ #[derive(Debug, Deserialize, Serialize)]
+ pub struct Fstat<'a> {
+ 	pub(crate) id: u32,
+-	handle:        Cow<'a, str>,
++	handle:        Cow<'a, [u8]>,
+ }
+ 
+ impl<'a> Fstat<'a> {
+-	pub(crate) fn new(handle: impl Into<Cow<'a, str>>) -> Self {
++	pub(crate) fn new(handle: impl Into<Cow<'a, [u8]>>) -> Self {
+ 		Self { id: 0, handle: handle.into() }
+ 	}
+ 
+--- upstream/yazi-sftp/src/requests/read.rs
++++ snapshot/yazi-sftp/src/requests/read.rs
+@@ -5,7 +5,7 @@
+ #[derive(Debug, Deserialize, Serialize)]
+ pub struct Read<'a> {
+ 	pub(crate) id: u32,
+-	handle:        Cow<'a, str>,
++	handle:        Cow<'a, [u8]>,
+ 	offset:        u64,
+ 	len:           u32,
+ }
+@@ -13,7 +13,7 @@
+ impl<'a> Read<'a> {
+ 	pub(crate) fn new<H>(handle: H, offset: u64, len: u32) -> Self
+ 	where
+-		H: Into<Cow<'a, str>>,
++		H: Into<Cow<'a, [u8]>>,
+ 	{
+ 		Self { id: 0, handle: handle.into(), offset, len }
+ 	}
+--- upstream/yazi-sftp/src/requests/read_dir.rs
++++ snapshot/yazi-sftp/src/requests/read_dir.rs
+@@ -5,11 +5,11 @@
+ #[derive(Debug, Deserialize, Serialize)]
+ pub struct ReadDir<'a> {
+ 	pub(crate) id: u32,
+-	handle:        Cow<'a, str>,
++	handle:        Cow<'a, [u8]>,
+ }
+ 
+ impl<'a> ReadDir<'a> {
+-	pub(crate) fn new(handle: &'a str) -> Self { Self { id: 0, handle: handle.into() } }
++	pub(crate) fn new(handle: &'a [u8]) -> Self { Self { id: 0, handle: handle.into() } }
+ 
+ 	pub(crate) fn len(&self) -> usize { size_of_val(&self.id) + 4 + self.handle.len() }
+ }
+--- upstream/yazi-sftp/src/requests/set_stat.rs
++++ snapshot/yazi-sftp/src/requests/set_stat.rs
+@@ -27,12 +27,12 @@
+ #[derive(Debug, Deserialize, Serialize)]
+ pub struct FSetStat<'a> {
+ 	pub(crate) id: u32,
+-	handle:        Cow<'a, str>,
++	handle:        Cow<'a, [u8]>,
+ 	attrs:         Cow<'a, Attrs>,
+ }
+ 
+ impl<'a> FSetStat<'a> {
+-	pub(crate) fn new(handle: impl Into<Cow<'a, str>>, attrs: &'a Attrs) -> Self {
++	pub(crate) fn new(handle: impl Into<Cow<'a, [u8]>>, attrs: &'a Attrs) -> Self {
+ 		Self { id: 0, handle: handle.into(), attrs: Cow::Borrowed(attrs) }
+ 	}
+ 
+--- upstream/yazi-sftp/src/requests/write.rs
++++ snapshot/yazi-sftp/src/requests/write.rs
+@@ -5,7 +5,7 @@
+ #[derive(Debug, Deserialize, Serialize)]
+ pub struct Write<'a> {
+ 	pub(crate) id: u32,
+-	handle:        Cow<'a, str>,
++	handle:        Cow<'a, [u8]>,
+ 	offset:        u64,
+ 	data:          Cow<'a, [u8]>,
+ }
+@@ -13,7 +13,7 @@
+ impl Write<'_> {
+ 	pub(crate) fn new<'a, H, D>(handle: H, offset: u64, data: D) -> Write<'a>
+ 	where
+-		H: Into<Cow<'a, str>>,
++		H: Into<Cow<'a, [u8]>>,
+ 		D: Into<Cow<'a, [u8]>>,
+ 	{
+ 		Write { id: 0, handle: handle.into(), offset, data: data.into() }
+--- upstream/yazi-sftp/src/responses/handle.rs
++++ snapshot/yazi-sftp/src/responses/handle.rs
+@@ -3,7 +3,7 @@
+ #[derive(Debug, Deserialize, Serialize)]
+ pub struct Handle {
+ 	pub(crate) id:     u32,
+-	pub(crate) handle: String,
++	pub(crate) handle: Vec<u8>,
+ }
+ 
+ impl Handle {

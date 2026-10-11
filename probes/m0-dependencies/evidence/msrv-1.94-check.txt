@@ -1,0 +1,6 @@
+error: rustc 1.94.0 is not supported by the following packages:
+  tfm-m0-dependency-probe@0.0.0 requires rustc 1.95.0
+  tfm-m0-dependency-probe@0.0.0 requires rustc 1.95.0
+  yazi-sftp@26.9.1 requires rustc 1.95.0
+  yazi-sftp@26.9.1 requires rustc 1.95.0
+

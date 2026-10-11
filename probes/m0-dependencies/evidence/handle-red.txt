@@ -1,0 +1,20 @@
+     Running unittests src/lib.rs (/tmp/tfm-m0-dependencies-20261011/target/debug/deps/yazi_sftp-cba06c22c9293459)
+
+running 1 test
+test probe::tests::handle_response_preserves_bytes ... FAILED
+
+failures:
+
+---- probe::tests::handle_response_preserves_bytes stdout ----
+
+thread 'probe::tests::handle_response_preserves_bytes' (3319354) panicked at vendor/yazi-sftp/src/probe.rs:16:37:
+called `Result::unwrap()` on an `Err` value: Serde("invalid utf-8 sequence of 1 bytes from index 1")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    probe::tests::handle_response_preserves_bytes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p yazi-sftp --lib`

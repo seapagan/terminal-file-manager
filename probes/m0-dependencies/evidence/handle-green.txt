@@ -1,0 +1,9 @@
+   Compiling yazi-sftp v26.9.1 (/home/seapagan/data/work/own/terminal-file-manager/probes/m0-dependencies/vendor/yazi-sftp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.38s
+     Running unittests src/lib.rs (/tmp/tfm-m0-dependencies-20261011/target/debug/deps/yazi_sftp-cba06c22c9293459)
+
+running 1 test
+test probe::tests::handle_response_preserves_bytes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
