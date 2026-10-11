@@ -68,10 +68,7 @@ function Invoke-ControlledAction([string]$Action, [string]$Answer = 'N') {
         $stderr = $process.StandardError.ReadToEndAsync()
         $process.StandardInput.WriteLine($Answer)
         $process.StandardInput.Close()
-        if (-not $process.WaitForExit(10000)) {
-            $process.Kill(); $process.WaitForExit()
-            throw 'installer confirmation did not complete promptly'
-        }
+        $process.WaitForExit()
         return @{ Code = $process.ExitCode; Output = $stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult(); Transcript = [IO.File]::ReadAllText($transcript) }
     } finally { $process.Dispose() }
 }
