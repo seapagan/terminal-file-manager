@@ -48,7 +48,9 @@ function Assert-OldBytes([string]$Directory) {
 function Invoke-ControlledAction([string]$Action, [string]$Answer = 'N') {
     $installer = (Resolve-Path -LiteralPath (Join-Path -Path $PSScriptRoot '../../install.ps1')).Path.Replace("'", "''")
     $path = Join-Path -Path $securityRoot -ChildPath 'control.ps1'
-    [IO.File]::WriteAllText($path, ". '$installer'`nfunction Get-NativeArchitecture { 'AMD64' }`n$Action")
+    $transcript = Join-Path -Path $securityRoot -ChildPath 'control-transcript.txt'
+    # Windows confirmation prompts bypass redirected stdout; transcription captures host output.
+    [IO.File]::WriteAllText($path, ". '$installer'`nfunction Get-NativeArchitecture { 'AMD64' }`nStart-Transcript -LiteralPath `$env:TFM_TEST_TRANSCRIPT -Force | Out-Null`ntry {`n$Action`n} finally { Stop-Transcript | Out-Null }")
     $psi = New-Object -TypeName Diagnostics.ProcessStartInfo
     $psi.FileName = (Get-Process -Id $PID).Path
     $psi.Arguments = "-NoProfile -File `"$path`""
@@ -58,6 +60,7 @@ function Invoke-ControlledAction([string]$Action, [string]$Answer = 'N') {
     $psi.RedirectStandardError = $true
     $psi.EnvironmentVariables['TFM_INSTALL_DIR'] = $destination
     $psi.EnvironmentVariables['TFM_TEST_CANDIDATE'] = $exe
+    $psi.EnvironmentVariables['TFM_TEST_TRANSCRIPT'] = $transcript
     $psi.EnvironmentVariables['TFM_BASE_URL'] = (Join-Path -Path $securityRoot -ChildPath 'missing-mirror')
     $process = [Diagnostics.Process]::Start($psi)
     try {
@@ -69,7 +72,7 @@ function Invoke-ControlledAction([string]$Action, [string]$Answer = 'N') {
             $process.Kill(); $process.WaitForExit()
             throw 'installer confirmation did not complete promptly'
         }
-        return @{ Code = $process.ExitCode; Output = $stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult() }
+        return @{ Code = $process.ExitCode; Output = $stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult(); Transcript = [IO.File]::ReadAllText($transcript) }
     } finally { $process.Dispose() }
 }
 
@@ -248,7 +251,7 @@ public static class TfmTlsFixture {
     Assert-OldBytes -Directory $destination
     $result = Invoke-ControlledAction -Action 'Install-Candidate -Candidate $env:TFM_TEST_CANDIDATE -InstallDir $env:TFM_INSTALL_DIR -Confirm' -Answer 'Y'
     Assert-Equal -Actual $result.Code -Expected 0 -Reason 'approved transaction failed'
-    Assert-Equal -Actual ([regex]::Matches($result.Output, 'Are you sure').Count) -Expected 1 -Reason 'nested transaction confirmation'
+    Assert-Equal -Actual ([regex]::Matches($result.Transcript, 'Are you sure').Count) -Expected 1 -Reason 'nested transaction confirmation'
     Assert-Equal -Actual ([IO.File]::ReadAllText((Join-Path -Path $destination -ChildPath 'tfm.exe'))) -Expected 'new tfm' -Reason 'approved transaction bytes'
     Assert-Equal -Actual @(Get-ChildItem -LiteralPath $destination -Force -Filter '.tfm-*').Count -Expected 0 -Reason 'approved transaction cleanup'
     [IO.File]::WriteAllText((Join-Path -Path $destination -ChildPath 'tfm.exe'), 'old tfm')
