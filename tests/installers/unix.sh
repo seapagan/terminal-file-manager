@@ -5,6 +5,11 @@
 
 set -eu
 
+if test "${1:-}" = --real-archive; then
+    shift
+    exec sh "$(dirname "$0")/unix-real.sh" "$@"
+fi
+
 root=$(mktemp -d)
 root=$(cd "$root" && pwd -P)
 trap 'rm -rf "$root"' 0 1 2 3 15

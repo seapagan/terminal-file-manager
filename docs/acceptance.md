@@ -22,9 +22,10 @@
 - Native Rust CI, separate Python support CI and exact MSRV CI; all eight
   targets retained in a manual nonpublishing release framework.
 
-Before authorized Git delivery the canonical clean-tree package gate is blocked
-by intentional uncommitted files. `cargo package --locked --allow-dirty` is only
-interim evidence. Hosted/native results are not implied by configuration files.
+Canonical packaging rejects uncommitted packaged files. Changes limited to
+excluded support files can pass without a clean tracked tree; that is local
+package evidence, not signed-delivery evidence. `--allow-dirty` is only interim
+evidence. Hosted/native results are not implied by configuration files.
 
 ## M0-C / M0-D: remaining foundation proof
 
@@ -71,9 +72,40 @@ interim evidence. Hosted/native results are not implied by configuration files.
 - Full host verification includes installer tests and Unix ShellCheck alongside
   every M0-B/C1 gate; `verify-fast` and local compulsory Linux xwin are unchanged.
   Native CI uses independent Windows invocations. No hosted xwin is added.
-- Linux execution is available-host proof only. Native macOS, Windows 5.1/7+, ARM64
-  emulation/installation, real release archives and hosted eight-target proof
-  remain pending. Stop for C2 review before C3/D9/D10.
+- C2's delivered native Windows x64 PowerShell 5.1/7+ suites passed at `df3919a`,
+  including running/locked-file preflight, old bytes, cleanup-failure rollback
+  and retained-backup/manual recovery. macOS Apple Silicon also has C2 native
+  fixture proof. ARM64 Windows/emulation, macOS Intel and real release archive
+  acceptance remain separate cells.
+
+### M0-C3: eight-target nonpublishing distribution rehearsal (D9/D10)
+
+- Source-side archive validation is mandatory before each upload, with the
+  verified built executable supplied through `--binary`. Foreign aggregate
+  validation omits that argument and executes no archived code.
+- Validate exact package/version/target naming, a single lowercase SHA256 record
+  with two spaces and exact basename, corruption, exact root regular members,
+  duplicates/aliases/links/special types, Unix executable mode, machine headers,
+  checkout licence/README bytes and packaged build bytes. Reads are chunked;
+  no untrusted member is extracted by the source-side helper.
+- Native macOS hashing uses `shasum -a 256`, retaining the Linux aggregate's
+  existing wire format and checksum block. Existing secure Rustup bootstrap,
+  sixteen-file inventory, all verifiers/strip/smoke and two-file one-day uploads
+  remain unchanged. All new tests join existing Ruff ALL/strict mypy/Lizard
+  policy and full verification; `verify-fast` and local-only xwin are preserved.
+- Each target has offline fresh/reinstall/corruption-preservation acceptance
+  using its actual archive and sidecar, unmodified candidate checks and real
+  prompt version execution. Each Linux libc is explicitly selected. Controlled
+  Linux images execute both unstripped and stripped builds with a ten-second
+  test deadline; GNU execution must occur inside GLIBC 2.28.
+- Required hosted cells remain pending until separately authorized delivery and
+  dispatch: all four Linux targets (including both ARM64 libcs), macOS Intel
+  and ARM64, Windows x64 and ARM64 with both PowerShell 5.1/7+, per-target native
+  regressions/real-archive installs/uploads and complete aggregate. Prior C2
+  fixture success does not establish these C3 release-artifact cells.
+- This checkpoint authorizes local implementation evidence only. No dispatch,
+  publishing, tags, attestations or settings change. Stop for implementation
+  review and separate signed-delivery/manual-dispatch approval.
 
 ### Remaining distribution proof
 

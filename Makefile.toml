@@ -198,7 +198,7 @@ dependencies = [
 [tasks.verify-common]
 description = "Run platform-independent foundation verification"
 dependencies = [
-    "python-format", "python-lint", "python-type", "python-test", "complexity",
+    "python-format", "python-lint", "python-type", "python-test", "release-assets-test", "complexity",
     "format", "check", "clippy", "maintainability", "test", "doctest", "doc", "build",
     "release-build", "package-list", "package",
     "msrv", "audit", "deny", "actions-lint", "zizmor", "coverage",
@@ -274,15 +274,15 @@ dependencies = ["_require-linux", "xwin-check", "xwin-clippy", "xwin-build"]
 
 [tasks.verify-linux]
 description = "Run complete native Linux and Windows MSVC cross-verification"
-dependencies = ["_require-linux", "verify-common", "bootstrap-test", "inventory-test", "verify-xwin", "release-shellcheck", "release-verification-test", "installers-shellcheck", "unix-installer-test"]
+dependencies = ["_require-linux", "verify-common", "bootstrap-test", "inventory-test", "verify-xwin", "release-shellcheck", "release-verification-test", "installers-shellcheck", "unix-installer-test", "release-hash-test", "release-hook-test"]
 
 [tasks.verify-macos]
 description = "Run complete native macOS verification"
-dependencies = ["_require-macos", "verify-common", "release-shellcheck", "release-verification-test", "installers-shellcheck", "unix-installer-test"]
+dependencies = ["_require-macos", "verify-common", "release-shellcheck", "release-verification-test", "installers-shellcheck", "unix-installer-test", "release-hash-test", "release-hook-test"]
 
 [tasks.verify-windows]
 description = "Run complete native Windows verification"
-dependencies = ["_require-windows", "verify-common", "release-verification-test", "windows-installer-test", "windows-installer-test-legacy"]
+dependencies = ["_require-windows", "verify-common", "release-verification-test", "windows-workflow-test", "windows-installer-test", "windows-installer-test-legacy"]
 
 [tasks.verify]
 description = "Run the complete local foundation verification gate"
@@ -427,7 +427,7 @@ windows_alias = "release-pe-test"
 description = "Lint the POSIX consumer installer and Unix regression harness"
 dependencies = ["_require-unix", "shellcheck-present"]
 command = "shellcheck"
-args = ["-x", "install.sh", "tests/installers/unix.sh", "tests/installers/macho-header.sh"]
+args = ["-x", "install.sh", "tests/installers/unix.sh", "tests/installers/macho-header.sh", "tests/installers/unix-real.sh", "tests/ci/macos-hash.sh", "tests/ci/real-archive-hook.sh"]
 
 [tasks.unix-installer-test]
 description = "Test Unix installer controls and real native executable fixtures offline"
@@ -456,3 +456,29 @@ description = "Run the complete Windows installer suites using Windows PowerShel
 dependencies = ["_require-windows", "release-build", "windows-installer-security-test-legacy"]
 command = "powershell"
 args = ["-NoProfile", "-File", "tests/installers/windows.ps1"]
+
+[tasks.release-assets-test]
+description = "Test exact distribution archive, sidecar and build-byte contracts"
+command = "python3"
+args = ["-B", "-m", "unittest", "discover", "-s", "tests", "-p", "test_verify_release_assets.py"]
+
+[tasks.windows-workflow-test]
+description = "Execute actual rehearsal PS7 steps and prove suite failure propagation"
+dependencies = ["_require-windows"]
+command = "pwsh"
+args = ["-NoProfile", "-File", "tests/ci/windows-steps.ps1"]
+
+[tasks.release-assets-test.windows]
+command = "python"
+
+[tasks.release-hash-test]
+description = "Test the actual macOS checksum workflow block"
+dependencies = ["_require-unix"]
+command = "sh"
+args = ["tests/ci/macos-hash.sh"]
+
+[tasks.release-hook-test]
+description = "Exercise the actual Unix real-archive workflow hook offline"
+dependencies = ["_require-unix", "release-build"]
+command = "sh"
+args = ["tests/ci/real-archive-hook.sh"]

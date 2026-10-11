@@ -5,7 +5,14 @@
 # Failure-path cases run on any OS with PowerShell 7+. Success-path cases
 # need a real Windows tfm.exe and run only on Windows.
 
+param([string]$RealArchive, [string]$Target, [string]$Version, [string]$Binary)
+
 $ErrorActionPreference = 'Stop'
+if ($RealArchive) {
+    & (Join-Path $PSScriptRoot 'windows-real.ps1') -Archive $RealArchive -Target $Target -Version $Version -Binary $Binary
+    exit 0
+}
+
 Set-StrictMode -Version 2.0
 
 $nativeWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
@@ -272,7 +279,9 @@ function Get-PromptNativeVersion([string]$Exe) {
 
 # --- Success path: needs a real Windows binary ----------------------------
 
-$builtExe = Join-Path $PSScriptRoot '..\..\target\release\tfm.exe'
+$builtExe = if ($Binary) { (Resolve-Path $Binary).Path } else {
+    Join-Path $PSScriptRoot '..\..\target\release\tfm.exe'
+}
 if (-not $nativeWindows) {
     Skip 'success-path cases require Windows (real tfm.exe)'
 } elseif (-not (Test-Path $builtExe)) {

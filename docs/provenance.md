@@ -68,9 +68,35 @@ Windows native architecture discovery uses
 [GetNativeSystemInfo alone](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getnativesysteminfo)
 can return an emulated architecture. Replacement uses the Framework-compatible
 [File.Replace overload](https://learn.microsoft.com/en-us/dotnet/api/system.io.file.replace?view=netframework-4.8.1)
-with a same-directory owned backup. Native proof remains pending.
+with a same-directory owned backup. The approved preservation correction
+[`df3919a`](https://github.com/seapagan/terminal-file-manager/commit/df3919a701dee4c21d22c64df7a52e0603889331)
+adds exclusive non-truncating replacement preflight and separate cleanup-failure
+recovery. Native Windows x64 PowerShell 5.1/7+ passed the complete preservation
+suites; ARM64/emulation proof remains pending.
 
 The revised C2 timeout approval preserves synchronous exact version validation
 without a deadline or a new consumer runtime. No release matrix, bootstrap,
 inventory, action/tool pin, canonical QC or publication infrastructure changes.
 Checksums establish downloaded-byte integrity, not publisher authenticity.
+
+## M0-C3: repository-side assets and offline real-archive hooks
+
+D9 changes only the macOS packaging hash to native `shasum -a 256`. D10's
+`scripts/verify_release_assets.py` is new approved standard-library code, rather
+than a reference port. It inspects physical tar headers and ZIP metadata without
+extraction or execution, requires exact four-file inventories and checksum
+records, compares checkout documents and, before upload, verified build bytes.
+The aggregate omits build-byte comparison and never executes foreign payloads.
+
+The existing eight-target workflow, frozen images/actions/bootstrap, pre/post
+object checks, checksum aggregation and recursive inventory remain authoritative.
+The separately approved C3 correction changes only the bootstrap checksum
+option from GNU `--check` to portable `-c`: the pinned MUSL image uses BusyBox.
+The same four-target corruption/positive regression runs inside each controlled
+Linux image, retaining verification before executable permission or execution.
+Real-archive harness modes replace only transport with owned local fixtures;
+production archive, architecture, version and destination checks still run.
+Added tests are repository tooling; no consumer runtime or publishing stage is
+introduced. Local proof and future hosted proof are distinguished in
+[acceptance](acceptance.md). Signed delivery and manual dispatch remain separate
+approval gates.

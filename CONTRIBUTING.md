@@ -91,7 +91,8 @@ Release archives use `terminal-file-manager-vX.Y.Z-<target>.tar.gz` on Unix and
 `.zip` on Windows, with exact-name `.sha256` sidecars. Archives contain the
 `tfm` / `tfm.exe`, `LICENSE-MIT`, `LICENSE-APACHE` and `README.md` as four
 root-level regular files. C1 verifiers and C2 installers have regression tasks;
-full eight-target rehearsal and real release-asset installer proof remain C3.
+The C3 source-side archive checks and real-archive rehearsal hooks are implemented;
+full eight-target hosted acceptance remains pending.
 No public TFM binary release is implied.
 
 `cargo make installers-shellcheck` follows all Unix harness sources;
@@ -108,6 +109,35 @@ success group uses the local `release-build` output. The security suite covers
 ZIP/sidecar/PE rejection, destination checks and replacement/recovery; running
 it with Linux PowerShell proves parser behavior and simulated transactions only.
 Native Windows CI invokes the two shell tasks independently.
+
+`cargo make release-assets-test` validates distribution archive names, strict
+sidecars, machine headers, member types/modes and checkout/build byte identity
+using Python's standard library. Full verification includes it; `verify-fast`
+is unchanged. `cargo make release-hash-test` executes the actual macOS workflow
+hash block with `shasum -a 256`; no macOS coreutils prerequisite is added.
+`cargo make release-hook-test` executes the literal Unix real-archive workflow
+step with an owned native archive, checks fresh/reinstall/preservation evidence
+and rejects corrupted or missing archives. It builds the native release fixture
+and runs in full Unix verification and native CI.
+
+The manual nonpublishing rehearsal validates every archive before upload and
+again in the foreign-asset aggregate. Its existing checksum and recursive
+sixteen-file inventory blocks remain mandatory. It runs real-archive installer
+acceptance on each matching native runner, including explicit GNU/MUSL selection
+and both Windows shells. Local offline entry points are:
+
+```sh
+sh tests/installers/unix.sh --real-archive ARCHIVE TARGET VERSION BINARY
+pwsh -NoProfile -File tests/installers/windows.ps1 -RealArchive ARCHIVE -Target TARGET -Version VERSION -Binary BINARY
+```
+
+Use only disposable installer destinations created by these harnesses. Unix
+real-archive tests require platform Perl to bound the owned version process;
+this is a test prerequisite, never an installer requirement. Controlled Linux
+build-image runtime tests require their existing `timeout` utility. Real Windows
+archive tests use Framework-compatible process deadlines in PowerShell 5.1/7+.
+No process-tree containment is claimed. Source inspection and local static tests
+do not prove Windows ARM64, macOS Intel or the complete hosted rehearsal.
 
 Consumer installers verify architecture and exact `tfm --version` before
 replacement. Version validation is synchronous without a deadline; no Bash,

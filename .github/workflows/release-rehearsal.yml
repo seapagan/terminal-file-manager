@@ -141,7 +141,25 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install Python for repository-side distribution proof
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14.8'
+          architecture: ${{ matrix.arch == 'aarch64' && 'arm64' || 'x64' }}
+
+      - name: Test source-side release asset validation
+        run: python -B -m unittest discover -s tests -p 'test_verify_release_assets.py'
+
       # ----- Linux: controlled-libc container builds ---------------------
+
+      - name: Test Rustup checksum boundary in the controlled image
+        if: matrix.kind == 'linux'
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/work:ro" \
+            --workdir /work \
+            "$BUILD_IMAGE" \
+            bash tests/ci/rustup-bootstrap.sh
 
       - name: Build in controlled libc container
         if: matrix.kind == 'linux'
@@ -153,6 +171,7 @@ jobs:
             --env RUSTUP_VERSION \
             --env RUSTUP_INIT_SHA256 \
             --env TARGET \
+            --env CRATE_VERSION \
             "$BUILD_IMAGE" \
             /bin/bash -ceu '
               export CARGO_HOME=/tmp/tfm-cargo
@@ -162,12 +181,15 @@ jobs:
               curl --proto "=https" --tlsv1.2 -sSf \
                 --output "$rustup_init" \
                 "https://static.rust-lang.org/rustup/archive/$RUSTUP_VERSION/$TARGET/rustup-init"
-              printf "%s  %s\n" "$RUSTUP_INIT_SHA256" "$rustup_init" | sha256sum --check -
+              printf "%s  %s\n" "$RUSTUP_INIT_SHA256" "$rustup_init" | sha256sum -c -
               chmod 755 "$rustup_init"
               "$rustup_init" -y --no-modify-path --profile minimal --default-toolchain "$RUST_VERSION"
               export PATH="$CARGO_HOME/bin:$PATH"
               rustup target add "$TARGET"
               cargo build --release --locked --target "$TARGET"
+              command -v timeout
+              output=$(timeout 10 "target/$TARGET/release/tfm" --version)
+              test "$output" = "tfm $CRATE_VERSION"
             '
 
       - name: Verify unstripped ELF compatibility
@@ -200,6 +222,21 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}
         run: scripts/verify-release-binary.sh static "$ARCH" "target/$TARGET/release/tfm"
+
+      - name: Execute stripped binary inside controlled libc environment
+        if: matrix.kind == 'linux'
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/work:ro" \
+            --workdir /work \
+            --env TARGET \
+            --env CRATE_VERSION \
+            "$BUILD_IMAGE" \
+            /bin/bash -ceu '
+              command -v timeout
+              output=$(timeout 10 "target/$TARGET/release/tfm" --version)
+              test "$output" = "tfm $CRATE_VERSION"
+            '
 
       # ----- macOS: native runner builds ----------------------------------
 
@@ -266,6 +303,41 @@ jobs:
 
       # ----- Shared: smoke test and packaging -------------------------------
 
+      - name: Run native Unix verifier and installer regressions
+        if: matrix.kind != 'windows'
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then sh tests/release/verify.sh; fi
+          bash tests/release/macho.sh
+          sh tests/installers/unix.sh
+          sh tests/ci/macos-hash.sh
+
+      - name: Run Windows PE regressions (PowerShell 7)
+        if: matrix.kind == 'windows'
+        shell: pwsh
+        run: |
+          & ./tests/release/verify.ps1
+
+      - name: Run Windows installer-security regressions (PowerShell 7)
+        if: matrix.kind == 'windows'
+        shell: pwsh
+        run: |
+          & ./tests/installers/windows-security.ps1
+
+      - name: Run Windows security regressions (PowerShell 5.1)
+        if: matrix.kind == 'windows'
+        shell: powershell
+        run: '& ./tests/installers/windows-security.ps1'
+
+      - name: Run Windows complete installer suite (PowerShell 7)
+        if: matrix.kind == 'windows'
+        shell: pwsh
+        run: '& ./tests/installers/windows.ps1 -Binary "target/$env:TARGET/release/tfm.exe"'
+
+      - name: Run Windows complete installer suite (PowerShell 5.1)
+        if: matrix.kind == 'windows'
+        shell: powershell
+        run: '& ./tests/installers/windows.ps1 -Binary "target/$env:TARGET/release/tfm.exe"'
+
       - name: Smoke-test version output (Unix)
         if: matrix.kind != 'windows'
         run: |
@@ -289,6 +361,8 @@ jobs:
 
       - name: Package archive and checksum (Unix)
         if: matrix.kind != 'windows'
+        env:
+          ASSET_KIND: ${{ matrix.kind }}
         run: |
           archive_root="$RUNNER_TEMP/tfm-release"
           mkdir -p "$archive_root"
@@ -296,7 +370,11 @@ jobs:
           cp LICENSE-MIT LICENSE-APACHE README.md "$archive_root/"
           tar -czf "$ARCHIVE_NAME" -C "$archive_root" \
             tfm LICENSE-MIT LICENSE-APACHE README.md
-          sha256sum "$ARCHIVE_NAME" > "$ARCHIVE_NAME.sha256"
+          if [ "$ASSET_KIND" = macos ]; then
+            shasum -a 256 "$ARCHIVE_NAME" > "$ARCHIVE_NAME.sha256"
+          else
+            sha256sum "$ARCHIVE_NAME" > "$ARCHIVE_NAME.sha256"
+          fi
 
       - name: Package archive and checksum (Windows)
         if: matrix.kind == 'windows'
@@ -309,6 +387,33 @@ jobs:
           Compress-Archive -Path (Join-Path $archiveRoot '*') -DestinationPath $env:ARCHIVE_NAME
           $hash = (Get-FileHash $env:ARCHIVE_NAME -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $env:ARCHIVE_NAME" | Set-Content -NoNewline "$env:ARCHIVE_NAME.sha256"
+
+      - name: Verify packaged bytes before upload
+        shell: bash
+        env:
+          BINARY_SUFFIX: ${{ matrix.kind == 'windows' && '.exe' || '' }}
+        run: |
+          python scripts/verify_release_assets.py --archive "$ARCHIVE_NAME" \
+            --target "$TARGET" --version "$CRATE_VERSION" \
+            --binary "target/$TARGET/release/tfm${BINARY_SUFFIX}"
+
+      - name: Install actual Unix release archive offline
+        if: matrix.kind != 'windows'
+        run: |
+          sh tests/installers/unix.sh --real-archive "$ARCHIVE_NAME" "$TARGET" \
+            "$CRATE_VERSION" "target/$TARGET/release/tfm"
+
+      - name: Install actual Windows release archive (PowerShell 7)
+        if: matrix.kind == 'windows'
+        shell: pwsh
+        run: |
+          & ./tests/installers/windows.ps1 -RealArchive $env:ARCHIVE_NAME -Target $env:TARGET -Version $env:CRATE_VERSION -Binary "target/$env:TARGET/release/tfm.exe"
+
+      - name: Install actual Windows release archive (PowerShell 5.1)
+        if: matrix.kind == 'windows'
+        shell: powershell
+        run: |
+          & ./tests/installers/windows.ps1 -RealArchive $env:ARCHIVE_NAME -Target $env:TARGET -Version $env:CRATE_VERSION -Binary "target/$env:TARGET/release/tfm.exe"
 
       - name: Upload build outputs
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -366,6 +471,30 @@ jobs:
               exit 1
             }
             (cd dist && sha256sum -c "$archive.sha256")
+          done
+
+      - name: Install Python for foreign archive inspection
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14.8'
+
+      - name: Validate all foreign archives without execution
+        run: |
+          for entry in \
+            x86_64-unknown-linux-gnu:tar.gz \
+            x86_64-unknown-linux-musl:tar.gz \
+            aarch64-unknown-linux-gnu:tar.gz \
+            aarch64-unknown-linux-musl:tar.gz \
+            x86_64-apple-darwin:tar.gz \
+            aarch64-apple-darwin:tar.gz \
+            x86_64-pc-windows-msvc:zip \
+            aarch64-pc-windows-msvc:zip
+          do
+            target=${entry%%:*}
+            extension=${entry#*:}
+            python scripts/verify_release_assets.py \
+              --archive "dist/terminal-file-manager-$TAG_NAME-$target.$extension" \
+              --target "$target" --version "${TAG_NAME#v}"
           done
 
       - name: Verify exact rehearsal asset inventory

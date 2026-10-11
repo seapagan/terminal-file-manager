@@ -67,9 +67,17 @@ jobs:
         if: runner.os != 'Windows'
         run: cargo make unix-installer-test
 
+      - name: Test the actual Unix archive workflow hook
+        if: runner.os != 'Windows'
+        run: cargo make release-hook-test
+
       - name: Test Windows installer with PowerShell 7
         if: runner.os == 'Windows'
         run: cargo make windows-installer-test
+
+      - name: Test actual Windows rehearsal step failure propagation
+        if: runner.os == 'Windows'
+        run: cargo make windows-workflow-test
 
       - name: Test Windows installer with PowerShell 5.1
         if: runner.os == 'Windows'
