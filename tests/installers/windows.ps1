@@ -44,7 +44,7 @@ $portableWrapper = Join-Path $root 'portable.ps1'
 $escapedInstaller = $resolvedInstaller.Replace("'", "''")
 [IO.File]::WriteAllText($portableWrapper, @"
 . '$escapedInstaller'
-function Get-NativeArchitecture { return `$env:PROCESSOR_ARCHITECTURE }
+function Get-NativeArchitecture { return `$env:TFM_TEST_ARCHITECTURE }
 Invoke-Install
 "@)
 $hostExecutable = if ($PSVersionTable.PSVersion.Major -lt 6) {
@@ -89,12 +89,12 @@ function New-ZipBytes([hashtable]$Files) {
     return [System.IO.File]::ReadAllBytes($archive)
 }
 
-function Invoke-Installer([string]$Mirror, [string]$InstallDir, [string]$Version = $TestTag, [string]$Architecture = 'AMD64', [bool]$Native = $false) {
+function Invoke-Installer([string]$Mirror, [string]$InstallDir, [string]$Version = $TestTag, [string]$Architecture = 'AMD64', [bool]$Native = $false, [string]$HostArchitecture) {
     $envVars = @{
         TFM_BASE_URL     = $Mirror
         TFM_INSTALL_DIR  = $InstallDir
         TFM_VERSION      = $Version
-        PROCESSOR_ARCHITECTURE = $Architecture
+        TFM_TEST_ARCHITECTURE = $Architecture
     }
     $psi = [System.Diagnostics.ProcessStartInfo]::new()
     $psi.FileName = $hostExecutable
@@ -105,6 +105,9 @@ function Invoke-Installer([string]$Mirror, [string]$InstallDir, [string]$Version
     $psi.RedirectStandardError = $true
     foreach ($name in $envVars.Keys) {
         $psi.EnvironmentVariables[$name] = $envVars[$name]
+    }
+    if ($HostArchitecture) {
+        $psi.EnvironmentVariables['PROCESSOR_ARCHITECTURE'] = $HostArchitecture
     }
     $process = [System.Diagnostics.Process]::Start($psi)
     $stdout = $process.StandardOutput.ReadToEnd()
@@ -141,6 +144,16 @@ foreach ($case in @(
     $mirror = New-Mirror   # empty: any asset request fails
     $result = Invoke-Installer -Mirror $mirror -InstallDir (Join-Path $root 'install') -Architecture $case.Arch
     Assert-Fails $result "architecture $($case.Arch) mapping" $case.Target
+}
+
+# Synthetic selection must not depend on the host's architecture variable.
+foreach ($case in @(
+    @{ Arch = 'AMD64'; HostArch = 'ARM64'; Target = 'x86_64-pc-windows-msvc' },
+    @{ Arch = 'ARM64'; HostArch = 'AMD64'; Target = 'aarch64-pc-windows-msvc' }
+)) {
+    $mirror = New-Mirror
+    $result = Invoke-Installer -Mirror $mirror -InstallDir (Join-Path $root 'conflict') -Architecture $case.Arch -HostArchitecture $case.HostArch
+    Assert-Fails $result "architecture $($case.Arch) with conflicting host $($case.HostArch)" $case.Target
 }
 
 $mirror = New-Mirror
@@ -225,7 +238,7 @@ $psi.RedirectStandardOutput = $true
 $psi.RedirectStandardError = $true
 $psi.EnvironmentVariables['TFM_BASE_URL'] = $mirror
 $psi.EnvironmentVariables['TFM_INSTALL_DIR'] = (Join-Path $root 'install')
-$psi.EnvironmentVariables['PROCESSOR_ARCHITECTURE'] = 'AMD64'
+$psi.EnvironmentVariables['TFM_TEST_ARCHITECTURE'] = 'AMD64'
 $psi.EnvironmentVariables.Remove('TFM_VERSION')
 $process = [System.Diagnostics.Process]::Start($psi)
 $markerOutput = $process.StandardOutput.ReadToEnd() + $process.StandardError.ReadToEnd()
@@ -245,7 +258,7 @@ $psi2.RedirectStandardOutput = $true
 $psi2.RedirectStandardError = $true
 $psi2.EnvironmentVariables['TFM_BASE_URL'] = $mirror
 $psi2.EnvironmentVariables['TFM_INSTALL_DIR'] = (Join-Path $root 'install')
-$psi2.EnvironmentVariables['PROCESSOR_ARCHITECTURE'] = 'AMD64'
+$psi2.EnvironmentVariables['TFM_TEST_ARCHITECTURE'] = 'AMD64'
 $psi2.EnvironmentVariables['TFM_BASE_URL'] = $mirror
 $psi2.EnvironmentVariables.Remove('TFM_VERSION')
 $process = [System.Diagnostics.Process]::Start($psi2)
