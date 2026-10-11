@@ -28,6 +28,27 @@ interim evidence. Hosted/native results are not implied by configuration files.
 
 ## M0-C / M0-D: remaining foundation proof
 
+### M0-C1: binary verifiers and D1 regressions
+
+- Preserve the complete pinned Labeldeck ELF/PE helpers and original 20 ELF /
+  seven PE cases. ELF production bytes remain unchanged; PE adapts the usage
+  comment only. Add fail-closed input/type/inspection/argument, MUSL-symbol and
+  PE-signature/offset cases without changing production policy.
+- Characterize both actual inline Mach-O workflow blocks, including x86_64 and
+  arm64 positives, architecture/type mismatches and failed `file` inspection.
+- Full local verification adds `release-verification-test`: ELF and Mach-O on
+  Linux, Mach-O on macOS, PE on Windows. Unix full verification also runs
+  `release-shellcheck`. Explicit host guards reject wrong-host tasks; missing
+  required tools fail. `verify-fast` remains unchanged; Linux full verification
+  retains compulsory xwin. Native Rust CI runs the same host-selected test task
+  independently; its existing Linux quality job lints the shell scripts.
+- Supplemental Linux PowerShell execution proves synthetic PE parsing only.
+  Native macOS/Windows CI, real ARM objects and all eight rehearsal builds remain
+  unproven until separately authorized hosted execution. Stop for C1 review
+  before installer implementation.
+
+### Remaining distribution proof
+
 M0-C adds actual executable binary verifiers/installers with full reference
 regressions; all eight locked builds, pre/post-strip ELF/MUSL/PE/Mach-O checks,
 GNU glibc <=2.28, suitable native smoke and real-asset installer negative/atomic

@@ -274,15 +274,15 @@ dependencies = ["_require-linux", "xwin-check", "xwin-clippy", "xwin-build"]
 
 [tasks.verify-linux]
 description = "Run complete native Linux and Windows MSVC cross-verification"
-dependencies = ["_require-linux", "verify-common", "bootstrap-test", "inventory-test", "verify-xwin"]
+dependencies = ["_require-linux", "verify-common", "bootstrap-test", "inventory-test", "verify-xwin", "release-shellcheck", "release-verification-test"]
 
 [tasks.verify-macos]
 description = "Run complete native macOS verification"
-dependencies = ["_require-macos", "verify-common"]
+dependencies = ["_require-macos", "verify-common", "release-shellcheck", "release-verification-test"]
 
 [tasks.verify-windows]
 description = "Run complete native Windows verification"
-dependencies = ["_require-windows", "verify-common"]
+dependencies = ["_require-windows", "verify-common", "release-verification-test"]
 
 [tasks.verify]
 description = "Run the complete local foundation verification gate"
@@ -386,3 +386,39 @@ description = "Lint the release inventory regression harness"
 dependencies = ["shellcheck-present"]
 command = "shellcheck"
 args = ["tests/ci/release-inventory.sh"]
+
+[tasks.release-shellcheck]
+description = "Lint the ELF verifier and ELF/Mach-O regression harnesses"
+dependencies = ["_require-unix", "shellcheck-present"]
+command = "shellcheck"
+args = ["scripts/verify-release-binary.sh", "tests/release/verify.sh", "tests/release/macho.sh"]
+
+[tasks.release-elf-test]
+description = "Test GNU, MUSL and post-strip static ELF verification"
+dependencies = ["_require-linux"]
+command = "sh"
+args = ["tests/release/verify.sh"]
+
+[tasks.release-macho-test]
+description = "Characterize the existing pre/post-strip Mach-O workflow checks"
+dependencies = ["_require-unix"]
+command = "bash"
+args = ["tests/release/macho.sh"]
+
+[tasks.release-pe-test]
+description = "Test x86_64 and aarch64 PE verification on native Windows"
+dependencies = ["_require-windows"]
+command = "pwsh"
+args = ["-NoProfile", "-File", "tests/release/verify.ps1"]
+
+[tasks.release-verification-linux]
+dependencies = ["_require-linux", "release-elf-test", "release-macho-test"]
+
+[tasks.release-verification-macos]
+dependencies = ["_require-macos", "release-macho-test"]
+
+[tasks.release-verification-test]
+description = "Run binary verification regressions for the current native host"
+linux_alias = "release-verification-linux"
+mac_alias = "release-verification-macos"
+windows_alias = "release-pe-test"

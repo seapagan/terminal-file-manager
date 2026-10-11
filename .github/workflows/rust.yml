@@ -60,6 +60,9 @@ jobs:
           cargo make build
           cargo make package
 
+      - name: Test native-host binary verification
+        run: cargo make release-verification-test
+
   msrv:
     name: Exact declared MSRV
     runs-on: ubuntu-24.04
@@ -158,6 +161,9 @@ jobs:
           shellcheck_dir="$install_dir/shellcheck-v${version}"
           echo "$shellcheck_dir" >> "${GITHUB_PATH:?}"
           "$shellcheck_dir/shellcheck" --version
+
+      - name: Lint binary verification scripts
+        run: cargo make release-shellcheck
 
       - name: Verify support code, dependencies, workflows, and coverage
         run: |
