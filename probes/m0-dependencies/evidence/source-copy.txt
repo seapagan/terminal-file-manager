@@ -1,3 +1,0 @@
-    Checking yazi-sftp v26.9.1 (/tmp/tfm-m0-dependencies-20261011/source-copy/vendor/yazi-sftp)
-    Checking tfm-m0-dependency-probe v0.0.0 (/tmp/tfm-m0-dependencies-20261011/source-copy)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.49s

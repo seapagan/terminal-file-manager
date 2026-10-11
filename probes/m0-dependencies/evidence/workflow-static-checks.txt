@@ -1,7 +1,0 @@
-Check frozen graph identity: PowerShell AST parse PASS
-Controlled native Linux proof: bash syntax PASS
-Native macOS graph and object proof: bash syntax PASS
-Native Windows graph and object proof: PowerShell AST parse PASS
-Eight target/runner/image/bootstrap entries match release-rehearsal.yml.
-actionlint .github/workflows/m0-dependency-probe.yml: PASS
-No workflow was dispatched; syntax checks do not prove runner execution.

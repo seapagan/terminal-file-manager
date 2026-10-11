@@ -1,6 +1,0 @@
-   Packaging yazi-sftp v26.9.1 (/home/seapagan/data/work/own/terminal-file-manager/probes/m0-dependencies/vendor/yazi-sftp)
-    Updating crates.io index
-    Packaged 53 files, 132.8KiB (33.9KiB compressed)
-   Verifying yazi-sftp v26.9.1 (/home/seapagan/data/work/own/terminal-file-manager/probes/m0-dependencies/vendor/yazi-sftp)
-   Compiling yazi-sftp v26.9.1 (/tmp/tfm-m0-dependencies-20261011/target-msrv/package/yazi-sftp-26.9.1)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.06s
