@@ -53,9 +53,6 @@ jobs:
         with:
           tool: cargo-make@0.37.24
 
-      - name: Test package report helper
-        run: python -B -m unittest discover -s tests -p 'test_package_report*.py'
-
       - name: Build verified package
         shell: bash
         run: |

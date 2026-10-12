@@ -46,23 +46,38 @@ cargo make verify
 ```
 
 `verify` selects `verify-linux`, `verify-macos` or `verify-windows` for the
-current host. Each runs every platform-independent gate; Linux also requires
-the Rustup-bootstrap and release-inventory regressions, plus `verify-xwin`.
-Distribution regressions also run on their native hosts: ELF/Mach-O and Unix
-installers on Linux, Mach-O and Unix installers on macOS, PE and Windows
-installers on Windows. Host guards reject explicit use on an incompatible
-host. `quality` follows the same routing. `verify-fast` runs the native Rust,
-documentation, build and clean-package checks without the support/security
-suite, distribution regressions or xwin cross-verification. `fmt` is a check-only alias for `format`;
-`release-build` builds the optimized binary, and `package-list` reports the locked crate inventory.
+current host. It checks Rust formatting, all targets/features, Clippy and rustdoc
+with warnings denied, unit/integration tests and independent doctests, builds,
+packaging, the exact declared MSRV, advisories/licenses/sources, workflow
+syntax/security, and coverage. Python formatting/lint/type checks and the
+complexity analysis itself remain mandatory. Unix verification also retains
+installer/verifier ShellCheck checks. Linux additionally requires `verify-xwin`.
+`quality` follows the same routing. Tooling unit tests and distribution/CI
+regression harnesses run through optional `cargo make verify-infra` instead.
 
-The full gate checks formatting, all targets/features, Clippy and rustdoc with
-warnings denied, unit/integration tests and doctests, builds, packaging, the
-exact declared MSRV, advisories/licenses/sources, workflow syntax/security,
-and coverage, plus the mandatory Python support tasks below. Packaging requires
-a clean committed tree. During development, run individual tasks and use
-`cargo package --locked --allow-dirty` as an
-interim check; run the canonical gate again after committing.
+`verify-fast` is unchanged: native Rust, documentation, build and clean-package
+checks without support/security analysis, infrastructure regressions or xwin.
+`fmt` is a check-only alias for `format`; `release-build` builds the optimized
+binary, and `package-list` reports the locked crate inventory. Packaging requires
+a clean package source. During development, `cargo package --locked --allow-dirty`
+is interim evidence; rerun the canonical gate after committing.
+
+`cargo make verify-infra` checks all required executables and supported host/
+architecture before starting any self-test; missing prerequisites are listed
+together and fail the task. The embedded Duckscript preflight does not require
+Python to launch. Python is required for the retained support suite. It then
+runs all Python support tests (including report and release-asset helpers),
+plus the complete applicable native installer/verifier and CI harness suites.
+Foreign-host suites print `not applicable`; unsupported hosts fail. Linux also
+runs bootstrap/inventory tests; Unix runs hash and real-archive-hook tests;
+Windows runs PE/workflow tests and both PowerShell installer suites.
+
+Infrastructure prerequisites include cargo/rustc, Git, Python 3.10+, Ruff, mypy and
+Lizard. Unix additionally needs ShellCheck, Bash/POSIX tools, Perl and platform
+hash tools; Linux ELF fixtures need GNU sort/tail, and inventory fixtures need
+find/diff and reporting mocks need jq. Windows needs `python`, PowerShell 7+ (`pwsh`) and Windows PowerShell
+5.1+ (`powershell`). The preflight prints installed runtime/tool versions.
+Individual Make tasks remain independently callable.
 
 ```console
 cargo make coverage
@@ -102,23 +117,23 @@ is a test prerequisite, not an installer dependency. Tests use private PATH
 shims and local assets; they never download public releases. Hashing uses
 `sha256sum` on Linux and `shasum -a 256` on macOS.
 
-Windows full verification runs `cargo make windows-installer-test` with
+Windows infrastructure verification runs `cargo make windows-installer-test` with
 PowerShell 7 and `cargo make windows-installer-test-legacy` with Windows
 PowerShell 5.1. Both require the named shell; missing tools fail. Their native
 success group uses the local `release-build` output. The security suite covers
 ZIP/sidecar/PE rejection, destination checks and replacement/recovery; running
 it with Linux PowerShell proves parser behavior and simulated transactions only.
-Native Windows CI invokes the two shell tasks independently.
+The manual release rehearsal invokes both shell tasks independently.
 
 `cargo make release-assets-test` validates distribution archive names, strict
 sidecars, machine headers, member types/modes and checkout/build byte identity
-using Python's standard library. Full verification includes it; `verify-fast`
+using Python's standard library. Infrastructure verification includes it; `verify-fast`
 is unchanged. `cargo make release-hash-test` executes the actual macOS workflow
 hash block with `shasum -a 256`; no macOS coreutils prerequisite is added.
 `cargo make release-hook-test` executes the literal Unix real-archive workflow
 step with an owned native archive, checks fresh/reinstall/preservation evidence
 and rejects corrupted or missing archives. It builds the native release fixture
-and runs in full Unix verification and native CI.
+and runs in Unix infrastructure verification.
 
 The manual nonpublishing rehearsal validates every archive before upload and
 again in the foreign-asset aggregate. Its existing checksum and recursive
@@ -148,8 +163,17 @@ exclusive staging, no-overwrite move for fresh installs and `File.Replace` plus
 an owned backup for replacements; failed recovery retains its path for recovery.
 
 CI runs the native Rust checks on Linux, macOS, and Windows with current
-stable Rust. A separate Linux job derives and verifies the exact MSRV from
-`Cargo.toml`. Dependency/workflow audits and coverage run on Linux. Actions are
+stable Rust. All three OSes collect LCOV during their single native nextest
+run. Each OS runs doctests separately. The dependent combined-coverage job
+validates all three reports, merges them with LCOV, checks the source-file union,
+prints the observed baseline and uploads `coverage.lcov`. It does not rerun
+Rust tests or enforce a percentage threshold. Codacy receives the combined
+report only when `CODACY_PROJECT_TOKEN` is configured in a trusted push/manual
+or same-repository PR context. An absent token or fork PR prints a skip reason;
+reporter failures remain visible and fail that step. Coverage validation and
+artifact upload do not depend on the token. A separate Linux job derives and
+verifies the exact MSRV from `Cargo.toml`. Dependency/workflow audits and source
+complexity/maintainability checks remain routine hosted gates. Actions are
 pinned to full commit SHAs; verify upstream stable releases and compatibility
 before updating pins.
 
@@ -164,13 +188,21 @@ with distinct legacy and documented defect regressions retained. Install:
 python -m pip install 'lizard==1.23.0' 'ruff==0.17.0' 'mypy==2.4.0'
 ```
 
-`cargo make verify` requires every support tool: absent tools fail rather than
+`cargo make verify` requires its static support tools: absent tools fail rather than
 skip. Ruff uses the reference ALL policy and reviewed exceptions. Strict mypy
 checks Python 3.10 compatibility. Windows uses `python` for tests and the
 checker; Unix uses `python3`. Native Rust CI remains independent of Python.
-Linux quality CI uses exact Python 3.14.8. Separate support CI uses the same
+Linux source-quality CI uses exact Python 3.14.8 for the complexity scanner.
+Python support CI is manual-only (`workflow_dispatch`): it retains the same
 three native OS runners with 3.14.8, plus provisionable Linux 3.10.21 as a
 legacy floor compatibility test; it is not the recommended development runtime.
+Routine hosted CI does not run Python checker/report-helper tests or installer,
+binary-verifier, bootstrap and inventory regression harnesses. All individual
+Make tasks remain available. The local `verify` retains genuine checks and
+mandatory Linux xwin; self-tests move to `verify-infra`. Run that aggregate or
+`cargo make python-test`, `cargo make bootstrap-test`, `cargo make inventory-test`
+and the distribution tasks above when changing infrastructure; incompatible
+hosts and missing tools fail.
 The final Python 3.10 release is 3.10.22; the current setup-python manifest
 has no corresponding artifact. Lizard stays at audited 1.23.0 until the full
 separately approved upgrade gates pass.

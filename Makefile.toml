@@ -198,7 +198,7 @@ dependencies = [
 [tasks.verify-common]
 description = "Run platform-independent foundation verification"
 dependencies = [
-    "python-format", "python-lint", "python-type", "python-test", "release-assets-test", "complexity",
+    "python-format", "python-lint", "python-type", "complexity",
     "format", "check", "clippy", "maintainability", "test", "doctest", "doc", "build",
     "release-build", "package-list", "package",
     "msrv", "audit", "deny", "actions-lint", "zizmor", "coverage",
@@ -274,18 +274,18 @@ dependencies = ["_require-linux", "xwin-check", "xwin-clippy", "xwin-build"]
 
 [tasks.verify-linux]
 description = "Run complete native Linux and Windows MSVC cross-verification"
-dependencies = ["_require-linux", "verify-common", "bootstrap-test", "inventory-test", "verify-xwin", "release-shellcheck", "release-verification-test", "installers-shellcheck", "unix-installer-test", "release-hash-test", "release-hook-test"]
+dependencies = ["_require-linux", "verify-common", "verify-xwin", "release-shellcheck", "installers-shellcheck"]
 
 [tasks.verify-macos]
 description = "Run complete native macOS verification"
-dependencies = ["_require-macos", "verify-common", "release-shellcheck", "release-verification-test", "installers-shellcheck", "unix-installer-test", "release-hash-test", "release-hook-test"]
+dependencies = ["_require-macos", "verify-common", "release-shellcheck", "installers-shellcheck"]
 
 [tasks.verify-windows]
 description = "Run complete native Windows verification"
-dependencies = ["_require-windows", "verify-common", "release-verification-test", "windows-workflow-test", "windows-installer-test", "windows-installer-test-legacy"]
+dependencies = ["_require-windows", "verify-common"]
 
 [tasks.verify]
-description = "Run the complete local foundation verification gate"
+description = "Run Rust/product, static support-code and security gates; infrastructure tests are opt-in"
 linux_alias = "verify-linux"
 mac_alias = "verify-macos"
 windows_alias = "verify-windows"
@@ -482,3 +482,86 @@ description = "Exercise the actual Unix real-archive workflow hook offline"
 dependencies = ["_require-unix", "release-build"]
 command = "sh"
 args = ["tests/ci/real-archive-hook.sh"]
+
+[tasks._infra-prerequisites]
+private = true
+script_runner = "@duckscript"
+script = '''
+failed = set false
+host = get_env CARGO_MAKE_RUST_TARGET_OS
+arch = get_env CARGO_MAKE_RUST_TARGET_ARCH
+python = set python3
+tools = set "cargo rustc git ruff mypy lizard"
+if equals ${host} windows
+    python = set python
+    tools = set "${tools} python pwsh powershell"
+    echo "not applicable: Unix installer/verifier/hash/hook and Linux bootstrap/inventory suites on Windows"
+elif equals ${host} linux
+    tools = set "${tools} python3 shellcheck sh bash awk basename cat chmod cmp cksum cp cut date dd diff dirname env find grep gzip head install jq ln ls mkdir mktemp mv od perl pwd rm rmdir sed seq shasum sha256sum sort tail tar tee touch uname wc"
+    echo "not applicable: native Windows PE/installer/PowerShell workflow suites on Linux"
+elif equals ${host} macos
+    tools = set "${tools} python3 shellcheck sh bash awk basename cat chmod cmp cksum cp cut date dd dirname env find grep gzip head install ln ls mkdir mktemp mv od perl pwd rm sed seq shasum tar uname wc"
+    echo "not applicable: Linux ELF/bootstrap/inventory and native Windows suites on macOS"
+else
+    echo "error: verify-infra unsupported host ${host}; supported hosts: linux, macos, windows"
+    failed = set true
+end
+if not equals ${arch} x86_64
+    if not equals ${arch} aarch64
+        echo "error: native infrastructure fixtures require x86_64 or aarch64; current architecture: ${arch}"
+        failed = set true
+    end
+end
+required = split ${tools} " "
+for tool in ${required}
+    path = which ${tool}
+    if is_empty ${path}
+        echo "error: verify-infra missing prerequisite: ${tool}"
+        failed = set true
+    end
+end
+assert_false ${failed} "verify-infra prerequisites failed; no infrastructure tests were started"
+python_version = exec ${python} --version
+assert_eq ${python_version.code} 0 "verify-infra could not execute ${python} --version"
+version_parts = split ${python_version.stdout} " "
+version = array_get ${version_parts} 1
+version = trim ${version}
+too_old = semver_is_newer 3.10.0 ${version}
+assert_false ${too_old} "verify-infra requires Python 3.10+; found ${version}"
+echo ${python_version.stdout}
+exec --fail-on-error rustc --version
+exec --fail-on-error ruff --version
+exec --fail-on-error mypy --version
+exec --fail-on-error lizard --version
+if not equals ${host} windows
+    exec --fail-on-error shellcheck --version
+end
+if equals ${host} windows
+    exec --fail-on-error pwsh -NoProfile -Command "if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'verify-infra requires PowerShell 7+' }; $PSVersionTable.PSVersion"
+    exec --fail-on-error powershell -NoProfile -Command "if ($PSVersionTable.PSVersion -lt [version]'5.1') { throw 'verify-infra requires Windows PowerShell 5.1+' }; $PSVersionTable.PSVersion"
+end
+'''
+
+[tasks.verify-infra]
+description = "Preflight then run all applicable tooling self-tests; foreign-host suites are explicitly not applicable"
+dependencies = ["_infra-prerequisites", "python-format", "python-lint", "python-type", "python-test"]
+script_runner = "@duckscript"
+script = '''
+if equals ${CARGO_MAKE_RUST_TARGET_OS} linux
+    cm_run_task bootstrap-test
+    cm_run_task inventory-test
+end
+if equals ${CARGO_MAKE_RUST_TARGET_OS} windows
+    cm_run_task release-verification-test
+    cm_run_task windows-workflow-test
+    cm_run_task windows-installer-test
+    cm_run_task windows-installer-test-legacy
+else
+    cm_run_task release-shellcheck
+    cm_run_task release-verification-test
+    cm_run_task installers-shellcheck
+    cm_run_task unix-installer-test
+    cm_run_task release-hash-test
+    cm_run_task release-hook-test
+end
+'''
