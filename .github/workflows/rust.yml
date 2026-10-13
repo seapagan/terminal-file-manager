@@ -68,11 +68,16 @@ jobs:
       - name: Run native Rust tests with coverage
         env:
           COVERAGE_PLATFORM: ${{ matrix.coverage }}
-        run: >-
-          cargo llvm-cov nextest
-          --all-targets --all-features --locked --no-fail-fast
-          --remap-path-prefix --lcov
-          --output-path="coverage-${COVERAGE_PLATFORM}.lcov"
+        run: |
+          cargo llvm-cov nextest \
+            --all-targets --all-features --locked --no-fail-fast \
+            --remap-path-prefix --lcov \
+            --output-path="coverage-${COVERAGE_PLATFORM}.lcov"
+          cargo llvm-cov report \
+            --remap-path-prefix --json \
+            --output-path="coverage-${COVERAGE_PLATFORM}.json"
+          test -s "coverage-${COVERAGE_PLATFORM}.lcov"
+          test -s "coverage-${COVERAGE_PLATFORM}.json"
 
       - name: Validate Unix coverage
         if: runner.os != 'Windows'
@@ -158,9 +163,11 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-${{ matrix.coverage }}
-          path: coverage-${{ matrix.coverage }}.lcov
+          path: |
+            coverage-${{ matrix.coverage }}.lcov
+            coverage-${{ matrix.coverage }}.json
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 14
 
   msrv:
     name: Exact declared MSRV
@@ -296,41 +303,16 @@ jobs:
           sudo apt-get install --yes lcov=2.0-4ubuntu2
           lcov --version
 
-      - name: Validate native coverage inputs
+      - name: Validate and merge native LLVM coverage
         shell: bash
         run: |
           set -euo pipefail
-          for report in \
-            coverage/linux/coverage-linux.lcov \
-            coverage/macos/coverage-macos.lcov \
-            coverage/windows/coverage-windows.lcov
-          do
-            test -s "$report"
-            grep -q '^SF:' "$report"
-            awk '
-              /^SF:/ {
-                if ($0 !~ /^SF:src\/[A-Za-z0-9_.\/-]+$/) {
-                  print "Invalid LCOV source path: " $0 > "/dev/stderr"
-                  invalid = 1
-                }
-                if (seen[$0]++) {
-                  print "Duplicate LCOV source path: " $0 > "/dev/stderr"
-                  duplicate = 1
-                }
-              }
-              END { exit invalid || duplicate }
-            ' "$report"
-          done
-
-      - name: Merge native coverage
-        shell: bash
-        run: |
-          set -euo pipefail
-          lcov \
-            --add-tracefile coverage/linux/coverage-linux.lcov \
-            --add-tracefile coverage/macos/coverage-macos.lcov \
-            --add-tracefile coverage/windows/coverage-windows.lcov \
-            --output-file coverage.lcov
+          python3 -m scripts.merge_llvm_coverage \
+            --input linux coverage/linux/coverage-linux.lcov coverage/linux/coverage-linux.json \
+            --input macos coverage/macos/coverage-macos.lcov coverage/macos/coverage-macos.json \
+            --input windows coverage/windows/coverage-windows.lcov coverage/windows/coverage-windows.json \
+            --output coverage.lcov > coverage-summary.json
+          cat coverage-summary.json
 
       - name: Validate combined coverage
         shell: bash
@@ -363,7 +345,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-combined
-          path: coverage.lcov
+          path: |
+            coverage.lcov
+            coverage-summary.json
           if-no-files-found: error
           retention-days: 14
 

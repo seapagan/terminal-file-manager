@@ -168,14 +168,13 @@ script_runner = "@duckscript"
 script = ["mkdir target/llvm-cov"]
 
 [tasks.coverage]
-description = "Write remapped LCOV for the executable coverage baseline"
+description = "Write remapped LCOV and LLVM JSON from the native coverage baseline"
 dependencies = ["prepare-coverage"]
-command = "cargo"
-args = [
-    "llvm-cov", "nextest", "--all-targets", "--all-features", "--locked",
-    "--no-fail-fast", "--remap-path-prefix",
-    "--lcov", "--output-path=target/llvm-cov/coverage.lcov",
-]
+script_runner = "@duckscript"
+script = '''
+exec --fail-on-error cargo llvm-cov nextest --all-targets --all-features --locked --no-fail-fast --remap-path-prefix --lcov --output-path=target/llvm-cov/coverage.lcov
+exec --fail-on-error cargo llvm-cov report --remap-path-prefix --json --output-path=target/llvm-cov/coverage.json
+'''
 
 [tasks.coverage-html]
 description = "Generate a local HTML coverage report"

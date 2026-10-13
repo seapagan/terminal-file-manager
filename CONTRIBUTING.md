@@ -102,14 +102,38 @@ platform-specific file metadata, permissions and links. Never run destructive
 tests against real user data or credentials. Keep Rust unit, integration and
 doctest coverage aligned with the behaviour actually implemented.
 
-Rust CI tests on **Linux, macOS and Windows**. Each native job collects LCOV
-during its existing test run; an aggregation job validates and merges the three
-reports into a combined `coverage.lcov` artifact. It also uploads coverage to
+Rust CI tests on **Linux, macOS and Windows**. Each native job exports LCOV and
+LLVM JSON from the same test profiles. The aggregation job validates both formats
+and merges source-function groups and branch locations into `coverage.lcov`.
+It retains the `coverage-linux`, `coverage-macos`, `coverage-windows` and
+`coverage-combined` artifacts for 14 days. The combined artifact includes
+`coverage-summary.json` with the native LLVM summaries and combined LCOV counts.
+It also uploads coverage to
 Codacy when `CODACY_PROJECT_TOKEN` is available in an eligible context. Coverage
 collection and artifact validation do not depend on that token. No percentage
 threshold is currently enforced; set a measured, justified threshold once
-there is representative application code. Local LCOV is written to
-`target/llvm-cov/coverage.lcov` and HTML to `target/llvm-cov/html`.
+there is representative application code. `cargo make coverage` writes
+`target/llvm-cov/coverage.lcov` and `target/llvm-cov/coverage.json`;
+`cargo make coverage-html` writes HTML to `target/llvm-cov/html`.
+
+LLVM groups instantiations by the first region in a function's main-view file.
+The merger reproduces that rule and checks native function summaries and every
+instantiation's LCOV name, line and execution count against JSON. Branch IDs are
+local to an export; the merger checks LLVM's native enumeration before combining
+branches by function location, branch range, definition files and expansion call
+sites, including intermediate definition files. It checks complete expansion
+records and counters against the owning functions before merging. It supports
+LLVM's unified and separate branch-instantiation exports. It rejects conflicting
+checksums, incomplete reports, unsupported LCOV fields and ambiguous identities.
+LLVM JSON 3.1.0 is the supported schema. MC/DC and folded branch exports whose
+records cannot reproduce native summaries fail explicitly.
+
+Native LLVM line and branch summaries describe function groups; their counts can
+differ from detailed records when functions overlap or macros expand. The merger
+preserves these native summaries in its JSON diagnostics, checks line records
+against LLVM segments, and calculates combined LCOV summaries from the emitted
+unique records. Generic instantiations and build-specific Rust symbols therefore
+do not inflate the combined function denominator.
 
 Infrastructure regressions are retained locally under `verify-infra` rather
 than executed in every routine CI run. The Python support matrix is available
