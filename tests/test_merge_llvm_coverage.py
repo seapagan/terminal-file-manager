@@ -309,6 +309,24 @@ class MergeCoverageTests(unittest.TestCase):
                     self.merge([pair])
                 self.assertFalse(self.output.exists())
 
+    def test_boolean_and_float_counters_fail_before_output(self) -> None:
+        """JSON booleans and integral floats must never masquerade as counters."""
+        for value in (True, False, 1.0, 0.0):
+            pair = native([function("run", 10, 1, int(value))], 1, int(value))
+            pair[1]["data"][0]["functions"][0]["count"] = value
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                self.merge([pair])
+            self.assertFalse(self.output.exists())
+
+    def test_numeric_segment_flags_fail_before_output(self) -> None:
+        """Changing boolean flag checks must not admit integers or floats."""
+        for value in (0, 1, 0.0, 1.0):
+            pair = native([function("run", 10, 1, 1)], 1, 1)
+            pair[1]["data"][0]["files"][0]["segments"][0][3] = value
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                self.merge([pair])
+            self.assertFalse(self.output.exists())
+
     def test_real_rust_generics_and_same_line_closures(self) -> None:
         """Real LLVM exports have five source functions and three unique DA lines."""
         pair = (

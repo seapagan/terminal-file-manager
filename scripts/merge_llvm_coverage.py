@@ -16,6 +16,13 @@ from typing import Any
 
 from scripts import llvm_coverage as llvm
 
+HELP_TEXT = """
+Validate and combine native LLVM JSON/LCOV pairs by source coverage identity.
+
+Usage: python -m scripts.merge_llvm_coverage --input PLATFORM LCOV JSON ...
+       --output coverage.lcov
+The stdout JSON records native summaries and combined record-based statistics.
+"""
 DA_CHECKSUM_FIELDS = 3
 BRDA_FIELDS = 4
 
@@ -268,7 +275,7 @@ def merge(inputs: list[tuple[str, str, str]], output: str | Path) -> dict[str, A
 
 def main() -> None:
     """Merge native artifact pairs and report precise diagnostic failures."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=HELP_TEXT)
     parser.add_argument(
         "--input",
         nargs=3,

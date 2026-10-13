@@ -34,7 +34,10 @@ def require(condition: object, message: str) -> None:
 
 def number(value: object) -> int:
     """Require an unsigned JSON integer, excluding bool and float coercions."""
-    require(type(value) is int and value >= 0, f"Invalid LLVM counter: {value!r}")
+    require(
+        isinstance(value, int) and not isinstance(value, bool) and value >= 0,
+        f"Invalid LLVM counter: {value!r}",
+    )
     return int(value) if isinstance(value, int) else 0
 
 
@@ -203,7 +206,8 @@ def line_segments(segments: list[list[Any]]) -> dict[int, list[list[Any]]]:
             "Unsorted or duplicate segments",
         )
         require(
-            all(type(value) is bool for value in segment[3:]), "Invalid segment flags"
+            all(isinstance(value, bool) for value in segment[3:]),
+            "Invalid segment flags",
         )
         byline.setdefault(line, []).append([line, column, count, *segment[3:]])
         previous = line, column
