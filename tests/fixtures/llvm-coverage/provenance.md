@@ -13,8 +13,8 @@ fn nested() -> u64 { let f = |x| { if x { 1 } else { 2 } }; let g = |x| { if x {
 fn main() { assert_eq!(generic(1u8), 1); assert_eq!(generic(2u16), 2); assert_eq!(nested(), 5); }
 ```
 
-LLVM reports six instantiations, five source functions and five function-line
-entries. Its LCOV contains three unique `DA` lines.
+LLVM reports six instantiations and five source functions. Its LCOV contains
+six `FN:` records and three unique `DA` lines.
 
 `branches` uses Clang 21.1.8 with `-fprofile-instr-generate -fcoverage-mapping`:
 

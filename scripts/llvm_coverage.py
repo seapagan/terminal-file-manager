@@ -72,6 +72,7 @@ def summary_pair(summary: dict[str, Any]) -> tuple[int, int]:
         percent = summary["percent"]
         require(
             isinstance(percent, (int, float))
+            and not isinstance(percent, bool)
             and abs(percent - (100 * covered / count if count else 0))
             < PERCENT_TOLERANCE,
             "Invalid percentage summary",

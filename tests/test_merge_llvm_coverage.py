@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 from typing import Any
 
+from scripts import llvm_coverage as llvm
 from scripts import merge_llvm_coverage as merger
 
 FIXTURES = Path(__file__).parent / "fixtures" / "llvm-coverage"
@@ -317,6 +318,18 @@ class MergeCoverageTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 self.merge([pair])
             self.assertFalse(self.output.exists())
+
+    def test_boolean_percentages_are_rejected(self) -> None:
+        """Boolean JSON percentages cannot stand in for legitimate zero or one."""
+        for summary in (
+            {"count": 100, "covered": 1, "percent": True},
+            {"count": 1, "covered": 0, "percent": False},
+        ):
+            with (
+                self.subTest(summary=summary),
+                self.assertRaisesRegex(ValueError, "Invalid percentage"),
+            ):
+                llvm.summary_pair(summary)
 
     def test_numeric_segment_flags_fail_before_output(self) -> None:
         """Changing boolean flag checks must not admit integers or floats."""
