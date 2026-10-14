@@ -58,6 +58,7 @@ EOF
 
 cat >"$test_bin/getconf" <<'EOF'
 #!/bin/sh
+printf 'getconf\n' >>"$TEST_EVENT_LOG"
 case "${TEST_GETCONF_KIND:-glibc}" in
     glibc) printf 'glibc %s\n' "$TEST_GLIBC_VERSION" ;;
     malformed) printf 'glibc unknown\n' ;;
@@ -67,6 +68,7 @@ EOF
 
 cat >"$test_bin/ldd" <<'EOF'
 #!/bin/sh
+printf 'ldd\n' >>"$TEST_EVENT_LOG"
 case "${TEST_LDD_KIND:-glibc}" in
     glibc) printf 'ldd (GNU libc) %s\n' "$TEST_GLIBC_VERSION" ;;
     musl) printf 'musl libc (%s)\n' "${TEST_ARCH:-x86_64}" >&2 ;;
@@ -315,7 +317,7 @@ reset_env() {
 }
 
 run_install() {
-    env PATH="${TEST_BIN:-$test_bin}" /bin/sh ./install.sh >"$root/output" 2>&1
+    env PATH="${TEST_BIN:-$test_bin}" /bin/sh ./install.sh "$@" >"$root/output" 2>&1
 }
 
 assert_fails() {

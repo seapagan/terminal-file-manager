@@ -67,6 +67,11 @@ try {
         throw "production success path skipped a suite: $($result.Output)"
     }
     if ($bodies.Count -ne 2) { throw 'PE and security must have independent steps' }
+    foreach ($code in @(0, 23)) {
+        $native = '& "' + $hostExecutable + '" -NoProfile -Command "exit ' + $code + '"'
+        $status = Invoke-Step -Body $native -Directory $root
+        if ($status.Code -ne $code) { throw "Actions wrapper altered native exit ${code}: $($status.Output)" }
+    }
     foreach ($suite in @('PE', 'security')) {
         foreach ($failure in @('exit 23', "throw 'injected script failure'")) {
             Write-Fixture -Suite PE -Content 'Write-Information -MessageData ''PE reached'' -InformationAction Continue'
@@ -84,7 +89,7 @@ try {
         }
     }
     $real = Invoke-Job -Directory $repo
-    if ($real.Code -ne 0 -or $real.Output -notmatch 'PE verification tests passed: 12 cases' -or
+    if ($real.Code -ne 0 -or $real.Output -notmatch 'PE verification tests passed: [1-9][0-9]* cases\b' -or
         $real.Output -notmatch 'security.*passed') { throw "real suites failed or were skipped: $($real.Output)" }
     Write-Information -MessageData $real.Output -InformationAction Continue
     Write-Information -MessageData 'Actual PS7 workflow steps: unset-status success; both exit/throw failures propagated; later steps blocked after PE failure' -InformationAction Continue

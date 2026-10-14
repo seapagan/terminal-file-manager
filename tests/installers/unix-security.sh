@@ -208,7 +208,7 @@ for mode in fresh replacement wrong-version nonzero script wrong-machine truncat
             assert_fails "native $mode accepted"
             assert_old_binary
             case "$mode" in script|wrong-machine|truncated)
-                if grep -Fxq native-candidate "$TEST_EVENT_LOG"; then fail 'invalid header executed candidate'; fi ;;
+                if grep -Eq '^(candidate|native-candidate)$' "$TEST_EVENT_LOG"; then fail 'invalid header executed candidate'; fi ;;
             esac
             ;;
     esac

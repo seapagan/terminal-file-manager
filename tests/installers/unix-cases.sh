@@ -1,6 +1,26 @@
 #!/bin/sh
 # Complete inherited Labeldeck case sequence; sourced by unix.sh.
 
+reset_env
+TEST_OS=unsupported
+export TEST_OS
+run_install --help || fail 'installer help failed'
+assert_output 'Usage: install.sh [--help]'
+test ! -s "$TEST_DOWNLOAD_LOG" || fail 'help attempted a download'
+test ! -d "$TFM_INSTALL_DIR" || fail 'help created the destination'
+assert_tmp_cleaned
+pass
+
+for argument in --version --unknown unexpected; do
+    reset_env
+    if run_install "$argument"; then fail 'unsupported installer argument accepted'; fi
+    assert_output 'unsupported installer arguments'
+    test ! -s "$TEST_DOWNLOAD_LOG" || fail 'unsupported argument attempted a download'
+    test ! -d "$TFM_INSTALL_DIR" || fail 'unsupported argument created the destination'
+    assert_tmp_cleaned
+    pass
+done
+
 for case_data in 'x86_64:x86_64-unknown-linux-gnu' \
     'amd64:x86_64-unknown-linux-gnu' \
     'aarch64:aarch64-unknown-linux-gnu' \

@@ -10,9 +10,14 @@ $securitySkipped = 0
 # A test-only exception boundary permits independent negative assertions.
 function Die([string]$Message) { throw $Message }
 
-function Assert-Rejected([scriptblock]$Action, [string]$Reason) {
+function Assert-Rejected([scriptblock]$Action, [string]$Reason, [string]$Expected) {
+    if (-not $Expected) { throw "missing expected rejection: $Reason" }
     $rejected = $false
-    try { & $Action } catch { $rejected = $true }
+    try { & $Action } catch {
+        $failure = "$($_.Exception.GetBaseException().GetType().Name): $($_.Exception.Message)"
+        if ($failure -notmatch $Expected) { throw "unexpected rejection for ${Reason}: $failure" }
+        $rejected = $true
+    }
     if (-not $rejected) { throw "accepted unsafe input: $Reason" }
     $script:securityPasses++
 }
@@ -43,6 +48,44 @@ function Write-Sidecar([string]$Archive, [string]$Record) {
 
 function Assert-OldBytes([string]$Directory) {
     Assert-Equal -Actual ([IO.File]::ReadAllText((Join-Path -Path $Directory -ChildPath 'tfm.exe'))) -Expected 'old tfm' -Reason 'old bytes changed'
+}
+
+function Assert-InstallRejectionOrder {
+    $mirror = Join-Path -Path $securityRoot -ChildPath 'ordering-mirror'
+    $release = Join-Path -Path $mirror -ChildPath 'download/v1.2.3'
+    New-Item -ItemType Directory -Path $release -Force | Out-Null
+    $archive = Join-Path -Path $release -ChildPath 'terminal-file-manager-v1.2.3-x86_64-pc-windows-msvc.zip'
+    $fixture = Build-MemberZip -Names @('tfm.exe', 'LICENSE-MIT', 'LICENSE-APACHE', 'README.md')
+    [IO.File]::Copy($fixture, $archive)
+    $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
+    $savedBase = $script:ReleasesBase
+    $savedVersion = $env:TFM_VERSION
+    $savedDirectory = $env:TFM_INSTALL_DIR
+    $script:ReleasesBase = $mirror
+    $env:TFM_VERSION = 'v1.2.3'
+    $env:TFM_INSTALL_DIR = Join-Path -Path $securityRoot -ChildPath 'ordering-install'
+    # Observe the execution boundary while keeping the real transaction checks.
+    function Get-NativeArchitecture { 'AMD64' }
+    function Assert-CandidateVersion {
+        $script:orderingExecuted = $true
+        throw 'candidate executed before rejection'
+    }
+    try {
+        foreach ($mode in @('checksum', 'architecture')) {
+            $script:orderingExecuted = $false
+            $digest = if ($mode -eq 'checksum') { '0' * 64 } else { $hash }
+            Write-Sidecar -Archive $archive -Record "$digest  $([IO.Path]::GetFileName($archive))"
+            $expected = if ($mode -eq 'checksum') { 'checksum verification failed' } else { 'invalid DOS header' }
+            Assert-Rejected -Action { Invoke-Install -Confirm:$false } -Reason "$mode before execution" -Expected $expected
+            Assert-Equal -Actual $script:orderingExecuted -Expected $false -Reason "$mode executed candidate"
+            Assert-Equal -Actual (Test-Path -LiteralPath $env:TFM_INSTALL_DIR) -Expected $false -Reason "$mode created install directory"
+        }
+    } finally {
+        $script:ReleasesBase = $savedBase
+        $env:TFM_VERSION = $savedVersion
+        $env:TFM_INSTALL_DIR = $savedDirectory
+        Remove-Variable -Name orderingExecuted -Scope Script
+    }
 }
 
 function Invoke-ControlledAction([string]$Action, [string]$Answer = 'N') {
@@ -76,6 +119,7 @@ function Invoke-ControlledAction([string]$Action, [string]$Answer = 'N') {
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 try {
+    Assert-InstallRejectionOrder
     # Inject failures into the real legacy TLS block without changing host TLS.
     Add-Type -TypeDefinition @'
 using System;
@@ -116,17 +160,17 @@ public static class TfmTlsFixture {
     foreach ($record in @("$hash  wrong.zip", "$hash  $basename`n$hash  $basename",
         "$hash  $basename extra", "not-hex  $basename", " $hash  $basename", "$hash  $basename`n`n")) {
         Write-Sidecar -Archive $archive -Record $record
-        Assert-Rejected -Action { Assert-Checksum -Archive $archive -Sidecar "$archive.sha256" } -Reason 'sidecar structure'
+        Assert-Rejected -Action { Assert-Checksum -Archive $archive -Sidecar "$archive.sha256" } -Reason 'sidecar structure' -Expected 'checksum verification failed'
     }
     [IO.File]::WriteAllBytes("$archive.sha256", [byte[]](239, 187, 191) + [Text.Encoding]::ASCII.GetBytes("$hash  $basename"))
-    Assert-Rejected -Action { Assert-Checksum -Archive $archive -Sidecar "$archive.sha256" } -Reason 'UTF-8 BOM'
+    Assert-Rejected -Action { Assert-Checksum -Archive $archive -Sidecar "$archive.sha256" } -Reason 'UTF-8 BOM' -Expected 'checksum verification failed'
     [IO.File]::WriteAllText("$archive.sha256", "$hash  $basename", [Text.Encoding]::Unicode)
-    Assert-Rejected -Action { Assert-Checksum -Archive $archive -Sidecar "$archive.sha256" } -Reason 'UTF-16'
+    Assert-Rejected -Action { Assert-Checksum -Archive $archive -Sidecar "$archive.sha256" } -Reason 'UTF-16' -Expected 'checksum verification failed'
     Write-Sidecar -Archive $archive -Record "$hash  $basename"
     Assert-Checksum -Archive $archive -Sidecar "$archive.sha256"
     $securityPasses++
     [IO.File]::AppendAllText($archive, 'tampered')
-    Assert-Rejected -Action { Assert-Checksum -Archive $archive -Sidecar "$archive.sha256" } -Reason 'checksum mismatch'
+    Assert-Rejected -Action { Assert-Checksum -Archive $archive -Sidecar "$archive.sha256" } -Reason 'checksum mismatch' -Expected 'checksum verification failed'
 
     $outside = Join-Path -Path $securityRoot -ChildPath 'outside'
     [IO.File]::WriteAllText($outside, 'outside sentinel')
@@ -138,17 +182,17 @@ public static class TfmTlsFixture {
         $hash = (Get-FileHash -Path $archive -Algorithm SHA256).Hash
         Write-Sidecar -Archive $archive -Record "$hash  $([IO.Path]::GetFileName($archive))"
         Assert-Checksum -Archive $archive -Sidecar "$archive.sha256"
-        Assert-Rejected -Action { Expand-SafeArchive -Archive $archive -Destination $extracted } -Reason "archive member $bad"
+        Assert-Rejected -Action { Expand-SafeArchive -Archive $archive -Destination $extracted } -Reason "archive member $bad" -Expected 'unsafe archive members'
         Assert-Equal -Actual (Test-Path -Path $extracted) -Expected $false -Reason 'unsafe archive extracted'
         Assert-Equal -Actual ([IO.File]::ReadAllText($outside)) -Expected 'outside sentinel' -Reason 'outside bytes changed'
     }
     foreach ($attributes in @(268435456, 536870912, 1610612736, -1610612736, -1073741824, 16, 64, 1024)) {
         $archive = Build-MemberZip -Names $members -Attributes $attributes
-        Assert-Rejected -Action { Expand-SafeArchive -Archive $archive -Destination (Join-Path -Path $securityRoot -ChildPath 'types') } -Reason 'archive type'
+        Assert-Rejected -Action { Expand-SafeArchive -Archive $archive -Destination (Join-Path -Path $securityRoot -ChildPath 'types') } -Reason 'archive type' -Expected 'unsafe archive member types'
     }
     foreach ($omitted in $members) {
         $archive = Build-MemberZip -Names @($members | Where-Object -FilterScript { $_ -ne $omitted })
-        Assert-Rejected -Action { Expand-SafeArchive -Archive $archive -Destination (Join-Path -Path $securityRoot -ChildPath 'missing') } -Reason 'missing member'
+        Assert-Rejected -Action { Expand-SafeArchive -Archive $archive -Destination (Join-Path -Path $securityRoot -ChildPath 'missing') } -Reason 'missing member' -Expected 'unsafe archive members|release archive is missing tfm.exe'
     }
     $archive = Build-MemberZip -Names $members -Attributes -2119958528
     # 0x81A40000 denotes a regular Unix file with mode 0644.
@@ -163,7 +207,7 @@ public static class TfmTlsFixture {
     [IO.File]::WriteAllBytes($exe, $bytes)
     Assert-CandidateArchitecture -Exe $exe -Target 'x86_64-pc-windows-msvc'
     $securityPasses++
-    Assert-Rejected -Action { Assert-CandidateArchitecture -Exe $exe -Target 'aarch64-pc-windows-msvc' } -Reason 'wrong machine'
+    Assert-Rejected -Action { Assert-CandidateArchitecture -Exe $exe -Target 'aarch64-pc-windows-msvc' } -Reason 'wrong machine' -Expected 'wrong candidate architecture'
     $bytes[68] = 100; $bytes[69] = 170
     [IO.File]::WriteAllBytes($exe, $bytes)
     Assert-CandidateArchitecture -Exe $exe -Target 'aarch64-pc-windows-msvc'
@@ -171,10 +215,10 @@ public static class TfmTlsFixture {
     foreach ($offset in @(0, 64, 86)) {
         $badBytes = $bytes.Clone(); $badBytes[$offset] = 0
         [IO.File]::WriteAllBytes($exe, $badBytes)
-        Assert-Rejected -Action { Assert-CandidateArchitecture -Exe $exe -Target 'aarch64-pc-windows-msvc' } -Reason 'bad PE header'
+        Assert-Rejected -Action { Assert-CandidateArchitecture -Exe $exe -Target 'aarch64-pc-windows-msvc' } -Reason 'bad PE header' -Expected 'invalid DOS header|invalid candidate PE|not a PE executable'
     }
     [IO.File]::WriteAllBytes($exe, [byte[]](77, 90))
-    Assert-Rejected -Action { Assert-CandidateArchitecture -Exe $exe -Target 'x86_64-pc-windows-msvc' } -Reason 'truncated DOS header'
+    Assert-Rejected -Action { Assert-CandidateArchitecture -Exe $exe -Target 'x86_64-pc-windows-msvc' } -Reason 'truncated DOS header' -Expected 'invalid DOS header'
 
     # Expected launch failures reject the candidate; unrelated errors propagate.
     $nativeStatus = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
@@ -202,15 +246,15 @@ public static class TfmTlsFixture {
     }
 
     foreach ($tag in @('v1.2', '1.2.3', 'v1.2.3-rc.1', 'v1.2.3/extra', "v1.2.3`nmore", "v1.2.3`n")) {
-        Assert-Rejected -Action { Assert-StableTag -Tag $tag } -Reason 'unstable tag'
+        Assert-Rejected -Action { Assert-StableTag -Tag $tag } -Reason 'unstable tag' -Expected 'usable release tag'
     }
     $script:ReleasesBase = 'https://github.com/seapagan/terminal-file-manager/releases'
     foreach ($uri in @('http://github.com/file', 'https://evil.example/file', 'https://github.com:444/file',
         'https://user@github.com/file', 'https://github.com/file#fragment')) {
-        Assert-Rejected -Action { Assert-AssetUri -Uri ([uri]$uri) } -Reason 'unsafe transport'
+        Assert-Rejected -Action { Assert-AssetUri -Uri ([uri]$uri) } -Reason 'unsafe transport' -Expected 'asset transport must use unambiguous HTTPS|unexpected asset redirect origin'
     }
     foreach ($url in @('http://mirror.example', 'ftp://mirror.example', 'file:///tmp/mirror')) {
-        Assert-Rejected -Action { Test-IsHttp -Url $url } -Reason 'non-HTTPS source'
+        Assert-Rejected -Action { Test-IsHttp -Url $url } -Reason 'non-HTTPS source' -Expected 'remote sources must use HTTPS'
     }
     Assert-AssetUri -Uri ([uri]'https://release-assets.githubusercontent.com/file')
     $securityPasses++
@@ -252,13 +296,13 @@ public static class TfmTlsFixture {
     Assert-Equal -Actual ([IO.File]::ReadAllText((Join-Path -Path $destination -ChildPath 'tfm.exe'))) -Expected 'new tfm' -Reason 'approved transaction bytes'
     Assert-Equal -Actual @(Get-ChildItem -LiteralPath $destination -Force -Filter '.tfm-*').Count -Expected 0 -Reason 'approved transaction cleanup'
     [IO.File]::WriteAllText((Join-Path -Path $destination -ChildPath 'tfm.exe'), 'old tfm')
-    Assert-Rejected -Action { Install-Candidate -Candidate (Join-Path -Path $securityRoot -ChildPath 'missing.exe') -InstallDir $destination } -Reason 'missing candidate'
+    Assert-Rejected -Action { Install-Candidate -Candidate (Join-Path -Path $securityRoot -ChildPath 'missing.exe') -InstallDir $destination } -Reason 'missing candidate' -Expected '^FileNotFoundException:'
     Assert-OldBytes -Directory $destination
     Assert-Equal -Actual @(Get-ChildItem -Path $destination -Force -Filter '.tfm-*').Count -Expected 0 -Reason 'copy failure cleanup'
     New-Item -ItemType Directory -Path (Join-Path -Path $securityRoot -ChildPath 'directory-final/tfm.exe') -Force | Out-Null
-    Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir (Join-Path -Path $securityRoot -ChildPath 'directory-final') } -Reason 'final directory'
+    Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir (Join-Path -Path $securityRoot -ChildPath 'directory-final') } -Reason 'final directory' -Expected 'unsafe final destination'
     [IO.File]::WriteAllText((Join-Path -Path $securityRoot -ChildPath 'file-ancestor'), 'file')
-    Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir (Join-Path -Path $securityRoot -ChildPath 'file-ancestor/child') } -Reason 'non-directory ancestor'
+    Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir (Join-Path -Path $securityRoot -ChildPath 'file-ancestor/child') } -Reason 'non-directory ancestor' -Expected 'unsafe destination ancestor'
 
     # Recovery succeeds for absent and existing finals. Failed recovery keeps
     # the last good bytes and includes their exact location in the error.
@@ -296,7 +340,7 @@ public static class TfmTlsFixture {
     $savedLocation = Get-Location
     try {
         Set-Location -LiteralPath $workingLink
-        Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir 'child' } -Reason 'linked relative working directory'
+        Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir 'child' } -Reason 'linked relative working directory' -Expected 'unsafe destination ancestor'
         Assert-Equal -Actual (Test-Path -LiteralPath (Join-Path -Path $relativeOutside -ChildPath 'child')) -Expected $false -Reason 'relative destination created through link'
         Assert-Equal -Actual @(Get-ChildItem -LiteralPath $relativeOutside -Force).Count -Expected 1 -Reason 'outside object created'
         Assert-Equal -Actual ([IO.File]::ReadAllText($outsideSentinel)) -Expected 'outside sentinel' -Reason 'outside sentinel changed'
@@ -313,7 +357,7 @@ public static class TfmTlsFixture {
         return $path
     }
     try {
-        Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir $destination } -Reason 'changed final object'
+        Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir $destination } -Reason 'changed final object' -Expected 'final destination changed during installation'
         Assert-Equal -Actual ([IO.File]::ReadAllText((Join-Path -Path $destination -ChildPath 'tfm.exe'))) -Expected 'external replacement' -Reason 'external object overwritten'
     } finally { Set-Item -Path Function:\New-OwnedFile -Value $originalNewOwnedFile }
     [IO.File]::WriteAllText((Join-Path -Path $destination -ChildPath 'tfm.exe'), 'old tfm')
@@ -326,7 +370,7 @@ public static class TfmTlsFixture {
         throw 'injected error after replacement'
     }
     try {
-        Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir $destination } -Reason 'post-replace failure'
+        Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir $destination } -Reason 'post-replace failure' -Expected 'injected error after replacement'
         Assert-OldBytes -Directory $destination
         Assert-Equal -Actual @(Get-ChildItem -Path $destination -Force -Filter '.tfm-*').Count -Expected 0 -Reason 'rollback cleanup'
         $savedWhatIf = $WhatIfPreference
@@ -336,7 +380,7 @@ public static class TfmTlsFixture {
             $ConfirmPreference = 'Low'
             Assert-Rejected -Action {
                 Install-Candidate -Candidate $exe -InstallDir $destination -WhatIf:$false -Confirm:$false
-            } -Reason 'approved rollback under inherited preferences'
+            } -Reason 'approved rollback under inherited preferences' -Expected 'injected error after replacement'
             Assert-OldBytes -Directory $destination
             Assert-Equal -Actual @(Get-ChildItem -LiteralPath $destination -Force -Filter '.tfm-*').Count -Expected 0 -Reason 'inherited preferences skipped rollback cleanup'
         } finally { $WhatIfPreference = $savedWhatIf; $ConfirmPreference = $savedConfirm }
@@ -345,7 +389,7 @@ public static class TfmTlsFixture {
             throw "injected recovery failure; last good copy retained at $Backup"
         }
         try {
-            Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir $destination } -Reason 'recovery failure'
+            Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir $destination } -Reason 'recovery failure' -Expected 'injected recovery failure; last good copy retained at'
             $retained = @(Get-ChildItem -Path $destination -Force -Filter '.tfm-*')
             Assert-Equal -Actual $retained.Count -Expected 1 -Reason 'recovery material count'
             Assert-Equal -Actual ([IO.File]::ReadAllText($retained[0].FullName)) -Expected 'old tfm' -Reason 'recovery material bytes'
@@ -414,8 +458,8 @@ fn main() {
         $runningProcess = [Diagnostics.Process]::Start($runningFinal)
         try {
             Assert-Equal -Actual $runningProcess.HasExited -Expected $false -Reason 'running fixture exited before preflight'
-            Assert-Rejected -Action { Assert-ReplaceableFile -Final $runningFinal } -Reason 'running executable preflight'
-            Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir $runningDir } -Reason 'running existing executable'
+            Assert-Rejected -Action { Assert-ReplaceableFile -Final $runningFinal } -Reason 'running executable preflight' -Expected '^(IOException|UnauthorizedAccessException):'
+            Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir $runningDir } -Reason 'running existing executable' -Expected '^(IOException|UnauthorizedAccessException):'
             Assert-Equal -Actual (Get-FileHash -Path $runningFinal -Algorithm SHA256).Hash -Expected $runningHash -Reason 'running executable bytes'
             Assert-Equal -Actual @(Get-ChildItem -Path $runningDir -Force -Filter '.tfm-*').Count -Expected 0 -Reason 'running preflight cleanup'
         } finally {
@@ -431,13 +475,13 @@ fn main() {
         $final = Join-Path -Path $destination -ChildPath 'tfm.exe'
         $lock = [IO.File]::Open($final, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
         try {
-            Assert-Rejected -Action { Assert-ReplaceableFile -Final $final } -Reason 'explicit locked-file preflight'
-            Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir $destination } -Reason 'locked existing binary'
+            Assert-Rejected -Action { Assert-ReplaceableFile -Final $final } -Reason 'explicit locked-file preflight' -Expected '^IOException:'
+            Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir $destination } -Reason 'locked existing binary' -Expected '^IOException:'
         }
         finally { $lock.Dispose() }
         Assert-OldBytes -Directory $destination
         [IO.File]::SetAttributes($final, [IO.FileAttributes]::ReadOnly)
-        try { Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir $destination } -Reason 'read-only existing binary' }
+        try { Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir $destination } -Reason 'read-only existing binary' -Expected '^UnauthorizedAccessException:' }
         finally { [IO.File]::SetAttributes($final, [IO.FileAttributes]::Normal) }
         Assert-OldBytes -Directory $destination
         Assert-Equal -Actual @(Get-ChildItem -Path $destination -Force -Filter '.tfm-*').Count -Expected 0 -Reason 'read-only failure cleanup'
@@ -448,13 +492,13 @@ fn main() {
             [Security.AccessControl.FileSystemRights]::CreateFiles, [Security.AccessControl.AccessControlType]::Deny)
         $denied.AddAccessRule($rule)
         Set-Acl -LiteralPath $destination -AclObject $denied
-        try { Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir $destination } -Reason 'denied staging directory' }
+        try { Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir $destination } -Reason 'denied staging directory' -Expected '^UnauthorizedAccessException:' }
         finally { Set-Acl -LiteralPath $destination -AclObject $acl }
         Assert-OldBytes -Directory $destination
         $linked = Join-Path -Path $securityRoot -ChildPath 'junction'
         New-Item -ItemType Junction -Path $linked -Target $destination | Out-Null
-        Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir $linked } -Reason 'reparse install root'
-        Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir (Join-Path -Path $linked -ChildPath 'child') } -Reason 'reparse ancestor'
+        Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir $linked } -Reason 'reparse install root' -Expected 'unsafe destination ancestor'
+        Assert-Rejected -Action { Install-Candidate -Candidate $exe -InstallDir (Join-Path -Path $linked -ChildPath 'child') } -Reason 'reparse ancestor' -Expected 'unsafe destination ancestor'
         Assert-OldBytes -Directory $destination
     } else {
         $securitySkipped = 18

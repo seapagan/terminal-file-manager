@@ -311,6 +311,13 @@ replace_candidate() {
 }
 
 main() {
+    if test "$#" -eq 1 && test "$1" = --help; then
+        printf '%s\n' 'Usage: install.sh [--help]' \
+            'Install tfm for Linux or macOS.' \
+            'Configure TFM_VERSION, TFM_INSTALL_DIR and TFM_LIBC through the environment.'
+        return
+    fi
+    test "$#" -eq 0 || die 'unsupported installer arguments; use --help'
     target=$(detect_target)
     if test -n "${TFM_INSTALL_DIR:-}"; then
         install_dir=$TFM_INSTALL_DIR
