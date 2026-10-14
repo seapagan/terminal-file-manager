@@ -141,9 +141,12 @@ This approved unpublished path workspace is not the eventual Git shipping source
 Audit 0.22.2 found zero vulnerabilities/warnings against RustSec revision
 `7eebec69c352c7191b1f13eb95dd510eeca5d1de` (1,296 advisories). Deny 0.20.2 passed
 advisories/licences/bans/sources without warnings. These dated frozen-graph
-results do not certify future graphs. Approved allowlist: MIT, Apache-2.0, ISC,
-BSD-3-Clause, Zlib, Unicode-3.0. Project `deny.toml` keeps these licences and
-retains global duplicate/wildcard/source/advisory enforcement with **no skips**.
+results do not certify future graphs. The probe's approved allowlist was MIT,
+Apache-2.0, ISC, BSD-3-Clause, Zlib and Unicode-3.0. At closeout, project
+`deny.toml` retained that list with global duplicate/wildcard/source/advisory
+enforcement and **no skips**. Subsequent commit `986ae1f` narrowed the current
+product allowlist to MIT and Apache-2.0; future dependencies need a fresh
+licence-policy review rather than relying on this historical probe approval.
 
 Probe-only exact older-version duplicate exceptions were getrandom 0.2.17,
 hashbrown 0.16.1, sha3 0.11.0, syn 2.0.119 and windows-sys 0.52.0, paired with
@@ -809,7 +812,8 @@ local temporary evidence) were removed. No references to their runnable paths
 remain in active CI/task/script/test configuration. Product Cargo.toml/Cargo.lock,
 Makefile.toml (including verify-fast), installers, accepted release rehearsal,
 CHANGELOG.md and project deny.toml are unchanged. No probe duplicate skip leaks
-into project policy. The approved licence allowlist remains intact.
+into project policy. The approved licence allowlist remained intact at this
+dated closeout; the subsequent product-policy change is recorded above.
 
 `rtk proxy cargo make verify` passed, including mandatory Linux xwin check,
 strict Clippy and build, exact declared product MSRV gate, audit/deny, Python

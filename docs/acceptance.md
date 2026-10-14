@@ -31,18 +31,18 @@ evidence. Hosted/native results are not implied by configuration files.
 
 ### M0-C1: binary verifiers and D1 regressions
 
-- Preserve the complete pinned Labeldeck ELF/PE helpers and original 20 ELF /
-  seven PE cases. ELF production bytes remain unchanged; PE adapts the usage
-  comment only. Add fail-closed input/type/inspection/argument, MUSL-symbol and
-  PE-signature/offset cases without changing production policy.
+- Preserve the inherited Labeldeck ELF/PE contracts and original 20 ELF /
+  seven PE cases. The ELF verifier additionally requires ELF64 and little-endian
+  data. Retain fail-closed input/type/inspection/argument, MUSL-symbol and
+  PE-signature/offset cases.
 - Characterize both actual inline Mach-O workflow blocks, including x86_64 and
   arm64 positives, architecture/type mismatches and failed `file` inspection.
-- Full local verification adds `release-verification-test`: ELF and Mach-O on
-  Linux, Mach-O on macOS, PE on Windows. Unix full verification also runs
-  `release-shellcheck`. Explicit host guards reject wrong-host tasks; missing
-  required tools fail. `verify-fast` remains unchanged; Linux full verification
-  retains compulsory xwin. Native Rust CI runs the same host-selected test task
-  independently; its existing Linux quality job lints the shell scripts.
+- `cargo make verify-infra` runs `release-verification-test`: ELF and Mach-O on
+  Linux, Mach-O on macOS, PE on Windows. It also runs Unix `release-shellcheck`.
+  Explicit host guards reject wrong-host tasks; missing required tools fail.
+  `verify-fast` remains unchanged; full `verify` retains compulsory Linux xwin
+  and static script checks. Native Rust CI tests application code; infrastructure
+  regressions run locally or in the manual release rehearsal.
 - Supplemental Linux PowerShell execution proves synthetic PE parsing only.
   Native macOS/Windows CI, real ARM objects and all eight rehearsal builds remain
   unproven until separately authorized hosted execution. Stop for C1 review
@@ -69,9 +69,12 @@ evidence. Hosted/native results are not implied by configuration files.
   with an owned backup. Failed recovery retains the last good copy and reports
   its exact path. Native locking, read-only, denied paths and reparse tests must
   run on Windows before transaction semantics are accepted.
-- Full host verification includes installer tests and Unix ShellCheck alongside
-  every M0-B/C1 gate; `verify-fast` and local compulsory Linux xwin are unchanged.
-  Native CI uses independent Windows invocations. No hosted xwin is added.
+- `cargo make verify-infra` includes host-selected installer tests and Unix
+  ShellCheck. The manual rehearsal uses independent Windows invocations.
+  `verify-fast`, full `verify` and compulsory local Linux xwin are unchanged.
+  Unix installer `--help` returns before platform detection or downloads;
+  unsupported arguments fail before installation. Configuration stays in the
+  environment. No hosted xwin is added.
 - C2's delivered native Windows x64 PowerShell 5.1/7+ suites passed at `df3919a`,
   including running/locked-file preflight, old bytes, cleanup-failure rollback
   and retained-backup/manual recovery. macOS Apple Silicon also has C2 native
@@ -86,13 +89,19 @@ evidence. Hosted/native results are not implied by configuration files.
 - Validate exact package/version/target naming, a single lowercase SHA256 record
   with two spaces and exact basename, corruption, exact root regular members,
   duplicates/aliases/links/special types, Unix executable mode, machine headers,
-  checkout licence/README bytes and packaged build bytes. Reads are chunked;
-  no untrusted member is extracted by the source-side helper.
+  checkout licence/README bytes and packaged build bytes. Source-side validation
+  caps archives at 256 MiB before hashing, executables at 128 MiB before reading
+  payloads, and trailing tar zero padding at 64 KiB. Current eight-target
+  rehearsal archives are below 220 KiB, leaving over three orders of magnitude
+  of archive headroom. These bounds also apply to aggregate validation; documents
+  retain exact checkout-size limits. Reads are chunked; no untrusted member is
+  extracted by the source-side helper.
 - Native macOS hashing uses `shasum -a 256`, retaining the Linux aggregate's
   existing wire format and checksum block. Existing secure Rustup bootstrap,
   sixteen-file inventory, all verifiers/strip/smoke and two-file one-day uploads
   remain unchanged. All new tests join existing Ruff ALL/strict mypy/Lizard
-  policy and full verification; `verify-fast` and local-only xwin are preserved.
+  policy and `verify-infra`; `verify-fast`, full `verify` and local-only xwin
+  are preserved. Python support CI remains available through manual dispatch.
 - Each target has offline fresh/reinstall/corruption-preservation acceptance
   using its actual archive and sidecar, unmodified candidate checks and real
   prompt version execution. Each Linux libc is explicitly selected. Controlled
