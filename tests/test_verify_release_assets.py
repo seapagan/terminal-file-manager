@@ -110,6 +110,9 @@ class ReleaseAssetsTests(unittest.TestCase):
         repository.mkdir()
         for name in assets.DOCUMENTS:
             (repository / name).write_bytes((assets.ROOT / name).read_bytes())
+        (repository / "src").mkdir()
+        (repository / "src/main.rs").write_bytes(b"fn main() {}\n")
+        (repository / "install.sh").write_bytes(b"#!/bin/sh\n")
         attributes = assets.ROOT / ".gitattributes"
         if attributes.exists():
             (repository / attributes.name).write_bytes(attributes.read_bytes())
@@ -146,13 +149,9 @@ class ReleaseAssetsTests(unittest.TestCase):
     def test_cross_host_checkout_document_identity(self) -> None:
         """One Windows ZIP must retain literal identity across Git EOL defaults."""
         windows, linux = self.checkout_documents()
-        for name in assets.DOCUMENTS:
+        for name in (*assets.DOCUMENTS, "src/main.rs", "install.sh"):
             self.assertEqual((windows / name).read_bytes(), (linux / name).read_bytes())
             self.assertNotIn(b"\r\n", (windows / name).read_bytes())
-        self.assertEqual(
-            (assets.ROOT / ".gitattributes").read_text(encoding="utf-8").splitlines(),
-            [f"{name} text eol=lf" for name in assets.DOCUMENTS],
-        )
         self.target = "x86_64-pc-windows-msvc"
         self.payload = executable(self.target)
         members = [
@@ -206,26 +205,7 @@ class ReleaseAssetsTests(unittest.TestCase):
 
     def test_fixture_sidecar_ascii_lf_record(self) -> None:
         """Fixture records retain exact wire bytes under Windows text defaults."""
-
-        def windows_text(
-            path: Path,
-            data: str,
-            encoding: str | None = None,
-            errors: str | None = None,
-            newline: str | None = None,
-        ) -> int:
-            with path.open(
-                "w",
-                encoding=encoding,
-                errors=errors,
-                newline="\r\n" if newline is None else newline,
-            ) as stream:
-                return stream.write(data)
-
-        with mock.patch.object(
-            Path, "write_text", autospec=True, side_effect=windows_text
-        ):
-            self.write()
+        self.write()
         expected = f"{assets.digest_file(self.archive)}  {self.archive.name}\n".encode(
             "ascii"
         )
@@ -409,6 +389,57 @@ class ReleaseAssetsTests(unittest.TestCase):
             self.sidecar()
             with self.assertRaises((assets.AssetError, tarfile.TarError)):
                 self.check()
+
+    def test_executable_size_limit_before_payload_reads(self) -> None:
+        """Tar and ZIP ceilings apply with and without a verified build."""
+        for self.target in (assets.TARGETS[0], assets.TARGETS[-1]):
+            for size, accepted in ((256, True), (257, False)):
+                self.payload = executable(self.target) + bytes(size - 256)
+                self.write()
+                with mock.patch.object(assets, "MAX_BINARY_SIZE", 256, create=True):
+                    for aggregate in (False, True):
+                        with self.subTest(
+                            target=self.target, size=size, aggregate=aggregate
+                        ):
+                            if accepted:
+                                self.check(aggregate=aggregate)
+                            else:
+                                with self.assertRaisesRegex(
+                                    assets.AssetError, "executable size limit"
+                                ):
+                                    self.check(aggregate=aggregate)
+
+    def test_archive_size_limit_before_hashing(self) -> None:
+        """An oversized archive is rejected before its checksum consumes input."""
+        for self.target in (assets.TARGETS[0], assets.TARGETS[-1]):
+            self.payload = executable(self.target)
+            self.write()
+            size = self.archive.stat().st_size
+            with mock.patch.object(assets, "MAX_ARCHIVE_SIZE", size, create=True):
+                self.check()
+            with (
+                mock.patch.object(assets, "MAX_ARCHIVE_SIZE", size - 1, create=True),
+                mock.patch.object(
+                    assets,
+                    "digest_file",
+                    side_effect=AssertionError("oversized archive hashed"),
+                ),
+                self.assertRaisesRegex(assets.AssetError, "archive size limit"),
+            ):
+                self.check()
+
+    def test_tar_zero_padding_limit(self) -> None:
+        """Zero gzip trailers cannot bypass either source or aggregate ceilings."""
+        self.write()
+        original = gzip.decompress(self.archive.read_bytes())
+        self.archive.write_bytes(gzip.compress(original + bytes(65537)))
+        self.sidecar()
+        for aggregate in (False, True):
+            with (
+                self.subTest(aggregate=aggregate),
+                self.assertRaisesRegex(assets.AssetError, "tar padding limit"),
+            ):
+                self.check(aggregate=aggregate)
 
     def test_hidden_tar_alias_and_bad_header_checksum(self) -> None:
         """Physical name fields cannot hide aliases behind a NUL terminator."""

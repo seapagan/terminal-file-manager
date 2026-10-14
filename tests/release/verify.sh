@@ -62,7 +62,7 @@ write_elf_fixture() {
     interpreter=$2
     needed=$3
     versions=$4
-    printf '  Type:                              DYN (Position-Independent Executable file)\n  Machine:                           %s\n' "$machine" >"$fixture/header"
+    printf '  Class: ELF64\n  Data: 2s complement, little endian\n  Type:                              DYN (Position-Independent Executable file)\n  Machine:                           %s\n' "$machine" >"$fixture/header"
     printf '%s\n' "$interpreter" >"$fixture/program"
     printf '%s\n' "$needed" >"$fixture/dynamic"
     printf '%s\n' "$versions" >"$fixture/version"
@@ -99,10 +99,21 @@ write_elf_fixture 'AArch64' \
     '  INTERP         0x0000000000000238' \
     ' 0x0000000000000001 (NEEDED) Shared library: [libc.so.6]' \
     'Name: GLIBC_2.17  Name: GLIBC_2.28'
-printf '  Type: DYN (Position-Independent Executable file)\n  Machine: AArch64\n' \
+printf '  Class: ELF64\n  Data: little endian\n  Type: DYN (Position-Independent Executable file)\n  Machine: AArch64\n' \
     >"$fixture/header"
 assert_passes 'valid ELF header with compact spacing was rejected' \
     ./scripts/verify-release-binary.sh gnu aarch64 "$root/tfm"
+
+for malformed in class endian; do
+    write_elf_fixture 'Advanced Micro Devices X86-64' '' '' ''
+    case "$malformed" in
+        class) sed 's/ELF64/ELF32/' "$fixture/header" >"$root/header"; expected='expected 64-bit ELF' ;;
+        endian) sed 's/little endian/big endian/' "$fixture/header" >"$root/header"; expected='expected little-endian ELF' ;;
+    esac
+    cp "$root/header" "$fixture/header"
+    assert_fails_with "invalid ELF $malformed accepted" "$expected" \
+        ./scripts/verify-release-binary.sh static x86_64 "$root/tfm"
+done
 
 write_elf_fixture 'Advanced Micro Devices X86-64' '' '' ''
 printf '  6714: 0000000000342ca4   413 FUNC    LOCAL  DEFAULT    9 __init_libc\n' \

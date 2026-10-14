@@ -31,6 +31,10 @@ PE_OFFSET = 60
 HEADER_SIZE = 64
 MACH_EXECUTABLE = 2
 EXECUTABLE_BITS = 0o111
+# Current rehearsal archives are below 220 KiB; retain ample release-size headroom.
+MAX_ARCHIVE_SIZE = 256 * 1024 * 1024
+MAX_BINARY_SIZE = 128 * 1024 * 1024
+MAX_TAR_PADDING = 65536
 
 
 class ByteReader(Protocol):
@@ -178,6 +182,8 @@ def verify_content(
                     reject(f"checkout bytes mismatch: {name}")
                 remaining -= amount
     else:
+        if size > MAX_BINARY_SIZE:
+            reject("executable size limit exceeded")
         if binary is not None and size != binary.stat().st_size:
             reject("built executable size mismatch")
         actual = verify_payload(stream, size, target)
@@ -189,9 +195,11 @@ def verify_tar_end(stream: ByteReader) -> None:
     """Require a complete zero end marker and no hidden trailing records."""
     if read_exact(stream, BLOCK) != bytes(BLOCK):
         reject("invalid tar end marker")
-    while padding := stream.read(CHUNK):
-        if any(padding):
-            reject("data after tar end marker")
+    padding = stream.read(MAX_TAR_PADDING + 1)
+    if len(padding) > MAX_TAR_PADDING:
+        reject("tar padding limit exceeded")
+    if any(padding):
+        reject("data after tar end marker")
 
 
 def verify_tar_header(block: bytes, member: tarfile.TarInfo) -> None:
@@ -257,6 +265,8 @@ def verify(
     """Enforce complete source-side asset identity without foreign execution."""
     if archive.name != expected_name(target, version):
         reject("incorrect package, version or target archive basename")
+    if archive.stat().st_size > MAX_ARCHIVE_SIZE:
+        reject("archive size limit exceeded")
     verify_sidecar(archive)
     if "windows" in target:
         verify_zip(archive, target, binary)

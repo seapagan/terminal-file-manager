@@ -18,6 +18,10 @@ test -f "$binary" || die "binary not found: $binary"
 header=$($readelf -h "$binary") || die 'readelf could not inspect the ELF header'
 printf '%s\n' "$header" | grep -Eq 'Type:[[:space:]]+(EXEC|DYN)' || \
     die 'binary is not an executable ELF'
+printf '%s\n' "$header" | grep -Eq 'Class:[[:space:]]+ELF64([[:space:]]|$)' || \
+    die 'expected 64-bit ELF'
+printf '%s\n' "$header" | grep -Eq 'Data:.*little endian' || \
+    die 'expected little-endian ELF'
 
 case "$arch" in
     x86_64) machine='Advanced Micro Devices X86-64' ;;
