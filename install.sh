@@ -253,7 +253,7 @@ validate_candidate() {
     # POSIX sh has no portable deadline facility. Validation is synchronous;
     # native release/installer acceptance must prove prompt --version termination.
     if ! "$candidate" --version >"$tmp_dir/version"; then
-        die 'candidate failed --version validation'
+        die 'candidate failed --version validation; temporary-directory execution restrictions (such as noexec) are a possible cause. Try setting TMPDIR to an executable location.'
     fi
     printf 'tfm %s\n' "${version#v}" >"$tmp_dir/expected-version"
     cmp -s "$tmp_dir/version" "$tmp_dir/expected-version" ||

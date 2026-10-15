@@ -220,7 +220,10 @@ archive=terminal-file-manager-$TEST_RELEASE_TAG-x86_64-unknown-linux-gnu.tar.gz
 (cd "$release_dir" && "$REAL_SHA256SUM" "$archive" >"$archive.sha256")
 assert_fails 'unexecutable candidate succeeded'
 assert_output 'candidate failed --version validation'
+assert_output 'temporary-directory execution restrictions (such as noexec) are a possible cause'
+assert_output 'Try setting TMPDIR to an executable location.'
 assert_no_binary
+assert_tmp_cleaned
 "$REAL_TAR" -czf "$release_dir/$archive" -C "$root/archive" tfm README.md LICENSE-MIT LICENSE-APACHE
 (cd "$release_dir" && "$REAL_SHA256SUM" "$archive" >"$archive.sha256")
 pass
