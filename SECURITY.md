@@ -2,21 +2,27 @@
 
 ## Supported versions
 
-Only the latest release line is supported.
+TFM has no public release yet. Report issues against the development branch.
+Once releases begin, the maintainer will support the latest release line.
 
 ## Security properties
 
-M0-B only handles help, version and rejected arguments. It does not browse or
-mutate user files, open SSH connections, access credentials or install software.
+The application handles help, version and rejected arguments. It does not browse
+or mutate user files, open SSH connections or access credentials. The repository
+also contains Unix and PowerShell installers, which can replace an installed
+binary after archive, checksum, architecture and version validation.
 Future file-manager security contracts and their required proof are documented
 in [architecture](docs/architecture.md) and [acceptance](docs/acceptance.md).
 They are not implemented guarantees of this scaffold.
 
-The build-only release framework has no publishing job or write permissions.
-Executable downloads are version-pinned and SHA-256 verified before execution.
-Dependency and workflow policy checks are mandatory. Installer and native
-binary verification remain M0-C gates; no release-readiness claim follows from
-this framework alone.
+The build-only release rehearsal has no publishing job or write permissions.
+Its Rustup bootstrap verifies pinned executable downloads before execution.
+The consumer installers use HTTPS for remote release downloads and verify
+SHA-256 sidecars before extraction. Checksums establish byte integrity; users
+must trust the publisher and any configured Windows release mirror.
+Dependency and workflow policy checks remain mandatory. Native binary and
+installer proof passed for the recorded M0 checkpoint. Final shipping-graph
+verification and publication remain separate release gates.
 
 ## Reporting a vulnerability
 

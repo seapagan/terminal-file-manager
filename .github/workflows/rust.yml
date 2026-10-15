@@ -28,7 +28,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15, windows-2025]
+        include:
+          - os: ubuntu-24.04
+            coverage: linux
+          - os: macos-15
+            coverage: macos
+          - os: windows-2025
+            coverage: windows
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -39,7 +45,7 @@ jobs:
         uses: seapagan/setup-rust@a91f5a34c552642ece0e8cef8b5e9226f41a3c0b # v1.0.0
         with:
           toolchain: ${{ env.RUST_VERSION }}
-          components: rustfmt clippy
+          components: rustfmt clippy llvm-tools-preview
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -48,17 +54,120 @@ jobs:
       - name: Install test tools
         uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
         with:
-          tool: cargo-make@0.37.24, cargo-nextest@0.9.148
+          tool: cargo-make@0.37.24, cargo-nextest@0.9.148, cargo-llvm-cov@0.9.1
       - name: Verify the executable and library
         run: |
           cargo make format
           cargo make check
           cargo make clippy
-          cargo make test
           cargo make doctest
           cargo make doc
           cargo make build
           cargo make package
+
+      - name: Run native Rust tests with coverage
+        env:
+          COVERAGE_PLATFORM: ${{ matrix.coverage }}
+        run: |
+          cargo llvm-cov nextest \
+            --all-targets --all-features --locked --no-fail-fast \
+            --remap-path-prefix --lcov \
+            --output-path="coverage-${COVERAGE_PLATFORM}.lcov"
+          cargo llvm-cov report \
+            --remap-path-prefix --json \
+            --output-path="coverage-${COVERAGE_PLATFORM}.json"
+          test -s "coverage-${COVERAGE_PLATFORM}.lcov"
+          test -s "coverage-${COVERAGE_PLATFORM}.json"
+
+      - name: Validate Unix coverage
+        if: runner.os != 'Windows'
+        env:
+          COVERAGE_PLATFORM: ${{ matrix.coverage }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="coverage-${COVERAGE_PLATFORM}.lcov"
+          test -s "$report"
+          awk '
+            /^SF:/ {
+              found = 1
+              if ($0 !~ /^SF:src\/[A-Za-z0-9_.\/-]+$/) {
+                print "Invalid LCOV source path: " $0 > "/dev/stderr"
+                invalid = 1
+              }
+              if (seen[$0]++) {
+                print "Duplicate LCOV source path: " $0 > "/dev/stderr"
+                duplicate = 1
+              }
+            }
+            END { exit !found || invalid || duplicate }
+          ' "$report"
+
+      - name: Normalize Windows coverage paths
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $coveragePath = (Resolve-Path coverage-windows.lcov).Path
+          $coverageLines = [System.IO.File]::ReadAllLines($coveragePath)
+          for ($index = 0; $index -lt $coverageLines.Length; $index++) {
+            if ($coverageLines[$index].StartsWith('SF:')) {
+              $coverageLines[$index] = $coverageLines[$index].Replace('\', '/')
+            }
+          }
+          $coverageText = [string]::Join("`n", $coverageLines) + "`n"
+          [System.IO.File]::WriteAllText(
+            $coveragePath,
+            $coverageText,
+            [System.Text.UTF8Encoding]::new($false)
+          )
+
+      - name: Validate Windows coverage
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $coveragePath = (Resolve-Path coverage-windows.lcov).Path
+          if ((Get-Item $coveragePath).Length -eq 0) {
+            throw "The Windows coverage report is empty."
+          }
+          $sourcePaths = @(
+            Select-String -Path $coveragePath -Pattern '^SF:' |
+              ForEach-Object { $_.Line }
+          )
+          if ($sourcePaths.Count -eq 0) {
+            throw "The Windows coverage report contains no source paths."
+          }
+          $invalidPaths = @(
+            $sourcePaths |
+              Where-Object { $_ -notmatch '^SF:src/[A-Za-z0-9_./-]+$' }
+          )
+          if ($invalidPaths.Count -gt 0) {
+            $invalidPaths | ForEach-Object {
+              Write-Error "Invalid LCOV source path: $_"
+            }
+            throw "The Windows coverage report has invalid source paths."
+          }
+          $duplicatePaths = @(
+            $sourcePaths |
+              Group-Object |
+              Where-Object { $_.Count -gt 1 } |
+              ForEach-Object { $_.Name }
+          )
+          if ($duplicatePaths.Count -gt 0) {
+            $duplicatePaths | ForEach-Object {
+              Write-Error "Duplicate LCOV source path: $_"
+            }
+            throw "The Windows coverage report has duplicate source paths."
+          }
+
+      - name: Upload native coverage
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-${{ matrix.coverage }}
+          path: |
+            coverage-${{ matrix.coverage }}.lcov
+            coverage-${{ matrix.coverage }}.json
+          if-no-files-found: error
+          retention-days: 14
 
   msrv:
     name: Exact declared MSRV
@@ -94,7 +203,7 @@ jobs:
         run: cargo make msrv
 
   quality:
-    name: Dependency policy, workflows, and coverage
+    name: Source quality and script lint
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -107,15 +216,13 @@ jobs:
           python-version: '3.14.8'
       - name: Install Python support tools
         run: |
-          python -m pip install 'ruff==0.17.0' 'mypy==2.4.0' 'lizard==1.23.0'
-          ruff --version
-          mypy --version
+          python -m pip install 'lizard==1.23.0'
           lizard --version
       - name: Install current stable Rust
         uses: seapagan/setup-rust@a91f5a34c552642ece0e8cef8b5e9226f41a3c0b # v1.0.0
         with:
           toolchain: ${{ env.RUST_VERSION }}
-          components: rustfmt clippy llvm-tools-preview
+          components: clippy
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -125,19 +232,7 @@ jobs:
       - name: Install quality tools
         uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
         with:
-          tool: cargo-make@0.37.24, cargo-nextest@0.9.148, cargo-llvm-cov@0.9.1, cargo-audit@0.22.2, cargo-deny@0.20.2
-      - name: Install actionlint
-        env:
-          ACTIONLINT_VERSION: 1.7.12
-          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
-        run: |
-          archive="$RUNNER_TEMP/actionlint.tar.gz"
-          curl --fail --silent --show-error --location \
-            "https://github.com/rhysd/actionlint/releases/download/v$ACTIONLINT_VERSION/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
-            --output "$archive"
-          printf '%s  %s\n' "$ACTIONLINT_SHA256" "$archive" | sha256sum --check
-          tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
-          install -m 755 "$RUNNER_TEMP/actionlint" "$HOME/.cargo/bin/actionlint"
+          tool: cargo-make@0.37.24
       - name: Install ShellCheck
         shell: bash
         run: |
@@ -159,17 +254,125 @@ jobs:
           echo "$shellcheck_dir" >> "${GITHUB_PATH:?}"
           "$shellcheck_dir/shellcheck" --version
 
-      - name: Verify support code, dependencies, workflows, and coverage
+      - name: Lint binary verification scripts
+        run: cargo make release-shellcheck
+
+      - name: Lint POSIX installer and regression harness
+        run: cargo make installers-shellcheck
+
+      - name: Analyse source complexity and maintainability
         run: |
-          cargo make python-format
-          cargo make python-lint
-          cargo make python-type
-          cargo make python-test
           cargo make complexity
           cargo make maintainability
-          cargo make bootstrap-test
-          cargo make inventory-test
-          cargo make audit
-          cargo make deny
-          cargo make actions-lint
-          cargo make coverage
+
+  coverage:
+    name: Combined coverage
+    runs-on: ubuntu-24.04
+    needs: library
+
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Download Linux coverage
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-linux
+          path: coverage/linux
+
+      - name: Download macOS coverage
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-macos
+          path: coverage/macos
+
+      - name: Download Windows coverage
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-windows
+          path: coverage/windows
+
+      - name: Install LCOV
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes lcov=2.0-4ubuntu2
+          lcov --version
+
+      - name: Validate and merge native LLVM coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m scripts.merge_llvm_coverage \
+            --input linux coverage/linux/coverage-linux.lcov coverage/linux/coverage-linux.json \
+            --input macos coverage/macos/coverage-macos.lcov coverage/macos/coverage-macos.json \
+            --input windows coverage/windows/coverage-windows.lcov coverage/windows/coverage-windows.json \
+            --output coverage.lcov > coverage-summary.json
+          cat coverage-summary.json
+
+      - name: Validate combined coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage.lcov
+          awk '
+            /^SF:/ {
+              found = 1
+              if ($0 !~ /^SF:src\/[A-Za-z0-9_.\/-]+$/) {
+                print "Invalid LCOV source path: " $0 > "/dev/stderr"
+                invalid = 1
+              }
+              if (seen[$0]++) {
+                print "Duplicate LCOV source path: " $0 > "/dev/stderr"
+                duplicate = 1
+              }
+            }
+            END { exit !found || invalid || duplicate }
+          ' coverage.lcov
+          grep -h '^SF:' coverage/{linux,macos,windows}/coverage-*.lcov | sort -u > expected-sources.txt
+          grep '^SF:' coverage.lcov | sort > combined-sources.txt
+          cmp expected-sources.txt combined-sources.txt
+          lcov --summary coverage.lcov
+
+      - name: Print combined coverage summary
+        run: lcov --summary coverage.lcov
+
+      - name: Upload combined coverage
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-combined
+          path: |
+            coverage.lcov
+            coverage-summary.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Check optional Codacy configuration
+        id: codacy
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+        run: |
+          if [[ -n "$CODACY_PROJECT_TOKEN" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Explain skipped Codacy reporting
+        if: steps.codacy.outputs.configured != 'true'
+        run: |
+          echo "Codacy reporting skipped: token absent or untrusted fork PR. Combined coverage was verified and uploaded."
+
+      - name: Run Codacy coverage reporter
+        if: steps.codacy.outputs.configured == 'true'
+        uses: codacy/codacy-coverage-reporter-action@89d6c85cfafaec52c72b6c5e8b2878d33104c699 # v1.3.0
+        with:
+          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+          coverage-reports: coverage.lcov

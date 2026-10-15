@@ -1,27 +1,47 @@
 # Terminal File Manager
 
-`terminal-file-manager` is the Rust package; `tfm` is its executable.
-This repository currently contains the M0-B engineering foundation. The
-executable prints help or its version and rejects unsupported arguments.
-File browsing, TUI, filesystem operations and SSH are future milestones.
+TFM is a cross-platform, keyboard-first terminal file manager in development for
+Linux, macOS and Windows. The planned application will let you browse local and
+SSH/SFTP directories in one or two panes, copy and move files with clear
+overwrite and deletion safeguards, and manage transfers. Shell integration,
+clipboard support and directory jumping will help you work from the terminal.
+
+These file-manager features are planned. The current `tfm` executable prints
+help or its version and rejects unsupported arguments. You can try that CLI
+foundation from source:
 
 ```console
 cargo run --locked -- --help
 cargo run --locked -- --version
 ```
 
-No-argument invocation prints help. Help/version return 0; unsupported
-arguments print a diagnostic to stderr and return 2.
+Running without arguments also prints help. The Rust package name is
+`terminal-file-manager`; the command name is `tfm`.
 
-The package uses edition 2024, exact Rust 1.95.0 as the approved scaffold MSRV,
-and MIT OR Apache-2.0 licensing. Development uses pinned Rust 1.99.0.
-See [CONTRIBUTING](CONTRIBUTING.md) for tools and `cargo make verify`.
+## Progress
 
-The manual [release rehearsal](.github/workflows/release-rehearsal.yml)
-retains all eight Linux GNU/MUSL, macOS and Windows x64/ARM64 targets. It never
-publishes. Executable verifiers/installers and real native/ABI proof belong
-to M0-C; hosted proof follows separately authorized Git delivery. No binary
-release or installer is offered at this checkpoint.
+Completed:
+
+- The CLI foundation, build tooling, security checks and native CI for Linux,
+  macOS and Windows.
+- Unix and PowerShell installers, with native build and installation rehearsals
+  across eight platform targets.
+- An eight-target feasibility check for the planned embedded SSH/SFTP stack.
+
+Upcoming milestones:
+
+- Local browsing, dual panes, sorting, filters and selection.
+- Safe file operations, Trash, conflict handling and a transfer queue.
+- SSH/SFTP browsing, local/remote transfers and labelled client relay between
+  remote servers. Direct server-to-server transfers remain post-v1 work.
+- Bookmarks, history, shell and clipboard integration, and directory jumping.
+- Text viewing, filename search, directory comparison and terminal compatibility.
+- Verification of the finished application and its release artifacts.
+
+TFM has no public release yet. The completed engineering foundation does not
+include file browsing or file operations. See [CONTRIBUTING](CONTRIBUTING.md)
+for building and verification, and [acceptance](docs/acceptance.md) for recorded
+proof and remaining release gates. TFM uses the MIT OR Apache-2.0 licence.
 
 - [Architecture and future safety contracts](docs/architecture.md)
 - [Acceptance gates and milestone boundaries](docs/acceptance.md)

@@ -1,0 +1,5 @@
+LICENSE-MIT text eol=lf
+LICENSE-APACHE text eol=lf
+README.md text eol=lf
+*.rs text eol=lf
+*.sh text eol=lf

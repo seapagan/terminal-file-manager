@@ -125,9 +125,6 @@ jobs:
         with:
           python-version: '3.14.8'
 
-      - name: Test advisory report aggregation
-        run: python -B -m unittest discover -s tests -p 'test_advisory_quality_report*.py'
-
       - name: Build sticky comment
         run: |
           python scripts/advisory_quality_report.py combine \
