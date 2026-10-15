@@ -1,19 +1,20 @@
-# TFM M0 selected-dependency handover — accepted feasibility, probe removed
+# TFM M0 selected-dependency handover
 
 The maintainer accepted the bounded eight-target dependency proof on 2026-10-11.
 This is historical feasibility evidence for the selected minimal stack, not full
 shipping-graph certification or an implementation of a file manager/SSH client.
-The temporary source, isolated workspace and hosted workflow are removed during
-closeout. Ordinary product dependencies, MSRV, installers and distribution remain
-unchanged. PR #1 stays draft until separately authorised acceptance/merge.
+The maintainer removed the temporary source, isolated workspace and hosted
+workflow in [`e681a368`](https://github.com/seapagan/terminal-file-manager/commit/e681a368)
+on 2026-10-11. That cleanup left product dependencies, MSRV, installers and
+distribution unchanged. Later foundation changes appear in
+[provenance](provenance.md#later-foundation-changes).
 
 ## Handover location and future ownership
 
-The requested local handover is
-[plans/tfm-m0-dependency-probe-handover.md](../plans/tfm-m0-dependency-probe-handover.md).
-Plans and the canonical spec are ignored by `.git/info/exclude`; their local
-updates will not appear in the PR. This tracked document preserves the same
-substantive handover so the PR retains all conclusions and precise fix guidance.
+This tracked document is the public handover. Its local planning counterpart is
+`plans/tfm-m0-dependency-probe-handover.md`; Git excludes that file and the
+canonical specification. Repository readers can use the evidence links and fix
+guidance below without access to those local files.
 
 During M3, use a **maintained narrow Yazi SFTP fork pinned to a full Cargo Git
 revision**. Do not ship the M0 extracted snapshot or assume upstream has these
@@ -79,11 +80,14 @@ notices, budgets and release acceptance remain future obligations. Dependency
 smoke does not prove authentication, remote file operations, interoperability,
 short writes, acknowledged close, cancellation or reconnect safety.
 
-The previous std-only distribution rehearsal at `10e4be1`,
+The std-only distribution rehearsal at `10e4be1`,
 [run 38153439044](https://github.com/seapagan/terminal-file-manager/actions/runs/38153439044),
-remains accepted and was not repeated. Broad installer/QC test triage and CI
-simplification are a separate later task. No release/publication/settings change
-is authorised by this closeout.
+was the accepted distribution proof at probe closeout. The later
+[run 38625643530](https://github.com/seapagan/terminal-file-manager/actions/runs/38625643530)
+passed all eight native distribution targets and aggregate at `b3c31aa` on
+2026-10-14. The approved CI cleanup and coverage merger also landed after
+closeout; [provenance](provenance.md#later-foundation-changes) records them.
+These checkpoints did not publish a release or change the M3/M8 obligations.
 
 ## Selected sources, versions and features
 
@@ -106,11 +110,11 @@ is authorised by this closeout.
 - Necessary Yazi libraries: bitflags `=2.13.2` / serde, hashbrown `=0.17.1` /
   serde, parking_lot `=0.12.5`, serde `=1.0.229` / derive, typed-path `=0.12.3`.
 
-The executable actually exercised Ed25519 sign/verify and changed-message
+The probe exercised Ed25519 sign/verify and changed-message
 rejection, ring AES-256-GCM round trip, russh `connect_stream` identification via
 an in-memory duplex transport, and terminal APIs. The banner probe is not an
 SSH authentication/server harness. All eight compiled the real ring graph;
-foreign feature trees and Linux actual russh rustc cfgs confirm ring-only.
+foreign feature trees and the Linux russh rustc cfgs confirm ring-only.
 
 ## Provenance, consumability and policy
 
@@ -805,7 +809,7 @@ features, not a promise that all conditional target edges compile on every OS.
 | yazi-sftp | 26.9.1 | none |
 | zeroize | 1.9.1 | alloc, default |
 
-## Probe closeout verification — 2026-10-11
+## Probe closeout verification (2026-10-11)
 
 The temporary workflow and entire isolated probe tree (88 tracked files plus
 local temporary evidence) were removed. No references to their runnable paths
@@ -821,13 +825,14 @@ Ruff/strict mypy/tests, complexity, workflow actionlint/ShellCheck/pedantic Zizm
 Rust tests/docs/package and the existing local release/installer regressions.
 The initial sandbox attempt stopped at a read-only advisory-cache lock; the
 identical elevated retry passed. Deny reported only license-not-encountered
-warnings for the retained approved licences unused by today's std-only product.
+warnings for the retained approved licences unused by the std-only product at
+that checkpoint.
 No waiver was added. `rtk proxy cargo make verify-fast` passed unchanged, and
 `rtk proxy git diff --check` passed after documentation patch-display whitespace
 normalisation. Documentation preservation was checked against the existing
 source, graph, reverse-edge and hosted evidence before deletion.
 
-Only this tracked handover mirror and authorised removals are delivered. Local
-ignored handover/spec/plan links remain outside Git. Signed cleanup delivery and
-routine CI at its exact head are reported in the closeout response; no new
-dependency matrix, SDK rerun or distribution rehearsal is part of closeout.
+The signed cleanup commit delivered this handover and the authorized removals.
+Local handover/spec/plan files stayed outside Git. Routine hosted checks passed
+at `e681a368`; the closeout did not rerun the dependency matrix, SDK inventory or
+distribution rehearsal. The later distribution checkpoint is recorded above.

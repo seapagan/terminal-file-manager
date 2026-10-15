@@ -40,6 +40,13 @@ requires explicit approval. SSH/SFTP integration must additionally validate the
 actual adopted dependency graph and its supported native targets; historical
 feasibility results do not certify a future shipping build.
 
+## Current CLI
+
+The Cargo package is `terminal-file-manager`; the executable is `tfm`.
+`tfm`, `tfm --help` and `tfm -h` print help. `tfm --version` and `tfm -V` print
+the version. These commands return 0; unsupported arguments print a diagnostic
+to stderr and return 2. File-manager features belong to later milestones.
+
 ## Local verification
 
 Install stable Rust with `rustfmt`, Clippy and `llvm-tools-preview`, plus
@@ -151,11 +158,20 @@ The nonpublishing eight-target release rehearsal is **manual-only**. It checks
 binary architecture and ABI requirements, checksums, archive contents and
 native installer acceptance before any public release is considered. Linux GNU
 builds target a maximum GLIBC requirement of 2.28; MUSL builds are checked for
-static linkage. Native macOS and Windows verification remains necessary.
+static linkage. The [acceptance record](docs/acceptance.md) links the completed
+M0 native rehearsal. Repeat distribution acceptance for the final shipping graph
+and release artifacts; historical scaffold or dependency-probe runs do not
+certify a finished release.
 
 The Unix and Windows installers validate downloaded archive hashes, executable
 architecture and exact `tfm --version` before replacement. They use staging and
 preservation/recovery safeguards; do not weaken them when changing installers.
+Unix candidate execution can fail when the temporary filesystem restricts
+execution, for example with `noexec`. In that case, set `TMPDIR` to a writable
+directory on an executable filesystem and retry. Other launch failures need
+their own diagnosis. The installers reject linked destination ancestors; use
+an explicit physical installation path when that restriction applies.
+
 For focused offline acceptance using an existing release archive:
 
 ```sh
