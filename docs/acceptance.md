@@ -3,8 +3,9 @@
 ## Current status and evidence
 
 M0's engineering foundation is complete at the accepted checkpoints below. The
-application still implements only help, version and argument errors. M1–M8
-cover the file manager and its final release; genuine direct SSH-to-SSH transfer
+application now implements the M1 local read-only browser described below.
+M1 remains subject to native hosted results and maintainer review; M2–M8 cover
+the remaining application and final release. Genuine direct SSH-to-SSH transfer
 remains post-v1 work.
 
 | Checkpoint | Completed proof |
@@ -12,13 +13,92 @@ remains post-v1 work.
 | M0-S: feasibility | [Selected dependency graph](m0-dependency-feasibility.md) built and ran on all eight native targets at `1cf5408`, [run 38163834667](https://github.com/seapagan/terminal-file-manager/actions/runs/38163834667) |
 | M0-B: CLI and quality foundation | Native Linux/macOS/Windows Rust, exact MSRV, package and policy checks; [Rust CI at `67a25ac`](https://github.com/seapagan/terminal-file-manager/actions/runs/38783314282) and [manual Python support CI at `b3c31aa`](https://github.com/seapagan/terminal-file-manager/actions/runs/38625636018) |
 | M0-C: distribution and installers | Eight minimal-binary builds, ABI/object checks, real-archive installer acceptance and the sixteen-file aggregate at `b3c31aa`, [run 38625643530](https://github.com/seapagan/terminal-file-manager/actions/runs/38625643530) |
-| M0-D: delivery and hosted proof | Signed foundation delivery and hosted acceptance; [PR #1](https://github.com/seapagan/terminal-file-manager/pull/1) retains the review history. Merge and publication require separate authorization |
+| M0-D: delivery and hosted proof | Signed foundation delivery and hosted acceptance; [PR #1](https://github.com/seapagan/terminal-file-manager/pull/1) retains the review history. Merged into main at `c84557a`; publication remains separately authorized |
 
 The eight-target rehearsal passed on 2026-10-14. It covered both Linux
 architectures with GNU and MUSL, both macOS architectures, and Windows x64/ARM64
 with PowerShell 5.1 and 7. The later Unix execution diagnostic and documentation
 updates have no independent eight-target rerun. They do not replace the recorded
 checkpoint or certify final release artifacts.
+
+## M1 implementation and current proof
+
+The browser supports cwd/explicit-path startup, two independent session panes,
+width-based single/dual/sidebar restoration, all local sort/grouping modes,
+hidden/ignore/filter policies, visible-only marks and counts, session history,
+metadata popup/sidebar and cancellable on-demand totals. File mutations, SSH,
+viewer/editor and automatic launching are unavailable by design. Preferences
+are lazy/atomic; startup location/layout is never restored from preferences.
+
+Local Linux proof at `d59281b`: the unchanged `cargo make verify` passed,
+including exact Rust 1.95.0, package/source/security gates, Ruff/mypy/static
+support checks, strict Rust maintainability, Lizard 1.23.0 and compulsory xwin
+check/Clippy/build. Native tests passed 44 cases; one ignored child entry point
+is explicitly executed by its PTY parent. The approved final-review fixes and documentation/acceptance slice
+must receive the same final clean-tree gate before delivery. No thresholds or scanner
+semantics changed. All dependency exceptions are exact and approved; see
+[provenance](provenance.md).
+
+| Evidence | Scope and limits |
+| --- | --- |
+| State/input/TestBackend | Independent panes/history, visible/excluded marks, empty filter results, stale list/metadata/totals rejection, configurable keys/mouse, 1–200-column Unicode/control-name/monochrome rendering |
+| Linux filesystem | Natural and other sorts, nested/global/linked-worktree ignore refresh/precedence, invalid-byte identity, links/broken links/modes, no-follow cancelled/incomplete/overflow totals |
+| Native Linux PTY | Real cwd/explicit-path executable, file non-launch, simultaneous resize/input, quit, returned-error and unwind restoration, paired alternate/mouse/paste/keyboard modes |
+| Windows source/cross-build | Hidden attributes, junction/broken target/trailing separator, symlink/native-ID replacement, failed queries and lossless native UTF-16/drive/UNC normalization regressions compile under xwin; this is not native execution |
+| Hosted native acceptance | Existing Linux/macOS/Windows jobs run the real application tests and native PTY/ConPTY; results belong to the draft PR, not to configuration or cross-compilation claims |
+
+The [native Linux PTY recording](m1-browser.cast) shows the real executable
+listing an owned fixture, toggling dual panes, opening help and quitting.
+It is a fast scripted transcript in asciicast v2 format, with original timings.
+
+### Local coverage and complexity baseline
+
+Linux production coverage after the reviewed fixes is 1,720/2,052
+lines (83.82%), 198/231 functions (85.71%) and 2,679/3,264 regions (82.08%).
+LLVM supplied no branch data. This is native Linux evidence, not combined
+coverage or proof of Windows-only paths. No new coverage floor was introduced.
+
+Exact Lizard 1.23.0 reports no advisory findings under 10/50/8/500 across the
+maintained Rust/Python sources and tests. Rust maxima are CCN 10, function NLOC
+49, parameters 6 and file NCSS 363. Strict Clippy maintainability also passes.
+Hosted advisory/Codacy results still require observation; local lint is not
+an external Codacy result.
+
+### Measured M1 baseline — 16 October 2026
+
+Measurements used a Linux x86_64 host (kernel 7.0.0-38, glibc 2.43), local warm
+filesystem and unoptimized builds; fixture creation is excluded. The listing /
+filter measurements use Rust 1.95.0 with the reviewed refresh/sort fixes. Startup
+uses the unchanged terminal path measured with Rust 1.99.0 at `d59281b`. These are descriptive measurements, not acceptance thresholds or
+macOS/Windows/remote-heavy workload proof.
+
+| Operation | Five-sample median | Observed range |
+| --- | --- | --- |
+| Snapshot/lstat/ignore, 10,000 owned regular files | 19.440 ms | 19.057–20.871 ms |
+| Install + natural sort + visible working set, same files | 7.755 ms | 7.596–7.962 ms |
+| Native fuzzy filter to one matching entry, same files | 2.315 ms | 2.303–2.352 ms |
+| Spawn through first populated listing, native PTY / five entries | 6.039 ms | 5.078–6.505 ms |
+
+The final-review cached-snapshot reproduction on Rust 1.95.0 measured marked
+refresh at 2,875.378 ms before the fix and 18.305 ms after it (10,000 marked
+entries; snapshot clone excluded). Reconciliation now makes one entries pass
+with native-path hash lookups. Per-snapshot enumeration ordinals restore Unsorted
+transitions independently of directory grouping, cursor or marks. Focused tests
+also cover order replacement on refresh and missing/replaced/unavailable identity.
+
+Listing/filter measurements call the actual public fs/app APIs, assert 10,000
+entries before filtering and one afterward, over five fresh App instances.
+Startup starts its timer before PTY fork/exec and stops when the listing marker
+is observed. It includes terminal query responses; the owned config is absent.
+No sleeps or external filesystem/network data are used. Numeric performance,
+memory and subsystem coverage budgets remain a later reviewed decision.
+
+Remaining acceptance distinctions: hosted macOS/Windows behaviour (including
+ConPTY and Windows symlink permissions) must be inspected on the PR; UNC
+normalization/CLI identity tests do not establish access to a live SMB server.
+Representative real terminals/multiplexers, minimum OS versions, all eight
+release artifacts and final shipping graph certification retain M7/M8 ownership.
+A green local gate, code presence or a draft PR alone does not accept M1.
 
 ### M0-S: feasibility decisions and limits
 

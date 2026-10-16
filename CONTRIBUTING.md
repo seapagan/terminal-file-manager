@@ -10,8 +10,8 @@ need.
 
 The [repository](https://github.com/seapagan/terminal-file-manager) contains
 application source, tests, installer and release tooling, and CI configuration.
-The Cargo package includes the Rust sources, CLI tests, README, both licences,
-and required Cargo metadata. Local planning material and development support
+The Cargo package includes Rust sources, application/native tests, README,
+both licences and required Cargo metadata. Local planning material and development support
 utilities are excluded. Inspect the package with:
 
 ```sh
@@ -43,9 +43,19 @@ feasibility results do not certify a future shipping build.
 ## Current CLI
 
 The Cargo package is `terminal-file-manager`; the executable is `tfm`.
-`tfm`, `tfm --help` and `tfm -h` print help. `tfm --version` and `tfm -V` print
-the version. These commands return 0; unsupported arguments print a diagnostic
-to stderr and return 2. File-manager features belong to later milestones.
+`tfm` browses the shell cwd; `tfm DIRECTORY` browses the explicit native path.
+Both start single-pane and require a terminal on stdin/stdout. `-- DIRECTORY`
+accepts a leading hyphen. Explicit-path failures never substitute another path.
+`tfm --help` / `-h` and `tfm --version` / `-V` print output and return 0;
+unsupported arguments and startup failures report stderr and return 2.
+M1 browsing is read-only; Enter never launches files. See README for bindings
+and lazy preferences. Tests use owned fixtures and isolated HOME/config values.
+
+Native PTY tests use portable-pty on Unix and ConPTY on Windows. Their ignored
+`terminal_child` entry point is deliberately invoked by the parent restoration
+test; it is not an untested feature skip. Windows-only metadata tests must run
+on Windows; Linux xwin supplies compile/lint/build evidence only. Rendering and
+input tests use cached state/TestBackend, independently of a real terminal.
 
 ## Local verification
 

@@ -161,3 +161,37 @@ fn late_metadata_cannot_replace_new_selection_or_refreshed_listing() {
     let entry = terminal_file_manager::fs::inspect(&new.path);
     assert!(!app.complete_metadata(&new, entry, None));
 }
+
+#[test]
+fn large_marked_refresh_preserves_only_matching_native_identities() {
+    use terminal_file_manager::fs::Snapshot;
+    let (root, mut app) = loaded();
+    let template = app.panes[0].entries[0].clone();
+    let entries = (0..10_000)
+        .map(|index| {
+            let mut entry = template.clone();
+            entry.name = format!("entry{index:05}").into();
+            entry.path = root.path().join(&entry.name);
+            entry.hidden = false;
+            entry.identity.as_mut().unwrap().object = Some((1, index));
+            entry
+        })
+        .collect();
+    let mut snapshot = Snapshot {
+        path: root.path().to_path_buf(),
+        entries,
+        errors: vec![],
+    };
+    app.complete_listing(0, 1, Ok(snapshot.clone()));
+    app.panes[0].select_all();
+    snapshot.entries[1].identity.as_mut().unwrap().object = Some((2, 1));
+    snapshot.entries[2].identity = None;
+    snapshot.entries.remove(0);
+    let request = app.request_listing(0, root.path().to_path_buf());
+    app.complete_listing(0, request.generation, Ok(snapshot));
+    assert_eq!(app.panes[0].marks.len(), 9_997);
+    for name in ["entry00000", "entry00001", "entry00002"] {
+        assert!(!app.panes[0].marks.contains_key(&root.path().join(name)));
+    }
+    assert_eq!(app.panes[0].selection_counts().visible, 9_997);
+}

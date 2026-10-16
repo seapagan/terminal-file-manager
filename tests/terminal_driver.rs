@@ -24,6 +24,12 @@ pub fn drive(command: CommandBuilder, steps: &[(&str, &str)], resize: bool) -> S
         contains(&transcript, b"\x1b[?2004l"),
         "paste mode was not restored"
     );
+    if contains(&transcript, b"\x1b[?1006h") {
+        assert!(
+            contains(&transcript, b"\x1b[?1006l"),
+            "mouse capture was not restored"
+        );
+    }
     if contains(&transcript, b"\x1b[>1u") {
         assert!(
             contains(&transcript, b"\x1b[<1u"),

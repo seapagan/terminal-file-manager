@@ -1,6 +1,6 @@
 use crate::{
     fs::{Entry, Identity, Snapshot},
-    listing::SortPolicy,
+    listing::{Sort, SortPolicy},
 };
 use std::{collections::HashMap, path::PathBuf};
 
@@ -53,6 +53,7 @@ pub struct Pane {
     pub pending: Option<PathBuf>,
     pub error: Option<String>,
     pub warnings: Vec<String>,
+    listing_order: HashMap<PathBuf, usize>,
     pub(super) back: Vec<Visit>,
     pub(super) forward: Vec<Visit>,
     pub(super) restoring: Option<Visit>,
@@ -76,6 +77,7 @@ impl Pane {
             pending: None,
             error: None,
             warnings: Vec::new(),
+            listing_order: HashMap::new(),
             back: Vec::new(),
             forward: Vec::new(),
             restoring: None,
@@ -104,17 +106,23 @@ impl Pane {
             self.cursor = None;
             self.scroll = 0;
         }
+        self.listing_order = snapshot
+            .entries
+            .iter()
+            .enumerate()
+            .map(|(index, entry)| (entry.path.clone(), index))
+            .collect();
         self.entries = snapshot.entries;
         self.warnings = snapshot.errors;
-        self.marks.retain(|path, identity| {
-            self.entries.iter().any(|entry| {
-                &entry.path == path
-                    && entry
-                        .identity
-                        .as_ref()
-                        .is_some_and(|fresh| same_object(identity, fresh))
+        self.marks = self
+            .entries
+            .iter()
+            .filter_map(|entry| {
+                let previous = self.marks.get(&entry.path)?;
+                let fresh = entry.identity.as_ref()?;
+                same_object(previous, fresh).then(|| (entry.path.clone(), previous.clone()))
             })
-        });
+            .collect();
         self.resort();
         if let Some(visit) = self.restoring.take() {
             self.cursor = visit.cursor;
@@ -125,6 +133,10 @@ impl Pane {
 
     /// Apply sort/grouping while preserving cursor and raw marked paths.
     pub fn resort(&mut self) {
+        if self.sort.sort == Sort::Unsorted {
+            self.entries
+                .sort_by_key(|entry| self.listing_order.get(&entry.path).copied());
+        }
         self.sort.apply(&mut self.entries);
         self.refilter();
     }

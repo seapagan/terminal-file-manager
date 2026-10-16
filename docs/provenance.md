@@ -11,6 +11,16 @@ interactive directory entry, rebuilds rule matchers on refresh and reports
 unknown rule status instead of silently treating errors as unignored files.
 The native regression cases were reviewed and adapted to these contracts.
 
+The terminal lifecycle, native PTY/ConPTY session driver, colour mapping and
+semantic styling adapt [Labeldeck 8c0fdea](https://github.com/seapagan/labeldeck/tree/8c0fdea354bf0b0bd8abafb293af78c34ac9fe1d)
+(`src/edit/color.rs`, `src/edit/ui/{theme,render}.rs`, terminal guards and
+`tests/common/terminal*.rs`; MIT, Grant Ramsay). Associated named/indexed/RGB,
+monochrome, palette, resize and restoration tests were inspected before adapting
+the applicable regressions. TFM uses colored_text public detection/resolution
+APIs directly, not copied internal colour logic. Its native metadata boundary
+uses the lsplus Win32 query pattern with function-scoped approved unsafe code,
+attribute validation, lossless UTF-16 and owned handle cleanup.
+
 Ratatui/Crossterm and the direct `colored_text` dependency supply the M1 terminal
 foundation. The only approved dependency-policy exceptions are Zlib for
 `foldhash 0.2.0`, Unicode-3.0 for `unicode-ident 1.0.27`, and `syn 2.0.119`
