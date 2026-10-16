@@ -2,6 +2,7 @@
 
 use std::ffi::OsString;
 
+pub mod app;
 pub mod fs;
 pub mod listing;
 
