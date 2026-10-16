@@ -1,0 +1,369 @@
+use super::{Action, Bindings};
+use crate::{
+    app::{App, IgnoreMode, Request},
+    listing::{Grouping, Sort},
+    ui::Geometry,
+};
+use crossterm::event::{
+    Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
+use std::{path::PathBuf, time::Duration};
+
+/// Pure input controller; emitted requests are the only route to background I/O.
+pub struct Controller {
+    pub app: App,
+    pub quit: bool,
+    pub preferences_changed: bool,
+    bindings: Bindings,
+    filter_before: Option<String>,
+    last_click: Option<(usize, PathBuf, Duration)>,
+}
+
+impl Controller {
+    /// Own the authoritative app and validated keymap.
+    pub fn new(app: App, bindings: Bindings) -> Self {
+        Self {
+            app,
+            quit: false,
+            preferences_changed: false,
+            bindings,
+            filter_before: None,
+            last_click: None,
+        }
+    }
+
+    /// Normalize terminal input. Clock/geometry are explicit deterministic inputs.
+    pub fn handle(&mut self, event: Event, geometry: &Geometry, now: Duration) -> Vec<Request> {
+        match event {
+            Event::Key(key) if key.kind != KeyEventKind::Release => {
+                if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+                    self.quit = true;
+                    return Vec::new();
+                }
+                if self.filter_before.is_some() {
+                    self.filter_key(key);
+                    return Vec::new();
+                }
+                self.bindings
+                    .action(key)
+                    .map_or_else(Vec::new, |action| self.dispatch(action, geometry))
+            }
+            Event::Paste(text) if self.filter_before.is_some() => {
+                self.append_filter(&text);
+                Vec::new()
+            }
+            Event::Mouse(event) => self.mouse(event, geometry, now),
+            _ => Vec::new(),
+        }
+    }
+
+    /// Keyboard and clickable controls share this dispatcher and availability policy.
+    pub fn dispatch(&mut self, action: Action, geometry: &Geometry) -> Vec<Request> {
+        use Action::*;
+        if let Some(reason) = unavailable(action) {
+            self.app.status = reason.into();
+            return Vec::new();
+        }
+        match action {
+            Up | Down | Home | End | PageUp | PageDown => self.movement(action, geometry),
+            Enter | Parent | Back | Forward | Refresh => return self.navigate(action),
+            Mark | MarkNext | SelectAll | ClearVisible => self.selection(action, geometry),
+            Hidden | Ignore | Sort | Reverse | Group => self.policy(action),
+            TogglePanes | FocusPane | ToggleSidebar | Metadata | Help => {
+                self.layout(action, geometry)
+            }
+            Quit => self.quit = true,
+            Filter => {
+                self.filter_before = Some(self.app.panes[self.app.active].filter.clone());
+                self.app.status = "Filter: type to narrow; Enter accepts, Esc restores".into();
+            }
+            Count => return self.count(),
+            Cancel => self.cancel(),
+            _ => {}
+        }
+        Vec::new()
+    }
+
+    fn movement(&mut self, action: Action, geometry: &Geometry) {
+        let height = page_height(geometry, self.app.active);
+        if self.app.help || self.app.popup {
+            let delta = match action {
+                Action::Up => -1,
+                Action::Home => -i16::MAX,
+                Action::End => i16::MAX,
+                Action::PageUp => -(height as i16),
+                Action::PageDown => height as i16,
+                _ => 1,
+            };
+            self.app.overlay_scroll = self.app.overlay_scroll.saturating_add_signed(delta);
+            return;
+        }
+        let pane = &mut self.app.panes[self.app.active];
+        let delta = match action {
+            Action::Up => -1,
+            Action::Home => -isize::MAX,
+            Action::End => isize::MAX,
+            Action::PageUp => -(height as isize),
+            Action::PageDown => height as isize,
+            _ => 1,
+        };
+        pane.move_cursor(delta, height);
+    }
+
+    fn navigate(&mut self, action: Action) -> Vec<Request> {
+        let id = self.app.active;
+        if action == Action::Back {
+            return self.app.history(false).into_iter().collect();
+        }
+        if action == Action::Forward {
+            return self.app.history(true).into_iter().collect();
+        }
+        let pane = &self.app.panes[id];
+        let path = match action {
+            Action::Enter => {
+                let Some(entry) = pane.current() else {
+                    self.app.status = "No visible entry".into();
+                    return Vec::new();
+                };
+                if !entry.enterable {
+                    self.app.status =
+                        "Viewer unavailable until M6; files are never launched".into();
+                    return Vec::new();
+                }
+                entry.path.clone()
+            }
+            Action::Parent => {
+                let Some(parent) = pane.path.parent() else {
+                    self.app.status = "Filesystem root".into();
+                    return Vec::new();
+                };
+                parent.to_path_buf()
+            }
+            _ => pane.path.clone(),
+        };
+        vec![self.app.request_listing(id, path)]
+    }
+
+    fn selection(&mut self, action: Action, geometry: &Geometry) {
+        let height = page_height(geometry, self.app.active);
+        let pane = &mut self.app.panes[self.app.active];
+        match action {
+            Action::Mark => pane.toggle_mark(),
+            Action::MarkNext => {
+                pane.toggle_mark();
+                pane.move_cursor(1, height);
+            }
+            Action::SelectAll => pane.select_all(),
+            Action::ClearVisible => pane.clear_visible(),
+            _ => {}
+        }
+    }
+
+    fn policy(&mut self, action: Action) {
+        let pane = &mut self.app.panes[self.app.active];
+        match action {
+            Action::Hidden => pane.show_hidden = !pane.show_hidden,
+            Action::Ignore => {
+                pane.ignore = match pane.ignore {
+                    IgnoreMode::Dim => IgnoreMode::Hide,
+                    IgnoreMode::Hide => IgnoreMode::Off,
+                    IgnoreMode::Off => IgnoreMode::Dim,
+                }
+            }
+            Action::Sort => pane.sort.sort = next_sort(pane.sort.sort),
+            Action::Reverse => pane.sort.reverse = !pane.sort.reverse,
+            Action::Group => {
+                pane.sort.grouping = match pane.sort.grouping {
+                    Grouping::First => Grouping::Last,
+                    Grouping::Last => Grouping::Mixed,
+                    Grouping::Mixed => Grouping::First,
+                }
+            }
+            _ => {}
+        }
+        pane.resort();
+        self.preferences_changed = true;
+    }
+
+    fn layout(&mut self, action: Action, geometry: &Geometry) {
+        match action {
+            Action::TogglePanes => self.app.dual = !self.app.dual,
+            Action::FocusPane if geometry.panes.iter().all(Option::is_some) => {
+                self.app.active = 1 - self.app.active
+            }
+            Action::ToggleSidebar => {
+                self.app.sidebar = !self.app.sidebar;
+                self.preferences_changed = true;
+            }
+            Action::Metadata => {
+                self.app.popup = !self.app.popup;
+                self.app.overlay_scroll = 0;
+            }
+            Action::Help => {
+                self.app.help = !self.app.help;
+                self.app.overlay_scroll = 0;
+            }
+            _ => {}
+        }
+    }
+
+    fn count(&mut self) -> Vec<Request> {
+        let mut requests: Vec<_> = self
+            .app
+            .request_metadata(self.app.active)
+            .into_iter()
+            .collect();
+        if let Some(request) = self.app.request_totals() {
+            requests.push(request);
+            self.app.popup = true;
+        } else {
+            self.app.status = "Directory totals require a visible directory".into();
+        }
+        requests
+    }
+
+    fn cancel(&mut self) {
+        self.app.cancel_totals();
+        if self.app.help || self.app.popup {
+            self.app.help = false;
+            self.app.popup = false;
+        } else {
+            self.app.panes[self.app.active].set_filter(String::new());
+        }
+        self.app.overlay_scroll = 0;
+    }
+
+    fn filter_key(&mut self, key: crossterm::event::KeyEvent) {
+        match key.code {
+            KeyCode::Esc => {
+                let before = self.filter_before.take().unwrap_or_default();
+                self.app.panes[self.app.active].set_filter(before);
+                self.app.status = "Filter cancelled".into();
+            }
+            KeyCode::Enter => {
+                self.filter_before = None;
+                self.app.status = "Filter applied".into();
+            }
+            KeyCode::Backspace => {
+                let mut text = self.app.panes[self.app.active].filter.clone();
+                text.pop();
+                self.app.panes[self.app.active].set_filter(text);
+            }
+            KeyCode::Char(c)
+                if !key
+                    .modifiers
+                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+            {
+                self.append_filter(&c.to_string())
+            }
+            _ => {}
+        }
+    }
+
+    fn append_filter(&mut self, text: &str) {
+        let mut query = self.app.panes[self.app.active].filter.clone();
+        for c in text.chars().filter(|c| !c.is_control()) {
+            if query.len() + c.len_utf8() > 4096 {
+                break;
+            }
+            query.push(c);
+        }
+        self.app.panes[self.app.active].set_filter(query);
+    }
+
+    fn mouse(&mut self, event: MouseEvent, geometry: &Geometry, now: Duration) -> Vec<Request> {
+        if self.app.help || self.app.popup {
+            return Vec::new();
+        }
+        if geometry.footer.contains((event.column, event.row).into())
+            && event.kind == MouseEventKind::Down(MouseButton::Left)
+        {
+            let action = match event.column.saturating_sub(geometry.footer.x) {
+                0..=5 => Action::Help,
+                8..=15 => Action::TogglePanes,
+                18..=27 => Action::ToggleSidebar,
+                30..=37 => Action::Filter,
+                40..=45 => Action::Quit,
+                _ => return Vec::new(),
+            };
+            return self.dispatch(action, geometry);
+        }
+        let Some(id) = geometry.panes.iter().position(|area| {
+            area.is_some_and(|area| area.contains((event.column, event.row).into()))
+        }) else {
+            return Vec::new();
+        };
+        let height = page_height(geometry, id);
+        match event.kind {
+            MouseEventKind::ScrollDown => self.app.panes[id].move_cursor(1, height),
+            MouseEventKind::ScrollUp => self.app.panes[id].move_cursor(-1, height),
+            MouseEventKind::Down(MouseButton::Left) => {
+                return self.click(id, event.row, geometry, now);
+            }
+            _ => {}
+        }
+        Vec::new()
+    }
+
+    fn click(&mut self, id: usize, row: u16, geometry: &Geometry, now: Duration) -> Vec<Request> {
+        self.app.active = id;
+        let area = geometry.panes[id].expect("hit pane");
+        if row < area.y + 2 || row >= area.bottom().saturating_sub(3) {
+            return Vec::new();
+        }
+        let pane = &mut self.app.panes[id];
+        let index = pane.viewport_start(page_height(geometry, id)) + usize::from(row - area.y - 2);
+        let Some(entry) = pane.visible.get(index).map(|i| &pane.entries[*i]) else {
+            return Vec::new();
+        };
+        let path = entry.path.clone();
+        pane.cursor = Some(path.clone());
+        let double = self
+            .last_click
+            .as_ref()
+            .is_some_and(|(last_id, last_path, time)| {
+                *last_id == id
+                    && last_path == &path
+                    && now.saturating_sub(*time) <= Duration::from_millis(400)
+            });
+        self.last_click = if double { None } else { Some((id, path, now)) };
+        if double {
+            self.dispatch(Action::Enter, geometry)
+        } else {
+            Vec::new()
+        }
+    }
+}
+
+fn page_height(geometry: &Geometry, pane: usize) -> usize {
+    geometry.panes[pane].map_or(1, |area| usize::from(area.height.saturating_sub(5)).max(1))
+}
+
+fn next_sort(sort: Sort) -> Sort {
+    match sort {
+        Sort::Natural => Sort::Name,
+        Sort::Name => Sort::Extension,
+        Sort::Extension => Sort::Size,
+        Sort::Size => Sort::Modified,
+        Sort::Modified => Sort::Created,
+        Sort::Created => Sort::Kind,
+        Sort::Kind => Sort::Version,
+        Sort::Version => Sort::Unsorted,
+        Sort::Unsorted => Sort::Natural,
+    }
+}
+
+fn unavailable(action: Action) -> Option<&'static str> {
+    match action {
+        Action::Viewer | Action::Editor => {
+            Some("Viewer/editor unavailable until M6; files are never launched")
+        }
+        Action::Copy | Action::Move | Action::Mkdir | Action::Trash | Action::Delete => {
+            Some("File mutations unavailable until M2 — M1 is read-only")
+        }
+        Action::Path | Action::Zoxide | Action::OppositeZoxide | Action::ExitDirectory => {
+            Some("Navigation integration/shell handoff unavailable until M5")
+        }
+        _ => None,
+    }
+}

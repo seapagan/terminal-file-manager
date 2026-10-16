@@ -153,16 +153,38 @@ fn malformed_rules_are_unknown_and_cancellation_is_not_partial_success() {
     assert_eq!(error.kind(), std::io::ErrorKind::Interrupted);
 }
 
+#[test]
+fn nested_whitelist_cannot_reinclude_a_child_of_an_excluded_parent() {
+    let root = tempfile::tempdir().unwrap();
+    fs::create_dir(root.path().join(".git")).unwrap();
+    fs::create_dir(root.path().join("ignored-dir")).unwrap();
+    fs::write(root.path().join(".gitignore"), "ignored-dir/\n").unwrap();
+    fs::write(root.path().join("ignored-dir/.gitignore"), "!keep\n").unwrap();
+    fs::write(root.path().join("ignored-dir/keep"), "data").unwrap();
+    let snapshot = list(
+        &root.path().join("ignored-dir"),
+        &IgnoreContext::isolated(),
+        &AtomicBool::new(false),
+    )
+    .unwrap();
+    assert_eq!(
+        snapshot
+            .entries
+            .iter()
+            .find(|e| e.name == "keep")
+            .unwrap()
+            .ignored,
+        Some(true)
+    );
+}
+
 #[cfg(unix)]
 #[test]
-fn unix_names_links_modes_and_identity_are_not_lossy() {
+fn unix_links_modes_and_identity_are_preserved() {
     use std::ffi::OsString;
-    use std::os::unix::{
-        ffi::OsStringExt,
-        fs::{PermissionsExt, symlink},
-    };
+    use std::os::unix::fs::{PermissionsExt, symlink};
     let root = tempfile::tempdir().unwrap();
-    let raw = OsString::from_vec(vec![b'a', 0xff]);
+    let raw = OsString::from("a界");
     fs::write(root.path().join(&raw), "bytes").unwrap();
     fs::set_permissions(root.path().join(&raw), fs::Permissions::from_mode(0o751)).unwrap();
     symlink("missing", root.path().join("broken")).unwrap();
@@ -187,4 +209,33 @@ fn unix_names_links_modes_and_identity_are_not_lossy() {
     let cycle = snapshot.entries.iter().find(|e| e.name == "cycle").unwrap();
     assert!(cycle.enterable);
     assert!(!cycle.may_recurse());
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn linux_invalid_utf8_names_remain_distinct_native_paths() {
+    use std::{ffi::OsString, os::unix::ffi::OsStringExt};
+    let root = tempfile::tempdir().unwrap();
+    let names = [
+        OsString::from_vec(vec![b'a', 0xfe]),
+        OsString::from_vec(vec![b'a', 0xff]),
+    ];
+    for name in &names {
+        fs::write(root.path().join(name), b"raw").unwrap();
+    }
+    let snapshot = list(
+        root.path(),
+        &IgnoreContext::isolated(),
+        &AtomicBool::new(false),
+    )
+    .unwrap();
+    for name in names {
+        assert!(
+            snapshot
+                .entries
+                .iter()
+                .any(|e| e.path == root.path().join(&name))
+        );
+    }
+    assert_ne!(snapshot.entries[0].path, snapshot.entries[1].path);
 }

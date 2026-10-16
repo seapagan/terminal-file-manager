@@ -5,7 +5,8 @@ use crate::{
 use std::{collections::HashMap, path::PathBuf};
 
 /// Hidden, ignored and fuzzy-filter exclusions remain independent.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum IgnoreMode {
     Off,
     #[default]
@@ -189,6 +190,14 @@ impl Pane {
         self.visible
             .iter()
             .position(|i| Some(&self.entries[*i].path) == self.cursor.as_ref())
+    }
+
+    /// Shared viewport calculation for drawing and mouse row hit testing.
+    pub fn viewport_start(&self, height: usize) -> usize {
+        let index = self.cursor_index().unwrap_or(0);
+        self.scroll
+            .min(index)
+            .max(index.saturating_add(1).saturating_sub(height.max(1)))
     }
 
     /// Toggle the cursor's stable native mark.

@@ -1,13 +1,13 @@
 //! Native metadata boundaries, informed by lsplus's no-follow classification.
 
 use super::EntryKind;
-use std::{ffi::OsStr, fs::Metadata};
+use std::{ffi::OsStr, fs::Metadata, io, path::Path};
 
 #[cfg(unix)]
-pub(super) fn kind(metadata: &Metadata) -> EntryKind {
+pub(super) fn kind(_path: &Path, metadata: &Metadata) -> io::Result<EntryKind> {
     use std::os::unix::fs::FileTypeExt;
     let kind = metadata.file_type();
-    if kind.is_symlink() {
+    Ok(if kind.is_symlink() {
         EntryKind::Link
     } else if kind.is_dir() {
         EntryKind::Directory
@@ -21,23 +21,26 @@ pub(super) fn kind(metadata: &Metadata) -> EntryKind {
         EntryKind::Device
     } else {
         EntryKind::Unknown
-    }
+    })
 }
 
 #[cfg(windows)]
-pub(super) fn kind(metadata: &Metadata) -> EntryKind {
+pub(super) fn kind(path: &Path, metadata: &Metadata) -> io::Result<EntryKind> {
     use std::os::windows::fs::MetadataExt;
-    if metadata.is_symlink() {
-        EntryKind::Link
-    } else if metadata.file_attributes() & 0x400 != 0 {
-        EntryKind::ReparsePoint
-    } else if metadata.is_dir() {
+    if metadata.file_attributes() & 0x400 != 0 {
+        return Ok(match super::windows_native::reparse_tag(path)? {
+            0xA000_000C => EntryKind::Link,
+            0xA000_0003 => EntryKind::Junction,
+            _ => EntryKind::ReparsePoint,
+        });
+    }
+    Ok(if metadata.is_dir() {
         EntryKind::Directory
     } else if metadata.is_file() {
         EntryKind::File
     } else {
         EntryKind::Unknown
-    }
+    })
 }
 
 #[cfg(unix)]
@@ -76,14 +79,14 @@ pub(super) fn attributes(metadata: &Metadata) -> String {
 }
 
 #[cfg(unix)]
-pub(super) fn object(metadata: &Metadata) -> Option<(u64, u64)> {
+pub(super) fn object(_path: &Path, metadata: &Metadata) -> io::Result<Option<(u64, u64)>> {
     use std::os::unix::fs::MetadataExt;
-    Some((metadata.dev(), metadata.ino()))
+    Ok(Some((metadata.dev(), metadata.ino())))
 }
 
 #[cfg(windows)]
-pub(super) fn object(_metadata: &Metadata) -> Option<(u64, u64)> {
-    None
+pub(super) fn object(path: &Path, _metadata: &Metadata) -> io::Result<Option<(u64, u64)>> {
+    super::windows_native::object_id(path).map(Some)
 }
 
 #[cfg(unix)]

@@ -36,13 +36,31 @@ impl Default for IgnoreContext {
 }
 
 pub(super) struct Rules {
+    root: PathBuf,
     matchers: Vec<Gitignore>,
 }
 
 impl Rules {
     pub(super) fn ignored(&self, path: &Path, directory: bool) -> bool {
+        let Ok(relative) = path.strip_prefix(&self.root) else {
+            return false;
+        };
+        let mut current = self.root.clone();
+        for component in relative.components() {
+            current.push(component);
+            if self.ignored_at(&current, current != path || directory) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn ignored_at(&self, path: &Path, directory: bool) -> bool {
         for rules in self.matchers.iter().rev() {
-            match rules.matched_path_or_any_parents(path, directory) {
+            if !path.starts_with(rules.path()) {
+                continue;
+            }
+            match rules.matched(path, directory) {
                 Match::Ignore(_) => return true,
                 Match::Whitelist(_) => return false,
                 Match::None => {}
@@ -62,6 +80,7 @@ pub(super) fn load(directory: &Path, context: &IgnoreContext) -> (Option<Rules>,
 fn build(directory: &Path, context: &IgnoreContext) -> Result<Rules, String> {
     let Some((root, git)) = repository(directory).map_err(|e| e.to_string())? else {
         return Ok(Rules {
+            root: directory.to_path_buf(),
             matchers: Vec::new(),
         });
     };
@@ -85,7 +104,7 @@ fn build(directory: &Path, context: &IgnoreContext) -> Result<Rules, String> {
     for parent in parents {
         matchers.push(matcher(parent, &parent.join(".gitignore"))?);
     }
-    Ok(Rules { matchers })
+    Ok(Rules { root, matchers })
 }
 
 fn matcher(root: &Path, file: &Path) -> Result<Gitignore, String> {

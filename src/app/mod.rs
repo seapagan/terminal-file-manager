@@ -29,6 +29,8 @@ pub struct Detail {
     pub entry: Option<Entry>,
     pub canonical: Option<PathBuf>,
     pub totals: Option<Result<Totals, String>>,
+    pub totals_generation: u64,
+    pub counting: bool,
 }
 
 /// Both panes remain alive when hidden or temporarily collapsed by width.
@@ -40,6 +42,7 @@ pub struct App {
     pub sidebar_left: bool,
     pub popup: bool,
     pub help: bool,
+    pub overlay_scroll: u16,
     pub status: String,
     pub details: [Detail; 2],
 }
@@ -55,6 +58,7 @@ impl App {
             sidebar_left: false,
             popup: false,
             help: false,
+            overlay_scroll: 0,
             status: "Read-only — ? for help".into(),
             details: std::array::from_fn(|_| Detail::default()),
         }
@@ -111,6 +115,8 @@ impl App {
                 self.details[pane].path = None;
                 self.details[pane].entry = None;
                 self.details[pane].totals = None;
+                self.details[pane].totals_generation += 1;
+                self.details[pane].counting = false;
             }
             Err(error) => {
                 state.restoring = None;
@@ -135,6 +141,8 @@ impl App {
         detail.entry = None;
         detail.canonical = None;
         detail.totals = None;
+        detail.totals_generation += 1;
+        detail.counting = false;
         path.map(|path| Request {
             pane,
             generation: detail.generation,
@@ -182,5 +190,53 @@ impl App {
         self.panes[self.active].restoring = Some(visit);
         self.panes[self.active].history_forward = forward;
         Some(request)
+    }
+
+    /// Start an explicit count using a generation independent of metadata loading.
+    pub fn request_totals(&mut self) -> Option<Request> {
+        let pane = self.active;
+        let entry = self.panes[pane].current()?;
+        if !entry.may_recurse() {
+            return None;
+        }
+        let detail = &mut self.details[pane];
+        detail.totals_generation += 1;
+        detail.counting = true;
+        detail.totals = None;
+        Some(Request {
+            pane,
+            generation: detail.totals_generation,
+            path: entry.path.clone(),
+            kind: RequestKind::Totals,
+        })
+    }
+
+    /// Ignore old/cancelled count results even if the cursor returns to the same path.
+    pub fn complete_totals(&mut self, request: &Request, result: Result<Totals, String>) -> bool {
+        if !self.panes.get(request.pane).is_some_and(|pane| {
+            pane.current()
+                .is_some_and(|entry| entry.path == request.path)
+        }) {
+            return false;
+        }
+        let Some(detail) = self.details.get_mut(request.pane) else {
+            return false;
+        };
+        if detail.totals_generation != request.generation
+            || detail.path.as_ref() != Some(&request.path)
+        {
+            return false;
+        }
+        detail.counting = false;
+        detail.totals = Some(result);
+        true
+    }
+
+    /// Cancel counts in state immediately; the worker cooperatively stops traversal.
+    pub fn cancel_totals(&mut self) {
+        let detail = &mut self.details[self.active];
+        detail.totals_generation += 1;
+        detail.counting = false;
+        detail.totals = None;
     }
 }

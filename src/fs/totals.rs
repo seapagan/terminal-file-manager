@@ -18,6 +18,12 @@ pub struct Totals {
 /// Returns Interrupted on cancellation or the explicit root's access error.
 pub fn totals(path: &Path, cancelled: &AtomicBool) -> io::Result<Totals> {
     check_cancelled(cancelled)?;
+    if !inspect(path).may_recurse() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Totals require an ordinary directory, not a link/reparse point",
+        ));
+    }
     let mut stack = vec![fs::read_dir(path)?];
     let mut result = Totals::default();
     while let Some(directory) = stack.last_mut() {
@@ -55,7 +61,10 @@ fn count_entry(entry: &super::Entry, result: &mut Totals) {
         super::EntryKind::Directory => result.directories += 1,
         super::EntryKind::File => {
             result.files += 1;
-            result.bytes = result.bytes.saturating_add(entry.size.unwrap_or(0));
+            match result.bytes.checked_add(entry.size.unwrap_or(0)) {
+                Some(bytes) => result.bytes = bytes,
+                None => record_error(result, "Byte total overflow; scan incomplete".into()),
+            }
         }
         _ => {}
     }
@@ -68,5 +77,26 @@ fn record_error(result: &mut Totals, error: String) {
     // Keep an explicit incomplete marker without unbounded repeated diagnostics.
     if result.errors.len() < 32 {
         result.errors.push(error);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn byte_overflow_is_incomplete_rather_than_a_successful_saturated_total() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("file");
+        fs::write(&path, "data").unwrap();
+        let mut entry = inspect(&path);
+        entry.size = Some(u64::MAX);
+        let mut result = Totals {
+            bytes: 1,
+            ..Totals::default()
+        };
+        count_entry(&entry, &mut result);
+        assert_eq!(result.bytes, 1);
+        assert!(result.errors[0].contains("overflow"));
     }
 }

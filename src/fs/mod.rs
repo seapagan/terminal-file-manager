@@ -3,6 +3,8 @@
 mod platform;
 mod rules;
 mod totals;
+#[cfg(windows)]
+mod windows_native;
 
 pub use rules::IgnoreContext;
 use std::ffi::OsString;
@@ -19,6 +21,7 @@ pub enum EntryKind {
     Directory,
     File,
     Link,
+    Junction,
     ReparsePoint,
     Socket,
     Fifo,
@@ -87,6 +90,7 @@ pub fn list(path: &Path, context: &IgnoreContext, cancelled: &AtomicBool) -> io:
         }
     }
     for entry in &mut entries {
+        check_cancelled(cancelled)?;
         entry.ignored = rules
             .as_ref()
             .map(|rules| rules.ignored(&entry.path, entry.may_recurse()));
@@ -138,7 +142,10 @@ pub fn inspect(path: &Path) -> Entry {
 }
 
 fn fill(entry: &mut Entry, metadata: &Metadata) {
-    entry.kind = platform::kind(metadata);
+    entry.kind = platform::kind(&entry.path, metadata).unwrap_or_else(|error| {
+        entry.error = Some(error.to_string());
+        EntryKind::ReparsePoint
+    });
     entry.hidden = platform::hidden(&entry.name, metadata);
     entry.executable = platform::executable(metadata);
     entry.attributes = platform::attributes(metadata);
@@ -148,13 +155,22 @@ fn fill(entry: &mut Entry, metadata: &Metadata) {
     entry.created = metadata.created().ok();
     entry.accessed = metadata.accessed().ok();
     entry.identity = Some(Identity {
-        object: platform::object(metadata),
+        object: platform::object(&entry.path, metadata).unwrap_or_else(|error| {
+            entry.error = Some(error.to_string());
+            None
+        }),
         created: entry.created,
         modified: entry.modified,
         length: metadata.len(),
     });
     entry.enterable = metadata.is_dir();
-    if matches!(entry.kind, EntryKind::Link | EntryKind::ReparsePoint) {
+    if entry.kind == EntryKind::ReparsePoint {
+        entry.enterable = false;
+        entry
+            .error
+            .get_or_insert_with(|| "Unsupported reparse point; navigation disabled".into());
+    }
+    if matches!(entry.kind, EntryKind::Link | EntryKind::Junction) {
         entry.link_target = fs::read_link(&entry.path).ok();
         match fs::metadata(&entry.path) {
             Ok(target) => entry.enterable = target.is_dir(),

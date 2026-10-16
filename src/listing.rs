@@ -4,7 +4,8 @@ use crate::fs::Entry;
 use std::{cmp::Ordering, ffi::OsStr};
 
 /// Sort order; missing metadata sorts last.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Sort {
     #[default]
     Natural,
@@ -19,7 +20,8 @@ pub enum Sort {
 }
 
 /// Directory grouping remains independent of reverse direction.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Grouping {
     #[default]
     First,
