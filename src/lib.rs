@@ -2,6 +2,9 @@
 
 use std::ffi::OsString;
 
+pub mod fs;
+pub mod listing;
+
 /// Help for the currently implemented scaffold.
 pub const HELP: &str = "Usage: tfm [--help | --version]\n\nFile management is not implemented yet.\n\nOptions:\n  -h, --help     Print help\n  -V, --version  Print version";
 

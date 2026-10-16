@@ -1,5 +1,21 @@
 # Reference provenance
 
+## M1 local browsing
+
+The local metadata, sorting and ignore-rule boundaries were adapted from
+[`lsplus d30ea4a`](https://github.com/seapagan/lsplus/tree/d30ea4a4d8f382bce1fd761f62b470926906f847),
+particularly `src/platform/{unix,windows}.rs`, `src/utils/{sort,gitignore}.rs`
+and the associated `tests/crate/` filesystem and ignore suites (MIT, Grant
+Ramsay). TFM retains native path identity, separates recursive eligibility from
+interactive directory entry, rebuilds rule matchers on refresh and reports
+unknown rule status instead of silently treating errors as unignored files.
+The native regression cases were reviewed and adapted to these contracts.
+
+Ratatui/Crossterm and the direct `colored_text` dependency supply the M1 terminal
+foundation. The only approved dependency-policy exceptions are Zlib for
+`foldhash 0.2.0`, Unicode-3.0 for `unicode-ident 1.0.27`, and `syn 2.0.119`
+alongside `3.0.9`. Other duplicate versions and unknown sources remain denied.
+
 The M0 ports used complete reference files and tests. The private implementation
 ledger records differences, classifications and execution proof. The ports did
 not use the deleted historical M0-B implementation as a template.
