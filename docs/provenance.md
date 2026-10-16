@@ -14,7 +14,13 @@ The native regression cases were reviewed and adapted to these contracts.
 Ratatui/Crossterm and the direct `colored_text` dependency supply the M1 terminal
 foundation. The only approved dependency-policy exceptions are Zlib for
 `foldhash 0.2.0`, Unicode-3.0 for `unicode-ident 1.0.27`, and `syn 2.0.119`
-alongside `3.0.9`. Other duplicate versions and unknown sources remain denied.
+alongside `3.0.9`. The level-triggered Unix input path additionally requires
+`crossterm -> filedescriptor 0.8.3 -> thiserror 1.0.69 -> thiserror-impl 1.0.69`,
+alongside Ratatui/kasuari's `thiserror`/`thiserror-impl 2.0.21`. The two older
+versions have exact duplicate exceptions, to remove when filedescriptor adopts
+thiserror 2. This keeps pending input readable when resize and keyboard readiness
+coincide; the default Mio source can lose that readiness edge. Other duplicate
+versions and unknown sources remain denied; licence permissions are unchanged.
 
 The M0 ports used complete reference files and tests. The private implementation
 ledger records differences, classifications and execution proof. The ports did

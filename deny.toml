@@ -27,6 +27,16 @@ wildcards = "deny"
 name = "syn"
 version = "=2.0.119"
 
+# Crossterm's level-triggered Unix input uses filedescriptor -> thiserror 1;
+# Ratatui/kasuari require thiserror 2. Remove when filedescriptor adopts 2.
+[[bans.skip]]
+name = "thiserror"
+version = "=1.0.69"
+
+[[bans.skip]]
+name = "thiserror-impl"
+version = "=1.0.69"
+
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
