@@ -12,8 +12,15 @@ use ratatui::{
     widgets::{Block, Borders, Cell, Paragraph, Row, Table},
 };
 
-pub(super) fn render(frame: &mut Frame, app: &App, id: usize, area: Rect, theme: &Theme) {
+pub(super) fn render(
+    frame: &mut Frame,
+    app: &App,
+    id: usize,
+    geometry: &super::Geometry,
+    theme: &Theme,
+) {
     let pane = &app.panes[id];
+    let area = geometry.panes[id].expect("visible pane");
     let block = Block::default()
         .style(theme.style(if id == app.active {
             Role::ActivePane
@@ -39,35 +46,30 @@ pub(super) fn render(frame: &mut Frame, app: &App, id: usize, area: Rect, theme:
         }));
     let inner = block.inner(area);
     frame.render_widget(block, area);
-    let rows_area = Rect::new(
-        inner.x,
-        inner.y,
+    let summary = super::summary::lines(
+        pane.visible.len(),
+        geometry.selection_counts[id],
         inner.width,
-        inner.height.saturating_sub(2),
+        theme,
     );
+    let rows_area = Rect {
+        height: inner.height.saturating_sub(summary.len() as u16 + 1),
+        ..inner
+    };
     render_rows(frame, pane, rows_area, theme, id == app.active, app.now);
-    render_summary(frame, pane, inner);
+    render_summary(frame, summary, inner);
     render_status(frame, pane, inner, theme);
 }
 
-fn render_summary(frame: &mut Frame, pane: &Pane, inner: Rect) {
-    let counts = pane.selection_counts();
-    let summary = format!(
-        "{} items | {} marked +{} excluded ({} hidden/{} ignored/{} filtered)",
-        pane.visible.len(),
-        counts.visible,
-        counts.excluded(),
-        counts.hidden,
-        counts.ignored,
-        counts.filtered
-    );
+fn render_summary(frame: &mut Frame, lines: Vec<Line<'static>>, inner: Rect) {
+    let height = (lines.len() as u16).min(inner.height.saturating_sub(1));
     frame.render_widget(
-        Paragraph::new(summary),
+        Paragraph::new(lines),
         Rect::new(
             inner.x,
-            inner.bottom().saturating_sub(2),
+            inner.bottom().saturating_sub(height + 1),
             inner.width,
-            inner.height.min(1),
+            height,
         ),
     );
 }
@@ -209,7 +211,7 @@ fn columns(pane: &Pane, width: u16) -> (Vec<Constraint>, Vec<Cell<'static>>) {
 }
 
 /// Match drawn owner data cells, excluding borders, headers and summaries.
-pub(crate) fn owner_column(pane: &Pane, area: Rect) -> Option<Rect> {
+pub(crate) fn owner_column(pane: &Pane, area: Rect, rows: usize) -> Option<Rect> {
     let width = area.width.saturating_sub(2);
     if !pane.columns.visible(width, &pane.measurements).owner {
         return None;
@@ -230,7 +232,7 @@ pub(crate) fn owner_column(pane: &Pane, area: Rect) -> Option<Rect> {
         area.x + 1 + offset,
         area.y + 2,
         *lengths.last()?,
-        area.height.saturating_sub(5),
+        rows as u16,
     ))
 }
 

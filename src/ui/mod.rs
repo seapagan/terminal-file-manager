@@ -8,6 +8,7 @@ pub(crate) use listing::owner_column;
 mod measure;
 mod metadata;
 mod profiles;
+mod summary;
 mod text;
 mod view;
 use crate::{
@@ -35,8 +36,8 @@ pub fn clean(text: &str) -> String {
 pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     let geometry = geometry(app, frame.area());
     for (id, area) in geometry.panes.iter().enumerate() {
-        if let Some(area) = area {
-            listing::render(frame, app, id, *area, theme);
+        if area.is_some() {
+            listing::render(frame, app, id, &geometry, theme);
         }
     }
     if let Some(area) = geometry.sidebar {

@@ -5,6 +5,8 @@ use ratatui::layout::Rect;
 #[derive(Clone, Debug)]
 pub struct Geometry {
     pub panes: [Option<Rect>; 2],
+    pub listing_rows: [usize; 2],
+    pub selection_counts: [crate::app::SelectionCounts; 2],
     pub divider: Option<Rect>,
     pub sidebar: Option<Rect>,
     pub status: Rect,
@@ -21,6 +23,8 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
     let body = Rect::new(area.x, area.y, area.width, height);
     let mut geometry = Geometry {
         panes: [None, None],
+        listing_rows: [0, 0],
+        selection_counts: [Default::default(); 2],
         overlay_scroll_limit: 0,
         metadata_scroll_limit: 0,
         divider: None,
@@ -91,6 +95,14 @@ fn sidebar(geometry: &mut Geometry, app: &App, body: Rect) {
 }
 
 fn scroll_limits(app: &App, geometry: &mut Geometry, area: Rect) {
+    for (id, area) in geometry.panes.iter().enumerate() {
+        if let Some(area) = area {
+            let counts = app.panes[id].selection_counts();
+            geometry.selection_counts[id] = counts;
+            geometry.listing_rows[id] =
+                super::summary::row_count(app.panes[id].visible.len(), counts, *area);
+        }
+    }
     geometry.overlay_scroll_limit = if app.help {
         super::help::scroll_limit(app, area)
     } else if app.popup {

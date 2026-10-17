@@ -16,7 +16,7 @@ impl Controller {
         self.app.sidebar = self.app.panes[id].sidebar;
         let area = geometry.panes[id].expect("hit pane");
         let row = event.row;
-        if row < area.y + 2 || row >= area.bottom().saturating_sub(3) {
+        if row < area.y + 2 || row >= area.y + 2 + geometry.listing_rows[id] as u16 {
             return Vec::new();
         }
         let pane = &mut self.app.panes[id];
@@ -26,7 +26,7 @@ impl Controller {
         };
         let path = entry.path.clone();
         pane.cursor = Some(path.clone());
-        if crate::ui::owner_column(pane, area)
+        if crate::ui::owner_column(pane, area, geometry.listing_rows[id])
             .is_some_and(|cell| cell.contains((event.column, row).into()))
         {
             self.last_click = None;

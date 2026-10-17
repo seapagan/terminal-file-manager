@@ -437,7 +437,7 @@ impl Controller {
 }
 
 pub(super) fn page_height(geometry: &Geometry, pane: usize) -> usize {
-    geometry.panes[pane].map_or(1, |area| usize::from(area.height.saturating_sub(5)).max(1))
+    geometry.listing_rows[pane].max(1)
 }
 
 fn next_sort(sort: Sort) -> Sort {

@@ -87,6 +87,11 @@ report incomplete scans. They never recurse into links, junctions or other
 reparse points. Interactive navigation into supported directory links remains
 available; unsupported reparse objects stay visible with an explanation.
 
+Each pane reports its visible item count separately from selection. Excluded
+selection counts refer only to marked entries hidden by visibility or filtering,
+with hidden, ignored and filtered reasons counted once in that order. Narrow
+panes shorten the summary or use a second row to retain selection counts.
+
 The `V` View popup includes **Owner/group display: Names / Numeric**. On Unix,
 names use cached account lookups with numeric fallback; clicking an entry's
 owner/group data cell also toggles that pane. Windows ownership remains
