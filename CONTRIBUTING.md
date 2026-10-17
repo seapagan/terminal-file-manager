@@ -10,8 +10,8 @@ need.
 
 The [repository](https://github.com/seapagan/terminal-file-manager) contains
 application source, tests, installer and release tooling, and CI configuration.
-The Cargo package includes the Rust sources, CLI tests, README, both licences,
-and required Cargo metadata. Local planning material and development support
+The Cargo package includes Rust sources, application/native tests, README,
+both licences and required Cargo metadata. Local planning material and development support
 utilities are excluded. Inspect the package with:
 
 ```sh
@@ -27,7 +27,16 @@ not a replacement for the final verification gate.
 The minimum supported Rust version (MSRV) is declared in `Cargo.toml` as
 `rust-version = "1.95.0"`. TFM uses Rust edition 2024 and a version 4 lockfile.
 The manifest is the authority for the supported floor; developer tooling may
-need a newer compiler. Install the exact MSRV toolchain for compatibility checks:
+need a newer compiler. There is no repository toolchain override: local commands
+use your Rustup default (or an explicitly selected toolchain). Install the
+components used by local verification for that toolchain:
+
+```sh
+rustup component add rustfmt clippy llvm-tools-preview
+```
+
+CI selects its compiler and components explicitly. Install the exact MSRV
+toolchain for compatibility checks:
 
 ```sh
 rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
@@ -43,9 +52,25 @@ feasibility results do not certify a future shipping build.
 ## Current CLI
 
 The Cargo package is `terminal-file-manager`; the executable is `tfm`.
-`tfm`, `tfm --help` and `tfm -h` print help. `tfm --version` and `tfm -V` print
-the version. These commands return 0; unsupported arguments print a diagnostic
-to stderr and return 2. File-manager features belong to later milestones.
+`tfm` browses the shell cwd; `tfm DIRECTORY [OTHER_DIRECTORY]` accepts up to two
+native paths. `-2` / `--two-panes`, two paths or `two_panes = true` request dual
+startup. One explicit path initializes both panes. Browsing requires a terminal
+on stdin/stdout. `--` accepts leading-hyphen paths. Explicit-path failures never
+substitute another path.
+`tfm --help` / `-h` and `tfm --version` / `-V` print output and return 0;
+unsupported arguments and startup failures report stderr and return 2.
+M1 browsing is read-only; Enter never launches files. See README for bindings
+and lazy preferences. `Q` saves current local locations/layout; ordinary quit
+never replaces that session. `--restore-session` or `restore_session = true`
+opts into restoration; explicit paths override the configured default.
+`--save-session` validates and records startup locations/layout without a TUI.
+Tests use owned fixtures and isolated HOME/config values.
+
+Native PTY tests use portable-pty on Unix and ConPTY on Windows. Their ignored
+`terminal_child` entry point is deliberately invoked by the parent restoration
+test; it is not an untested feature skip. Windows-only metadata tests must run
+on Windows; Linux xwin supplies compile/lint/build evidence only. Rendering and
+input tests use cached state/TestBackend, independently of a real terminal.
 
 ## Local verification
 
