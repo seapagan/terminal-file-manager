@@ -28,6 +28,7 @@ pub enum Action {
     Help,
     TogglePanes,
     FocusPane,
+    Maximise,
     SplitLeft,
     SplitRight,
     ToggleSidebar,

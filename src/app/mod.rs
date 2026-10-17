@@ -38,6 +38,7 @@ pub struct App {
     pub panes: [Pane; 2],
     pub active: usize,
     pub dual: bool,
+    pub maximized: bool,
     pub split_percent: u16,
     pub sidebar: bool,
     pub sidebar_left: bool,
@@ -64,6 +65,7 @@ impl App {
             panes: [Pane::new(path.clone()), Pane::new(path)],
             active: 0,
             dual: false,
+            maximized: false,
             split_percent: 50,
             sidebar: false,
             sidebar_left: false,
@@ -88,7 +90,7 @@ impl App {
 
     /// Effective width never changes the user's requested layout.
     pub fn visible_panes(&self, width: u16) -> Vec<usize> {
-        if self.dual && width >= 80 {
+        if self.dual && !self.maximized && width >= 80 {
             vec![0, 1]
         } else {
             vec![self.active]

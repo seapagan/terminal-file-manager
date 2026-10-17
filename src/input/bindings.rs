@@ -134,6 +134,7 @@ const DEFAULT_BINDINGS: &[(&str, Action)] = &[
     ("Ctrl+c", Quit),
     ("?", Help),
     ("Alt+p", TogglePanes),
+    ("Alt+m", Maximise),
     ("Tab", FocusPane),
     ("Shift+Tab", FocusPane),
     ("Ctrl+Left", SplitLeft),

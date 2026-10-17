@@ -113,3 +113,22 @@ fn resize_cancels_stale_drag_and_keyboard_adjustment_still_works() {
     controller.dispatch(Action::SplitRight, &narrow);
     assert_eq!(controller.app.split_percent, 55);
 }
+
+#[test]
+fn permanent_single_pane_choice_clears_temporary_maximise() {
+    let mut controller = controller();
+    let geometry = ui::geometry(&controller.app, Rect::new(0, 0, 160, 24));
+    controller.dispatch(Action::Maximise, &geometry);
+    assert!(controller.app.maximized && controller.app.dual);
+    assert!(
+        ui::geometry(&controller.app, Rect::new(0, 0, 160, 24))
+            .divider
+            .is_none()
+    );
+    controller.dispatch(Action::TogglePanes, &geometry);
+    assert!(!controller.app.maximized && !controller.app.dual);
+    controller.dispatch(Action::Maximise, &geometry);
+    assert!(!controller.app.maximized);
+    controller.dispatch(Action::TogglePanes, &geometry);
+    assert_eq!(controller.app.visible_panes(160), [0, 1]);
+}

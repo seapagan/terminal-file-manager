@@ -114,7 +114,7 @@ impl Controller {
             Enter | Parent | Back | Forward | Refresh => return self.navigate(action),
             Mark | MarkNext | SelectAll | ClearVisible => self.selection(action, geometry),
             Hidden | Ignore | Sort | Reverse | Group => self.policy(action),
-            TogglePanes | FocusPane | ToggleSidebar | Metadata | Help => {
+            TogglePanes | Maximise | FocusPane | ToggleSidebar | Metadata | Help => {
                 self.layout(action, geometry)
             }
             Quit => self.quit = true,
@@ -244,7 +244,27 @@ impl Controller {
 
     fn layout(&mut self, action: Action, geometry: &Geometry) {
         match action {
-            Action::TogglePanes => self.app.dual = !self.app.dual,
+            Action::TogglePanes => {
+                self.app.dual = !self.app.dual;
+                self.app.maximized = false;
+                self.dragging_divider = false;
+                self.app.status = if self.app.dual {
+                    "Two-pane layout"
+                } else {
+                    "Single-pane layout"
+                }
+                .into();
+            }
+            Action::Maximise if self.app.dual => {
+                self.app.maximized = !self.app.maximized;
+                self.dragging_divider = false;
+                self.app.status = if self.app.maximized {
+                    "Active pane maximised — Alt+M restores split"
+                } else {
+                    "Split restored"
+                }
+                .into();
+            }
             Action::FocusPane if geometry.panes.iter().all(Option::is_some) => {
                 self.app.active = 1 - self.app.active;
                 self.app.sidebar = self.app.panes[self.app.active].sidebar;

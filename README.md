@@ -34,6 +34,7 @@ help/version also work in scripts. Errors return exit code 2.
 | Alt+Left / Alt+Right | Back/forward in this pane's session history |
 | Alt+P; Tab/Shift+Tab | Toggle one/two panes; focus the other visible pane |
 | Ctrl+Left / Ctrl+Right | Move divider left/right; drag the central border with the mouse |
+| Alt+M | Temporarily maximise active pane / restore its previous split |
 | Space; Insert | Mark/unmark; mark/unmark and advance |
 | Ctrl+A / Ctrl+U | Select all / clear marks in the visible working set |
 | /; Enter; Esc | Edit fuzzy filter; accept; cancel/clear |

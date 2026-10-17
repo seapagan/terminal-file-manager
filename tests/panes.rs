@@ -66,6 +66,45 @@ fn active_single_pane_and_width_fallback_preserve_requested_dual() {
 }
 
 #[test]
+fn temporary_maximise_restores_split_marks_locations_cursor_and_history() {
+    use terminal_file_manager::{
+        input::{Action, Bindings, Controller},
+        ui,
+    };
+    let (root, mut app) = loaded();
+    let child = root.path().join("child");
+    fs::create_dir(&child).unwrap();
+    let request = app.request_listing(0, child.clone());
+    app.complete_listing(
+        0,
+        request.generation,
+        Ok(list(&child, &IgnoreContext::isolated(), &AtomicBool::new(false)).unwrap()),
+    );
+    app.panes[1].select_all();
+    let cursor = app.panes[1].cursor.clone();
+    app.dual = true;
+    app.split_percent = 65;
+    app.active = 1;
+    let mut controller = Controller::new(
+        app,
+        Bindings::new(&Default::default()).unwrap(),
+        Default::default(),
+    );
+    let geometry = ui::geometry(&controller.app, ratatui::layout::Rect::new(0, 0, 160, 24));
+    controller.dispatch(Action::Maximise, &geometry);
+    assert!(controller.app.dual && controller.app.maximized);
+    assert_eq!(controller.app.visible_panes(160), [1]);
+    controller.dispatch(Action::Maximise, &geometry);
+    assert_eq!(controller.app.visible_panes(160), [0, 1]);
+    assert_eq!(controller.app.split_percent, 65);
+    assert_eq!(controller.app.panes[0].path, child);
+    assert_eq!(controller.app.panes[1].cursor, cursor);
+    assert_eq!(controller.app.panes[1].marks.len(), 3);
+    controller.app.active = 0;
+    assert_eq!(controller.app.history(false).unwrap().path, root.path());
+}
+
+#[test]
 fn late_listing_cannot_replace_new_navigation_or_clear_its_error() {
     let (root, mut app) = loaded();
     let old = app.request_listing(0, root.path().join("old"));
