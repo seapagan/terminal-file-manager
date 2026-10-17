@@ -87,6 +87,13 @@ report incomplete scans. They never recurse into links, junctions or other
 reparse points. Interactive navigation into supported directory links remains
 available; unsupported reparse objects stay visible with an explanation.
 
+The `V` View popup includes **Owner/group display: Names / Numeric**. On Unix,
+names use cached account lookups with numeric fallback; clicking an entry's
+owner/group data cell also toggles that pane. Windows ownership remains
+unavailable. `owner_display = "names"` (default) or `"numeric"` also works in
+TOML settings and named view profiles. Explicit changes update restart defaults;
+switching panes does not change those defaults.
+
 ## Navigation sessions
 
 `q`, F10 and Ctrl+C never replace a saved navigation session. `Q` saves the two

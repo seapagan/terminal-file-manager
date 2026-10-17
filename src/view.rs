@@ -54,6 +54,7 @@ impl Columns {
 pub struct ViewSettings {
     pub human_sizes: bool,
     pub fuzzy_timestamps: bool,
+    pub owner_display: crate::owner::OwnerDisplay,
     pub permissions: PermissionDisplay,
     pub columns: Columns,
     pub sort: Sort,
@@ -69,6 +70,7 @@ impl Default for ViewSettings {
         Self {
             human_sizes: true,
             fuzzy_timestamps: false,
+            owner_display: crate::owner::OwnerDisplay::default(),
             permissions: PermissionDisplay::Symbolic,
             columns: Columns::default(),
             sort: Sort::Natural,
@@ -87,6 +89,7 @@ impl ViewSettings {
         Self {
             human_sizes: pane.human_sizes,
             fuzzy_timestamps: pane.fuzzy_timestamps,
+            owner_display: pane.owner_display,
             permissions: pane.permissions,
             columns: pane.columns.clone(),
             sort: pane.sort.sort,
@@ -102,6 +105,7 @@ impl ViewSettings {
     pub fn apply(&self, pane: &mut Pane) {
         pane.human_sizes = self.human_sizes;
         pane.fuzzy_timestamps = self.fuzzy_timestamps;
+        pane.owner_display = self.owner_display;
         pane.permissions = self.permissions;
         pane.columns = self.columns.clone();
         pane.sort = SortPolicy {

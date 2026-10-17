@@ -37,6 +37,7 @@ pub struct Settings {
     pub ignore: IgnoreMode,
     pub human_sizes: bool,
     pub fuzzy_timestamps: bool,
+    pub owner_display: crate::owner::OwnerDisplay,
     pub permissions: crate::permissions::PermissionDisplay,
     pub columns: crate::view::Columns,
     pub profiles: BTreeMap<String, crate::view::ViewSettings>,
@@ -60,6 +61,7 @@ impl Default for Settings {
             ignore: IgnoreMode::Dim,
             human_sizes: true,
             fuzzy_timestamps: false,
+            owner_display: crate::owner::OwnerDisplay::default(),
             permissions: crate::permissions::PermissionDisplay::default(),
             columns: crate::view::Columns::default(),
             profiles: crate::view::profiles(),
@@ -74,6 +76,7 @@ impl Settings {
     pub fn capture_view(&mut self, view: &crate::view::ViewSettings) {
         self.human_sizes = view.human_sizes;
         self.fuzzy_timestamps = view.fuzzy_timestamps;
+        self.owner_display = view.owner_display;
         self.permissions = view.permissions;
         self.columns = view.columns.clone();
         self.sort = view.sort;
@@ -123,6 +126,7 @@ impl Settings {
             pane.ignore = self.ignore;
             pane.human_sizes = self.human_sizes;
             pane.fuzzy_timestamps = self.fuzzy_timestamps;
+            pane.owner_display = self.owner_display;
             pane.permissions = self.permissions;
             pane.columns = self.columns.clone();
             pane.resort();
@@ -135,6 +139,7 @@ impl Settings {
         match action {
             Action::HumanSizes => self.human_sizes = pane.human_sizes,
             Action::FuzzyTimestamps => self.fuzzy_timestamps = pane.fuzzy_timestamps,
+            Action::OwnerDisplay => self.owner_display = pane.owner_display,
             Action::Permissions => self.permissions = pane.permissions,
             Action::ColumnSize => self.columns.size = pane.columns.size,
             Action::ColumnModified => self.columns.modified = pane.columns.modified,

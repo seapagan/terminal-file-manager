@@ -51,7 +51,7 @@ pub struct Entry {
     pub accessed: Option<SystemTime>,
     pub attributes: String,
     pub mode: Option<u32>,
-    pub owner: Option<String>,
+    pub owner: Option<crate::owner::Ownership>,
     pub hidden: bool,
     pub executable: bool,
     pub enterable: bool,
@@ -61,6 +61,13 @@ pub struct Entry {
 }
 
 impl Entry {
+    /// Format cached account data without resolving accounts on the render thread.
+    pub fn owner_display(&self, mode: crate::owner::OwnerDisplay) -> String {
+        self.owner
+            .as_ref()
+            .map_or_else(|| "unavailable".into(), |owner| owner.display(mode))
+    }
+
     /// Recursive inspection never follows links or reparse points.
     pub fn may_recurse(&self) -> bool {
         self.kind == EntryKind::Directory

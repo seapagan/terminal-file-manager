@@ -20,6 +20,7 @@ pub(crate) const OPTIONS: &[(&str, Action)] = &[
     ("Owner column", Action::ColumnOwner),
     ("Metadata sidebar", Action::ToggleSidebar),
     ("Preferred metadata", Action::MetadataPresentation),
+    ("Owner/group display", Action::OwnerDisplay),
 ];
 
 pub(super) fn key(controller: &mut Controller, key: KeyEvent, geometry: &Geometry) {
@@ -71,6 +72,12 @@ pub(super) fn formatting(controller: &mut Controller, action: Action) {
                 PermissionDisplay::Octal => PermissionDisplay::Symbolic,
             }
         }
+        Action::OwnerDisplay => {
+            pane.owner_display = match pane.owner_display {
+                crate::owner::OwnerDisplay::Names => crate::owner::OwnerDisplay::Numeric,
+                crate::owner::OwnerDisplay::Numeric => crate::owner::OwnerDisplay::Names,
+            };
+        }
         Action::ColumnSize => pane.columns.size = !pane.columns.size,
         Action::ColumnModified => pane.columns.modified = !pane.columns.modified,
         Action::ColumnAttributes => pane.columns.attributes = !pane.columns.attributes,
@@ -111,6 +118,7 @@ pub(crate) fn rows(app: &App, preferred: MetadataPresentation) -> Vec<(String, S
         check(pane.columns.owner),
         check(app.sidebar),
         format!("{preferred:?}"),
+        format!("{:?}", pane.owner_display),
     ];
     OPTIONS
         .iter()

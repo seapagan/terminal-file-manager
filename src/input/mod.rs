@@ -1,5 +1,6 @@
 //! One action vocabulary for keyboard and mouse dispatch.
 mod bindings;
+mod click;
 mod controller;
 mod divider;
 mod help;
@@ -41,6 +42,7 @@ pub enum Action {
     HumanSizes,
     FuzzyTimestamps,
     Permissions,
+    OwnerDisplay,
     ColumnSize,
     ColumnModified,
     ColumnAttributes,

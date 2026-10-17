@@ -51,6 +51,7 @@ pub struct Pane {
     pub ignore: IgnoreMode,
     pub human_sizes: bool,
     pub fuzzy_timestamps: bool,
+    pub owner_display: crate::owner::OwnerDisplay,
     pub permissions: crate::permissions::PermissionDisplay,
     pub columns: crate::view::Columns,
     pub sidebar: bool,
@@ -92,6 +93,7 @@ impl Pane {
             ignore: IgnoreMode::Dim,
             human_sizes: true,
             fuzzy_timestamps: false,
+            owner_display: crate::owner::OwnerDisplay::default(),
             permissions: crate::permissions::PermissionDisplay::default(),
             columns: crate::view::Columns::default(),
             sidebar: false,
@@ -178,6 +180,7 @@ impl Pane {
             self.visible.iter().map(|i| &self.entries[*i]),
             self.human_sizes,
             self.permissions,
+            self.owner_display,
         );
         if !self
             .visible

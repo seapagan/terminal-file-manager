@@ -5,9 +5,9 @@ use super::{
     text::wrap_value,
 };
 use crate::{
-    app::{App, Detail},
+    app::{App, Detail, Pane},
     color::{Role, Theme},
-    permissions::{PermissionDisplay, attributes},
+    permissions::attributes,
 };
 use ratatui::{
     Frame,
@@ -19,7 +19,7 @@ use ratatui::{
 type Field = (&'static str, String);
 
 pub(super) fn render(frame: &mut Frame, app: &App, bounds: Rect, theme: &Theme, floating: bool) {
-    let fields = fields(&app.details[app.active], app.panes[app.active].permissions);
+    let fields = fields(&app.details[app.active], &app.panes[app.active]);
     let width = if floating {
         bounds.width.saturating_sub(4).min(90)
     } else {
@@ -64,8 +64,8 @@ pub(super) fn render(frame: &mut Frame, app: &App, bounds: Rect, theme: &Theme, 
     );
 }
 
-fn fields(detail: &Detail, permissions: PermissionDisplay) -> Vec<Field> {
-    let mut fields = entry_fields(detail, permissions);
+fn fields(detail: &Detail, pane: &Pane) -> Vec<Field> {
+    let mut fields = entry_fields(detail, pane);
     if let Some(totals) = &detail.totals {
         match totals {
             Ok(totals) => {
@@ -95,7 +95,7 @@ fn fields(detail: &Detail, permissions: PermissionDisplay) -> Vec<Field> {
     fields
 }
 
-fn entry_fields(detail: &Detail, permissions: PermissionDisplay) -> Vec<Field> {
+fn entry_fields(detail: &Detail, pane: &Pane) -> Vec<Field> {
     let Some(entry) = &detail.entry else {
         return vec![(
             "Status",
@@ -122,11 +122,8 @@ fn entry_fields(detail: &Detail, permissions: PermissionDisplay) -> Vec<Field> {
         ("Modified UTC", timestamp(entry.modified)),
         ("Created UTC", timestamp(entry.created)),
         ("Accessed UTC", timestamp(entry.accessed)),
-        ("Attributes", attributes(entry, permissions)),
-        (
-            "Owner/group",
-            entry.owner.clone().unwrap_or_else(|| "unavailable".into()),
-        ),
+        ("Attributes", attributes(entry, pane.permissions)),
+        ("Owner/group", entry.owner_display(pane.owner_display)),
         (
             "Link target",
             entry
@@ -183,7 +180,7 @@ fn label_width(fields: &[Field], width: u16) -> usize {
 }
 
 pub(super) fn scroll_limit(app: &App, bounds: Rect, floating: bool) -> u16 {
-    let fields = fields(&app.details[app.active], app.panes[app.active].permissions);
+    let fields = fields(&app.details[app.active], &app.panes[app.active]);
     let width = if floating {
         bounds.width.saturating_sub(4).min(90)
     } else {

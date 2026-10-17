@@ -22,3 +22,11 @@ Multimedia/image/Kitty/Sixel previews, implicit external execution/launchers,
 embedded terminal, plugin/scripting ecosystem, drag-and-drop and cloud backends
 remain excluded from v1. No sync/resume/editor implementation is added merely
 for future readiness.
+
+## Deferred native Windows ownership
+
+Resolve Windows owner/group accounts with native SID/account semantics in a
+separately approved change. M1 intentionally displays `unavailable` for both
+Names and Numeric modes on Windows; lsplus does not implement this lookup.
+Cover local/domain and missing/unresolvable accounts, access failures and
+worker-side caching on native Windows without blocking rendering.

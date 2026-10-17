@@ -13,6 +13,15 @@ Git-ignore reference code and associated native regression cases:
 `tests/crate/`. TFM adapts these areas for independent panes, asynchronous
 requests, native path identity and explicit errors when rule status is unknown.
 
+Unix account resolution directly ports `src/platform/unix.rs::get_username`
+and `get_groupname` at that revision, including numeric fallback for missing
+or failed lookups. The original `tests/crate/file_unix.rs` fallback assertions
+are retained; macOS additionally accepts its native `wheel` group for GID 0.
+TFM caches names with raw UID/GID in worker snapshots and makes Names/Numeric a
+per-pane view preference. The existing locked nix 0.28 dependency supplies the
+safe lookup API. lsplus's Windows `file_details` leaves user/group empty;
+Windows account resolution remains deferred in TFM as well.
+
 Size formatting is a direct port of `lsplus/src/utils/format.rs` at that
 revision (`SizeScale`, `human_readable_format`, `show_size` and rounding).
 `tests/sizes.rs` retains its seven size regressions from `tests/format.rs`.

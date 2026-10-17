@@ -101,12 +101,12 @@ pub(super) fn object(path: &Path, _metadata: &Metadata) -> io::Result<Option<(u6
 }
 
 #[cfg(unix)]
-pub(super) fn owner(metadata: &Metadata) -> Option<String> {
+pub(super) fn owner(metadata: &Metadata) -> Option<crate::owner::Ownership> {
     use std::os::unix::fs::MetadataExt;
-    Some(format!("{}:{} (uid:gid)", metadata.uid(), metadata.gid()))
+    Some(crate::owner::lookup(metadata.uid(), metadata.gid()))
 }
 
 #[cfg(windows)]
-pub(super) fn owner(_metadata: &Metadata) -> Option<String> {
+pub(super) fn owner(_metadata: &Metadata) -> Option<crate::owner::Ownership> {
     None
 }

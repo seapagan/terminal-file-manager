@@ -39,6 +39,7 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
     (ColumnSize, "Toggle size column"),
     (ColumnModified, "Toggle date column"),
     (ColumnAttributes, "Toggle attribute column"),
+    (OwnerDisplay, "Toggle owner/group names or numeric IDs"),
     (ColumnOwner, "Toggle owner column"),
     (
         MetadataPresentation,

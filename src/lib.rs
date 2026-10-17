@@ -59,3 +59,6 @@ pub fn run(arguments: &[OsString]) -> Result<Invocation, &'static str> {
         _ => startup::parse(arguments),
     }
 }
+
+/// Cached native ownership and presentation policy.
+pub mod owner;

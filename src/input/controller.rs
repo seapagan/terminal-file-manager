@@ -19,7 +19,7 @@ pub struct Controller {
     pub preferences: Settings,
     bindings: Bindings,
     filter_before: Option<String>,
-    last_click: Option<(usize, PathBuf, Duration)>,
+    pub(super) last_click: Option<(usize, PathBuf, Duration)>,
     pub(super) dragging_divider: bool,
 }
 
@@ -109,7 +109,7 @@ impl Controller {
                 self.app.help = false;
             }
             HumanSizes | FuzzyTimestamps | Permissions | ColumnSize | ColumnModified
-            | ColumnAttributes | ColumnOwner | MetadataPresentation => {
+            | ColumnAttributes | ColumnOwner | OwnerDisplay | MetadataPresentation => {
                 super::view::formatting(self, action)
             }
             Up | Down | Home | End | PageUp | PageDown => self.movement(action, geometry),
@@ -428,45 +428,15 @@ impl Controller {
             MouseEventKind::ScrollDown => self.app.panes[id].move_cursor(1, height),
             MouseEventKind::ScrollUp => self.app.panes[id].move_cursor(-1, height),
             MouseEventKind::Down(MouseButton::Left) => {
-                return self.click(id, event.row, geometry, now);
+                return self.click(id, event, geometry, now);
             }
             _ => {}
         }
         Vec::new()
     }
-
-    fn click(&mut self, id: usize, row: u16, geometry: &Geometry, now: Duration) -> Vec<Request> {
-        self.app.active = id;
-        self.app.sidebar = self.app.panes[id].sidebar;
-        let area = geometry.panes[id].expect("hit pane");
-        if row < area.y + 2 || row >= area.bottom().saturating_sub(3) {
-            return Vec::new();
-        }
-        let pane = &mut self.app.panes[id];
-        let index = pane.viewport_start(page_height(geometry, id)) + usize::from(row - area.y - 2);
-        let Some(entry) = pane.visible.get(index).map(|i| &pane.entries[*i]) else {
-            return Vec::new();
-        };
-        let path = entry.path.clone();
-        pane.cursor = Some(path.clone());
-        let double = self
-            .last_click
-            .as_ref()
-            .is_some_and(|(last_id, last_path, time)| {
-                *last_id == id
-                    && last_path == &path
-                    && now.saturating_sub(*time) <= Duration::from_millis(400)
-            });
-        self.last_click = if double { None } else { Some((id, path, now)) };
-        if double {
-            self.dispatch(Action::Enter, geometry)
-        } else {
-            Vec::new()
-        }
-    }
 }
 
-fn page_height(geometry: &Geometry, pane: usize) -> usize {
+pub(super) fn page_height(geometry: &Geometry, pane: usize) -> usize {
     geometry.panes[pane].map_or(1, |area| usize::from(area.height.saturating_sub(5)).max(1))
 }
 

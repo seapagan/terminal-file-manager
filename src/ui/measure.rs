@@ -20,6 +20,7 @@ impl Measurements {
         entries: impl Iterator<Item = &'a Entry>,
         human: bool,
         permissions: crate::permissions::PermissionDisplay,
+        owner_display: crate::owner::OwnerDisplay,
     ) -> Self {
         let mut measured = Self {
             name: 4,
@@ -41,7 +42,7 @@ impl Measurements {
             measured.number = measured.number.max(width(&number));
             measured.owner = measured
                 .owner
-                .max(width(entry.owner.as_deref().unwrap_or("unavailable")));
+                .max(width(&super::clean(&entry.owner_display(owner_display))));
         }
         measured
     }
