@@ -63,8 +63,9 @@ location, filter and marks while you switch focus or layouts.
 
 Press `V` to choose columns, size/time formats, owner/group display, sorting and
 visibility. Unix permissions support symbolic and octal formats. Press `Alt+V`
-to choose **Compact**, **Detailed** or **Minimal**. Detailed enables the sidebar;
-Compact and Minimal hide it. Dual-pane and narrow layouts hide the sidebar.
+to choose **Compact**, **Detailed** or **Minimal**. Detailed shows hidden entries
+and requests the sidebar; Compact and Minimal turn both off. Dual-pane and
+narrow layouts hide the sidebar while retaining its requested state.
 
 In View profiles, press Enter to apply a profile to the active pane. Press Space
 on a profile to select **Apply to both**, then Enter to confirm. Choose **Save

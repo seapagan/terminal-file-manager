@@ -125,6 +125,7 @@ impl ViewSettings {
 /// Built-in views; saving explicitly can replace any named profile.
 pub fn profiles() -> std::collections::BTreeMap<String, ViewSettings> {
     let compact = ViewSettings {
+        hidden: false,
         fuzzy_timestamps: true,
         sidebar: Some(false),
         columns: Columns {
@@ -136,11 +137,13 @@ pub fn profiles() -> std::collections::BTreeMap<String, ViewSettings> {
         ..Default::default()
     };
     let detailed = ViewSettings {
+        hidden: true,
         fuzzy_timestamps: true,
         sidebar: Some(true),
         ..Default::default()
     };
     let minimal = ViewSettings {
+        hidden: false,
         columns: Columns {
             size: false,
             modified: false,

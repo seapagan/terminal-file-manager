@@ -41,11 +41,15 @@ fn profile(c: &mut Controller, index: usize) {
 fn builtin_profiles_have_repeatable_sidebar_results_from_both_initial_states() {
     for initial in [false, true] {
         let mut c = controller(initial);
+        c.app.panes[0].show_hidden = initial;
         for (index, expected) in [(1, true), (0, false), (1, true), (2, false), (0, false)] {
             profile(&mut c, index);
             assert_eq!(c.app.sidebar, expected);
             assert_eq!(c.app.panes[0].sidebar, expected);
             assert_eq!(c.preferences.sidebar, expected);
+            assert_eq!(c.app.panes[0].show_hidden, expected);
+            assert_eq!(c.preferences.hidden, expected);
+            assert!(!c.app.panes[1].show_hidden);
             assert_eq!(c.app.panes[1].sidebar, initial);
             assert_eq!(
                 ui::geometry(&c.app, Rect::new(0, 0, 120, 24))
@@ -61,6 +65,7 @@ fn builtin_profiles_have_repeatable_sidebar_results_from_both_initial_states() {
 fn focus_maximise_resize_and_popup_preserve_each_panes_sidebar_preference() {
     let mut c = controller(false);
     profile(&mut c, 1);
+    assert!(c.app.panes[0].show_hidden);
     action(&mut c, Action::TogglePanes);
     action(&mut c, Action::Maximise);
     assert!(c.app.sidebar);
@@ -72,7 +77,9 @@ fn focus_maximise_resize_and_popup_preserve_each_panes_sidebar_preference() {
     action(&mut c, Action::Maximise);
     action(&mut c, Action::FocusPane);
     assert!(!c.app.sidebar);
+    assert!(!c.app.panes[1].show_hidden);
     profile(&mut c, 1);
+    assert!(c.app.panes[1].show_hidden);
     action(&mut c, Action::TogglePanes);
     action(&mut c, Action::Metadata);
     assert!(c.app.popup && c.app.sidebar);
@@ -89,6 +96,7 @@ fn focus_maximise_resize_and_popup_preserve_each_panes_sidebar_preference() {
     let mut restart = App::new(".".into());
     restored.apply(&mut restart);
     assert!(restart.sidebar && restart.panes.iter().all(|p| p.sidebar));
+    assert!(restart.panes.iter().all(|p| p.show_hidden));
 }
 
 #[test]
