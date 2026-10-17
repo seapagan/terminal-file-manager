@@ -47,6 +47,8 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
     ),
     (Up, "Move cursor up"),
     (Down, "Move cursor down"),
+    (ExtendUp, "Extend marked range up"),
+    (ExtendDown, "Extend marked range down"),
     (Home, "First entry"),
     (End, "Last entry"),
     (PageUp, "Previous page"),

@@ -18,6 +18,8 @@ pub use controller::Controller;
 pub enum Action {
     Up,
     Down,
+    ExtendUp,
+    ExtendDown,
     Home,
     End,
     PageUp,

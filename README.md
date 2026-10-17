@@ -45,6 +45,7 @@ help/version also work in scripts. Errors return exit code 2.
 | Ctrl+Left / Ctrl+Right | Move divider left/right; drag the central border with the mouse |
 | Alt+M | Temporarily maximise active pane / restore its previous split |
 | Space; Insert | Mark/unmark; mark/unmark and advance |
+| Shift+Up / Shift+Down; Shift+click | Extend or shrink a marked range from the pane's anchor |
 | Ctrl+A / Ctrl+U | Select all / clear marks in the visible working set |
 | /; Enter; Esc | Edit fuzzy filter; accept; cancel/clear |
 | h; i | Toggle hidden entries; cycle ignore dim/hide/off |
@@ -85,6 +86,13 @@ Marked entries outside the current hidden/ignore/filter rules remain marked but
 are excluded from the visible scope. Counts distinguish those exclusions;
 select-all and clear affect only visible entries. Zero matches have no cursor
 fallback. Refresh removes marks for missing/replaced objects conservatively.
+Range selection follows visible sorted/filtered rows. Shrinking removes only
+marks added by that range; earlier independent marks remain. Ordinary movement
+or click establishes a new anchor. Explicit mark changes end the current range;
+refresh/navigation, sorting, filtering and hidden/ignore policy changes reset it
+without clearing surviving marks. Each pane keeps its own anchor across focus
+changes. Formatting changes retain the anchor. Shift+click never enters a directory
+or toggles an owner cell.
 
 Metadata is loaded in bounded background work; late results cannot replace the
 current selection. Size/item totals run only on request, stop cooperatively and
@@ -181,7 +189,7 @@ Other preference fields are `reverse` and `hidden` (booleans). Grouping is
 `natural`, `name`, `extension`, `size`, `modified`, `created`, `kind`, `version`
 and `unsorted`. Binding action names also include `up`, `down`, `enter`,
 `parent`, `back`, `forward`, `focus-pane`, `mark`, `mark-next`, `select-all`,
-`clear-visible`, `toggle-sidebar`, `metadata`, `info`, `count`, `cancel`, `refresh`,
+`clear-visible`, `extend-up`, `extend-down`, `toggle-sidebar`, `metadata`, `info`, `count`, `cancel`, `refresh`,
 `hidden`, `ignore`, `sort`, `reverse`, `group`, `help` and `quit`.
 Chords accept Ctrl/Alt/Shift, a printable character, named navigation keys,
 Space, Insert, Esc, or F1–F24. Overrides replace the chosen chord; the centred,

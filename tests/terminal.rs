@@ -144,6 +144,22 @@ fn isolate(command: &mut CommandBuilder, root: &std::path::Path) {
 }
 
 #[test]
+fn shifted_arrow_marks_a_range_in_a_real_terminal() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("range-a"), "one").unwrap();
+    fs::write(root.path().join("range-b"), "two").unwrap();
+    let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+    command.cwd(root.path());
+    isolate(&mut command, root.path());
+    drive(
+        command,
+        &[("range-a", "\u{1b}[1;2B"), ("Selected: 2 visible", "q")],
+        false,
+    );
+    assert_eq!(fs::read(root.path().join("range-a")).unwrap(), b"one");
+}
+
+#[test]
 fn save_quit_restores_both_navigated_locations_and_normal_quit_keeps_session() {
     use terminal_file_manager::session::SessionStore;
     let root = tempfile::tempdir().unwrap();

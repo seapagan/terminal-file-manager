@@ -1,5 +1,6 @@
 //! Authoritative pane state and pure transitions. No filesystem calls.
 mod pane;
+mod selection;
 use crate::fs::{Entry, Snapshot, Totals};
 pub use pane::{IgnoreMode, Pane, SelectionCounts};
 use std::path::PathBuf;
@@ -100,6 +101,7 @@ impl App {
     /// Request navigation; commit the location/history only on successful completion.
     pub fn request_listing(&mut self, pane: usize, path: PathBuf) -> Request {
         let state = &mut self.panes[pane];
+        state.reset_range();
         state.generation += 1;
         state.pending = Some(path.clone());
         state.error = None;

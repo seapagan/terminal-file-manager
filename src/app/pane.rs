@@ -62,6 +62,7 @@ pub struct Pane {
     pub pending: Option<PathBuf>,
     pub error: Option<String>,
     pub warnings: Vec<String>,
+    pub(super) range: Option<super::selection::RangeSelection>,
     listing_order: HashMap<PathBuf, usize>,
     pub(super) back: Vec<Visit>,
     pub(super) forward: Vec<Visit>,
@@ -104,6 +105,7 @@ impl Pane {
             pending: None,
             error: None,
             warnings: Vec::new(),
+            range: None,
             listing_order: HashMap::new(),
             back: Vec::new(),
             forward: Vec::new(),
@@ -113,6 +115,7 @@ impl Pane {
     }
 
     pub(super) fn install(&mut self, snapshot: Snapshot) {
+        self.reset_range();
         let navigating = self.path != snapshot.path;
         if navigating {
             if self.restoring.is_some() {
@@ -160,6 +163,7 @@ impl Pane {
 
     /// Apply sort/grouping while preserving cursor and raw marked paths.
     pub fn resort(&mut self) {
+        self.reset_range();
         if self.sort.sort == Sort::Unsorted {
             self.entries
                 .sort_by_key(|entry| self.listing_order.get(&entry.path).copied());
@@ -194,6 +198,7 @@ impl Pane {
 
     /// Live subsequence filtering stays in process; empty results have no fallback.
     pub fn set_filter(&mut self, filter: String) {
+        self.reset_range();
         self.filter = filter;
         self.refilter();
     }
@@ -214,6 +219,11 @@ impl Pane {
 
     /// Move within the cached working set, retaining a bounded scroll offset.
     pub fn move_cursor(&mut self, delta: isize, height: usize) {
+        self.shift_cursor(delta, height);
+        self.anchor_range();
+    }
+
+    pub(super) fn shift_cursor(&mut self, delta: isize, height: usize) {
         let index = self.cursor_index().unwrap_or(0);
         let next = index
             .saturating_add_signed(delta)
@@ -247,6 +257,7 @@ impl Pane {
 
     /// Toggle the cursor's stable native mark.
     pub fn toggle_mark(&mut self) {
+        self.reset_range();
         if let Some((path, identity)) = self
             .current()
             .map(|entry| (entry.path.clone(), entry.identity.clone()))
@@ -259,6 +270,7 @@ impl Pane {
 
     /// Mark only the current visible working set.
     pub fn select_all(&mut self) {
+        self.reset_range();
         for i in &self.visible {
             let entry = &self.entries[*i];
             if let Some(identity) = &entry.identity {
@@ -269,6 +281,7 @@ impl Pane {
 
     /// Clear visible marks; hidden and filtered marks remain in state.
     pub fn clear_visible(&mut self) {
+        self.reset_range();
         for i in &self.visible {
             self.marks.remove(&self.entries[*i].path);
         }

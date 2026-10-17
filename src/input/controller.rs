@@ -113,6 +113,7 @@ impl Controller {
                 super::view::formatting(self, action)
             }
             Up | Down | Home | End | PageUp | PageDown => self.movement(action, geometry),
+            ExtendUp | ExtendDown => self.extend_selection(action, geometry),
             Enter | Parent | Back | Forward | Refresh => return self.navigate(action),
             Mark | MarkNext | SelectAll | ClearVisible => self.selection(action, geometry),
             Hidden | Ignore | Sort | Reverse | Group => self.policy(action),
@@ -209,6 +210,14 @@ impl Controller {
             _ => pane.path.clone(),
         };
         vec![self.app.request_listing(id, path)]
+    }
+
+    fn extend_selection(&mut self, action: Action, geometry: &Geometry) {
+        if !self.app.popup {
+            let height = page_height(geometry, self.app.active);
+            self.app.panes[self.app.active]
+                .extend_range(if action == Action::ExtendUp { -1 } else { 1 }, height);
+        }
     }
 
     fn selection(&mut self, action: Action, geometry: &Geometry) {

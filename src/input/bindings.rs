@@ -120,6 +120,8 @@ const DEFAULT_BINDINGS: &[(&str, Action)] = &[
     ("k", Up),
     ("Down", Down),
     ("j", Down),
+    ("Shift+Up", ExtendUp),
+    ("Shift+Down", ExtendDown),
     ("Home", Home),
     ("End", End),
     ("PageUp", PageUp),

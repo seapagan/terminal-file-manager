@@ -1,7 +1,7 @@
 //! Entry-row clicks share the listing's owner-cell geometry.
 use super::{Action, Controller, controller::page_height};
 use crate::{app::Request, ui::Geometry};
-use crossterm::event::MouseEvent;
+use crossterm::event::{KeyModifiers, MouseEvent};
 use std::time::Duration;
 
 impl Controller {
@@ -25,7 +25,13 @@ impl Controller {
             return Vec::new();
         };
         let path = entry.path.clone();
+        if event.modifiers.contains(KeyModifiers::SHIFT) {
+            pane.select_range_to(path, page_height(geometry, id));
+            self.last_click = None;
+            return Vec::new();
+        }
         pane.cursor = Some(path.clone());
+        pane.anchor_range();
         if crate::ui::owner_column(pane, area, geometry.listing_rows[id])
             .is_some_and(|cell| cell.contains((event.column, row).into()))
         {
