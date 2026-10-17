@@ -72,6 +72,7 @@ fn junctions_are_native_nonrecursive_and_preserve_trailing_paths() {
     assert_eq!(broken.kind, EntryKind::Junction);
     assert!(broken.error.is_some());
     assert_totals(root.path(), (0, 0, 0), Some(&junction));
+    assert_broken_junction_navigation_and_grouping(root.path(), &junction);
     fs::remove_dir(&junction).unwrap();
 }
 
@@ -155,4 +156,41 @@ fn assert_totals(
     } else {
         assert!(totals.errors.is_empty());
     }
+}
+
+fn assert_broken_junction_navigation_and_grouping(
+    root: &std::path::Path,
+    junction: &std::path::Path,
+) {
+    use terminal_file_manager::{
+        app::App,
+        input::{Action, Bindings, Controller},
+        ui,
+    };
+    fs::create_dir(root.join("zz-directory")).unwrap();
+    fs::write(root.join("aaa-file"), "data").unwrap();
+    let broken = local::inspect(junction);
+    assert_eq!(broken.kind, EntryKind::Junction);
+    assert!(!broken.enterable && !broken.may_recurse());
+    assert!(broken.error.is_some() && broken.link_target.is_some());
+    let snapshot = local::list(root, &IgnoreContext::isolated(), &AtomicBool::new(false)).unwrap();
+    let mut app = App::new(root.into());
+    assert!(app.complete_listing(0, 1, Ok(snapshot)));
+    let pane = &mut app.panes[0];
+    let names: Vec<_> = pane
+        .entries
+        .iter()
+        .map(|e| e.name.to_str().unwrap())
+        .collect();
+    assert_eq!(names, ["zz-directory", "aaa-file", "junction"]);
+    pane.cursor = Some(junction.into());
+    let mut c = Controller::new(
+        app,
+        Bindings::new(&Default::default()).unwrap(),
+        Default::default(),
+    );
+    let g = ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 120, 24));
+    assert!(c.dispatch(Action::Enter, &g).is_empty());
+    assert!(c.app.panes[0].pending.is_none());
+    assert_eq!(c.app.panes[0].path, root);
 }

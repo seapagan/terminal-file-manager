@@ -184,7 +184,10 @@ fn fill(entry: &mut Entry, metadata: &Metadata) {
         entry.link_target = fs::read_link(&entry.path).ok();
         match fs::metadata(&entry.path) {
             Ok(target) => entry.enterable = target.is_dir(),
-            Err(error) => entry.error = Some(error.to_string()),
+            Err(error) => {
+                entry.enterable = false;
+                entry.error = Some(error.to_string());
+            }
         }
     }
 }
