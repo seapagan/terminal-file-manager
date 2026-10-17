@@ -28,6 +28,8 @@ pub(super) fn reparse_tag(path: &Path) -> io::Result<u32> {
         fn drop(&mut self) {
             // SAFETY: Search owns one successful FindFirstFile handle; no other
             // code closes it. Drop runs on every return and during unwinding.
+            // Audited cleanup; reassess if search-handle ownership changes.
+            // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
             unsafe {
                 FindClose(self.0);
             }
@@ -37,12 +39,16 @@ pub(super) fn reparse_tag(path: &Path) -> io::Result<u32> {
     let mut data = MaybeUninit::<WIN32_FIND_DATAW>::zeroed();
     // SAFETY: wide is NUL-terminated native UTF-16. Output has the exact SDK
     // layout, writable storage and lifetime required by this synchronous call.
+    // Audited read-only query; reassess if buffer or path lifetimes change.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     let handle = unsafe { FindFirstFileW(wide.as_ptr(), data.as_mut_ptr()) };
     if handle == INVALID_HANDLE_VALUE {
         return Err(io::Error::last_os_error());
     }
     let _search = Search(handle);
     // SAFETY: success initialized this zero-backed SDK structure.
+    // Audited success-only read; reassess if SDK output initialization changes.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     let data = unsafe { data.assume_init() };
     Ok(
         if data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
@@ -68,6 +74,8 @@ pub(super) fn object_id(path: &Path) -> io::Result<(u64, u64)> {
     let mut data = MaybeUninit::<BY_HANDLE_FILE_INFORMATION>::zeroed();
     // SAFETY: the File's borrowed handle remains valid through this synchronous
     // read; output storage has the exact SDK structure size and lifetime.
+    // Audited read-only query; reassess if the borrowed handle lifetime changes.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     if unsafe { GetFileInformationByHandle(file.as_raw_handle(), data.as_mut_ptr()) } == 0 {
         return Err(io::Error::last_os_error());
     }

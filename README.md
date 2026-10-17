@@ -137,8 +137,7 @@ may be used under the accompanying [Apache licence](LICENSE-APACHE). The MIT
 notices below share the permission/warranty text that follows. Adapted lsplus
 and Labeldeck source is Copyright (c) Grant Ramsay, under MIT; see provenance.
 
-<details>
-<summary>MIT dependency copyright and permission notices</summary>
+### MIT dependency copyright and permission notices
 
 | Dependency | Copyright notice |
 | --- | --- |
@@ -244,10 +243,7 @@ have been licensed under extremely permissive terms.
 Copyright notices are retained in src/* files where relevant.
 ```
 
-</details>
-
-<details>
-<summary>foldhash 0.2.0 — Zlib</summary>
+### foldhash 0.2.0 — Zlib
 
 ```text
 Copyright (c) 2024 Orson Peters
@@ -271,10 +267,7 @@ the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
 ```
 
-</details>
-
-<details>
-<summary>unicode-ident 1.0.27 — Unicode-3.0</summary>
+### unicode-ident 1.0.27 — Unicode-3.0
 
 ```text
 UNICODE LICENSE V3
@@ -317,5 +310,3 @@ not be used in advertising or otherwise to promote the sale, use or other
 dealings in these Data Files or Software without prior written
 authorization of the copyright holder.
 ```
-
-</details>

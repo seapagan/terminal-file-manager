@@ -65,6 +65,8 @@ fn preference_change_survives_exit_from_other_pane_and_real_restart() {
 fn terminal_restores_after_returned_error_and_unwind() {
     let root = tempfile::tempdir().unwrap();
     for mode in ["error", "panic"] {
+        // Relaunches this test child without a security decision; reassess if privileged.
+        // nosemgrep: rust.lang.security.current-exe.current-exe
         let mut command = CommandBuilder::new(std::env::current_exe().unwrap());
         command.args(["--ignored", "--exact", "terminal_child", "--nocapture"]);
         command.env("TFM_TEST_TERMINAL_MODE", mode);
