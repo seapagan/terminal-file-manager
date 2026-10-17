@@ -108,8 +108,8 @@ and `unsorted`. Binding action names also include `up`, `down`, `enter`,
 `clear-visible`, `toggle-sidebar`, `metadata`, `info`, `count`, `cancel`, `refresh`,
 `hidden`, `ignore`, `sort`, `reverse`, `group`, `help` and `quit`.
 Chords accept Ctrl/Alt/Shift, a printable character, named navigation keys,
-Space, Insert, Esc, or F1–F24. Overrides replace the chosen chord; the help
-screen and footer describe the default bindings. Ctrl+C remains an emergency
+Space, Insert, Esc, or F1–F24. Overrides replace the chosen chord; the centred,
+scrollable help lists the effective bindings. The footer shows defaults. Ctrl+C remains an emergency
 quit while editing a filter.
 
 Colour detection and capability downgrades use `colored_text`, including its

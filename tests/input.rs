@@ -88,6 +88,84 @@ fn preferred_metadata_presentation_keeps_both_direct_shortcuts() {
 }
 
 #[test]
+fn help_lists_effective_bindings_and_centres_the_action_table() {
+    use colored_text::ColorLevel;
+    use ratatui::{Terminal, backend::TestBackend};
+    let (_root, controller) = controller();
+    let settings = terminal_file_manager::settings::Settings::parse(
+        "[bindings]\n'Ctrl+p'='quit'\n'F12'='toggle-panes'",
+    )
+    .unwrap();
+    let mut controller = Controller::new(
+        controller.app,
+        Bindings::new(&settings.bindings).unwrap(),
+        settings,
+    );
+    key(&mut controller, "?");
+    let mut terminal = Terminal::new(TestBackend::new(160, 60)).unwrap();
+    terminal
+        .draw(|frame| {
+            ui::render(
+                frame,
+                &controller.app,
+                &terminal_file_manager::color::Theme::new(ColorLevel::NoColor),
+            );
+        })
+        .unwrap();
+    let rows = terminal
+        .backend()
+        .buffer()
+        .content()
+        .chunks(160)
+        .map(|row| row.iter().map(|cell| cell.symbol()).collect::<String>())
+        .collect::<Vec<_>>();
+    let pane_row = rows
+        .iter()
+        .find(|row| row.contains("Toggle one/two panes"))
+        .unwrap();
+    assert!(pane_row.contains("F12"));
+    assert!(!pane_row.contains("Ctrl+P"));
+    let title = rows.iter().position(|row| row.contains("Help —")).unwrap();
+    assert!(title > 0);
+    assert!(rows[title].find('┌').unwrap() > 0);
+}
+
+#[test]
+fn help_scrolling_reaches_last_action_without_changing_pane_policy() {
+    use colored_text::ColorLevel;
+    use ratatui::{Terminal, backend::TestBackend};
+    let (_root, mut controller) = controller();
+    key(&mut controller, "?");
+    key(&mut controller, "h");
+    assert!(!controller.app.panes[0].show_hidden);
+    key(&mut controller, "End");
+    for (width, height) in [(1, 1), (12, 5), (80, 10)] {
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        terminal
+            .draw(|frame| {
+                ui::render(
+                    frame,
+                    &controller.app,
+                    &terminal_file_manager::color::Theme::new(ColorLevel::NoColor),
+                );
+            })
+            .unwrap();
+        if width == 80 {
+            let text = terminal
+                .backend()
+                .buffer()
+                .content()
+                .iter()
+                .map(|cell| cell.symbol())
+                .collect::<String>();
+            assert!(text.contains("shell handoff"));
+        }
+    }
+    key(&mut controller, "Esc");
+    assert!(!controller.app.help);
+}
+
+#[test]
 fn wheel_does_not_change_focus_and_double_click_never_launches_files() {
     let (_root, mut controller) = controller();
     controller.app.dual = true;

@@ -8,6 +8,23 @@ pub struct Bindings {
 }
 
 impl Bindings {
+    /// Aligned help rows come from the effective keymap, including overrides.
+    pub fn help_rows(&self) -> Vec<(String, String)> {
+        let mut grouped = BTreeMap::<Action, Vec<String>>::new();
+        for ((code, modifiers), action) in &self.keys {
+            grouped
+                .entry(*action)
+                .or_default()
+                .push(super::help::key_name(*code, *modifiers));
+        }
+        grouped
+            .into_iter()
+            .map(|(action, mut keys)| {
+                keys.sort();
+                (keys.join(" / "), super::help::description(action).into())
+            })
+            .collect()
+    }
     /// Build and validate configurable bindings.
     ///
     /// # Errors

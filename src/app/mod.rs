@@ -42,6 +42,7 @@ pub struct App {
     pub sidebar_left: bool,
     pub popup: bool,
     pub help: bool,
+    pub help_rows: Vec<(String, String)>,
     pub overlay_scroll: u16,
     pub metadata_scroll: u16,
     pub status: String,
@@ -60,6 +61,9 @@ impl App {
             sidebar_left: false,
             popup: false,
             help: false,
+            help_rows: crate::input::Bindings::new(&Default::default())
+                .expect("default bindings")
+                .help_rows(),
             overlay_scroll: 0,
             metadata_scroll: 0,
             status: "Read-only — ? for help".into(),

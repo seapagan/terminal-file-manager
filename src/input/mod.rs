@@ -1,11 +1,14 @@
 //! One action vocabulary for keyboard and mouse dispatch.
 mod bindings;
 mod controller;
+mod help;
 pub use bindings::{Bindings, chord};
 pub use controller::Controller;
 
 /// Only read-only M1 actions execute; later actions explain their unavailability.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Action {
     Up,

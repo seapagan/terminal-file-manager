@@ -23,7 +23,8 @@ pub struct Controller {
 
 impl Controller {
     /// Own the authoritative app and validated keymap.
-    pub fn new(app: App, bindings: Bindings, preferences: Settings) -> Self {
+    pub fn new(mut app: App, bindings: Bindings, preferences: Settings) -> Self {
+        app.help_rows = bindings.help_rows();
         Self {
             app,
             quit: false,
@@ -63,6 +64,14 @@ impl Controller {
     /// Keyboard and clickable controls share this dispatcher and availability policy.
     pub fn dispatch(&mut self, action: Action, geometry: &Geometry) -> Vec<Request> {
         use Action::*;
+        if self.app.help
+            && !matches!(
+                action,
+                Up | Down | Home | End | PageUp | PageDown | Help | Cancel | Quit
+            )
+        {
+            return Vec::new();
+        }
         if let Some(reason) = unavailable(action) {
             self.app.status = reason.into();
             return Vec::new();
