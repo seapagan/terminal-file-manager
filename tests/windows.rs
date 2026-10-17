@@ -9,6 +9,9 @@ use terminal_file_manager::{
 #[test]
 fn windows_hidden_attribute_is_independent_of_dot_names() {
     let root = tempfile::tempdir().unwrap();
+    let dotted = root.path().join(".dot-name");
+    fs::write(&dotted, "data").unwrap();
+    assert!(!local::inspect(&dotted).hidden);
     let hidden = root.path().join("hidden-name");
     fs::write(&hidden, "data").unwrap();
     let output = Command::new("attrib")

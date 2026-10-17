@@ -81,6 +81,7 @@ fn temporary_maximise_restores_split_marks_locations_cursor_and_history() {
         Ok(list(&child, &IgnoreContext::isolated(), &AtomicBool::new(false)).unwrap()),
     );
     app.panes[1].select_all();
+    let marks = app.panes[1].marks.clone();
     let cursor = app.panes[1].cursor.clone();
     app.dual = true;
     app.split_percent = 65;
@@ -99,7 +100,7 @@ fn temporary_maximise_restores_split_marks_locations_cursor_and_history() {
     assert_eq!(controller.app.split_percent, 65);
     assert_eq!(controller.app.panes[0].path, child);
     assert_eq!(controller.app.panes[1].cursor, cursor);
-    assert_eq!(controller.app.panes[1].marks.len(), 3);
+    assert_eq!(controller.app.panes[1].marks, marks);
     controller.app.active = 0;
     assert_eq!(controller.app.history(false).unwrap().path, root.path());
 }
