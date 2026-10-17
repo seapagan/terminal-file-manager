@@ -33,6 +33,7 @@ help/version also work in scripts. Errors return exit code 2.
 | Enter; Backspace or Alt+Up | Enter a directory; go to its parent |
 | Alt+Left / Alt+Right | Back/forward in this pane's session history |
 | Alt+P; Tab/Shift+Tab | Toggle one/two panes; focus the other visible pane |
+| Ctrl+Left / Ctrl+Right | Move divider left/right; drag the central border with the mouse |
 | Space; Insert | Mark/unmark; mark/unmark and advance |
 | Ctrl+A / Ctrl+U | Select all / clear marks in the visible working set |
 | /; Enter; Esc | Edit fuzzy filter; accept; cancel/clear |
@@ -91,6 +92,7 @@ linked/nonregular config files are rejected.
 ```toml
 sidebar = true
 two_panes = false # -2/--two-panes overrides this for one invocation
+split_percent = 50 # 20–80; each visible pane retains at least 24 columns
 sidebar_left = false
 human_sizes = true # false shows exact bytes; human values use B/K/M/G/T/P
 fuzzy_timestamps = false # true uses relative phrases, including future times

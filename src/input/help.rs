@@ -58,6 +58,8 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
     (Help, "Toggle help"),
     (TogglePanes, "Toggle one/two panes"),
     (FocusPane, "Focus other visible pane"),
+    (SplitLeft, "Move pane divider left"),
+    (SplitRight, "Move pane divider right"),
     (ToggleSidebar, "Toggle metadata sidebar"),
     (Metadata, "Toggle metadata popup"),
     (Info, "Toggle preferred metadata presentation"),

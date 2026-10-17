@@ -5,6 +5,7 @@ use ratatui::layout::Rect;
 #[derive(Clone, Debug)]
 pub struct Geometry {
     pub panes: [Option<Rect>; 2],
+    pub divider: Option<Rect>,
     pub sidebar: Option<Rect>,
     pub status: Rect,
     pub footer: Rect,
@@ -18,6 +19,7 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
     let body = Rect::new(area.x, area.y, area.width, height);
     let mut geometry = Geometry {
         panes: [None, None],
+        divider: None,
         sidebar: None,
         footer_controls: Vec::new(),
         menu: menu_area(app, area),
@@ -36,7 +38,10 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
     };
     geometry.footer_controls = super::footer::controls(geometry.footer);
     if app.visible_panes(area.width).len() == 2 {
-        let width = body.width / 2;
+        let width = ((u32::from(body.width) * u32::from(app.split_percent.clamp(20, 80)) / 100)
+            as u16)
+            .clamp(24, body.width.saturating_sub(24));
+        geometry.divider = Some(Rect::new(body.x + width - 1, body.y, 2, height));
         geometry.panes = [
             Some(Rect::new(body.x, body.y, width, height)),
             Some(Rect::new(

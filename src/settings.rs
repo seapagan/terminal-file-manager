@@ -26,6 +26,7 @@ pub enum MetadataPresentation {
 pub struct Settings {
     pub sidebar: bool,
     pub two_panes: bool,
+    pub split_percent: u16,
     pub sidebar_left: bool,
     pub mouse: bool,
     pub sort: Sort,
@@ -47,6 +48,7 @@ impl Default for Settings {
         Self {
             sidebar: false,
             two_panes: false,
+            split_percent: 50,
             sidebar_left: false,
             mouse: true,
             sort: Sort::Natural,
@@ -88,6 +90,9 @@ impl Settings {
     /// Returns the TOML or normalized-key diagnostic without resetting preferences.
     pub fn parse(text: &str) -> Result<Self, String> {
         let mut settings: Self = toml::from_str(text).map_err(|e| e.to_string())?;
+        if !(20..=80).contains(&settings.split_percent) {
+            return Err("split_percent must be between 20 and 80".into());
+        }
         for name in settings.profiles.keys() {
             validate_profile_name(name)?;
         }
@@ -102,6 +107,7 @@ impl Settings {
     pub fn apply(&self, app: &mut App) {
         app.sidebar = self.sidebar;
         app.dual = self.two_panes;
+        app.split_percent = self.split_percent;
         app.sidebar_left = self.sidebar_left;
         app.metadata_presentation = self.metadata_presentation;
         for pane in &mut app.panes {

@@ -1,6 +1,7 @@
 //! One action vocabulary for keyboard and mouse dispatch.
 mod bindings;
 mod controller;
+mod divider;
 mod help;
 mod profiles;
 pub(crate) mod view;
@@ -27,6 +28,8 @@ pub enum Action {
     Help,
     TogglePanes,
     FocusPane,
+    SplitLeft,
+    SplitRight,
     ToggleSidebar,
     Metadata,
     Info,

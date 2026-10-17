@@ -19,6 +19,7 @@ pub struct Controller {
     bindings: Bindings,
     filter_before: Option<String>,
     last_click: Option<(usize, PathBuf, Duration)>,
+    pub(super) dragging_divider: bool,
 }
 
 impl Controller {
@@ -35,6 +36,7 @@ impl Controller {
             bindings,
             filter_before: None,
             last_click: None,
+            dragging_divider: false,
         }
     }
 
@@ -67,6 +69,10 @@ impl Controller {
                 Vec::new()
             }
             Event::Mouse(event) => self.mouse(event, geometry, now),
+            Event::Resize(_, _) => {
+                self.dragging_divider = false;
+                Vec::new()
+            }
             _ => Vec::new(),
         }
     }
@@ -88,6 +94,8 @@ impl Controller {
             return Vec::new();
         }
         match action {
+            SplitLeft => super::divider::adjust(self, self.app.split_percent.saturating_sub(5)),
+            SplitRight => super::divider::adjust(self, self.app.split_percent.saturating_add(5)),
             ViewProfiles => super::profiles::open(self),
             ViewOptions => {
                 self.app.view_menu = if self.app.view_menu.is_some() {
@@ -325,26 +333,36 @@ impl Controller {
         self.app.panes[self.app.active].set_filter(query);
     }
 
-    fn mouse(&mut self, event: MouseEvent, geometry: &Geometry, now: Duration) -> Vec<Request> {
+    fn overlay_mouse(&mut self, event: MouseEvent, geometry: &Geometry) -> bool {
         if self.app.profile_menu.is_some() {
             if let Some(area) = geometry.menu {
                 super::profiles::mouse(self, event, area);
             }
-            return Vec::new();
+            return true;
         }
         if self.app.view_menu.is_some() {
             super::view::mouse(self, event, geometry);
-            return Vec::new();
+            return true;
         }
         if self.app.help || self.app.popup {
             scroll_overlay(&mut self.app.overlay_scroll, event.kind);
-            return Vec::new();
+            return true;
         }
         if geometry
             .sidebar
             .is_some_and(|area| area.contains((event.column, event.row).into()))
         {
             scroll_overlay(&mut self.app.metadata_scroll, event.kind);
+            return true;
+        }
+        false
+    }
+
+    fn mouse(&mut self, event: MouseEvent, geometry: &Geometry, now: Duration) -> Vec<Request> {
+        if self.overlay_mouse(event, geometry) {
+            return Vec::new();
+        }
+        if super::divider::mouse(self, event, geometry) {
             return Vec::new();
         }
         if geometry.footer.contains((event.column, event.row).into())
