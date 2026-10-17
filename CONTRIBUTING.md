@@ -27,7 +27,16 @@ not a replacement for the final verification gate.
 The minimum supported Rust version (MSRV) is declared in `Cargo.toml` as
 `rust-version = "1.95.0"`. TFM uses Rust edition 2024 and a version 4 lockfile.
 The manifest is the authority for the supported floor; developer tooling may
-need a newer compiler. Install the exact MSRV toolchain for compatibility checks:
+need a newer compiler. There is no repository toolchain override: local commands
+use your Rustup default (or an explicitly selected toolchain). Install the
+components used by local verification for that toolchain:
+
+```sh
+rustup component add rustfmt clippy llvm-tools-preview
+```
+
+CI selects its compiler and components explicitly. Install the exact MSRV
+toolchain for compatibility checks:
 
 ```sh
 rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt

@@ -15,16 +15,14 @@ cargo run --locked -- --help
 cargo run --locked -- --version
 ```
 
-To install from this checkout with its pinned development toolchain:
+To install from this checkout using your default Rust toolchain:
 
 ```console
-cargo +1.99.0 install --path . --force --locked
+cargo install --path . --force --locked
 ```
 
-Plain `cargo install --path . --force` also builds, but Cargo warns that the
-local `rust-toolchain.toml` implicitly overrides the default toolchain. The
-explicit `+1.99.0` acknowledges that selection. The package MSRV stays 1.95.0;
-this warning does not indicate a failed build.
+Rust 1.95.0 or newer is required. The checkout does not override your default
+Rust toolchain; CI selects its compiler explicitly and checks the exact MSRV.
 
 The package is `terminal-file-manager`; the command is `tfm`. Each invocation
 starts at the shell's current directory, or the supplied native directory paths.
