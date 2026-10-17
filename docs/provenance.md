@@ -38,6 +38,14 @@ native link/special-bit and missing-metadata tests. TFM uses cached full native
 mode bits, never follows link targets for permissions, and leaves Windows
 attributes intact for either preference. No Unix permissions are fabricated.
 
+Entry/column colours adapt `src/utils/file.rs::colorize_name` and
+`src/utils/render.rs`'s permission, size and timestamp style classifiers at that
+revision. `tests/colours.rs` adapts special-type/name, ignored executable,
+permission-character, raw-size boundary and age-segment regressions from
+`tests/crate/{file_unix,file_windows,render,render_unix}.rs`. TFM composes dimming
+with type accents and explicit cursor/mark styles. Named/256 palette roles
+replace RGB gradients; all resolution uses `colored_text`, all output Ratatui.
+
 [Labeldeck](https://github.com/seapagan/labeldeck/tree/8c0fdea354bf0b0bd8abafb293af78c34ac9fe1d),
 Copyright (c) Grant Ramsay, supplied terminal guards, colour mapping, semantic
 styling and the PTY/ConPTY session driver. The relevant sources include

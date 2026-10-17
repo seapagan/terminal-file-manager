@@ -7,6 +7,8 @@ use crate::{
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Rect},
+    style::Style,
+    text::{Line, Span},
     widgets::{Block, Borders, Cell, Paragraph, Row, Table},
 };
 
@@ -113,14 +115,22 @@ fn render_rows(
     let rows = pane.visible.iter().skip(start).take(height).map(|i| {
         let entry = &pane.entries[*i];
         let cursor = pane.cursor.as_ref() == Some(&entry.path);
-        let style = theme.style(if cursor && active {
-            Role::Cursor
+        let focus = if cursor && active {
+            Some(Role::Cursor)
         } else if cursor {
-            Role::InactiveCursor
+            Some(Role::InactiveCursor)
         } else {
-            role(entry, pane.ignore)
-        });
-        Row::new(cells(entry, pane, area.width, now)).style(style)
+            None
+        };
+        let style = theme.style(
+            if pane.ignore == IgnoreMode::Dim && entry.ignored == Some(true) {
+                Role::Ignored
+            } else {
+                Role::Normal
+            },
+        );
+        let style = focus.map_or(style, |role| style.patch(theme.style(role)));
+        Row::new(cells(entry, pane, area.width, now, theme, focus)).style(style)
     });
     frame.render_widget(
         Table::new(rows, widths)
@@ -129,20 +139,24 @@ fn render_rows(
         area,
     );
     if pane.visible.is_empty() {
-        frame.render_widget(
-            Paragraph::new(if pane.pending.is_some() {
-                "Loading directory…"
-            } else {
-                "No visible entries"
-            }),
-            Rect::new(
-                area.x,
-                area.y.saturating_add(1),
-                area.width,
-                area.height.saturating_sub(1),
-            ),
-        );
+        render_empty(frame, pane, area);
     }
+}
+
+fn render_empty(frame: &mut Frame, pane: &Pane, area: Rect) {
+    frame.render_widget(
+        Paragraph::new(if pane.pending.is_some() {
+            "Loading directory…"
+        } else {
+            "No visible entries"
+        }),
+        Rect::new(
+            area.x,
+            area.y.saturating_add(1),
+            area.width,
+            area.height.saturating_sub(1),
+        ),
+    );
 }
 
 fn columns(pane: &Pane, width: u16) -> (Vec<Constraint>, Vec<Cell<'static>>) {
@@ -196,50 +210,104 @@ fn columns(pane: &Pane, width: u16) -> (Vec<Constraint>, Vec<Cell<'static>>) {
     (widths, headers)
 }
 
-fn cells(entry: &Entry, pane: &Pane, width: u16, now: std::time::SystemTime) -> Vec<Cell<'static>> {
+fn cells(
+    entry: &Entry,
+    pane: &Pane,
+    width: u16,
+    now: std::time::SystemTime,
+    theme: &Theme,
+    focus: Option<Role>,
+) -> Vec<Cell<'static>> {
+    let decorate = |base: Style| focus.map_or(base, |role| base.patch(theme.style(role)));
+    if width < 8 {
+        let mut cells = identity_cells(entry, pane, theme, decorate);
+        return vec![cells.pop().expect("name cell")];
+    }
+    let mut cells = identity_cells(entry, pane, theme, decorate);
+    if width >= 45 {
+        let (number, unit) = super::measure::parts(entry, pane.human_sizes);
+        cells.push(
+            Cell::from(ratatui::text::Line::from(number).alignment(Alignment::Right))
+                .style(decorate(theme.size_style(entry.size))),
+        );
+        cells.push(Cell::from(unit).style(decorate(theme.size_style(entry.size))));
+    }
+    if width >= 70 {
+        cells.push(
+            Cell::from(listing_timestamp(
+                entry.modified,
+                pane.fuzzy_timestamps,
+                now,
+            ))
+            .style(decorate(theme.time_style(entry.modified, now))),
+        );
+    }
+    if width >= 90 {
+        cells.push(permission_cell(entry, pane.permissions, theme, decorate));
+    }
+    if width >= 125 {
+        cells.push(
+            Cell::from(entry.owner.clone().unwrap_or_else(|| "unavailable".into()))
+                .style(decorate(theme.style(Role::Label))),
+        );
+    }
+    cells
+}
+
+fn identity_cells(
+    entry: &Entry,
+    pane: &Pane,
+    theme: &Theme,
+    decorate: impl Fn(Style) -> Style,
+) -> Vec<Cell<'static>> {
+    let name_style = decorate(theme.entry_style(entry));
     let name = format!(
         "{}{}",
         if entry.hidden { "[h] " } else { "" },
         clean(&entry.name.to_string_lossy())
     );
-    if width < 8 {
-        return vec![Cell::from(name)];
-    }
-    let mut cells = vec![
+    vec![
         Cell::from(if pane.marks.contains_key(&entry.path) {
             "[*]"
         } else {
             "   "
-        }),
-        Cell::from(indicator(entry)),
-        Cell::from(name),
-    ];
-    if width >= 45 {
-        let (number, unit) = super::measure::parts(entry, pane.human_sizes);
-        cells.push(Cell::from(
-            ratatui::text::Line::from(number).alignment(Alignment::Right),
-        ));
-        cells.push(Cell::from(unit));
-    }
-    if width >= 70 {
-        cells.push(Cell::from(listing_timestamp(
-            entry.modified,
-            pane.fuzzy_timestamps,
-            now,
-        )));
-    }
-    if width >= 90 {
-        cells.push(Cell::from(crate::permissions::attributes(
-            entry,
-            pane.permissions,
-        )));
-    }
-    if width >= 125 {
-        cells.push(Cell::from(
-            entry.owner.clone().unwrap_or_else(|| "unavailable".into()),
-        ));
-    }
-    cells
+        })
+        .style(decorate(theme.style(
+            if pane.marks.contains_key(&entry.path) {
+                Role::Marked
+            } else {
+                Role::Normal
+            },
+        ))),
+        Cell::from(indicator(entry)).style(name_style),
+        Cell::from(name).style(name_style),
+    ]
+}
+
+fn permission_cell(
+    entry: &Entry,
+    permissions: crate::permissions::PermissionDisplay,
+    theme: &Theme,
+    decorate: impl Fn(Style) -> Style,
+) -> Cell<'static> {
+    let text = crate::permissions::attributes(entry, permissions);
+    let spans = text
+        .chars()
+        .enumerate()
+        .map(|(index, value)| {
+            let style = if index == 0 {
+                theme.entry_style(entry)
+            } else if entry.mode.is_some()
+                && permissions == crate::permissions::PermissionDisplay::Symbolic
+            {
+                theme.permission_style(value)
+            } else {
+                theme.style(Role::Warning)
+            };
+            Span::styled(value.to_string(), decorate(style))
+        })
+        .collect::<Vec<_>>();
+    Cell::from(Line::from(spans))
 }
 
 fn listing_timestamp(
@@ -270,25 +338,6 @@ fn indicator(entry: &Entry) -> &'static str {
         EntryKind::Fifo => "p",
         EntryKind::Device => "d",
         EntryKind::Unknown => "?",
-    }
-}
-
-fn role(entry: &Entry, ignore: IgnoreMode) -> Role {
-    if entry.error.is_some() {
-        Role::Warning
-    } else if ignore == IgnoreMode::Dim && entry.ignored == Some(true) {
-        Role::Ignored
-    } else if matches!(
-        entry.kind,
-        EntryKind::Link | EntryKind::Junction | EntryKind::ReparsePoint
-    ) {
-        Role::Link
-    } else if entry.enterable {
-        Role::Directory
-    } else if entry.executable {
-        Role::Executable
-    } else {
-        Role::Normal
     }
 }
 

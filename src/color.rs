@@ -1,4 +1,5 @@
 //! Renderer-neutral adapter adapted from Labeldeck's edit/color.rs and UI theme.
+mod listing;
 use colored_text::{AnsiColor, ColorLevel, ResolvedColor, resolve_hex, resolve_named};
 use ratatui::style::{Color, Modifier, Style};
 
@@ -70,7 +71,8 @@ impl Theme {
                 }
                 style
             }
-            Role::Cursor => style
+            Role::Cursor => self
+                .style(Role::ActivePane)
                 .remove_modifier(Modifier::DIM)
                 .add_modifier(Modifier::REVERSED | Modifier::BOLD),
             Role::InactiveCursor => style.add_modifier(Modifier::DIM | Modifier::BOLD),
