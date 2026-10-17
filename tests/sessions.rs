@@ -36,6 +36,53 @@ fn session_storage_round_trips_layout_and_both_native_locations() {
     assert!(NavigationSession::parse(&text.replace("version = 1", "version = 2")).is_err());
 }
 
+#[test]
+fn foreign_session_path_encodings_fail_without_rewriting_storage() {
+    let root = tempfile::tempdir().unwrap();
+    let store = SessionStore {
+        path: root.path().join("session.toml"),
+    };
+    store.save(&App::new(root.path().to_owned())).unwrap();
+    let mut foreign: toml::Value =
+        toml::from_str(&std::fs::read_to_string(&store.path).unwrap()).unwrap();
+    let encoding = if cfg!(unix) { "windows" } else { "unix" };
+    for location in foreign["locations"].as_array_mut().unwrap() {
+        location["encoding"] = toml::Value::String(encoding.into());
+        location["units"] =
+            toml::Value::Array(vec![toml::Value::Integer(47), toml::Value::Integer(120)]);
+    }
+    let text = toml::to_string(&foreign).unwrap();
+    std::fs::write(&store.path, &text).unwrap();
+    let error = store.load().unwrap_err();
+    assert!(error.contains("session path encoding belongs to another platform"));
+    assert!(error.contains(&store.path.display().to_string()));
+    assert_eq!(std::fs::read_to_string(&store.path).unwrap(), text);
+}
+
+#[test]
+fn session_size_limit_accepts_the_boundary_and_rejects_one_extra_byte() {
+    let root = tempfile::tempdir().unwrap();
+    let store = SessionStore {
+        path: root.path().join("session.toml"),
+    };
+    let app = App::new(root.path().to_owned());
+    store.save(&app).unwrap();
+    let mut text = std::fs::read_to_string(&store.path).unwrap();
+    text.push_str("\n#");
+    text.push_str(&" ".repeat(1_048_576 - text.len()));
+    std::fs::write(&store.path, &text).unwrap();
+    assert_eq!(
+        store.load().unwrap().locations().unwrap(),
+        [app.panes[0].path.clone(), app.panes[1].path.clone()]
+    );
+    text.push(' ');
+    std::fs::write(&store.path, &text).unwrap();
+    let error = store.load().unwrap_err();
+    assert!(error.contains("session exceeds 1 MiB"));
+    assert!(error.contains(&store.path.display().to_string()));
+    assert_eq!(std::fs::read_to_string(&store.path).unwrap(), text);
+}
+
 #[cfg(unix)]
 #[test]
 fn unix_session_paths_retain_non_utf8_bytes() {

@@ -172,6 +172,20 @@ fn invalid_settings_and_key_conflicts_are_actionable_errors() {
 }
 
 #[test]
+fn invalid_utf8_config_fails_without_replacing_bytes_with_defaults() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("config.toml");
+    let bytes = b"mouse = false\n\xff\xfe";
+    fs::write(&path, bytes).unwrap();
+    let error = Store::load(path.clone())
+        .err()
+        .expect("invalid UTF-8 must fail");
+    assert!(error.contains(&path.display().to_string()));
+    assert!(error.to_ascii_lowercase().contains("utf-8"));
+    assert_eq!(fs::read(path).unwrap(), bytes);
+}
+
+#[test]
 fn linked_config_is_rejected_without_modifying_the_target() {
     let root = tempfile::tempdir().unwrap();
     let target = root.path().join("target");
