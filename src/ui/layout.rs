@@ -11,6 +11,8 @@ pub struct Geometry {
     pub footer: Rect,
     pub footer_controls: Vec<super::FooterControl>,
     pub menu: Option<Rect>,
+    pub overlay_scroll_limit: u16,
+    pub metadata_scroll_limit: u16,
 }
 
 /// Width-driven layout never depends on a directory's longest filename.
@@ -19,6 +21,8 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
     let body = Rect::new(area.x, area.y, area.width, height);
     let mut geometry = Geometry {
         panes: [None, None],
+        overlay_scroll_limit: 0,
+        metadata_scroll_limit: 0,
         divider: None,
         sidebar: None,
         footer_controls: Vec::new(),
@@ -56,6 +60,7 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
     } else {
         geometry.panes[app.active] = Some(body);
     }
+    scroll_limits(app, &mut geometry, area);
     geometry
 }
 
@@ -83,4 +88,17 @@ fn sidebar(geometry: &mut Geometry, app: &App, body: Rect) {
     };
     geometry.sidebar = Some(Rect::new(info_x, body.y, width, body.height));
     geometry.panes[app.active] = Some(Rect::new(pane_x, body.y, body.width - width, body.height));
+}
+
+fn scroll_limits(app: &App, geometry: &mut Geometry, area: Rect) {
+    geometry.overlay_scroll_limit = if app.help {
+        super::help::scroll_limit(app, area)
+    } else if app.popup {
+        super::metadata::scroll_limit(app, area, true)
+    } else {
+        0
+    };
+    geometry.metadata_scroll_limit = geometry
+        .sidebar
+        .map_or(0, |area| super::metadata::scroll_limit(app, area, false));
 }

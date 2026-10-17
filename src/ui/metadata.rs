@@ -142,12 +142,7 @@ fn entry_fields(detail: &Detail, permissions: PermissionDisplay) -> Vec<Field> {
 }
 
 fn lines(fields: &[Field], width: u16, theme: &Theme) -> Vec<Line<'static>> {
-    let label_width = fields
-        .iter()
-        .map(|(label, _)| label.len() + 2)
-        .max()
-        .unwrap_or(0)
-        .min(usize::from(width / 2));
+    let label_width = label_width(fields, width);
     let value_width = usize::from(width).saturating_sub(label_width);
     fields
         .iter()
@@ -176,6 +171,32 @@ fn lines(fields: &[Field], width: u16, theme: &Theme) -> Vec<Line<'static>> {
                 })
         })
         .collect()
+}
+
+fn label_width(fields: &[Field], width: u16) -> usize {
+    fields
+        .iter()
+        .map(|(label, _)| label.len() + 2)
+        .max()
+        .unwrap_or(0)
+        .min(usize::from(width / 2))
+}
+
+pub(super) fn scroll_limit(app: &App, bounds: Rect, floating: bool) -> u16 {
+    let fields = fields(&app.details[app.active], app.panes[app.active].permissions);
+    let width = if floating {
+        bounds.width.saturating_sub(4).min(90)
+    } else {
+        bounds.width
+    };
+    let inner_width = width.saturating_sub(2);
+    let value_width = usize::from(inner_width).saturating_sub(label_width(&fields, inner_width));
+    let count: usize = fields
+        .iter()
+        .map(|(_, value)| wrap_value(&clean(value), value_width).len())
+        .sum();
+    let height = bounds.height.saturating_sub(if floating { 4 } else { 2 });
+    u16::try_from(count.saturating_sub(usize::from(height))).unwrap_or(u16::MAX)
 }
 
 #[cfg(test)]

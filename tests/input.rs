@@ -158,8 +158,12 @@ fn help_scrolling_reaches_last_action_without_changing_pane_policy() {
     key(&mut controller, "?");
     key(&mut controller, "h");
     assert!(!controller.app.panes[0].show_hidden);
-    key(&mut controller, "End");
     for (width, height) in [(1, 1), (12, 5), (80, 10)] {
+        let geometry = ui::geometry(
+            &controller.app,
+            ratatui::layout::Rect::new(0, 0, width, height),
+        );
+        controller.dispatch(terminal_file_manager::input::Action::End, &geometry);
         let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
         terminal
             .draw(|frame| {

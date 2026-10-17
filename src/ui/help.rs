@@ -9,22 +9,7 @@ use ratatui::{
 };
 
 pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme) {
-    let natural_keys = app
-        .help_rows
-        .iter()
-        .map(|(keys, _)| Line::raw(keys).width())
-        .max()
-        .unwrap_or(0);
-    let natural_action = app
-        .help_rows
-        .iter()
-        .map(|(_, action)| Line::raw(action).width())
-        .max()
-        .unwrap_or(0);
-    let width = (natural_keys + natural_action + 5)
-        .min(110)
-        .min(usize::from(frame.area().width.saturating_sub(2)));
-    let keys_width = natural_keys.min(width.saturating_sub(3) / 3);
+    let (width, keys_width) = metrics(app, frame.area());
     let lines = rows(app, width.saturating_sub(2), keys_width, theme);
     let height = u16::try_from(lines.len() + 2)
         .unwrap_or(u16::MAX)
@@ -75,4 +60,39 @@ fn rows(app: &App, width: usize, key_width: usize, theme: &Theme) -> Vec<Line<'s
             })
         })
         .collect()
+}
+
+fn metrics(app: &App, bounds: ratatui::layout::Rect) -> (usize, usize) {
+    let natural_keys = app
+        .help_rows
+        .iter()
+        .map(|(keys, _)| Line::raw(keys).width())
+        .max()
+        .unwrap_or(0);
+    let natural_action = app
+        .help_rows
+        .iter()
+        .map(|(_, action)| Line::raw(action).width())
+        .max()
+        .unwrap_or(0);
+    let width = (natural_keys + natural_action + 5)
+        .min(110)
+        .min(usize::from(bounds.width.saturating_sub(2)));
+    let keys_width = natural_keys.min(width.saturating_sub(3) / 3);
+    (width, keys_width)
+}
+
+pub(super) fn scroll_limit(app: &App, bounds: ratatui::layout::Rect) -> u16 {
+    let (width, key_width) = metrics(app, bounds);
+    let count: usize = app
+        .help_rows
+        .iter()
+        .map(|(keys, action)| {
+            super::text::wrap_value(keys, key_width)
+                .len()
+                .max(super::text::wrap_value(action, width.saturating_sub(key_width + 3)).len())
+        })
+        .sum();
+    u16::try_from(count.saturating_sub(usize::from(bounds.height.saturating_sub(4))))
+        .unwrap_or(u16::MAX)
 }

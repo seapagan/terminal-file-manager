@@ -4,6 +4,7 @@ mod controller;
 mod divider;
 mod help;
 mod profiles;
+mod scroll;
 pub(crate) mod view;
 pub use bindings::{Bindings, chord};
 pub use controller::Controller;

@@ -71,8 +71,8 @@ impl Controller {
                 Vec::new()
             }
             Event::Mouse(event) => self.mouse(event, geometry, now),
-            Event::Resize(_, _) => {
-                self.dragging_divider = false;
+            Event::Resize(width, height) => {
+                super::scroll::resize(self, width, height);
                 Vec::new()
             }
             _ => Vec::new(),
@@ -157,7 +157,12 @@ impl Controller {
                 Action::PageDown => height as i16,
                 _ => 1,
             };
-            self.app.overlay_scroll = self.app.overlay_scroll.saturating_add_signed(delta);
+            self.app.overlay_scroll = self
+                .app
+                .overlay_scroll
+                .min(geometry.overlay_scroll_limit)
+                .saturating_add_signed(delta)
+                .min(geometry.overlay_scroll_limit);
             return;
         }
         let pane = &mut self.app.panes[self.app.active];
@@ -372,14 +377,22 @@ impl Controller {
             return true;
         }
         if self.app.help || self.app.popup {
-            scroll_overlay(&mut self.app.overlay_scroll, event.kind);
+            super::scroll::wheel(
+                &mut self.app.overlay_scroll,
+                event.kind,
+                geometry.overlay_scroll_limit,
+            );
             return true;
         }
         if geometry
             .sidebar
             .is_some_and(|area| area.contains((event.column, event.row).into()))
         {
-            scroll_overlay(&mut self.app.metadata_scroll, event.kind);
+            super::scroll::wheel(
+                &mut self.app.metadata_scroll,
+                event.kind,
+                geometry.metadata_scroll_limit,
+            );
             return true;
         }
         false
@@ -450,14 +463,6 @@ impl Controller {
         } else {
             Vec::new()
         }
-    }
-}
-
-fn scroll_overlay(scroll: &mut u16, kind: MouseEventKind) {
-    match kind {
-        MouseEventKind::ScrollUp => *scroll = scroll.saturating_sub(1),
-        MouseEventKind::ScrollDown => *scroll = scroll.saturating_add(1),
-        _ => {}
     }
 }
 
