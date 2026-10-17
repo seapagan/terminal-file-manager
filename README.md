@@ -57,6 +57,8 @@ help/version also work in scripts. Errors return exit code 2.
 | c; Esc | Count an ordinary directory's descendants; cancel count/close overlay |
 | ?; q/F10/Ctrl+C | Help; quit without replacing the saved navigation session |
 | Q | Save current navigation session and quit |
+| F12 | Show/hide live read-only colour and pane diagnostics |
+| Alt+PageUp / Alt+PageDown | Scroll diagnostics without moving the file cursor |
 
 Mouse clicks focus a pane and position its cursor. Double-click enters a
 directory; files stay unopened. The wheel moves the pane under the pointer
@@ -205,6 +207,27 @@ quit while editing a filter.
 Colour detection and capability downgrades use `colored_text`, including its
 `NO_COLOR`, `FORCE_COLOR`, `CLICOLOR_FORCE`, `CLICOLOR`, `TERM` and `COLORTERM`
 policy. TFM draws Ratatui styles rather than embedding ANSI strings in cells.
+
+F12 opens a non-modal panel at the top right. It reports the startup colour
+depth and environment evidence, each pane's intended semantic styles, and
+actual pane-buffer cell styles captured before other overlays. Selected-row
+runs include trailing blank cells. `Reset` means **terminal default / unknown**;
+the panel cannot measure physical terminal colours. Scroll with Alt+PageUp /
+Alt+PageDown or the wheel over the panel. Other keys keep their ordinary
+meaning, and panel mouse events do not reach underlying controls. F12 hides
+the panel without losing its scroll position. Custom bindings retain priority;
+the actions are `diagnostics`, `diagnostics-up` and `diagnostics-down`.
+
+For a manual check without inherited colour overrides, launch from a real
+terminal with a child-only environment (Unix):
+
+```sh
+env -u NO_COLOR -u FORCE_COLOR -u CLICOLOR -u CLICOLOR_FORCE target/debug/tfm -2 DIRECTORY
+```
+
+Use your ordinary terminal environment for comparison. Capability detection
+runs once at startup; appearance (light/dark) and default background RGB are
+not detected. Diagnostics does not change the palette or cursor styles.
 
 ## Project status
 
