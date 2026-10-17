@@ -68,6 +68,18 @@ impl Controller {
             return Vec::new();
         }
         match action {
+            Info => {
+                return self.dispatch(
+                    if self.preferences.metadata_presentation
+                        == crate::settings::MetadataPresentation::Sidebar
+                    {
+                        ToggleSidebar
+                    } else {
+                        Metadata
+                    },
+                    geometry,
+                );
+            }
             Up | Down | Home | End | PageUp | PageDown => self.movement(action, geometry),
             Enter | Parent | Back | Forward | Refresh => return self.navigate(action),
             Mark | MarkNext | SelectAll | ClearVisible => self.selection(action, geometry),
@@ -278,6 +290,14 @@ impl Controller {
 
     fn mouse(&mut self, event: MouseEvent, geometry: &Geometry, now: Duration) -> Vec<Request> {
         if self.app.help || self.app.popup {
+            scroll_overlay(&mut self.app.overlay_scroll, event.kind);
+            return Vec::new();
+        }
+        if geometry
+            .sidebar
+            .is_some_and(|area| area.contains((event.column, event.row).into()))
+        {
+            scroll_overlay(&mut self.app.metadata_scroll, event.kind);
             return Vec::new();
         }
         if geometry.footer.contains((event.column, event.row).into())
@@ -337,6 +357,14 @@ impl Controller {
         } else {
             Vec::new()
         }
+    }
+}
+
+fn scroll_overlay(scroll: &mut u16, kind: MouseEventKind) {
+    match kind {
+        MouseEventKind::ScrollUp => *scroll = scroll.saturating_sub(1),
+        MouseEventKind::ScrollDown => *scroll = scroll.saturating_add(1),
+        _ => {}
     }
 }
 

@@ -11,6 +11,15 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// Preferred metadata action; direct sidebar and popup actions remain available.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum MetadataPresentation {
+    Sidebar,
+    #[default]
+    Popup,
+}
+
 /// M1 preferences. Later milestones own additional theme/integration settings.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -26,6 +35,7 @@ pub struct Settings {
     pub human_sizes: bool,
     pub fuzzy_timestamps: bool,
     pub permissions: crate::permissions::PermissionDisplay,
+    pub metadata_presentation: MetadataPresentation,
     pub bindings: BTreeMap<String, Action>,
 }
 
@@ -43,6 +53,7 @@ impl Default for Settings {
             human_sizes: true,
             fuzzy_timestamps: false,
             permissions: crate::permissions::PermissionDisplay::default(),
+            metadata_presentation: MetadataPresentation::default(),
             bindings: BTreeMap::new(),
         }
     }

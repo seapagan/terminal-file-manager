@@ -72,6 +72,22 @@ fn files_and_mutations_explain_unavailability_without_launching() {
 }
 
 #[test]
+fn preferred_metadata_presentation_keeps_both_direct_shortcuts() {
+    let (_root, mut controller) = controller();
+    controller.preferences =
+        terminal_file_manager::settings::Settings::parse("metadata_presentation = 'sidebar'")
+            .unwrap();
+    key(&mut controller, "F2");
+    assert!(controller.app.sidebar);
+    assert!(!controller.app.popup);
+    key(&mut controller, "Alt+Enter");
+    assert!(controller.app.popup);
+    key(&mut controller, "Esc");
+    key(&mut controller, "Alt+i");
+    assert!(!controller.app.sidebar);
+}
+
+#[test]
 fn wheel_does_not_change_focus_and_double_click_never_launches_files() {
     let (_root, mut controller) = controller();
     controller.app.dual = true;

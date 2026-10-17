@@ -1,107 +1,241 @@
+//! Shared label/value presentation for the metadata sidebar and floating popup.
 use super::{
     clean,
     listing::{size, timestamp},
 };
 use crate::{
-    app::App,
+    app::{App, Detail},
     color::{Role, Theme},
     permissions::{PermissionDisplay, attributes},
 };
 use ratatui::{
     Frame,
     layout::Rect,
-    widgets::{Block, Borders, Clear, Paragraph, Wrap},
+    style::Style,
+    text::{Line, Span},
+    widgets::{Block, Borders, Clear, Paragraph},
 };
 
-pub(super) fn render(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
+type Field = (&'static str, String);
+
+pub(super) fn render(frame: &mut Frame, app: &App, bounds: Rect, theme: &Theme, floating: bool) {
+    let fields = fields(&app.details[app.active], app.panes[app.active].permissions);
+    let width = if floating {
+        bounds.width.saturating_sub(4).min(90)
+    } else {
+        bounds.width
+    };
+    let lines = lines(&fields, width.saturating_sub(2), theme);
+    let area = if floating {
+        super::centered(
+            bounds,
+            width,
+            u16::try_from(lines.len().saturating_add(2))
+                .unwrap_or(u16::MAX)
+                .min(bounds.height.saturating_sub(2)),
+        )
+    } else {
+        bounds
+    };
+    let scroll = if floating {
+        app.overlay_scroll
+    } else {
+        app.metadata_scroll
+    };
+    let max_scroll = lines
+        .len()
+        .saturating_sub(usize::from(area.height.saturating_sub(2)));
+    let scroll = usize::from(scroll)
+        .min(max_scroll)
+        .min(usize::from(u16::MAX)) as u16;
     frame.render_widget(Clear, area);
-    let detail = &app.details[app.active];
-    let mut lines = entry_lines(detail, app.panes[app.active].permissions);
-    append_totals(detail, &mut lines);
-    if detail.counting {
-        lines.push("Calculating totals… Esc cancels".into());
-    }
-    lines.push("c: count/size on demand; Esc cancels/closes".into());
-    let text = lines
-        .iter()
-        .map(|line| clean(line))
-        .collect::<Vec<_>>()
-        .join("\n");
     frame.render_widget(
-        Paragraph::new(text)
-            .scroll((if app.popup { app.overlay_scroll } else { 0 }, 0))
-            .wrap(Wrap { trim: false })
-            .block(Block::default().borders(Borders::ALL).title("Metadata"))
-            .style(theme.style(Role::Normal)),
+        Paragraph::new(lines).scroll((scroll, 0)).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(if floating {
+                    "Metadata — ↑/↓ or wheel"
+                } else {
+                    "Metadata — wheel scrolls"
+                })
+                .border_style(theme.style(Role::Header)),
+        ),
         area,
     );
 }
 
-fn entry_lines(detail: &crate::app::Detail, permissions: PermissionDisplay) -> Vec<String> {
-    let mut lines = Vec::new();
-    if let Some(entry) = &detail.entry {
-        lines.extend([
-            format!("Name: {}", entry.name.to_string_lossy()),
-            format!("Path: {}", entry.path.display()),
-            format!(
-                "Canonical: {}",
-                detail
-                    .canonical
-                    .as_ref()
-                    .map_or_else(|| "unavailable".into(), |p| p.display().to_string())
-            ),
-            format!("Type: {:?}", entry.kind),
-            format!("Size (entry): {}", size(entry.size)),
-            format!("Modified UTC: {}", timestamp(entry.modified)),
-            format!("Created UTC: {}", timestamp(entry.created)),
-            format!("Accessed UTC: {}", timestamp(entry.accessed)),
-            format!("Mode/attributes: {}", attributes(entry, permissions)),
-            format!(
-                "Owner/group: {}",
-                entry.owner.as_deref().unwrap_or("unavailable")
-            ),
-            format!(
-                "Link target: {}",
-                entry
-                    .link_target
-                    .as_ref()
-                    .map_or_else(|| "not available".into(), |p| p.display().to_string())
-            ),
-        ]);
-        if let Some(error) = &entry.error {
-            lines.push(format!("Error: {error}"));
+fn fields(detail: &Detail, permissions: PermissionDisplay) -> Vec<Field> {
+    let mut fields = entry_fields(detail, permissions);
+    if let Some(totals) = &detail.totals {
+        match totals {
+            Ok(totals) => {
+                fields.push((
+                    "Descendants",
+                    format!(
+                        "{} files, {} directories, {}{}",
+                        totals.files,
+                        totals.directories,
+                        size(Some(totals.bytes)),
+                        if totals.errors.is_empty() {
+                            ""
+                        } else {
+                            " — INCOMPLETE"
+                        }
+                    ),
+                ));
+                fields.extend(totals.errors.iter().map(|error| ("Error", error.clone())));
+            }
+            Err(error) => fields.push(("Error", error.clone())),
         }
-    } else {
-        lines.push(
+    }
+    if detail.counting {
+        fields.push(("Status", "Calculating totals… Esc cancels".into()));
+    }
+    fields.push(("Keys", "c: count/size on demand; Esc cancels/closes".into()));
+    fields
+}
+
+fn entry_fields(detail: &Detail, permissions: PermissionDisplay) -> Vec<Field> {
+    let Some(entry) = &detail.entry else {
+        return vec![(
+            "Status",
             if detail.path.is_some() {
                 "Loading metadata…"
             } else {
                 "No visible entry"
             }
             .into(),
-        );
+        )];
+    };
+    let mut fields = vec![
+        ("Name", entry.name.to_string_lossy().into_owned()),
+        ("Path", entry.path.display().to_string()),
+        (
+            "Canonical",
+            detail
+                .canonical
+                .as_ref()
+                .map_or_else(|| "unavailable".into(), |p| p.display().to_string()),
+        ),
+        ("Type", format!("{:?}", entry.kind)),
+        ("Size", size(entry.size)),
+        ("Modified UTC", timestamp(entry.modified)),
+        ("Created UTC", timestamp(entry.created)),
+        ("Accessed UTC", timestamp(entry.accessed)),
+        ("Attributes", attributes(entry, permissions)),
+        (
+            "Owner/group",
+            entry.owner.clone().unwrap_or_else(|| "unavailable".into()),
+        ),
+        (
+            "Link target",
+            entry
+                .link_target
+                .as_ref()
+                .map_or_else(|| "unavailable".into(), |p| p.display().to_string()),
+        ),
+    ];
+    if let Some(error) = &entry.error {
+        fields.push(("Error", error.clone()));
     }
-    lines
+    fields
 }
 
-fn append_totals(detail: &crate::app::Detail, lines: &mut Vec<String>) {
-    if let Some(totals) = &detail.totals {
-        match totals {
-            Ok(totals) => {
-                lines.push(format!(
-                    "Descendants: {} files, {} directories, {}{}",
-                    totals.files,
-                    totals.directories,
-                    size(Some(totals.bytes)),
-                    if totals.errors.is_empty() {
-                        ""
+fn lines(fields: &[Field], width: u16, theme: &Theme) -> Vec<Line<'static>> {
+    let label_width = fields
+        .iter()
+        .map(|(label, _)| label.len() + 2)
+        .max()
+        .unwrap_or(0)
+        .min(usize::from(width / 2));
+    let value_width = usize::from(width).saturating_sub(label_width);
+    fields
+        .iter()
+        .flat_map(|(label, value)| {
+            let value_role = if *label == "Error" {
+                Role::Error
+            } else if *label == "Keys" {
+                Role::Key
+            } else {
+                Role::Value
+            };
+            wrap_value(&clean(value), value_width)
+                .into_iter()
+                .enumerate()
+                .map(move |(index, value)| {
+                    let label = if index == 0 {
+                        format!("{label}:")
                     } else {
-                        " — INCOMPLETE"
-                    }
-                ));
-                lines.extend(totals.errors.iter().cloned());
-            }
-            Err(error) => lines.push(format!("Totals: {error}")),
+                        String::new()
+                    };
+                    let label: String = label.chars().take(label_width.saturating_sub(1)).collect();
+                    Line::from(vec![
+                        Span::styled(format!("{label:label_width$}"), theme.style(Role::Label)),
+                        Span::styled(value, theme.style(value_role)),
+                    ])
+                })
+        })
+        .collect()
+}
+
+fn wrap_value(text: &str, width: usize) -> Vec<String> {
+    if width == 0 {
+        return vec![String::new()];
+    }
+    let line = Line::raw(text);
+    let mut rows = vec![String::new()];
+    let mut used = 0;
+    for grapheme in line.styled_graphemes(Style::default()) {
+        let length = Span::raw(grapheme.symbol).width();
+        if used + length > width && used > 0 {
+            rows.push(String::new());
+            used = 0;
         }
+        // A wide grapheme cannot fit in a one-cell value column; preserve layout.
+        if length > width {
+            rows.last_mut().unwrap().push('�');
+            used += 1;
+        } else {
+            rows.last_mut().unwrap().push_str(grapheme.symbol);
+            used += length;
+        }
+    }
+    rows
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use colored_text::ColorLevel;
+
+    #[test]
+    fn wrapped_values_keep_graphemes_and_continue_under_value_column() {
+        let theme = Theme::new(ColorLevel::Ansi16);
+        let fields = vec![("Path", "界e\u{301}界e\u{301}界e\u{301}\u{1b}\n".into())];
+        let lines = lines(&fields, 13, &theme);
+        assert!(lines.len() > 1);
+        let mut restored = String::new();
+        for (index, line) in lines.iter().enumerate() {
+            assert!(line.width() <= 13);
+            assert_eq!(line.spans[0].width(), 6);
+            assert_eq!(line.spans[0].content.trim().is_empty(), index != 0);
+            assert!(!line.spans[1].content.contains('\u{1b}'));
+            restored.push_str(&line.spans[1].content);
+        }
+        assert_eq!(restored, "界e\u{301}界e\u{301}界e\u{301}\\u{1b}\\n");
+        assert!(
+            lines[0].spans[0]
+                .style
+                .add_modifier
+                .contains(ratatui::style::Modifier::BOLD)
+        );
+        assert_ne!(lines[0].spans[0].style.fg, lines[0].spans[1].style.fg);
+    }
+
+    #[test]
+    fn one_cell_values_do_not_overflow_or_split_combining_sequences() {
+        assert_eq!(wrap_value("界e\u{301}", 1), ["�", "e\u{301}"]);
+        assert_eq!(wrap_value("", 1), [""]);
+        assert_eq!(wrap_value("value", 0), [""]);
     }
 }

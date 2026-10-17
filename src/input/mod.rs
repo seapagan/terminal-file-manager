@@ -24,6 +24,7 @@ pub enum Action {
     FocusPane,
     ToggleSidebar,
     Metadata,
+    Info,
     Count,
     Cancel,
     Mark,

@@ -115,6 +115,7 @@ fn defaults() -> &'static [(&'static str, Action)] {
         ("Tab", FocusPane),
         ("Alt+i", ToggleSidebar),
         ("Alt+Enter", Metadata),
+        ("F2", Info),
         ("c", Count),
         ("Esc", Cancel),
         ("Space", Mark),

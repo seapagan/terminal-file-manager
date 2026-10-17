@@ -43,6 +43,7 @@ pub struct App {
     pub popup: bool,
     pub help: bool,
     pub overlay_scroll: u16,
+    pub metadata_scroll: u16,
     pub status: String,
     pub now: std::time::SystemTime,
     pub details: [Detail; 2],
@@ -60,6 +61,7 @@ impl App {
             popup: false,
             help: false,
             overlay_scroll: 0,
+            metadata_scroll: 0,
             status: "Read-only — ? for help".into(),
             now: std::time::SystemTime::now(),
             details: std::array::from_fn(|_| Detail::default()),
@@ -137,6 +139,9 @@ impl App {
         let detail = &mut self.details[pane];
         if path == detail.path {
             return None;
+        }
+        if pane == self.active {
+            self.metadata_scroll = 0;
         }
         detail.generation += 1;
         detail.path = path.clone();

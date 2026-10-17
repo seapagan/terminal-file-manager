@@ -37,7 +37,7 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
         }
     }
     if let Some(area) = geometry.sidebar {
-        metadata::render(frame, app, area, theme);
+        metadata::render(frame, app, area, theme, false);
     }
     frame.render_widget(
         Paragraph::new(clean(&app.status)).style(theme.style(Role::Status)),
@@ -49,7 +49,7 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
         geometry.footer,
     );
     if app.popup {
-        metadata::render(frame, app, overlay(frame.area()), theme);
+        metadata::render(frame, app, frame.area(), theme, true);
     }
     if app.help {
         render_help(frame, theme, app.overlay_scroll);
@@ -68,6 +68,17 @@ pub(super) fn overlay(area: Rect) -> Rect {
         area.y + margin,
         area.width.saturating_sub(margin * 2),
         area.height.saturating_sub(margin * 2),
+    )
+}
+
+pub(super) fn centered(area: Rect, width: u16, height: u16) -> Rect {
+    let width = width.min(area.width);
+    let height = height.min(area.height);
+    Rect::new(
+        area.x + (area.width - width) / 2,
+        area.y + (area.height - height) / 2,
+        width,
+        height,
     )
 }
 

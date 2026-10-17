@@ -223,7 +223,7 @@ fn metadata_fields_have_separate_rows_and_share_the_cached_entry() {
         .collect();
     let name = rows
         .iter()
-        .position(|row| row.contains("Name: selected"))
+        .position(|row| row.contains("Name:") && row.contains("selected"))
         .unwrap();
     let path = rows.iter().position(|row| row.contains("Path:")).unwrap();
     assert!(path > name);
@@ -355,5 +355,50 @@ fn fuzzy_timestamp_setting_uses_one_fixed_frame_clock_and_preserves_exact_utc() 
             .map(|x| terminal.backend().buffer()[(x, 2)].symbol())
             .collect::<String>();
         assert!(row.contains(expected), "{row}");
+    }
+}
+
+#[test]
+fn metadata_popup_centres_bounds_and_clamps_scrolling_after_resize() {
+    let root = tempfile::tempdir().unwrap();
+    let mut app = App::new(root.path().into());
+    app.details[0].entry = Some(terminal_file_manager::fs::inspect(root.path()));
+    app.popup = true;
+    for (width, height) in [(160, 50), (40, 12), (4, 3), (1, 1)] {
+        for scroll in [0, u16::MAX] {
+            app.overlay_scroll = scroll;
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+            terminal
+                .draw(|frame| {
+                    ui::render(frame, &app, &Theme::new(ColorLevel::NoColor));
+                })
+                .unwrap();
+            let buffer = terminal.backend().buffer();
+            assert!(
+                buffer
+                    .content()
+                    .iter()
+                    .all(|cell| !cell.symbol().contains('\u{1b}'))
+            );
+            if width == 160 {
+                let top = (0..height)
+                    .find(|y| {
+                        (0..width)
+                            .map(|x| buffer[(x, *y)].symbol())
+                            .collect::<String>()
+                            .contains("Metadata")
+                    })
+                    .unwrap();
+                assert!(top > 0 && top < height / 2);
+                assert_eq!(buffer[(35, top)].symbol(), "┌");
+                let text = buffer
+                    .content()
+                    .iter()
+                    .map(|cell| cell.symbol())
+                    .collect::<String>();
+                assert!(text.contains("Metadata"));
+                assert!(text.contains("Keys:"));
+            }
+        }
     }
 }

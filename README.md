@@ -36,6 +36,7 @@ help/version also work in scripts. Errors return exit code 2.
 | h; i | Toggle hidden entries; cycle ignore dim/hide/off |
 | s; v; g; r | Cycle sort; reverse; cycle directory grouping; refresh |
 | Alt+I; Alt+Enter | Toggle metadata sidebar; open full metadata |
+| F2 | Toggle preferred metadata presentation |
 | c; Esc | Count an ordinary directory's descendants; cancel count/close overlay |
 | ?; q/F10/Ctrl+C | Help; quit without changing the shell directory |
 
@@ -88,6 +89,7 @@ sidebar_left = false
 human_sizes = true # false shows exact bytes; human values use B/K/M/G/T/P
 fuzzy_timestamps = false # true uses relative phrases, including future times
 permissions = "symbolic" # or "octal" on Unix; Windows keeps native attributes
+metadata_presentation = "popup" # F2 preference; or "sidebar"
 mouse = true
 sort = "natural"
 grouping = "first"
@@ -103,7 +105,7 @@ Other preference fields are `reverse` and `hidden` (booleans). Grouping is
 `natural`, `name`, `extension`, `size`, `modified`, `created`, `kind`, `version`
 and `unsorted`. Binding action names also include `up`, `down`, `enter`,
 `parent`, `back`, `forward`, `focus-pane`, `mark`, `mark-next`, `select-all`,
-`clear-visible`, `toggle-sidebar`, `metadata`, `count`, `cancel`, `refresh`,
+`clear-visible`, `toggle-sidebar`, `metadata`, `info`, `count`, `cancel`, `refresh`,
 `hidden`, `ignore`, `sort`, `reverse`, `group`, `help` and `quit`.
 Chords accept Ctrl/Alt/Shift, a printable character, named navigation keys,
 Space, Insert, Esc, or F1–F24. Overrides replace the chosen chord; the help
