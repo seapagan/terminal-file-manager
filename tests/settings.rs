@@ -67,6 +67,50 @@ fn missing_config_does_not_create_files_and_preferences_round_trip() {
 }
 
 #[test]
+fn explicit_detail_columns_survive_exit_from_the_other_pane_and_restart() {
+    use terminal_file_manager::view::Columns;
+    for (action, flags) in [
+        (Action::ColumnModified, [false, true, true]),
+        (Action::ColumnAttributes, [true, false, true]),
+        (Action::ColumnOwner, [true, true, false]),
+    ] {
+        let expected = Columns {
+            modified: flags[0],
+            attributes: flags[1],
+            owner: flags[2],
+            ..Columns::default()
+        };
+        let root = tempfile::tempdir().unwrap();
+        let mut store = Store::load(root.path().join("config.toml")).unwrap();
+        let mut app = App::new(root.path().into());
+        store.settings.apply(&mut app);
+        app.dual = true;
+        let mut c = Controller::new(
+            app,
+            Bindings::new(&Default::default()).unwrap(),
+            store.settings.clone(),
+        );
+        let geometry = ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 160, 24));
+        c.dispatch(action, &geometry);
+        assert_eq!(c.app.panes[0].columns, expected);
+        assert_eq!(c.app.panes[1].columns, Columns::default());
+        assert_eq!(c.preferences.columns, expected);
+        assert!(c.preferences_changed);
+        c.dispatch(Action::FocusPane, &geometry);
+        assert_eq!(c.app.active, 1);
+        c.dispatch(Action::Quit, &geometry);
+        assert!(c.quit);
+        store.settings = c.preferences;
+        store.save().unwrap();
+        let restored = Store::load(store.path).unwrap();
+        let mut restarted = App::new(root.path().into());
+        restored.settings.apply(&mut restarted);
+        assert!(restarted.panes.iter().all(|pane| pane.columns == expected));
+        assert_eq!(restored.settings.profiles, Settings::default().profiles);
+    }
+}
+
+#[test]
 fn clean_settings_and_every_builtin_profile_start_without_reverse() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("config.toml");
