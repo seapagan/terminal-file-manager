@@ -79,22 +79,12 @@ fn render_status(frame: &mut Frame, pane: &Pane, inner: Rect, theme: &Theme) {
         .error
         .as_deref()
         .or_else(|| pane.warnings.first().map(String::as_str));
-    let policy = format!(
-        "{} | /{}/ {:?}{} {:?} hidden:{} ignore:{:?}",
-        clean(&pane.profile_label()),
-        clean(&pane.filter),
-        pane.sort.sort,
-        if pane.sort.reverse { " reverse" } else { "" },
-        pane.sort.grouping,
-        pane.show_hidden,
-        pane.ignore
+    let line = status.map_or_else(
+        || super::policy::line(pane, inner.width, theme),
+        |message| Line::styled(clean(message), theme.style(Role::Warning)),
     );
     frame.render_widget(
-        Paragraph::new(status.map_or(policy, clean)).style(theme.style(if status.is_some() {
-            Role::Warning
-        } else {
-            Role::Normal
-        })),
+        Paragraph::new(line),
         Rect::new(
             inner.x,
             inner.bottom().saturating_sub(1),
