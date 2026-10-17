@@ -1,6 +1,25 @@
 use super::Action;
 use crossterm::event::{KeyCode, KeyModifiers};
 
+pub(super) fn accepts(action: Action) -> bool {
+    matches!(
+        action,
+        Action::Up
+            | Action::Down
+            | Action::Home
+            | Action::End
+            | Action::PageUp
+            | Action::PageDown
+            | Action::Help
+            | Action::Cancel
+            | Action::Quit
+            | Action::SaveQuit
+            | Action::Diagnostics
+            | Action::DiagnosticsUp
+            | Action::DiagnosticsDown
+    )
+}
+
 pub(super) fn key_name(code: KeyCode, modifiers: KeyModifiers) -> String {
     let mut name = String::new();
     for (flag, text) in [
@@ -60,6 +79,9 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
     (SaveQuit, "Save navigation session and quit"),
     (Quit, "Quit without saving a navigation session"),
     (Help, "Toggle help"),
+    (Diagnostics, "Toggle read-only diagnostics"),
+    (DiagnosticsUp, "Scroll diagnostics up"),
+    (DiagnosticsDown, "Scroll diagnostics down"),
     (TogglePanes, "Toggle one/two panes"),
     (FocusPane, "Focus other visible pane"),
     (Maximise, "Temporarily maximise active pane / restore split"),

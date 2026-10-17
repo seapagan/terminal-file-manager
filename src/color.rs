@@ -1,4 +1,5 @@
 //! Renderer-neutral adapter adapted from Labeldeck's edit/color.rs and UI theme.
+mod evidence;
 mod listing;
 use colored_text::{AnsiColor, ColorLevel, ResolvedColor, resolve_hex, resolve_named, resolve_rgb};
 use ratatui::style::{Color, Modifier, Style};
@@ -28,12 +29,25 @@ pub enum Role {
 /// Terminal-native palette with capability-aware colour resolution.
 pub struct Theme {
     pub level: ColorLevel,
+    pub(crate) evidence: Vec<String>,
 }
 
 impl Theme {
     /// Capability detection and environment precedence belong to colored_text.
     pub fn new(level: ColorLevel) -> Self {
-        Self { level }
+        Self {
+            level,
+            evidence: Vec::new(),
+        }
+    }
+
+    /// Detect stdout capability once, retaining the startup evidence for diagnostics.
+    pub fn for_stdout() -> Self {
+        let mut theme = Self::new(colored_text::ColorizeConfig::color_level(
+            colored_text::RenderTarget::Stdout,
+        ));
+        theme.evidence = evidence::startup();
+        theme
     }
 
     /// Resolve a configured hexadecimal accent without copying library internals.

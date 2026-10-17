@@ -144,6 +144,45 @@ fn isolate(command: &mut CommandBuilder, root: &std::path::Path) {
 }
 
 #[test]
+fn diagnostics_uses_startup_capability_in_a_controlled_real_terminal() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("diagnostics-sentinel"), "read only").unwrap();
+    for (forced, expected) in [
+        (None, "TrueColor"),
+        (Some("0"), "NoColor"),
+        (Some("1"), "Ansi16"),
+        (Some("2"), "Ansi256"),
+        (Some("3"), "TrueColor"),
+    ] {
+        let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+        command.cwd(root.path());
+        isolate(&mut command, root.path());
+        // Only this child drops inherited overrides; precedence tests stay intact.
+        for name in ["NO_COLOR", "FORCE_COLOR", "CLICOLOR", "CLICOLOR_FORCE"] {
+            command.env_remove(name);
+        }
+        command.env("COLORTERM", "truecolor");
+        if let Some(value) = forced {
+            command.env("FORCE_COLOR", value);
+        }
+        drive(
+            command,
+            &[
+                ("diagnostics-sentinel", "\u{1b}[24~"),
+                (&format!("Applied ColorLevel: {expected}"), "\u{1b}[24~\r"),
+                ("Viewer unavailable until M6", "q"),
+            ],
+            true,
+        );
+    }
+    assert_eq!(
+        fs::read(root.path().join("diagnostics-sentinel")).unwrap(),
+        b"read only"
+    );
+    assert!(!root.path().join("config/tfm/config.toml").exists());
+}
+
+#[test]
 fn shifted_arrow_marks_a_range_in_a_real_terminal() {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("range-a"), "one").unwrap();

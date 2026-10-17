@@ -2,6 +2,7 @@
 mod bindings;
 mod click;
 mod controller;
+mod diagnostics;
 mod divider;
 mod help;
 mod profiles;
@@ -31,6 +32,9 @@ pub enum Action {
     Quit,
     SaveQuit,
     Help,
+    Diagnostics,
+    DiagnosticsUp,
+    DiagnosticsDown,
     TogglePanes,
     FocusPane,
     Maximise,

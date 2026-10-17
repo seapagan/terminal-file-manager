@@ -13,6 +13,8 @@ pub struct Geometry {
     pub footer: Rect,
     pub footer_controls: Vec<super::FooterControl>,
     pub menu: Option<Rect>,
+    pub diagnostics: Option<Rect>,
+    pub diagnostics_scroll_limit: u16,
     pub overlay_scroll_limit: u16,
     pub metadata_scroll_limit: u16,
     pub metadata_controls: Vec<super::MetadataControl>,
@@ -22,30 +24,7 @@ pub struct Geometry {
 pub fn geometry(app: &App, area: Rect) -> Geometry {
     let height = area.height.saturating_sub(2);
     let body = Rect::new(area.x, area.y, area.width, height);
-    let mut geometry = Geometry {
-        panes: [None, None],
-        listing_rows: [0, 0],
-        selection_counts: [Default::default(); 2],
-        overlay_scroll_limit: 0,
-        metadata_scroll_limit: 0,
-        metadata_controls: Vec::new(),
-        divider: None,
-        sidebar: None,
-        footer_controls: Vec::new(),
-        menu: menu_area(app, area),
-        status: Rect::new(
-            area.x,
-            area.y + height,
-            area.width,
-            u16::from(area.height >= 2),
-        ),
-        footer: Rect::new(
-            area.x,
-            area.bottom().saturating_sub(1),
-            area.width,
-            u16::from(area.height >= 1),
-        ),
-    };
+    let mut geometry = initial_geometry(app, area, height);
     geometry.footer_controls = super::footer::controls(geometry.footer);
     if app.visible_panes(area.width).len() == 2 {
         let width = ((u32::from(body.width) * u32::from(app.split_percent.clamp(20, 80)) / 100)
@@ -68,6 +47,35 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
     }
     scroll_limits(app, &mut geometry, area);
     geometry
+}
+
+fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
+    Geometry {
+        panes: [None, None],
+        listing_rows: [0, 0],
+        selection_counts: [Default::default(); 2],
+        overlay_scroll_limit: 0,
+        metadata_scroll_limit: 0,
+        metadata_controls: Vec::new(),
+        divider: None,
+        sidebar: None,
+        footer_controls: Vec::new(),
+        menu: menu_area(app, area),
+        diagnostics: app.diagnostics.then(|| super::diagnostics::area(area)),
+        diagnostics_scroll_limit: 0,
+        status: Rect::new(
+            area.x,
+            area.y + height,
+            area.width,
+            u16::from(area.height >= 2),
+        ),
+        footer: Rect::new(
+            area.x,
+            area.bottom().saturating_sub(1),
+            area.width,
+            u16::from(area.height >= 1),
+        ),
+    }
 }
 
 fn menu_area(app: &App, area: Rect) -> Option<Rect> {

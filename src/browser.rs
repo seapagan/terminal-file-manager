@@ -9,7 +9,6 @@ use crate::{
     ui,
     workers::{Pool, Value},
 };
-use colored_text::{ColorizeConfig, RenderTarget};
 use std::{
     io::{self, IsTerminal},
     path::Path,
@@ -51,7 +50,7 @@ pub fn run_startup(options: &crate::startup::Startup) -> Result<(), String> {
 fn browse(app: App, settings: Settings, store: &mut Option<Store>) -> Result<(), String> {
     let bindings = Bindings::new(&settings.bindings)?;
     let mut controller = Controller::new(app, bindings, settings.clone());
-    let theme = Theme::new(ColorizeConfig::color_level(RenderTarget::Stdout));
+    let theme = Theme::for_stdout();
     let mut pool = Pool::new(IgnoreContext::default()).map_err(|e| e.to_string())?;
     for pane in 0..2 {
         pool.submit(Request {

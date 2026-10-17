@@ -17,7 +17,7 @@ pub struct Controller {
     pub save_session: bool,
     pub preferences_changed: bool,
     pub preferences: Settings,
-    bindings: Bindings,
+    pub(super) bindings: Bindings,
     filter_before: Option<String>,
     pub(super) last_click: Option<(usize, PathBuf, Duration)>,
     pub(super) dragging_divider: bool,
@@ -44,6 +44,9 @@ impl Controller {
 
     /// Normalize terminal input. Clock/geometry are explicit deterministic inputs.
     pub fn handle(&mut self, event: Event, geometry: &Geometry, now: Duration) -> Vec<Request> {
+        if super::diagnostics::handle(self, &event, geometry) {
+            return Vec::new();
+        }
         match event {
             Event::Key(key) if key.kind != KeyEventKind::Release => {
                 if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
@@ -83,12 +86,7 @@ impl Controller {
     pub fn dispatch(&mut self, action: Action, geometry: &Geometry) -> Vec<Request> {
         use Action::*;
         let action = self.preferred_action(action);
-        if self.app.help
-            && !matches!(
-                action,
-                Up | Down | Home | End | PageUp | PageDown | Help | Cancel | Quit | SaveQuit
-            )
-        {
+        if self.app.help && !super::help::accepts(action) {
             return Vec::new();
         }
         if let Some(reason) = unavailable(action) {
@@ -96,6 +94,9 @@ impl Controller {
             return Vec::new();
         }
         match action {
+            Diagnostics | DiagnosticsUp | DiagnosticsDown => {
+                super::diagnostics::action(self, action, geometry)
+            }
             SplitLeft => super::divider::adjust(self, self.app.split_percent.saturating_sub(5)),
             SplitRight => super::divider::adjust(self, self.app.split_percent.saturating_add(5)),
             ViewProfiles => super::profiles::open(self),

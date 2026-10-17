@@ -1,4 +1,5 @@
 //! Render cached state only. No filesystem calls, subprocesses or worker submission.
+mod diagnostics;
 mod footer;
 mod help;
 pub use footer::FooterControl;
@@ -36,12 +37,15 @@ pub fn clean(text: &str) -> String {
 
 /// Draw a frame using the same geometry used by mouse hit testing.
 pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
-    let geometry = geometry(app, frame.area());
+    let mut geometry = geometry(app, frame.area());
     for (id, area) in geometry.panes.iter().enumerate() {
         if area.is_some() {
             listing::render(frame, app, id, &geometry, theme);
         }
     }
+    let diagnostics = app
+        .diagnostics
+        .then(|| diagnostics::report(frame.buffer_mut(), app, &geometry, theme));
     if let Some(area) = geometry.sidebar {
         metadata::render(frame, app, area, theme, false);
     }
@@ -62,6 +66,9 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
         } else {
             profiles::render(frame, app, area, theme);
         }
+    }
+    if let Some(lines) = diagnostics {
+        diagnostics::render(frame, app, theme, &mut geometry, lines);
     }
     geometry
 }
