@@ -319,9 +319,23 @@ fn permission_cell(
     theme: &Theme,
     decorate: impl Fn(Style) -> Style,
 ) -> Cell<'static> {
+    let spans = permission_spans(entry, permissions, theme)
+        .into_iter()
+        .map(|mut span| {
+            span.style = decorate(span.style);
+            span
+        })
+        .collect::<Vec<_>>();
+    Cell::from(Line::from(spans))
+}
+
+pub(super) fn permission_spans(
+    entry: &Entry,
+    permissions: crate::permissions::PermissionDisplay,
+    theme: &Theme,
+) -> Vec<Span<'static>> {
     let text = crate::permissions::attributes(entry, permissions);
-    let spans = text
-        .chars()
+    text.chars()
         .enumerate()
         .map(|(index, value)| {
             let style = if index == 0 {
@@ -333,10 +347,9 @@ fn permission_cell(
             } else {
                 theme.style(Role::Warning)
             };
-            Span::styled(value.to_string(), decorate(style))
+            Span::styled(value.to_string(), style)
         })
-        .collect::<Vec<_>>();
-    Cell::from(Line::from(spans))
+        .collect()
 }
 
 fn listing_timestamp(

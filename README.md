@@ -99,6 +99,9 @@ current selection. Size/item totals run only on request, stop cooperatively and
 report incomplete scans. They never recurse into links, junctions or other
 reparse points. Interactive navigation into supported directory links remains
 available; unsupported reparse objects stay visible with an explanation.
+Sidebar and popup attributes use the listing's permission format and character
+colours. Click an attribute value (including a wrapped continuation) to switch
+symbolic/octal display for that pane; labels and padding stay inactive.
 
 Each pane reports its visible item count separately from selection. Excluded
 selection counts refer only to marked entries hidden by visibility or filtering,

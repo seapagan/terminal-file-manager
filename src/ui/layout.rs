@@ -15,6 +15,7 @@ pub struct Geometry {
     pub menu: Option<Rect>,
     pub overlay_scroll_limit: u16,
     pub metadata_scroll_limit: u16,
+    pub metadata_controls: Vec<super::MetadataControl>,
 }
 
 /// Width-driven layout never depends on a directory's longest filename.
@@ -27,6 +28,7 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
         selection_counts: [Default::default(); 2],
         overlay_scroll_limit: 0,
         metadata_scroll_limit: 0,
+        metadata_controls: Vec::new(),
         divider: None,
         sidebar: None,
         footer_controls: Vec::new(),
@@ -113,4 +115,13 @@ fn scroll_limits(app: &App, geometry: &mut Geometry, area: Rect) {
     geometry.metadata_scroll_limit = geometry
         .sidebar
         .map_or(0, |area| super::metadata::scroll_limit(app, area, false));
+    if !app.help && geometry.menu.is_none() {
+        geometry.metadata_controls = if app.popup {
+            super::metadata::controls(app, area, true)
+        } else {
+            geometry
+                .sidebar
+                .map_or_else(Vec::new, |area| super::metadata::controls(app, area, false))
+        };
+    }
 }

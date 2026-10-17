@@ -1,13 +1,13 @@
 //! Shared label/value presentation for the metadata sidebar and floating popup.
 use super::{
     clean,
-    listing::{size, timestamp},
-    text::wrap_value,
+    listing::{permission_spans, size, timestamp},
+    text::wrap_line,
 };
 use crate::{
     app::{App, Detail, Pane},
     color::{Role, Theme},
-    permissions::attributes,
+    input::Action,
 };
 use ratatui::{
     Frame,
@@ -16,55 +16,66 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph},
 };
 
-type Field = (&'static str, String);
+struct Field {
+    label: &'static str,
+    value: Line<'static>,
+    action: Option<Action>,
+}
+
+impl Field {
+    fn plain(label: &'static str, value: String, theme: &Theme) -> Self {
+        let role = match label {
+            "Error" => Role::Error,
+            "Keys" => Role::Key,
+            _ => Role::Value,
+        };
+        Self {
+            label,
+            value: Line::styled(clean(&value), theme.style(role)),
+            action: None,
+        }
+    }
+}
+
+/// A visible value run; labels, borders and padding are never actionable.
+#[derive(Clone, Debug)]
+pub struct MetadataControl {
+    pub area: Rect,
+    pub action: Action,
+}
+
+type Row = (Line<'static>, Option<Action>, u16);
+
+struct Layout {
+    area: Rect,
+    lines: Vec<Line<'static>>,
+    controls: Vec<MetadataControl>,
+    scroll: u16,
+    limit: u16,
+}
 
 pub(super) fn render(frame: &mut Frame, app: &App, bounds: Rect, theme: &Theme, floating: bool) {
-    let fields = fields(&app.details[app.active], &app.panes[app.active]);
-    let width = if floating {
-        bounds.width.saturating_sub(4).min(90)
-    } else {
-        bounds.width
-    };
-    let lines = lines(&fields, width.saturating_sub(2), theme);
-    let area = if floating {
-        super::centered(
-            bounds,
-            width,
-            u16::try_from(lines.len().saturating_add(2))
-                .unwrap_or(u16::MAX)
-                .min(bounds.height.saturating_sub(2)),
-        )
-    } else {
-        bounds
-    };
-    let scroll = if floating {
-        app.overlay_scroll
-    } else {
-        app.metadata_scroll
-    };
-    let max_scroll = lines
-        .len()
-        .saturating_sub(usize::from(area.height.saturating_sub(2)));
-    let scroll = usize::from(scroll)
-        .min(max_scroll)
-        .min(usize::from(u16::MAX)) as u16;
+    let layout = layout(app, bounds, theme, floating);
+    let area = layout.area;
     frame.render_widget(Clear, area);
     frame.render_widget(
-        Paragraph::new(lines).scroll((scroll, 0)).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(if floating {
-                    "Metadata — ↑/↓ or wheel"
-                } else {
-                    "Metadata — wheel scrolls"
-                })
-                .border_style(theme.style(Role::Header)),
-        ),
+        Paragraph::new(layout.lines)
+            .scroll((layout.scroll, 0))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(if floating {
+                        "Metadata — ↑/↓ or wheel"
+                    } else {
+                        "Metadata — wheel scrolls"
+                    })
+                    .border_style(theme.style(Role::Header)),
+            ),
         area,
     );
 }
 
-fn fields(detail: &Detail, pane: &Pane) -> Vec<Field> {
+fn fields(detail: &Detail, pane: &Pane, theme: &Theme) -> Vec<Field> {
     let mut fields = entry_fields(detail, pane);
     if let Some(totals) = &detail.totals {
         match totals {
@@ -93,9 +104,21 @@ fn fields(detail: &Detail, pane: &Pane) -> Vec<Field> {
     }
     fields.push(("Keys", "c: count/size on demand; Esc cancels/closes".into()));
     fields
+        .into_iter()
+        .map(|(label, value)| {
+            let mut field = Field::plain(label, value, theme);
+            if label == "Attributes"
+                && let Some(entry) = &detail.entry
+            {
+                field.value = Line::from(permission_spans(entry, pane.permissions, theme));
+                field.action = Some(Action::Permissions);
+            }
+            field
+        })
+        .collect()
 }
 
-fn entry_fields(detail: &Detail, pane: &Pane) -> Vec<Field> {
+fn entry_fields(detail: &Detail, pane: &Pane) -> Vec<(&'static str, String)> {
     let Some(entry) = &detail.entry else {
         return vec![(
             "Status",
@@ -122,7 +145,10 @@ fn entry_fields(detail: &Detail, pane: &Pane) -> Vec<Field> {
         ("Modified UTC", timestamp(entry.modified)),
         ("Created UTC", timestamp(entry.created)),
         ("Accessed UTC", timestamp(entry.accessed)),
-        ("Attributes", attributes(entry, pane.permissions)),
+        (
+            "Attributes",
+            crate::permissions::attributes(entry, pane.permissions),
+        ),
         ("Owner/group", entry.owner_display(pane.owner_display)),
         (
             "Link target",
@@ -138,33 +164,29 @@ fn entry_fields(detail: &Detail, pane: &Pane) -> Vec<Field> {
     fields
 }
 
-fn lines(fields: &[Field], width: u16, theme: &Theme) -> Vec<Line<'static>> {
+fn rows(fields: &[Field], width: u16, theme: &Theme) -> Vec<Row> {
     let label_width = label_width(fields, width);
     let value_width = usize::from(width).saturating_sub(label_width);
     fields
         .iter()
-        .flat_map(|(label, value)| {
-            let value_role = if *label == "Error" {
-                Role::Error
-            } else if *label == "Keys" {
-                Role::Key
-            } else {
-                Role::Value
-            };
-            wrap_value(&clean(value), value_width)
+        .flat_map(|field| {
+            wrap_line(field.value.clone(), value_width)
                 .into_iter()
                 .enumerate()
                 .map(move |(index, value)| {
                     let label = if index == 0 {
-                        format!("{label}:")
+                        format!("{}:", field.label)
                     } else {
                         String::new()
                     };
                     let label: String = label.chars().take(label_width.saturating_sub(1)).collect();
-                    Line::from(vec![
-                        Span::styled(format!("{label:label_width$}"), theme.style(Role::Label)),
-                        Span::styled(value, theme.style(value_role)),
-                    ])
+                    let length = value.width() as u16;
+                    let mut spans = vec![Span::styled(
+                        format!("{label:label_width$}"),
+                        theme.style(Role::Label),
+                    )];
+                    spans.extend(value.spans);
+                    (Line::from(spans), field.action, length)
                 })
         })
         .collect()
@@ -173,47 +195,115 @@ fn lines(fields: &[Field], width: u16, theme: &Theme) -> Vec<Line<'static>> {
 fn label_width(fields: &[Field], width: u16) -> usize {
     fields
         .iter()
-        .map(|(label, _)| label.len() + 2)
+        .map(|field| field.label.len() + 2)
         .max()
         .unwrap_or(0)
         .min(usize::from(width / 2))
 }
 
-pub(super) fn scroll_limit(app: &App, bounds: Rect, floating: bool) -> u16 {
-    let fields = fields(&app.details[app.active], &app.panes[app.active]);
+fn layout(app: &App, bounds: Rect, theme: &Theme, floating: bool) -> Layout {
+    let fields = fields(&app.details[app.active], &app.panes[app.active], theme);
     let width = if floating {
         bounds.width.saturating_sub(4).min(90)
     } else {
         bounds.width
     };
-    let inner_width = width.saturating_sub(2);
-    let value_width = usize::from(inner_width).saturating_sub(label_width(&fields, inner_width));
-    let count: usize = fields
-        .iter()
-        .map(|(_, value)| wrap_value(&clean(value), value_width).len())
-        .sum();
-    let height = bounds.height.saturating_sub(if floating { 4 } else { 2 });
-    u16::try_from(count.saturating_sub(usize::from(height))).unwrap_or(u16::MAX)
+    let rows = rows(&fields, width.saturating_sub(2), theme);
+    let area = if floating {
+        super::centered(
+            bounds,
+            width,
+            u16::try_from(rows.len().saturating_add(2))
+                .unwrap_or(u16::MAX)
+                .min(bounds.height.saturating_sub(2)),
+        )
+    } else {
+        bounds
+    };
+    let inner = Block::default().borders(Borders::ALL).inner(area);
+    let limit =
+        u16::try_from(rows.len().saturating_sub(usize::from(inner.height))).unwrap_or(u16::MAX);
+    let scroll = if floating {
+        app.overlay_scroll
+    } else {
+        app.metadata_scroll
+    }
+    .min(limit);
+    let offset = label_width(&fields, inner.width) as u16;
+    let controls = value_controls(&rows, inner, scroll, offset);
+    Layout {
+        area,
+        lines: rows.into_iter().map(|(line, _, _)| line).collect(),
+        controls,
+        scroll,
+        limit,
+    }
+}
+
+fn value_controls(rows: &[Row], inner: Rect, scroll: u16, offset: u16) -> Vec<MetadataControl> {
+    rows.iter()
+        .skip(usize::from(scroll))
+        .take(usize::from(inner.height))
+        .enumerate()
+        .filter_map(|(row, (_, action, length))| {
+            let action = (*action)?;
+            let width = (*length).min(inner.width.saturating_sub(offset));
+            (width > 0).then_some(MetadataControl {
+                area: Rect::new(inner.x + offset, inner.y + row as u16, width, 1),
+                action,
+            })
+        })
+        .collect()
+}
+
+pub(super) fn scroll_limit(app: &App, bounds: Rect, floating: bool) -> u16 {
+    layout(
+        app,
+        bounds,
+        &Theme::new(colored_text::ColorLevel::NoColor),
+        floating,
+    )
+    .limit
+}
+
+pub(super) fn controls(app: &App, bounds: Rect, floating: bool) -> Vec<MetadataControl> {
+    layout(
+        app,
+        bounds,
+        &Theme::new(colored_text::ColorLevel::NoColor),
+        floating,
+    )
+    .controls
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ui::text::wrap_value;
     use colored_text::ColorLevel;
 
     #[test]
     fn wrapped_values_keep_graphemes_and_continue_under_value_column() {
         let theme = Theme::new(ColorLevel::Ansi16);
-        let fields = vec![("Path", "界e\u{301}界e\u{301}界e\u{301}\u{1b}\n".into())];
-        let lines = lines(&fields, 13, &theme);
+        let fields = vec![Field::plain(
+            "Path",
+            "界e\u{301}界e\u{301}界e\u{301}\u{1b}\n".into(),
+            &theme,
+        )];
+        let lines: Vec<_> = rows(&fields, 13, &theme)
+            .into_iter()
+            .map(|(line, _, _)| line)
+            .collect();
         assert!(lines.len() > 1);
         let mut restored = String::new();
         for (index, line) in lines.iter().enumerate() {
             assert!(line.width() <= 13);
             assert_eq!(line.spans[0].width(), 6);
             assert_eq!(line.spans[0].content.trim().is_empty(), index != 0);
-            assert!(!line.spans[1].content.contains('\u{1b}'));
-            restored.push_str(&line.spans[1].content);
+            for span in &line.spans[1..] {
+                assert!(!span.content.contains('\u{1b}'));
+                restored.push_str(&span.content);
+            }
         }
         assert_eq!(restored, "界e\u{301}界e\u{301}界e\u{301}\\u{1b}\\n");
         assert!(

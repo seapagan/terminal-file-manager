@@ -375,6 +375,15 @@ impl Controller {
     }
 
     fn overlay_mouse(&mut self, event: MouseEvent, geometry: &Geometry) -> bool {
+        if event.kind == MouseEventKind::Down(MouseButton::Left)
+            && let Some(control) = geometry
+                .metadata_controls
+                .iter()
+                .find(|control| control.area.contains((event.column, event.row).into()))
+        {
+            self.dispatch(control.action, geometry);
+            return true;
+        }
         if self.app.profile_menu.is_some() {
             if let Some(area) = geometry.menu {
                 super::profiles::mouse(self, event, area);

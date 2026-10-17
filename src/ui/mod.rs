@@ -7,6 +7,7 @@ mod listing;
 pub(crate) use listing::owner_column;
 mod measure;
 mod metadata;
+pub use metadata::MetadataControl;
 mod policy;
 mod profiles;
 mod summary;
