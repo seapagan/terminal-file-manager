@@ -128,10 +128,7 @@ fn fields(
 }
 
 fn time_label(label: &str) -> bool {
-    matches!(
-        label,
-        "Modified" | "Modified UTC" | "Created" | "Created UTC" | "Accessed" | "Accessed UTC"
-    )
+    matches!(label, "Modified" | "Created" | "Accessed")
 }
 
 fn time_field(
@@ -140,12 +137,11 @@ fn time_field(
     pane: &MetadataFormat,
     now: std::time::SystemTime,
 ) -> (&'static str, String) {
-    let label = if pane.fuzzy_timestamps {
-        label.split_once(' ').map_or(label, |(name, _)| name)
-    } else {
-        label
-    };
-    (label, listing_timestamp(time, pane.fuzzy_timestamps, now))
+    let mut value = listing_timestamp(time, pane.fuzzy_timestamps, now);
+    if !pane.fuzzy_timestamps && time.is_some() {
+        value.push_str(" (UTC)");
+    }
+    (label, value)
 }
 
 fn entry_fields(
@@ -176,9 +172,9 @@ fn entry_fields(
         ),
         ("Type", format!("{:?}", entry.kind)),
         ("Size", size(entry.size)),
-        time_field("Modified UTC", entry.modified, pane, now),
-        time_field("Created UTC", entry.created, pane, now),
-        time_field("Accessed UTC", entry.accessed, pane, now),
+        time_field("Modified", entry.modified, pane, now),
+        time_field("Created", entry.created, pane, now),
+        time_field("Accessed", entry.accessed, pane, now),
         (
             "Attributes",
             crate::permissions::attributes(entry, pane.permissions),

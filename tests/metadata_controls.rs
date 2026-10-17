@@ -74,13 +74,20 @@ fn visible_value(buffer: &Buffer, geometry: &ui::Geometry, text: &str) -> (u16, 
     let control = geometry
         .metadata_controls
         .iter()
-        .find(|control| {
-            let value: String = (control.area.x..control.area.right())
-                .map(|x| buffer[(x, control.area.y)].symbol())
-                .collect();
-            value == text
+        .enumerate()
+        .find_map(|(index, control)| {
+            let mut value = String::new();
+            for run in &geometry.metadata_controls[index..] {
+                if run.action != control.action || value.len() >= text.len() {
+                    break;
+                }
+                value.extend(
+                    (run.area.x..run.area.right()).map(|x| buffer[(x, run.area.y)].symbol()),
+                );
+            }
+            (value == text).then_some(control)
         })
-        .expect("value run matches visible buffer content");
+        .expect("value runs match visible buffer content");
     (control.area.x, control.area.y)
 }
 
@@ -282,10 +289,11 @@ fn metadata_times_follow_pane_mode_and_advance_from_cached_timestamps() {
         find(&draw(&c.app, 180, 40, ColorLevel::NoColor), "2 days ago");
         c.app.panes[0].fuzzy_timestamps = false;
         let buffer = draw(&c.app, 180, 40, ColorLevel::NoColor);
-        find(&buffer, "Modified UTC:");
-        find(&buffer, "1970-01-11 00:00:00.123456700");
-        find(&buffer, "Created UTC:");
-        find(&buffer, "Accessed UTC:");
+        find(&buffer, "Modified:");
+        let geometry = ui::geometry(&c.app, Rect::new(0, 0, 180, 40));
+        visible_value(&buffer, &geometry, "1970-01-11 00:00:00.123456700 (UTC)");
+        find(&buffer, "Created:");
+        find(&buffer, "Accessed:");
         assert_eq!(c.app.details[0].path, detail.path);
         assert_eq!(c.app.details[0].generation, detail.generation);
         assert_eq!(
@@ -300,9 +308,9 @@ fn metadata_times_follow_pane_mode_and_advance_from_cached_timestamps() {
 fn each_metadata_time_value_toggles_only_the_open_metadata_view() {
     for floating in [false, true] {
         for (label, text) in [
-            ("Modified UTC:", "1970-01-11 00:00:00.123456700"),
-            ("Created UTC:", "1970-01-11 23:00:00.123456700"),
-            ("Accessed UTC:", "unavailable"),
+            ("Modified:", "1970-01-11 00:00:00.123456700 (UTC)"),
+            ("Created:", "1970-01-11 23:00:00.123456700 (UTC)"),
+            ("Accessed:", "unavailable"),
         ] {
             let (_root, mut c) = loaded();
             cached_times(&mut c);
@@ -367,9 +375,9 @@ fn show_time_tail(c: &mut Controller, bounds: Rect, floating: bool, tail: &str) 
 #[test]
 fn timestamp_continuations_remain_clickable_after_narrow_overlay_and_sidebar_scroll() {
     for (floating, width, tail) in [
-        (true, 24, "00"),
-        (true, 40, "123456700"),
-        (false, 120, "56700"),
+        (true, 24, "00 (UTC)"),
+        (true, 40, "23456700 (UTC)"),
+        (false, 120, "6700 (UTC)"),
     ] {
         let (_root, mut c) = loaded();
         cached_times(&mut c);
