@@ -45,6 +45,7 @@ fn junctions_are_native_nonrecursive_and_preserve_trailing_paths() {
         &AtomicBool::new(false),
     )
     .unwrap();
+    assert_junction_rendering(&snapshot);
     let link = snapshot
         .entries
         .iter()
@@ -68,6 +69,39 @@ fn junctions_are_native_nonrecursive_and_preserve_trailing_paths() {
     assert_eq!(broken.kind, EntryKind::Junction);
     assert!(broken.error.is_some());
     fs::remove_dir(&junction).unwrap();
+}
+
+fn assert_junction_rendering(snapshot: &local::Snapshot) {
+    use colored_text::ColorLevel;
+    use ratatui::{Terminal, backend::TestBackend};
+    use terminal_file_manager::{app::App, color::Theme, ui, view::Columns};
+    let mut app = App::new(snapshot.path.clone());
+    app.complete_listing(0, 1, Ok(snapshot.clone()));
+    app.panes[0].columns = Columns {
+        size: false,
+        modified: false,
+        attributes: false,
+        owner: false,
+    };
+    app.panes[0].cursor = None;
+    let row = app.panes[0]
+        .visible
+        .iter()
+        .position(|i| app.panes[0].entries[*i].name == "junction")
+        .unwrap() as u16
+        + 2;
+    let mut terminal = Terminal::new(TestBackend::new(80, 12)).unwrap();
+    terminal
+        .draw(|frame| {
+            ui::render(frame, &app, &Theme::new(ColorLevel::NoColor));
+        })
+        .unwrap();
+    let buffer = terminal.backend().buffer();
+    assert_eq!(buffer[(5, row)].symbol(), "j");
+    let name = (7..79)
+        .map(|x| buffer[(x, row)].symbol())
+        .collect::<String>();
+    assert_eq!(name.trim_end(), "junction");
 }
 
 #[test]

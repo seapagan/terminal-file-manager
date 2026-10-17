@@ -78,6 +78,8 @@ Hidden entries start off; Git-ignore awareness starts in dim mode. Refresh
 reloads nested/global/linked-worktree rules. Rule errors remain visible as
 unknown status. Hidden entries carry `[h]`; ignored filenames use dim styling
 while type indicators, marks and metadata retain their normal styles.
+Ordinary directories appear as `d docs/`; enterable links and junctions keep
+their distinct type indicators and have no directory suffix.
 
 Marked entries outside the current hidden/ignore/filter rules remain marked but
 are excluded from the visible scope. Counts distinguish those exclusions;

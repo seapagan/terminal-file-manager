@@ -105,6 +105,10 @@ fn render_rows(
     let height = usize::from(area.height.saturating_sub(1));
     let start = pane.viewport_start(height);
     let (widths, headers) = columns(pane, area.width);
+    let name_width = match widths.get(if area.width < 8 { 0 } else { 2 }) {
+        Some(Constraint::Length(width)) => *width,
+        _ => 0,
+    };
     let rows = pane.visible.iter().skip(start).take(height).map(|i| {
         let entry = &pane.entries[*i];
         let cursor = pane.cursor.as_ref() == Some(&entry.path);
@@ -116,7 +120,10 @@ fn render_rows(
             None
         };
         let style = focus.map_or_else(Style::default, |role| theme.style(role));
-        Row::new(cells(entry, pane, area.width, now, theme, focus)).style(style)
+        Row::new(cells(
+            entry, pane, area.width, name_width, now, theme, focus,
+        ))
+        .style(style)
     });
     frame.render_widget(
         Table::new(rows, widths)
@@ -227,6 +234,7 @@ fn cells(
     entry: &Entry,
     pane: &Pane,
     width: u16,
+    name_width: u16,
     now: std::time::SystemTime,
     theme: &Theme,
     focus: Option<Role>,
@@ -234,10 +242,10 @@ fn cells(
     let columns = pane.columns.visible(width, &pane.measurements);
     let decorate = |base: Style| focus.map_or(base, |role| base.patch(theme.style(role)));
     if width < 8 {
-        let mut cells = identity_cells(entry, pane, theme, focus, decorate);
+        let mut cells = identity_cells(entry, pane, theme, focus, name_width, decorate);
         return vec![cells.pop().expect("name cell")];
     }
-    let mut cells = identity_cells(entry, pane, theme, focus, decorate);
+    let mut cells = identity_cells(entry, pane, theme, focus, name_width, decorate);
     if columns.size {
         let (number, unit) = super::measure::parts(entry, pane.human_sizes);
         cells.push(
@@ -273,6 +281,7 @@ fn identity_cells(
     pane: &Pane,
     theme: &Theme,
     focus: Option<Role>,
+    name_width: u16,
     decorate: impl Fn(Style) -> Style,
 ) -> Vec<Cell<'static>> {
     let type_style = decorate(theme.entry_style(entry));
@@ -292,11 +301,7 @@ fn identity_cells(
         (_, true) => "[*]",
         _ => "   ",
     };
-    let name = format!(
-        "{}{}",
-        if entry.hidden { "[h] " } else { "" },
-        clean(&entry.name.to_string_lossy())
-    );
+    let name = super::measure::name(entry, name_width);
     vec![
         Cell::from(marker).style(decorate(theme.style(if marked {
             Role::Marked
@@ -351,7 +356,7 @@ fn listing_timestamp(
 
 fn indicator(entry: &Entry) -> &'static str {
     match entry.kind {
-        EntryKind::Directory => "/",
+        EntryKind::Directory => "d",
         EntryKind::File if entry.executable => "*",
         EntryKind::File => "-",
         EntryKind::Link if entry.error.is_some() => "!",
