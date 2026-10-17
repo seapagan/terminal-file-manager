@@ -130,6 +130,11 @@ fn repository(directory: &Path) -> io::Result<Option<(PathBuf, PathBuf)>> {
             Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
             Err(error) => return Err(error),
         };
+        let metadata = if metadata.file_type().is_symlink() {
+            fs::metadata(&dot)?
+        } else {
+            metadata
+        };
         let git = if metadata.is_dir() {
             dot
         } else {

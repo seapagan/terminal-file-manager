@@ -292,6 +292,52 @@ fn symlink_file(target: &Path, link: &Path) {
     std::os::windows::fs::symlink_file(target, link).unwrap();
 }
 
+fn directory_link(target: &Path, link: &Path) {
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(target, link).unwrap();
+    #[cfg(windows)]
+    std::os::windows::fs::symlink_dir(target, link).unwrap();
+}
+
+fn remove_directory_link(link: &Path) {
+    #[cfg(unix)]
+    fs::remove_file(link).unwrap();
+    #[cfg(windows)]
+    fs::remove_dir(link).unwrap();
+}
+
+#[test]
+fn git_directory_links_and_pointer_files_follow_git_without_hiding_broken_links() {
+    let repo = Repository::new();
+    let dot = repo.path.join(".git");
+    let admin = repo.temp.path().join("linked-administration");
+    fs::rename(&dot, &admin).unwrap();
+    fs::write(admin.join("info/exclude"), "info-victim\n").unwrap();
+    fs::write(&repo.global, "global-victim\n").unwrap();
+    fs::write(repo.path.join(".gitignore"), "local-victim\n").unwrap();
+    for name in ["info-victim", "global-victim", "local-victim"] {
+        fs::write(repo.path.join(name), "fixture").unwrap();
+    }
+    directory_link(Path::new("../linked-administration"), &dot);
+    for name in ["info-victim", "global-victim", "local-victim"] {
+        repo.compare(&repo.path, name, Some(true));
+    }
+    remove_directory_link(&dot);
+    directory_link(Path::new("../missing-administration"), &dot);
+    let output = repo
+        .command(&repo.path)
+        .args(["check-ignore", "info-victim"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(128));
+    assert_unknown(&repo);
+    remove_directory_link(&dot);
+    fs::write(&dot, "gitdir: ../linked-administration\n").unwrap();
+    for name in ["info-victim", "global-victim", "local-victim"] {
+        repo.compare(&repo.path, name, Some(true));
+    }
+}
+
 #[test]
 fn symlinked_root_ignore_is_skipped_and_regular_replacement_is_reloaded() {
     let repo = Repository::new();
