@@ -40,7 +40,7 @@ impl Field {
             && let Some(entry) = &detail.entry
         {
             self.value = Line::from(permission_spans(entry, format.permissions, theme));
-            self.action = Some(Action::Permissions);
+            self.action = entry.mode.map(|_| Action::Permissions);
         } else if self.label == "Owner/group" {
             self.action = Some(Action::OwnerDisplay);
         } else if time_label(self.label) {
