@@ -22,6 +22,8 @@ fn environment_policy_preserves_no_color_and_force_precedence() {
         (vec![("CLICOLOR", "0")], "NoColor"),
         (vec![("TERM", "dumb")], "NoColor"),
     ] {
+        // Relaunches this test for colour precedence without a security decision.
+        // nosemgrep: rust.lang.security.current-exe.current-exe
         let mut child = Command::new(std::env::current_exe().unwrap());
         for key in [
             "NO_COLOR",

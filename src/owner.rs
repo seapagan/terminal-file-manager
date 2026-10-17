@@ -61,11 +61,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn lsplus_user_and_group_resolution_retains_numeric_fallbacks() {
+    fn lsplus_user_and_group_resolution_retains_native_names() {
         assert!(matches!(get_username(0).as_str(), "root" | "0"));
-        assert_eq!(get_username(u32::MAX), u32::MAX.to_string());
         // macOS names GID 0 wheel rather than root; retain native account names.
         assert!(matches!(get_groupname(0).as_str(), "root" | "wheel" | "0"));
-        assert_eq!(get_groupname(u32::MAX), u32::MAX.to_string());
+        if let Ok(Some(user)) = nix::unistd::User::from_uid(u32::MAX.into()) {
+            assert_eq!(get_username(u32::MAX), user.name);
+        }
+        if let Ok(Some(group)) = nix::unistd::Group::from_gid(u32::MAX.into()) {
+            assert_eq!(get_groupname(u32::MAX), group.name);
+        }
+    }
+
+    #[test]
+    fn unresolved_user_retains_numeric_fallback() {
+        // Require lookup failure instead of assuming a reserved ID is absent.
+        let uid = (0..=u32::MAX)
+            .rev()
+            .find(|uid| !matches!(nix::unistd::User::from_uid((*uid).into()), Ok(Some(_))))
+            .expect("a UID that native account lookup cannot resolve");
+        assert_eq!(get_username(uid), uid.to_string());
+    }
+
+    #[test]
+    fn unresolved_group_retains_numeric_fallback() {
+        // macOS resolves u32::MAX as nogroup; require an actually absent group.
+        let gid = (0..=u32::MAX)
+            .rev()
+            .find(|gid| !matches!(nix::unistd::Group::from_gid((*gid).into()), Ok(Some(_))))
+            .expect("a GID that native group lookup cannot resolve");
+        assert_eq!(get_groupname(gid), gid.to_string());
     }
 }
