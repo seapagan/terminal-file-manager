@@ -71,8 +71,13 @@ view when width permits. A single-pane sidebar similarly returns when there is
 space. Columns shrink with terminal width; names take priority over optional
 metadata. Plain Unicode, explicit marks, active-pane labels and reverse-video
 cursor keep the browser usable without a special font or colour. The active
-cursor uses `>` and reverse video; the other pane's retained cursor uses `:`
-and bold text. Both keep the terminal's default colours and show `*` when marked.
+cursor uses a bold full-width selection bar; the other pane's retained cursor
+uses a less prominent full-width bar. Both show `*` when marked.
+Coloured bars use explicit foreground/background pairs; without colour, both
+use reverse video and only the active cursor is bold. ANSI-16 keeps pane
+backgrounds unchanged. At 256 colours and true colour, the active pane uses a
+restrained dark blue-grey background and light foreground; the inactive pane
+keeps terminal defaults. This fixed palette does not detect light/dark themes.
 
 Natural name order with directories first is the default. Other sort modes are
 name, extension, size (largest first), modified/created time (newest first),

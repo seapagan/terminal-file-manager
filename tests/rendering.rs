@@ -51,7 +51,10 @@ fn theme_resolves_all_capability_levels_and_keeps_noncolour_cursor() {
     ] {
         let theme = Theme::new(level);
         let style = theme.style(Role::Cursor);
-        assert!(style.add_modifier.contains(Modifier::REVERSED));
+        assert_eq!(
+            style.add_modifier.contains(Modifier::REVERSED),
+            level == ColorLevel::NoColor
+        );
         let directory = theme.style(Role::Directory);
         assert_eq!(directory.fg.is_none(), level == ColorLevel::NoColor);
         match level {
@@ -104,19 +107,17 @@ fn dual_pane_focus_distinguishes_retained_cursor_and_background() {
                 let buffer = terminal.backend().buffer();
                 let focused = &buffer[(1 + active as u16 * (width / 2), 2)];
                 let retained = &buffer[(1 + (1 - active) as u16 * (width / 2), 2)];
-                assert!(
-                    focused
-                        .modifier
-                        .contains(Modifier::REVERSED | Modifier::BOLD)
-                );
-                assert!(!focused.modifier.contains(Modifier::DIM));
-                assert!(!retained.modifier.contains(Modifier::DIM));
-                assert!(!retained.modifier.contains(Modifier::REVERSED));
-                assert!(retained.modifier.contains(Modifier::BOLD));
-                let active_space = &buffer[((width / 2 - 2) + active as u16 * (width / 2), 10)];
+                assert_focus_styles(focused, retained, level);
+                let active_space = &buffer[((width / 2 - 2) + active as u16 * (width / 2), 5)];
                 let inactive_space =
-                    &buffer[((width / 2 - 2) + (1 - active) as u16 * (width / 2), 10)];
-                assert_eq!(active_space.bg, Color::Reset);
+                    &buffer[((width / 2 - 2) + (1 - active) as u16 * (width / 2), 5)];
+                assert_eq!(
+                    active_space.bg,
+                    Theme::new(level)
+                        .style(Role::ActivePane)
+                        .bg
+                        .unwrap_or(Color::Reset)
+                );
                 assert_eq!(inactive_space.bg, Color::Reset);
             }
         }
@@ -408,4 +409,23 @@ fn metadata_popup_centres_bounds_and_clamps_scrolling_after_resize() {
             }
         }
     }
+}
+
+fn assert_focus_styles(
+    focused: &ratatui::buffer::Cell,
+    retained: &ratatui::buffer::Cell,
+    level: ColorLevel,
+) {
+    assert!(focused.modifier.contains(Modifier::BOLD));
+    assert_eq!(
+        focused.modifier.contains(Modifier::REVERSED),
+        level == ColorLevel::NoColor
+    );
+    assert!(!focused.modifier.contains(Modifier::DIM));
+    assert!(!retained.modifier.contains(Modifier::DIM));
+    assert_eq!(
+        retained.modifier.contains(Modifier::REVERSED),
+        level == ColorLevel::NoColor
+    );
+    assert!(!retained.modifier.contains(Modifier::BOLD));
 }

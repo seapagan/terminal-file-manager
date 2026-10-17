@@ -39,7 +39,13 @@ fn policy_uses_labels_and_semantic_styles_without_changing_selection_summary() {
             buffer[(10, 8)].fg == Color::Reset,
             level == ColorLevel::NoColor
         );
-        assert_eq!(buffer[(16, 8)].fg, Color::Reset);
+        assert_eq!(
+            buffer[(16, 8)].fg,
+            Theme::new(level)
+                .style(terminal_file_manager::color::Role::ActivePane)
+                .fg
+                .unwrap_or(Color::Reset)
+        );
         let summary = (1..119)
             .map(|x| buffer[(x, 7)].symbol())
             .collect::<String>();

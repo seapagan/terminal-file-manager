@@ -49,6 +49,7 @@ fn report_distinguishes_nominal_defaults_from_full_width_rendered_cursors() {
             let theme = Theme::new(level);
             let (buffer, geometry) = buffer(&app, &theme, 160, 40);
             let lines = report(&buffer, &app, &geometry, &theme);
+            println!("{level:?} focus={active}\n{}", lines.join("\n"));
             assert!(
                 lines
                     .iter()
@@ -60,12 +61,12 @@ fn report_distinguishes_nominal_defaults_from_full_width_rendered_cursors() {
                     .any(|line| line.starts_with("unoccupied body rendered")
                         && line.contains("bg=terminal default / unknown (Reset)"))
             );
-            assert_rendered_panes(&lines, active, border);
+            assert_rendered_panes(&lines, active, border, &theme);
         }
     }
 }
 
-fn assert_rendered_panes(lines: &[String], active: usize, border: &str) {
+fn assert_rendered_panes(lines: &[String], active: usize, border: &str, theme: &Theme) {
     for id in 0..2 {
         let x = id * 80;
         let actual = lines
@@ -90,9 +91,14 @@ fn assert_rendered_panes(lines: &[String], active: usize, border: &str) {
                 ))
             })
             .unwrap();
-        assert!(row.contains("fg=terminal default / unknown (Reset) bg=terminal default / unknown (Reset) underline=terminal default / unknown (Reset)"));
-        assert!(row.contains("BOLD"));
-        assert_eq!(row.contains("REVERSED"), id as usize == active);
+        let style = theme.style(if id as usize == active {
+            Role::Cursor
+        } else {
+            Role::InactiveCursor
+        });
+        assert!(row.contains(&format!("fg={} bg={}", colour(style.fg), colour(style.bg))));
+        assert_eq!(row.contains("BOLD"), id as usize == active);
+        assert_eq!(row.contains("REVERSED"), theme.level == ColorLevel::NoColor);
         assert!(!row.contains("DIM"));
     }
 }
@@ -120,11 +126,7 @@ fn report_reads_actual_cell_layers_instead_of_repeating_the_cursor_role() {
         .iter()
         .find(|line| line.starts_with("selected row intended:"))
         .unwrap();
-    assert!(
-        nominal.contains(
-            "fg=terminal default / unknown (Reset) bg=terminal default / unknown (Reset)"
-        )
-    );
+    assert!(nominal.contains("fg=RGB(245,248,250) bg=RGB(35,85,125)"));
     assert!(!nominal.contains("UNDERLINED"));
 }
 

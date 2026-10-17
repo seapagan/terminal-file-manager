@@ -76,24 +76,7 @@ fn size_and_age_boundaries_follow_lsplus_and_downgrade_without_colours() {
 fn ignored_hidden_executable_and_mark_cues_compose_beneath_active_cursor() {
     let root = tempfile::tempdir().unwrap();
     std::fs::write(root.path().join(".run"), "data").unwrap();
-    let mut app = App::new(root.path().to_path_buf());
-    app.complete_listing(
-        0,
-        1,
-        Ok(fs::list(
-            root.path(),
-            &fs::IgnoreContext::isolated(),
-            &AtomicBool::new(false),
-        )
-        .unwrap()),
-    );
-    let pane = &mut app.panes[0];
-    pane.entries[0].hidden = true;
-    pane.entries[0].ignored = Some(true);
-    pane.entries[0].executable = true;
-    pane.show_hidden = true;
-    pane.refilter();
-    pane.select_all();
+    let mut app = ignored_executable_app(root.path());
     for level in [
         ColorLevel::NoColor,
         ColorLevel::Ansi16,
@@ -112,7 +95,10 @@ fn ignored_hidden_executable_and_mark_cues_compose_beneath_active_cursor() {
             let name = &buffer[(11, 2)];
             assert_eq!(name.symbol(), ".");
             assert_eq!(name.modifier.contains(Modifier::DIM), !cursor);
-            assert_eq!(name.modifier.contains(Modifier::REVERSED), cursor);
+            assert_eq!(
+                name.modifier.contains(Modifier::REVERSED),
+                cursor && level == ColorLevel::NoColor
+            );
             assert!(name.modifier.contains(Modifier::BOLD));
             if level != ColorLevel::NoColor && !cursor {
                 let expected = Theme::new(level).entry_style(&app.panes[0].entries[0]).fg;
@@ -159,4 +145,26 @@ fn permission_spans_and_age_palette_match_original_lsplus_cases() {
             Some(Color::Indexed(index))
         );
     }
+}
+
+fn ignored_executable_app(root: &std::path::Path) -> App {
+    let mut app = App::new(root.to_path_buf());
+    app.complete_listing(
+        0,
+        1,
+        Ok(fs::list(
+            root,
+            &fs::IgnoreContext::isolated(),
+            &AtomicBool::new(false),
+        )
+        .unwrap()),
+    );
+    let pane = &mut app.panes[0];
+    pane.entries[0].hidden = true;
+    pane.entries[0].ignored = Some(true);
+    pane.entries[0].executable = true;
+    pane.show_hidden = true;
+    pane.refilter();
+    pane.select_all();
+    app
 }

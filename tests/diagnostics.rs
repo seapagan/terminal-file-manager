@@ -109,7 +109,16 @@ fn diagnostics_groups_information_and_styles_headings_at_the_applied_depth() {
         let visible = text(&buffer);
         assert!(visible.contains("LAYOUT"));
         assert!(visible.contains("INTENDED STYLES"));
-        assert!(visible.contains("fg=inherit bg=inherit"));
+        let body = Theme::new(level).style(terminal_file_manager::color::Role::ActivePane);
+        assert!(visible.contains(if body.bg.is_some() {
+            if level == ColorLevel::TrueColor {
+                "bg=RGB(22,28,36)"
+            } else {
+                "bg=indexed(234)"
+            }
+        } else {
+            "fg=inherit bg=inherit"
+        }));
     }
 }
 

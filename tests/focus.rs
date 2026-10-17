@@ -11,7 +11,7 @@ use std::{
 };
 use terminal_file_manager::{
     app::App,
-    color::Theme,
+    color::{Role, Theme},
     fs::{IgnoreContext, list},
     ui,
 };
@@ -59,26 +59,37 @@ fn cursors_override_directory_size_time_permission_and_mark_spans() {
             let buffer = terminal.backend().buffer();
             for id in 0..2 {
                 let left = 1 + id * 120;
-                assert_eq!(
-                    buffer[(left, 2)].symbol(),
-                    if id as usize == active { ">" } else { ":" }
-                );
+                assert_eq!(buffer[(left, 2)].symbol(), " ");
                 assert_eq!(buffer[(left + 1, 2)].symbol(), "*");
                 for x in left..left + 118 {
-                    let cell = &buffer[(x, 2)];
-                    assert_eq!((cell.fg, cell.bg), (Color::Reset, Color::Reset));
-                    assert_eq!(
-                        cell.modifier.contains(Modifier::REVERSED),
-                        id as usize == active
-                    );
-                    assert!(cell.modifier.contains(Modifier::BOLD));
-                    assert!(
-                        !cell
-                            .modifier
-                            .intersects(Modifier::DIM | Modifier::UNDERLINED)
-                    );
+                    assert_cursor(&buffer[(x, 2)], level, id as usize == active);
                 }
             }
         }
     }
+}
+
+fn assert_cursor(cell: &ratatui::buffer::Cell, level: ColorLevel, active: bool) {
+    let style = Theme::new(level).style(if active {
+        Role::Cursor
+    } else {
+        Role::InactiveCursor
+    });
+    assert_eq!(
+        (cell.fg, cell.bg),
+        (
+            style.fg.unwrap_or(Color::Reset),
+            style.bg.unwrap_or(Color::Reset)
+        )
+    );
+    assert_eq!(
+        cell.modifier.contains(Modifier::REVERSED),
+        level == ColorLevel::NoColor
+    );
+    assert_eq!(cell.modifier.contains(Modifier::BOLD), active);
+    assert!(
+        !cell
+            .modifier
+            .intersects(Modifier::DIM | Modifier::UNDERLINED)
+    );
 }

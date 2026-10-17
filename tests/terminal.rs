@@ -165,11 +165,13 @@ fn diagnostics_uses_startup_capability_in_a_controlled_real_terminal() {
         if let Some(value) = forced {
             command.env("FORCE_COLOR", value);
         }
+        let scroll = "\u{1b}[6;3~".repeat(200);
         drive(
             command,
             &[
                 ("diagnostics-sentinel", "\u{1b}[24~"),
-                (&format!("Applied ColorLevel: {expected}"), "\u{1b}[24~\r"),
+                (&format!("Applied ColorLevel: {expected}"), &scroll),
+                ("Startup stdout TTY: true", "\u{1b}[24~\r"),
                 ("Viewer unavailable until M6", "q"),
             ],
             true,

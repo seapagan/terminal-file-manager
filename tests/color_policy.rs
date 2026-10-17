@@ -10,6 +10,7 @@ fn environment_policy_preserves_no_color_and_force_precedence() {
         assert_eq!(format!("{level:?}"), expected);
         let style = Theme::new(level).style(Role::Directory);
         assert_eq!(style.fg.is_none(), expected == "NoColor");
+        assert_rendered_policy(level);
         return;
     }
     for (values, expected) in [
@@ -48,5 +49,70 @@ fn environment_policy_preserves_no_color_and_force_precedence() {
             "{}",
             String::from_utf8_lossy(&result.stdout)
         );
+    }
+}
+
+fn assert_rendered_policy(level: colored_text::ColorLevel) {
+    use ratatui::{Terminal, backend::TestBackend, style::Color};
+    use terminal_file_manager::{
+        app::App,
+        fs::{self, IgnoreContext},
+        ui,
+    };
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(root.path().join("policy-entry"), "data").unwrap();
+    let mut app = App::new(root.path().into());
+    app.dual = true;
+    for id in 0..2 {
+        app.complete_listing(
+            id,
+            1,
+            Ok(fs::list(
+                root.path(),
+                &IgnoreContext::isolated(),
+                &std::sync::atomic::AtomicBool::new(false),
+            )
+            .unwrap()),
+        );
+    }
+    let mut terminal = Terminal::new(TestBackend::new(100, 16)).unwrap();
+    let theme = Theme::for_stdout();
+    assert_eq!(theme.level, level);
+    terminal
+        .draw(|frame| {
+            ui::render(frame, &app, &theme);
+        })
+        .unwrap();
+    assert_selection_rows(terminal.backend().buffer(), &theme);
+    if level == colored_text::ColorLevel::NoColor {
+        assert!(
+            terminal
+                .backend()
+                .buffer()
+                .content()
+                .iter()
+                .all(|cell| cell.fg == Color::Reset && cell.bg == Color::Reset)
+        );
+    }
+}
+
+fn assert_selection_rows(buffer: &ratatui::buffer::Buffer, theme: &Theme) {
+    use ratatui::style::Modifier;
+    let level = theme.level;
+    for (id, range) in [(0, 1..49), (1, 51..99)] {
+        let role = if id == 0 {
+            Role::Cursor
+        } else {
+            Role::InactiveCursor
+        };
+        let style = theme.style(role);
+        for x in range {
+            let cell = &buffer[(x, 2)];
+            assert_eq!((cell.fg, cell.bg), (style.fg.unwrap(), style.bg.unwrap()));
+            assert_eq!(
+                cell.modifier.contains(Modifier::REVERSED),
+                level == colored_text::ColorLevel::NoColor
+            );
+        }
     }
 }

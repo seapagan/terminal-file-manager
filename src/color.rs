@@ -93,22 +93,60 @@ impl Theme {
             style = style.fg(color);
         }
         match role {
-            Role::ActivePane => style,
-            Role::Cursor => Style::default()
-                .fg(Color::Reset)
-                .bg(Color::Reset)
-                .remove_modifier(Modifier::DIM)
-                .add_modifier(Modifier::REVERSED | Modifier::BOLD),
-            Role::InactiveCursor => Style::default()
-                .fg(Color::Reset)
-                .bg(Color::Reset)
-                .remove_modifier(Modifier::DIM | Modifier::REVERSED)
-                .add_modifier(Modifier::BOLD),
+            Role::ActivePane if self.level >= ColorLevel::Ansi256 => {
+                self.pair((220, 225, 230), (22, 28, 36))
+            }
+            Role::Cursor | Role::InactiveCursor => self.cursor_style(matches!(role, Role::Cursor)),
             Role::Header | Role::Marked | Role::Label | Role::Key | Role::Error => {
                 style.add_modifier(Modifier::BOLD)
             }
             Role::Ignored | Role::Disabled => style.add_modifier(Modifier::DIM),
             _ => style,
+        }
+    }
+
+    fn pair(&self, fg: (u8, u8, u8), bg: (u8, u8, u8)) -> Style {
+        let resolve = |(r, g, b)| resolve_rgb(r, g, b, self.level).map(map_color);
+        Style {
+            fg: resolve(fg),
+            bg: resolve(bg),
+            ..Style::default()
+        }
+    }
+
+    fn cursor_style(&self, active: bool) -> Style {
+        let style = match self.level {
+            ColorLevel::NoColor => Style::default()
+                .fg(Color::Reset)
+                .bg(Color::Reset)
+                .add_modifier(Modifier::REVERSED),
+            ColorLevel::Ansi16 => {
+                let (fg, bg) = if active {
+                    (AnsiColor::Black, AnsiColor::Cyan)
+                } else {
+                    (AnsiColor::BrightWhite, AnsiColor::Blue)
+                };
+                let style = Style {
+                    fg: resolve_named(fg, self.level).map(map_color),
+                    bg: resolve_named(bg, self.level).map(map_color),
+                    ..Style::default()
+                };
+                style.remove_modifier(Modifier::REVERSED)
+            }
+            _ => {
+                let (fg, bg) = if active {
+                    ((245, 248, 250), (35, 85, 125))
+                } else {
+                    ((184, 192, 202), (41, 47, 56))
+                };
+                self.pair(fg, bg).remove_modifier(Modifier::REVERSED)
+            }
+        }
+        .remove_modifier(Modifier::DIM | Modifier::BOLD);
+        if active {
+            style.add_modifier(Modifier::BOLD)
+        } else {
+            style
         }
     }
 }

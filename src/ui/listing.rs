@@ -294,10 +294,7 @@ fn identity_cells(
     );
     let marked = pane.marks.contains_key(&entry.path);
     let marker = match (focus, marked) {
-        (Some(Role::Cursor), true) => ">* ",
-        (Some(Role::Cursor), false) => ">  ",
-        (Some(Role::InactiveCursor), true) => ":* ",
-        (Some(Role::InactiveCursor), false) => ":  ",
+        (Some(Role::Cursor | Role::InactiveCursor), true) => " * ",
         (_, true) => "[*]",
         _ => "   ",
     };
