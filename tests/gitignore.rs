@@ -111,10 +111,10 @@ fn nested_parent_and_source_precedence_match_git() {
     fs::create_dir(repo.path.join("nested")).unwrap();
     fs::create_dir(repo.path.join("blocked")).unwrap();
     fs::create_dir(repo.path.join("dir-only")).unwrap();
-    fs::write(&repo.global, "*.log\ninfo-wins\n!global-loses\n").unwrap();
+    fs::write(&repo.global, "AGENTS.md\n*.log\ninfo-wins\n!global-loses\n").unwrap();
     fs::write(
         repo.path.join(".git/info/exclude"),
-        "!info-wins\nglobal-loses\n!local-wins\n",
+        "*.diff\ncodacy*.json\n!info-wins\nglobal-loses\n!local-wins\n",
     )
     .unwrap();
     fs::write(
@@ -129,6 +129,9 @@ fn nested_parent_and_source_precedence_match_git() {
     .unwrap();
     fs::write(repo.path.join("blocked/.gitignore"), "!keep.log\n").unwrap();
     let cases = [
+        ("AGENTS.md", Some(true)),
+        ("branch.diff", Some(true)),
+        ("codacy-pr-1.json", Some(true)),
         ("plain", None),
         ("gone.log", Some(true)),
         ("keep.log", Some(false)),

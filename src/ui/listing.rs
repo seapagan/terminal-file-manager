@@ -125,14 +125,7 @@ fn render_rows(
         } else {
             None
         };
-        let style = theme.style(
-            if pane.ignore == IgnoreMode::Dim && entry.ignored == Some(true) {
-                Role::Ignored
-            } else {
-                Role::Normal
-            },
-        );
-        let style = focus.map_or(style, |role| style.patch(theme.style(role)));
+        let style = focus.map_or_else(Style::default, |role| theme.style(role));
         Row::new(cells(entry, pane, area.width, now, theme, focus)).style(style)
     });
     frame.render_widget(
@@ -292,7 +285,14 @@ fn identity_cells(
     focus: Option<Role>,
     decorate: impl Fn(Style) -> Style,
 ) -> Vec<Cell<'static>> {
-    let name_style = decorate(theme.entry_style(entry));
+    let type_style = decorate(theme.entry_style(entry));
+    let name_style = decorate(
+        if pane.ignore == IgnoreMode::Dim && entry.ignored == Some(true) {
+            theme.entry_style(entry).patch(theme.style(Role::Ignored))
+        } else {
+            theme.entry_style(entry)
+        },
+    );
     let marked = pane.marks.contains_key(&entry.path);
     let marker = match (focus, marked) {
         (Some(Role::Cursor), true) => ">* ",
@@ -313,8 +313,8 @@ fn identity_cells(
         } else {
             Role::Normal
         }))),
-        Cell::from(indicator(entry)).style(name_style),
-        Cell::from(name).style(name_style),
+        Cell::from(indicator(entry)).style(type_style),
+        Cell::from(Line::from(Span::styled(name, name_style))),
     ]
 }
 

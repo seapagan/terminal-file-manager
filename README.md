@@ -76,7 +76,8 @@ name, extension, size (largest first), modified/created time (newest first),
 type, version and filesystem order. Reverse and directory grouping are separate.
 Hidden entries start off; Git-ignore awareness starts in dim mode. Refresh
 reloads nested/global/linked-worktree rules. Rule errors remain visible as
-unknown status. Hidden entries carry `[h]`; ignored entries use dim styling.
+unknown status. Hidden entries carry `[h]`; ignored filenames use dim styling
+while type indicators, marks and metadata retain their normal styles.
 
 Marked entries outside the current hidden/ignore/filter rules remain marked but
 are excluded from the visible scope. Counts distinguish those exclusions;
