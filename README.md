@@ -15,6 +15,17 @@ cargo run --locked -- --help
 cargo run --locked -- --version
 ```
 
+To install from this checkout with its pinned development toolchain:
+
+```console
+cargo +1.99.0 install --path . --force --locked
+```
+
+Plain `cargo install --path . --force` also builds, but Cargo warns that the
+local `rust-toolchain.toml` implicitly overrides the default toolchain. The
+explicit `+1.99.0` acknowledges that selection. The package MSRV stays 1.95.0;
+this warning does not indicate a failed build.
+
 The package is `terminal-file-manager`; the command is `tfm`. Each invocation
 starts at the shell's current directory, or the supplied native directory paths.
 `tfm -2` / `--two-panes` requests two panes; `two_panes = true` configures that

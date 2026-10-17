@@ -8,9 +8,11 @@ eight-target release rehearsal. [Acceptance](acceptance.md) records the complete
 native checkpoints and the remaining production-release gates.
 
 `src/main.rs` owns native CLI arguments, output and exit status. `src/lib.rs`
-parses help/version or an optional startup directory. The M1 browser opens two
-independent pane models, always showing one initially. Cursor, scroll, marks,
-filter and back/forward history are session-only; preferences persist lazily.
+parses help/version, native startup locations and explicit session options.
+The M1 browser retains two independent pane models, with configurable one/two-pane
+startup, bounded divider adjustment and temporary active-pane maximisation.
+Cursor, scroll, marks, filter and back/forward history are session-only;
+preferences persist lazily.
 
 `app` owns pure transitions and request generations; `input` maps keyboard and
 mouse to the same read-only actions. `ui` renders cached data through Ratatui,
@@ -42,10 +44,15 @@ use-dev-tty input source: its default Mio path can lose a keyboard readiness
 edge when resize is returned first. Native PTY/ConPTY tests exercise resize,
 quit and error/unwind cleanup. `settings` loads before terminal setup and saves
 changed preferences after teardown through an owned same-directory stage.
-Linked config files fail explicitly; no location/layout session is serialized.
+Linked config files fail explicitly. `session` owns a separate strict version-1
+navigation schema: current native locations and layout only. Unix byte arrays
+and Windows UTF-16 arrays preserve identity without Unicode coercion. Q saves
+after teardown through the same owned atomic staging; normal quit never replaces
+session bytes. Restore is opt-in and validates both paths without fallback.
 
 M1 never creates, renames, copies, moves, deletes, trashes, opens or launches a
-selected file. Only deliberate preference changes write TFM's own configuration.
+selected file. Only deliberate preference/session actions write TFM's own
+configuration data.
 Viewer/editor, mutation and navigation integrations explain their later milestone
 instead of silently falling back to a subprocess.
 
@@ -55,9 +62,11 @@ Future milestones preserve native local byte/UTF-16 path identities separately
 from display text. Remote POSIX paths remain exact bytes on every client OS;
 Windows native paths are not remote identifiers. Stable entry/job identities,
 generation-tagged asynchronous results and bounded queues prevent stale results
-from authorizing mutations. Startup is always one pane; navigation/session
-state is not persisted. Only preferences, bookmarks and successful manual
-histories may persist, lazily and atomically.
+from authorizing mutations. Navigation sessions remain distinct from named
+view profiles: profiles contain only display/sort/visibility policies, while
+sessions contain local locations/layout. Full navigation history persistence
+remains outside the implemented contract. Future preference/bookmark/history
+writes must remain lazy and atomic.
 
 The selected future transport is embedded russh with ring, RSA disabled,
 and Yazi's byte-preserving SFTP boundary. It requires corrected opaque handles,

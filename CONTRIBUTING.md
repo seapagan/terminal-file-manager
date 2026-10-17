@@ -51,7 +51,11 @@ substitute another path.
 `tfm --help` / `-h` and `tfm --version` / `-V` print output and return 0;
 unsupported arguments and startup failures report stderr and return 2.
 M1 browsing is read-only; Enter never launches files. See README for bindings
-and lazy preferences. Tests use owned fixtures and isolated HOME/config values.
+and lazy preferences. `Q` saves current local locations/layout; ordinary quit
+never replaces that session. `--restore-session` or `restore_session = true`
+opts into restoration; explicit paths override the configured default.
+`--save-session` validates and records startup locations/layout without a TUI.
+Tests use owned fixtures and isolated HOME/config values.
 
 Native PTY tests use portable-pty on Unix and ConPTY on Windows. Their ignored
 `terminal_child` entry point is deliberately invoked by the parent restoration
