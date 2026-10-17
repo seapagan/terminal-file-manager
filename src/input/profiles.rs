@@ -137,13 +137,11 @@ pub(super) fn mouse(controller: &mut Controller, event: MouseEvent, area: ratatu
         MouseEventKind::Down(MouseButton::Left)
             if area.contains((event.column, event.row).into()) =>
         {
-            if event.row <= area.y || event.row >= area.bottom().saturating_sub(1) {
+            let Some(index) =
+                crate::ui::profile_hit(&controller.app, area, (event.column, event.row).into())
+            else {
                 return;
-            }
-            let index = controller.app.profile_menu.unwrap();
-            let start = index.saturating_sub(usize::from(area.height.saturating_sub(3)));
-            let index = (start + usize::from(event.row - area.y - 1))
-                .min(controller.app.profile_names.len() + 1);
+            };
             controller.app.profile_menu = Some(index);
             if index < controller.app.profile_names.len() {
                 controller.app.profile_choice = index;

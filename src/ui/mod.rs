@@ -11,6 +11,7 @@ mod metadata;
 pub use metadata::MetadataControl;
 mod policy;
 mod profiles;
+pub(crate) use profiles::hit as profile_hit;
 mod summary;
 mod text;
 mod view;
