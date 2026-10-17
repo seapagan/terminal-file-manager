@@ -39,8 +39,8 @@ fn row(app: &App, width: u16, y: u16) -> String {
 fn attributes_fit_below_the_old_global_threshold_and_reflow_in_both_panes() {
     let (_root, mut app) = loaded();
     // Four size digits, one unit, 16 timestamp cells, 10 attribute cells,
-    // 16 name cells, indicators and all six inter-column spaces: 57 cells.
-    for (width, attrs) in [(58, false), (59, true), (60, true), (70, true)] {
+    // 16 name cells, indicators and all six inter-column spaces: 58 cells.
+    for (width, attrs) in [(59, false), (60, true), (61, true), (70, true)] {
         assert_eq!(row(&app, width, 1).contains("Mode/attrs"), attrs);
     }
     app.dual = true;
@@ -68,16 +68,16 @@ fn disabled_columns_release_width_and_cached_sizes_determine_boundaries() {
         attributes: true,
         owner: false,
     };
-    assert!(row(&app, 35, 1).contains("Mode/attrs"));
+    assert!(row(&app, 36, 1).contains("Mode/attrs"));
     app.panes[0].columns = Columns::default();
     app.panes[0].entries[0].size = Some(1_234_567_890);
     app.panes[0].human_sizes = false;
     app.panes[0].refilter();
     assert_eq!(app.panes[0].measurements.number, 10);
-    assert!(!row(&app, 64, 1).contains("Mode/attrs"));
-    assert!(row(&app, 65, 1).contains("Mode/attrs"));
-    assert!(row(&app, 65, 2).contains("1234567890"));
-    for width in 1..=65 {
+    assert!(!row(&app, 65, 1).contains("Mode/attrs"));
+    assert!(row(&app, 66, 1).contains("Mode/attrs"));
+    assert!(row(&app, 66, 2).contains("1234567890"));
+    for width in 1..=66 {
         let _ = row(&app, width, 2);
     }
 }

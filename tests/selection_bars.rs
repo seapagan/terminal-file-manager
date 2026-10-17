@@ -32,7 +32,10 @@ fn fixture() -> (tempfile::TempDir, App) {
         );
         for entry in &mut app.panes[id].entries {
             entry.ignored = Some(true);
+            entry.hidden = true;
         }
+        app.panes[id].show_hidden = true;
+        app.panes[id].refilter();
     }
     (root, app)
 }

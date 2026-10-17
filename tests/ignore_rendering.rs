@@ -75,7 +75,7 @@ fn global_and_local_ignores_dim_only_filename_cells() {
         for (row, length) in &targets {
             for x in 1..179 {
                 let mut expected = plain[(x, *row)].clone();
-                if (7..7 + length).contains(&x) {
+                if (8..8 + length).contains(&x) {
                     expected.modifier.insert(Modifier::DIM);
                 }
                 assert_eq!(dimmed[(x, *row)], expected, "column {x}, row {row}");

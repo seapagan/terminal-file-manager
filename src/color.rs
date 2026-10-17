@@ -14,6 +14,7 @@ pub enum Role {
     Link,
     Warning,
     Ignored,
+    Hidden,
     Cursor,
     InactiveCursor,
     ActivePane,
@@ -79,7 +80,9 @@ impl Theme {
     /// Focus, cursor and marks remain distinguishable in monochrome terminals.
     pub fn style(&self, role: Role) -> Style {
         let named = match role {
-            Role::Header | Role::Link | Role::Label | Role::Key => Some(AnsiColor::Cyan),
+            Role::Header | Role::Link | Role::Label | Role::Key | Role::Hidden => {
+                Some(AnsiColor::Cyan)
+            }
             Role::Status => Some(AnsiColor::Green),
             Role::Error => Some(AnsiColor::Red),
             Role::Directory => Some(AnsiColor::Blue),
@@ -100,7 +103,7 @@ impl Theme {
             Role::Header | Role::Marked | Role::Label | Role::Key | Role::Error => {
                 style.add_modifier(Modifier::BOLD)
             }
-            Role::Ignored | Role::Disabled => style.add_modifier(Modifier::DIM),
+            Role::Ignored | Role::Hidden | Role::Disabled => style.add_modifier(Modifier::DIM),
             _ => style,
         }
     }

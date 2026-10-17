@@ -92,7 +92,7 @@ fn ignored_hidden_executable_and_mark_cues_compose_beneath_active_cursor() {
                 })
                 .unwrap();
             let buffer = terminal.backend().buffer();
-            let name = &buffer[(11, 2)];
+            let name = &buffer[(8, 2)];
             assert_eq!(name.symbol(), ".");
             assert_eq!(name.modifier.contains(Modifier::DIM), !cursor);
             assert_eq!(
@@ -105,7 +105,8 @@ fn ignored_hidden_executable_and_mark_cues_compose_beneath_active_cursor() {
                 assert_eq!(Some(name.fg), expected);
             }
             assert_eq!(buffer[(2, 2)].symbol(), "*");
-            assert_eq!(buffer[(7, 2)].symbol(), "[");
+            assert_eq!(buffer[(5, 2)].symbol(), "*");
+            assert_eq!(buffer[(6, 2)].symbol(), "h");
         }
     }
 }

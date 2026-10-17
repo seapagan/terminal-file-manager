@@ -157,7 +157,7 @@ fn columns(pane: &Pane, width: u16) -> (Vec<Constraint>, Vec<Cell<'static>>) {
     if width < 8 {
         return (vec![Constraint::Length(width)], vec![Cell::from("Name")]);
     }
-    let mut widths = vec![Constraint::Length(3), Constraint::Length(1)];
+    let mut widths = vec![Constraint::Length(3), Constraint::Length(2)];
     let mut headers = vec![Cell::from(""), Cell::from("T"), Cell::from("Name")];
     let mut details = Vec::new();
     if columns.size {
@@ -192,7 +192,7 @@ fn columns(pane: &Pane, width: u16) -> (Vec<Constraint>, Vec<Cell<'static>>) {
         })
         .sum();
     let spacing = (headers.len() - 1) as u16;
-    let available = width.saturating_sub(4 + reserved + spacing);
+    let available = width.saturating_sub(5 + reserved + spacing);
     widths.push(Constraint::Length(
         pane.measurements.name.clamp(16, 64).min(available),
     ));
@@ -305,7 +305,13 @@ fn identity_cells(
         } else {
             Role::Normal
         }))),
-        Cell::from(indicator(entry)).style(type_style),
+        Cell::from(Line::from(vec![
+            Span::styled(indicator(entry), type_style),
+            Span::styled(
+                if entry.hidden { "h" } else { " " },
+                decorate(theme.style(Role::Hidden)),
+            ),
+        ])),
         Cell::from(Line::from(Span::styled(name, name_style))),
     ]
 }

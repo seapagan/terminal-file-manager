@@ -100,7 +100,10 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
         Filter,
         "Edit live fuzzy filter; Enter accepts, Esc restores",
     ),
-    (Hidden, "Toggle hidden entries"),
+    (
+        Hidden,
+        "Toggle hidden entries (h beside the type indicator)",
+    ),
     (Ignore, "Cycle Git-ignore Dim/Hide/Off"),
     (Refresh, "Refresh active directory"),
     (Sort, "Cycle sort order"),

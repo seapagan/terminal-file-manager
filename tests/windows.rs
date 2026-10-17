@@ -98,7 +98,7 @@ fn assert_junction_rendering(snapshot: &local::Snapshot) {
         .unwrap();
     let buffer = terminal.backend().buffer();
     assert_eq!(buffer[(5, row)].symbol(), "j");
-    let name = (7..79)
+    let name = (8..79)
         .map(|x| buffer[(x, row)].symbol())
         .collect::<String>();
     assert_eq!(name.trim_end(), "junction");

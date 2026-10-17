@@ -29,8 +29,8 @@ impl Default for Columns {
 impl Columns {
     /// One responsive visibility contract for headers and data cells.
     pub fn visible(&self, width: u16, measured: &crate::ui::Measurements) -> Self {
-        // Marks (3), type (1), name (16), and their two spaces are mandatory.
-        let mut remaining = width.saturating_sub(22);
+        // Marks (3), type/hidden (2), name (16), and their two spaces are mandatory.
+        let mut remaining = width.saturating_sub(23);
         let mut fit = |enabled: bool, required: u16| {
             if enabled && required <= remaining {
                 remaining -= required;

@@ -45,11 +45,7 @@ impl Measurements {
 }
 
 pub(super) fn name(entry: &Entry, width: u16) -> String {
-    let name = format!(
-        "{}{}",
-        if entry.hidden { "[h] " } else { "" },
-        super::clean(&entry.name.to_string_lossy())
-    );
+    let name = super::clean(&entry.name.to_string_lossy());
     if entry.kind != EntryKind::Directory {
         return name;
     }
