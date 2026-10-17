@@ -1,0 +1,258 @@
+//! Git oracle fixtures, adapted from lsplus's MIT-licensed gitignore regressions.
+use std::{
+    fs,
+    io::Write,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+    sync::atomic::AtomicBool,
+};
+use terminal_file_manager::fs::{IgnoreContext, list};
+
+struct Repository {
+    temp: tempfile::TempDir,
+    path: PathBuf,
+    global: PathBuf,
+}
+
+impl Repository {
+    fn new() -> Self {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("repo");
+        let global = temp.path().join("global-ignore");
+        fs::create_dir(&path).unwrap();
+        fs::write(&global, "").unwrap();
+        let repo = Self { temp, path, global };
+        repo.run(&repo.path, &["init", "--quiet"]);
+        repo
+    }
+
+    fn command(&self, directory: &Path) -> Command {
+        let mut command = Command::new("git");
+        command.current_dir(directory).env_clear();
+        for key in ["PATH", "SystemRoot", "SYSTEMROOT", "WINDIR", "TMP", "TEMP"] {
+            if let Some(value) = std::env::var_os(key) {
+                command.env(key, value);
+            }
+        }
+        command
+            .env("HOME", self.temp.path())
+            .env("USERPROFILE", self.temp.path())
+            .env("XDG_CONFIG_HOME", self.temp.path())
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", self.temp.path().join("absent-config"))
+            .args([
+                "-c",
+                "commit.gpgsign=false",
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "-c",
+            ])
+            .arg(format!("core.excludesFile={}", self.global.display()));
+        command
+    }
+
+    fn run(&self, directory: &Path, args: &[&str]) {
+        let output = self.command(directory).args(args).output().unwrap();
+        assert!(output.status.success(), "{args:?}: {:?}", output);
+    }
+
+    fn compare(&self, root: &Path, relative: impl AsRef<Path>, expected: Option<bool>) {
+        let relative = relative.as_ref();
+        let path = root.join(relative);
+        let mut child = self
+            .command(root)
+            .args([
+                "check-ignore",
+                "--no-index",
+                "--verbose",
+                "--non-matching",
+                "-z",
+                "--stdin",
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut input = relative.as_os_str().as_encoded_bytes().to_vec();
+        input.push(0);
+        child.stdin.take().unwrap().write_all(&input).unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert!(matches!(output.status.code(), Some(0 | 1)), "{output:?}");
+        let fields: Vec<_> = output.stdout.split(|byte| *byte == 0).collect();
+        assert_eq!(fields.len(), 5, "{output:?}");
+        let oracle = (!fields[2].is_empty()).then(|| !fields[2].starts_with(b"!"));
+        assert_eq!(oracle, expected, "Git: {relative:?}");
+        let context = IgnoreContext {
+            global_file: Some(self.global.clone()),
+            discover_global: false,
+        };
+        let snapshot = list(path.parent().unwrap(), &context, &AtomicBool::new(false)).unwrap();
+        assert!(snapshot.errors.is_empty(), "{:?}", snapshot.errors);
+        let entry = snapshot
+            .entries
+            .iter()
+            .find(|entry| entry.path == path)
+            .unwrap();
+        assert_eq!(
+            entry.ignored,
+            Some(oracle.unwrap_or(false)),
+            "TFM: {relative:?}"
+        );
+        assert_eq!(entry.path, path);
+    }
+}
+
+#[test]
+fn nested_parent_and_source_precedence_match_git() {
+    let repo = Repository::new();
+    fs::create_dir(repo.path.join("nested")).unwrap();
+    fs::create_dir(repo.path.join("blocked")).unwrap();
+    fs::create_dir(repo.path.join("dir-only")).unwrap();
+    fs::write(&repo.global, "*.log\ninfo-wins\n!global-loses\n").unwrap();
+    fs::write(
+        repo.path.join(".git/info/exclude"),
+        "!info-wins\nglobal-loses\n!local-wins\n",
+    )
+    .unwrap();
+    fs::write(
+        repo.path.join(".gitignore"),
+        "!keep.log\nlocal-wins\nblocked/\ndir-only/\nfile-only/\n",
+    )
+    .unwrap();
+    fs::write(
+        repo.path.join("nested/.gitignore"),
+        "!local-wins\nkeep.log\n!again.log\n",
+    )
+    .unwrap();
+    fs::write(repo.path.join("blocked/.gitignore"), "!keep.log\n").unwrap();
+    let cases = [
+        ("plain", None),
+        ("gone.log", Some(true)),
+        ("keep.log", Some(false)),
+        ("info-wins", Some(false)),
+        ("global-loses", Some(true)),
+        ("local-wins", Some(true)),
+        ("nested/local-wins", Some(false)),
+        ("nested/keep.log", Some(true)),
+        ("nested/again.log", Some(false)),
+        ("blocked/keep.log", Some(true)),
+        ("dir-only", Some(true)),
+        ("dir-only/child", Some(true)),
+        ("file-only", None),
+    ];
+    for (path, _) in cases {
+        if path != "dir-only" {
+            fs::write(repo.path.join(path), "fixture").unwrap();
+        }
+    }
+    for (path, expected) in cases {
+        repo.compare(&repo.path, path, expected);
+    }
+}
+
+#[test]
+fn refresh_reloads_each_source_without_a_lifetime_cache() {
+    let repo = Repository::new();
+    fs::write(&repo.global, "gone.log\n").unwrap();
+    fs::write(repo.path.join("gone.log"), "fixture").unwrap();
+    fs::write(repo.path.join("plain"), "fixture").unwrap();
+    repo.compare(&repo.path, "gone.log", Some(true));
+    fs::write(repo.path.join(".gitignore"), "!gone.log\n").unwrap();
+    repo.compare(&repo.path, "gone.log", Some(false));
+    fs::write(&repo.global, "plain\n").unwrap();
+    repo.compare(&repo.path, "plain", Some(true));
+    fs::write(repo.path.join(".git/info/exclude"), "!plain\n").unwrap();
+    repo.compare(&repo.path, "plain", Some(false));
+}
+
+#[test]
+fn real_linked_worktree_uses_common_excludes_and_native_paths() {
+    let repo = Repository::new();
+    repo.run(
+        &repo.path,
+        &["commit", "--quiet", "--allow-empty", "-m", "fixture"],
+    );
+    let linked = repo.temp.path().join("linked 界");
+    let output = repo
+        .command(&repo.path)
+        .args(["worktree", "add", "--quiet", "-b", "linked"])
+        .arg(&linked)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    fs::write(repo.path.join(".git/info/exclude"), "excluded\n").unwrap();
+    fs::write(linked.join("excluded"), "fixture").unwrap();
+    repo.compare(&linked, "excluded", Some(true));
+    fs::write(linked.join(".gitignore"), "!excluded\n").unwrap();
+    repo.compare(&linked, "excluded", Some(false));
+    // Git chooses the worktree administrative name; retain its exact native spelling.
+    let admin = fs::read_dir(repo.path.join(".git/worktrees"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    fs::write(
+        linked.join(".git"),
+        format!(
+            "gitdir: ../repo/.git/worktrees/{}\n",
+            admin.file_name().unwrap().to_str().unwrap()
+        ),
+    )
+    .unwrap();
+    repo.compare(&linked, "excluded", Some(false));
+    fs::write(
+        admin.join("commondir"),
+        format!("{}\n", repo.path.join(".git").display()),
+    )
+    .unwrap();
+    repo.compare(&linked, "excluded", Some(false));
+}
+
+#[test]
+fn invalid_or_unreadable_rule_sources_are_unknown_not_unignored() {
+    let repo = Repository::new();
+    fs::write(repo.path.join("visible"), "fixture").unwrap();
+    for rule in [
+        repo.path.join(".gitignore"),
+        repo.path.join(".git/info/exclude"),
+        repo.global.clone(),
+    ] {
+        let previous = fs::read(&rule).ok();
+        fs::write(&rule, "{a,b\n").unwrap();
+        assert_unknown(&repo);
+        fs::remove_file(&rule).unwrap();
+        fs::create_dir(&rule).unwrap();
+        assert_unknown(&repo);
+        fs::remove_dir(&rule).unwrap();
+        if let Some(previous) = previous {
+            fs::write(&rule, previous).unwrap();
+        }
+    }
+}
+
+fn assert_unknown(repo: &Repository) {
+    let context = IgnoreContext {
+        global_file: Some(repo.global.clone()),
+        discover_global: false,
+    };
+    let snapshot = list(&repo.path, &context, &AtomicBool::new(false)).unwrap();
+    assert!(!snapshot.errors.is_empty());
+    assert!(snapshot.entries.iter().all(|entry| entry.ignored.is_none()));
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn raw_names_remain_distinct_when_matching_git_rules() {
+    use std::{ffi::OsString, os::unix::ffi::OsStringExt};
+    let repo = Repository::new();
+    fs::write(repo.path.join(".gitignore"), "*.log\n").unwrap();
+    for byte in [0xfe, 0xff] {
+        let name = PathBuf::from(OsString::from_vec(vec![b'n', byte, b'.', b'l', b'o', b'g']));
+        fs::write(repo.path.join(&name), "fixture").unwrap();
+        repo.compare(&repo.path, name, Some(true));
+    }
+}

@@ -11,6 +11,17 @@ interactive directory entry, rebuilds rule matchers on refresh and reports
 unknown rule status instead of silently treating errors as unignored files.
 The native regression cases were reviewed and adapted to these contracts.
 
+The correctness follow-up compares isolated real Git repositories and linked
+worktrees against `git check-ignore --no-index --verbose --non-matching -z`,
+distinguishing explicit negations from ignored paths. TFM retains its existing
+excluded-parent check: lsplus's combined `matched_path_or_any_parents` call
+returns a direct child negation before checking an excluded parent, which fails
+this matrix. No lifetime cache or swallowed rule errors were adopted. Invalid
+patterns that Git treats literally can instead produce an explicit unknown
+state in the `ignore` library; matching describes rules independently of Git's
+tracked-file index. Global discovery follows the library's supported Git config
+lookup rather than promising all of Git's configuration directives.
+
 The terminal lifecycle, native PTY/ConPTY session driver, colour mapping and
 semantic styling adapt [Labeldeck 8c0fdea](https://github.com/seapagan/labeldeck/tree/8c0fdea354bf0b0bd8abafb293af78c34ac9fe1d)
 (`src/edit/color.rs`, `src/edit/ui/{theme,render}.rs`, terminal guards and

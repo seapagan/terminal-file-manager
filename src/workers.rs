@@ -40,7 +40,12 @@ pub struct Pool {
     sender: mpsc::SyncSender<Completion>,
     receiver: mpsc::Receiver<Completion>,
     context: IgnoreContext,
+    #[cfg(test)]
+    pub(crate) before_execute: Option<BeforeExecute>,
 }
+
+#[cfg(test)]
+type BeforeExecute = Arc<dyn Fn(&Request, &AtomicBool) + Send + Sync>;
 
 impl Pool {
     /// Create one runtime with a fixed bound on blocking filesystem calls.
@@ -59,6 +64,8 @@ impl Pool {
             sender,
             receiver,
             context,
+            #[cfg(test)]
+            before_execute: None,
         })
     }
 
@@ -133,10 +140,16 @@ impl Pool {
             lane.running = Some(cancelled.clone());
             let context = self.context.clone();
             let sender = self.sender.clone();
+            #[cfg(test)]
+            let before_execute = self.before_execute.clone();
             self.runtime
                 .as_ref()
                 .expect("live runtime")
                 .spawn_blocking(move || {
+                    #[cfg(test)]
+                    if let Some(before_execute) = before_execute {
+                        before_execute(&request, &cancelled);
+                    }
                     let value = execute(&request, &context, &cancelled);
                     let _ = sender.send(Completion { request, value });
                 });

@@ -277,9 +277,15 @@ mod tests {
     #[test]
     fn timestamps_retain_precision_and_out_of_range_metadata_cannot_panic() {
         use std::time::{Duration, UNIX_EPOCH};
+        // Windows SystemTime stores FILETIME ticks of 100 ns, before formatting.
+        let fractional = if cfg!(windows) { "100" } else { "123" };
         assert_eq!(
             timestamp(Some(UNIX_EPOCH + Duration::new(1, 123))),
-            "1970-01-01 00:00:01.000000123"
+            format!("1970-01-01 00:00:01.000000{fractional}")
+        );
+        assert_eq!(
+            timestamp(Some(UNIX_EPOCH + Duration::new(1, 123_456_700))),
+            "1970-01-01 00:00:01.123456700"
         );
         assert_eq!(
             timestamp(Some(UNIX_EPOCH - Duration::from_secs(1))),

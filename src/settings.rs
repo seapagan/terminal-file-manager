@@ -69,16 +69,18 @@ impl Settings {
         }
     }
 
-    /// Remember the active pane's preferences without serializing its session state.
-    pub fn capture(&mut self, app: &App) {
+    /// Capture only the explicit change; pane switches never choose restart defaults.
+    pub fn capture(&mut self, app: &App, action: Action) {
         let pane = &app.panes[app.active];
-        self.sidebar = app.sidebar;
-        self.sidebar_left = app.sidebar_left;
-        self.sort = pane.sort.sort;
-        self.grouping = pane.sort.grouping;
-        self.reverse = pane.sort.reverse;
-        self.hidden = pane.show_hidden;
-        self.ignore = pane.ignore;
+        match action {
+            Action::ToggleSidebar => self.sidebar = app.sidebar,
+            Action::Sort => self.sort = pane.sort.sort,
+            Action::Group => self.grouping = pane.sort.grouping,
+            Action::Reverse => self.reverse = pane.sort.reverse,
+            Action::Hidden => self.hidden = pane.show_hidden,
+            Action::Ignore => self.ignore = pane.ignore,
+            _ => {}
+        }
     }
 }
 

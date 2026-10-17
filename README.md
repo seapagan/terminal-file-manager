@@ -73,7 +73,9 @@ available; unsupported reparse objects stay visible with an explanation.
 
 No config file is created just by browsing. Deliberate changes to sidebar,
 sorting, grouping, hidden or ignore preferences are saved atomically on normal
-exit. Pane locations, marks, filters, history and startup layout are not saved.
+exit. Each preference keeps its last explicit change from either pane; switching
+panes never replaces it. Pane policies remain independent during the session.
+Pane locations, marks, filters, history and startup layout are not saved.
 
 The config is `tfm/config.toml` under `$XDG_CONFIG_HOME` (or `~/.config`) on
 Linux, `$XDG_CONFIG_HOME` (or `~/Library/Application Support`) on macOS, and

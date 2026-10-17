@@ -2,6 +2,7 @@ use super::{Action, Bindings};
 use crate::{
     app::{App, IgnoreMode, Request},
     listing::{Grouping, Sort},
+    settings::Settings,
     ui::Geometry,
 };
 use crossterm::event::{
@@ -14,6 +15,7 @@ pub struct Controller {
     pub app: App,
     pub quit: bool,
     pub preferences_changed: bool,
+    pub preferences: Settings,
     bindings: Bindings,
     filter_before: Option<String>,
     last_click: Option<(usize, PathBuf, Duration)>,
@@ -21,11 +23,12 @@ pub struct Controller {
 
 impl Controller {
     /// Own the authoritative app and validated keymap.
-    pub fn new(app: App, bindings: Bindings) -> Self {
+    pub fn new(app: App, bindings: Bindings, preferences: Settings) -> Self {
         Self {
             app,
             quit: false,
             preferences_changed: false,
+            preferences,
             bindings,
             filter_before: None,
             last_click: None,
@@ -182,6 +185,7 @@ impl Controller {
             _ => {}
         }
         pane.resort();
+        self.preferences.capture(&self.app, action);
         self.preferences_changed = true;
     }
 
@@ -193,6 +197,7 @@ impl Controller {
             }
             Action::ToggleSidebar => {
                 self.app.sidebar = !self.app.sidebar;
+                self.preferences.capture(&self.app, action);
                 self.preferences_changed = true;
             }
             Action::Metadata => {

@@ -34,6 +34,34 @@ fn browser_starts_at_cwd_and_explicit_path_and_restores_terminal() {
 }
 
 #[test]
+fn preference_change_survives_exit_from_other_pane_and_real_restart() {
+    use terminal_file_manager::{listing::Sort, settings::Store};
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("preference-sentinel"), "read only").unwrap();
+    let config = root.path().join("config/tfm/config.toml");
+    fs::create_dir_all(config.parent().unwrap()).unwrap();
+    fs::write(
+        &config,
+        "mouse = false\nsidebar_left = true\n[bindings]\nF12 = 'quit'\n",
+    )
+    .unwrap();
+    for step in [("preference-sentinel", "s\u{10}\tq"), ("Name", "q")] {
+        let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+        command.cwd(root.path());
+        isolate(&mut command, root.path());
+        drive(command, &[step], false);
+        let saved = Store::load(config.clone()).unwrap().settings;
+        assert_eq!(saved.sort, Sort::Name);
+        assert!(!saved.mouse);
+        assert!(saved.sidebar_left);
+        assert_eq!(
+            saved.bindings.get("F12"),
+            Some(&terminal_file_manager::input::Action::Quit)
+        );
+    }
+}
+
+#[test]
 fn terminal_restores_after_returned_error_and_unwind() {
     let root = tempfile::tempdir().unwrap();
     for mode in ["error", "panic"] {

@@ -26,7 +26,11 @@ fn controller() -> (tempfile::TempDir, Controller) {
     }
     (
         root,
-        Controller::new(app, Bindings::new(&Default::default()).unwrap()),
+        Controller::new(
+            app,
+            Bindings::new(&Default::default()).unwrap(),
+            Default::default(),
+        ),
     )
 }
 

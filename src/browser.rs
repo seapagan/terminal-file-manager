@@ -31,7 +31,7 @@ pub fn run(path: &Path) -> Result<(), String> {
     let mut app = App::new(path);
     settings.apply(&mut app);
     let bindings = Bindings::new(&settings.bindings)?;
-    let mut controller = Controller::new(app, bindings);
+    let mut controller = Controller::new(app, bindings, settings.clone());
     let theme = Theme::new(ColorizeConfig::color_level(RenderTarget::Stdout));
     let mut pool = Pool::new(IgnoreContext::default()).map_err(|e| e.to_string())?;
     for pane in 0..2 {
@@ -50,7 +50,7 @@ pub fn run(path: &Path) -> Result<(), String> {
         let Some(store) = store.as_mut() else {
             return Err("preferences changed but no user config directory is available".into());
         };
-        store.settings.capture(&controller.app);
+        store.settings = controller.preferences;
         store.save()?;
     }
     Ok(())
@@ -151,4 +151,100 @@ fn startup_path(path: &Path) -> Result<PathBuf, String> {
         return Err("interactive browsing requires a terminal on stdin and stdout".into());
     }
     Ok(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{fs, input::Action};
+    use std::sync::{Arc, Mutex, atomic::AtomicBool, mpsc};
+
+    fn counting_controller(root: &Path) -> Controller {
+        let directory = root.join("directory");
+        std::fs::create_dir(&directory).unwrap();
+        std::fs::write(directory.join("file"), "1234").unwrap();
+        let mut app = App::new(root.to_path_buf());
+        app.complete_listing(
+            0,
+            1,
+            Ok(fs::list(root, &IgnoreContext::isolated(), &AtomicBool::new(false)).unwrap()),
+        );
+        Controller::new(
+            app,
+            Bindings::new(&Default::default()).unwrap(),
+            Settings::default(),
+        )
+    }
+
+    fn hold_first_count(
+        pool: &mut Pool,
+    ) -> (mpsc::Receiver<()>, mpsc::SyncSender<()>, mpsc::Receiver<()>) {
+        let (entered, running) = mpsc::sync_channel(1);
+        let (release, wait) = mpsc::sync_channel(1);
+        let (confirmed, stopped) = mpsc::sync_channel(1);
+        let wait = Mutex::new(wait);
+        let held = AtomicBool::new(false);
+        pool.before_execute = Some(Arc::new(move |request, cancelled| {
+            if request.kind == RequestKind::Totals
+                && !held.swap(true, std::sync::atomic::Ordering::Relaxed)
+            {
+                entered.send(()).unwrap();
+                wait.lock()
+                    .unwrap()
+                    .recv_timeout(Duration::from_secs(10))
+                    .unwrap();
+                assert!(cancelled.load(std::sync::atomic::Ordering::Relaxed));
+                confirmed.send(()).unwrap();
+            }
+        }));
+        (running, release, stopped)
+    }
+
+    #[test]
+    fn cancel_signals_active_traversal_and_new_count_owns_the_lane() {
+        let root = tempfile::tempdir().unwrap();
+        let mut controller = counting_controller(root.path());
+        let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
+        let (running, release, stopped) = hold_first_count(&mut pool);
+        let geometry = ui::geometry(&controller.app, ratatui::layout::Rect::new(0, 0, 120, 24));
+        let first = controller.dispatch(Action::Count, &geometry).pop().unwrap();
+        pool.submit(first.clone());
+        running.recv_timeout(Duration::from_secs(10)).unwrap();
+        controller.dispatch(Action::Cancel, &geometry);
+        schedule_metadata(&mut controller, &mut pool, &mut [None, None]);
+        release.send(()).unwrap();
+        // Confirm Esc itself cancelled the worker before submit can also cancel it.
+        stopped.recv_timeout(Duration::from_secs(10)).unwrap();
+        let next = controller.dispatch(Action::Count, &geometry).pop().unwrap();
+        pool.submit(next.clone());
+        let old = pool.next(Duration::from_secs(10)).unwrap();
+        assert_eq!(old.request.generation, first.generation);
+        let Value::Totals(result) = old.value else {
+            panic!("totals completion")
+        };
+        assert_eq!(result.as_ref().unwrap_err(), "inspection cancelled");
+        assert!(!controller.app.complete_totals(&old.request, result));
+        let fresh = pool.next(Duration::from_secs(10)).unwrap();
+        let Value::Totals(result) = fresh.value else {
+            panic!("totals completion")
+        };
+        assert_eq!(result.as_ref().unwrap().bytes, 4);
+        assert!(controller.app.complete_totals(&fresh.request, result));
+        assert!(
+            !controller
+                .app
+                .complete_totals(&first, Ok(fs::Totals::default()))
+        );
+        assert_eq!(
+            controller.app.details[0]
+                .totals
+                .as_ref()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .bytes,
+            4
+        );
+        assert_eq!(pool.active_count(), 0);
+    }
 }
