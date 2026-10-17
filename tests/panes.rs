@@ -156,15 +156,23 @@ fn refresh_removes_marks_for_missing_or_replaced_objects() {
 #[test]
 fn back_forward_restore_cursor_scroll_and_failed_navigation_keeps_history() {
     let (root, mut app) = loaded();
+    let opposite_cursor = app.panes[1].cursor.clone();
     app.panes[0].cursor = Some(root.path().join("beta"));
     app.panes[0].scroll = 1;
     let child = root.path().join("child");
     fs::create_dir(&child).unwrap();
+    for name in ["first", "last"] {
+        fs::write(child.join(name), name).unwrap();
+    }
     let request = app.request_listing(0, child.clone());
-    let snapshot = list(&child, &IgnoreContext::isolated(), &AtomicBool::new(false)).unwrap();
-    app.complete_listing(0, request.generation, Ok(snapshot));
+    let child_snapshot = list(&child, &IgnoreContext::isolated(), &AtomicBool::new(false)).unwrap();
+    assert!(app.complete_listing(0, request.generation, Ok(child_snapshot.clone())));
+    app.panes[0].cursor = Some(child.join("last"));
+    app.panes[0].scroll = 1;
     let back = app.history(false).unwrap();
-    app.complete_listing(0, back.generation, Err("denied".into()));
+    assert!(app.complete_listing(0, back.generation, Err("denied".into())));
+    assert_eq!(app.panes[0].path, child);
+    assert_eq!(app.panes[0].cursor, Some(child.join("last")));
     let back = app.history(false).unwrap();
     let snapshot = list(
         root.path(),
@@ -172,10 +180,28 @@ fn back_forward_restore_cursor_scroll_and_failed_navigation_keeps_history() {
         &AtomicBool::new(false),
     )
     .unwrap();
-    app.complete_listing(0, back.generation, Ok(snapshot));
+    assert!(app.complete_listing(0, back.generation, Ok(snapshot.clone())));
     assert_eq!(app.panes[0].cursor, Some(root.path().join("beta")));
     assert_eq!(app.panes[0].scroll, 1);
-    assert_eq!(app.history(true).unwrap().path, child);
+    let forward = app.history(true).unwrap();
+    assert_eq!(forward.path, child);
+    assert!(app.complete_listing(0, forward.generation, Err("denied".into())));
+    assert_eq!(app.panes[0].path, root.path());
+    assert_eq!(app.panes[0].cursor, Some(root.path().join("beta")));
+    let retry = app.history(true).unwrap();
+    assert!(app.complete_listing(0, retry.generation, Ok(child_snapshot)));
+    assert_eq!(app.panes[0].path, child);
+    assert_eq!(app.panes[0].cursor, Some(child.join("last")));
+    assert_eq!(app.panes[0].scroll, 1);
+    assert!(app.history(true).is_none());
+    let back = app.history(false).unwrap();
+    assert!(app.complete_listing(0, back.generation, Ok(snapshot)));
+    assert_eq!(app.panes[0].cursor, Some(root.path().join("beta")));
+    assert_eq!(app.panes[0].scroll, 1);
+    assert!(app.history(false).is_none());
+    assert_eq!(app.panes[1].path, root.path());
+    assert_eq!(app.panes[1].cursor, opposite_cursor);
+    assert_eq!(app.panes[1].scroll, 0);
 }
 
 #[test]
