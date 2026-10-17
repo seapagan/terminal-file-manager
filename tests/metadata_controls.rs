@@ -70,6 +70,20 @@ fn click(c: &mut Controller, x: u16, y: u16, geometry: &ui::Geometry) {
     );
 }
 
+fn visible_value(buffer: &Buffer, geometry: &ui::Geometry, text: &str) -> (u16, u16) {
+    let control = geometry
+        .metadata_controls
+        .iter()
+        .find(|control| {
+            let value: String = (control.area.x..control.area.right())
+                .map(|x| buffer[(x, control.area.y)].symbol())
+                .collect();
+            value == text
+        })
+        .expect("value run matches visible buffer content");
+    (control.area.x, control.area.y)
+}
+
 #[test]
 fn metadata_attributes_keep_symbolic_and_octal_character_styles_at_every_depth() {
     let (_root, mut c) = loaded();
@@ -87,7 +101,8 @@ fn metadata_attributes_keep_symbolic_and_octal_character_styles_at_every_depth()
                 let entry = c.app.details[0].entry.as_ref().unwrap();
                 let value = terminal_file_manager::permissions::attributes(entry, format);
                 let buffer = draw(&c.app, 120, 32, level);
-                let (x, y) = find(&buffer, &value);
+                let geometry = ui::geometry(&c.app, Rect::new(0, 0, 120, 32));
+                let (x, y) = visible_value(&buffer, &geometry, &value);
                 for (i, ch) in value.chars().enumerate() {
                     let style = if i == 0 {
                         theme.entry_style(entry)
@@ -111,8 +126,8 @@ fn attribute_value_click_changes_only_active_pane_and_persisted_explicit_prefere
         let (_root, mut c) = loaded();
         c.app.popup = floating;
         let buffer = draw(&c.app, 120, 32, ColorLevel::NoColor);
-        let (x, y) = find(&buffer, "-rwsr-xr--");
         let geometry = ui::geometry(&c.app, Rect::new(0, 0, 120, 32));
+        let (x, y) = visible_value(&buffer, &geometry, "-rwsr-xr--");
         click(&mut c, x - 2, y, &geometry);
         assert_eq!(c.app.panes[0].permissions, PermissionDisplay::Symbolic);
         assert!(!c.preferences_changed);
@@ -127,8 +142,8 @@ fn attribute_value_click_changes_only_active_pane_and_persisted_explicit_prefere
         .unwrap();
         assert_eq!(restored.permissions, PermissionDisplay::Octal);
         let buffer = draw(&c.app, 120, 32, ColorLevel::NoColor);
-        let (x, y) = find(&buffer, "- 4754");
         let geometry = ui::geometry(&c.app, Rect::new(0, 0, 120, 32));
+        let (x, y) = visible_value(&buffer, &geometry, "- 4754");
         click(&mut c, x, y, &geometry);
         assert_eq!(c.app.panes[0].permissions, PermissionDisplay::Symbolic);
     }
@@ -148,7 +163,13 @@ fn show_attributes(c: &mut Controller, bounds: Rect, floating: bool) -> u16 {
             } else {
                 c.app.metadata_scroll = *scroll;
             }
-            let controls = ui::geometry(&c.app, bounds).metadata_controls;
+            let controls: Vec<_> = ui::geometry(&c.app, bounds)
+                .metadata_controls
+                .into_iter()
+                .filter(|control| {
+                    control.action == terminal_file_manager::input::Action::Permissions
+                })
+                .collect();
             let buffer = draw(&c.app, bounds.width, bounds.height, ColorLevel::Ansi16);
             let text: String = controls
                 .iter()
@@ -170,8 +191,14 @@ fn wrapped_scrolled_values_match_click_regions_and_exclude_padding_and_overlays(
         let bounds = Rect::new(0, 0, width, 12);
         let scroll = show_attributes(&mut c, bounds, floating);
         assert!(scroll > 0);
-        let geometry = ui::geometry(&c.app, bounds);
-        let shifted = ui::geometry(&c.app, Rect::new(5, 7, width, 12));
+        let mut geometry = ui::geometry(&c.app, bounds);
+        geometry
+            .metadata_controls
+            .retain(|control| control.action == terminal_file_manager::input::Action::Permissions);
+        let mut shifted = ui::geometry(&c.app, Rect::new(5, 7, width, 12));
+        shifted
+            .metadata_controls
+            .retain(|control| control.action == terminal_file_manager::input::Action::Permissions);
         assert_eq!(
             geometry.metadata_controls.len(),
             shifted.metadata_controls.len()
@@ -198,6 +225,166 @@ fn wrapped_scrolled_values_match_click_regions_and_exclude_padding_and_overlays(
         c.app.help = false;
         c.app.view_menu = Some(0);
         assert!(ui::geometry(&c.app, bounds).metadata_controls.is_empty());
+    }
+}
+
+fn cached_times(c: &mut Controller) {
+    use std::time::SystemTime;
+    let mut entry = c.app.details[0].entry.clone().unwrap();
+    entry.modified = Some(SystemTime::UNIX_EPOCH + Duration::new(10 * 86_400, 123_456_700));
+    c.app.now = entry.modified.unwrap() + Duration::from_secs(86_400);
+    entry.created = Some(c.app.now - Duration::from_secs(3600));
+    entry.accessed = None;
+    c.app.complete_listing(
+        0,
+        1,
+        Ok(fs::Snapshot {
+            path: c.app.panes[0].path.clone(),
+            entries: vec![entry.clone()],
+            errors: vec![],
+        }),
+    );
+    c.app.panes[0].columns.modified = false;
+    let request = c.app.request_metadata(0).unwrap();
+    assert!(c.app.complete_metadata(&request, entry.clone(), None));
+    std::fs::remove_file(entry.path).unwrap();
+    assert!(c.app.request_metadata(0).is_none());
+}
+
+#[test]
+fn metadata_times_follow_pane_mode_and_advance_from_cached_timestamps() {
+    for floating in [false, true] {
+        let (_root, mut c) = loaded();
+        cached_times(&mut c);
+        c.app.popup = floating;
+        let detail = c.app.details[0].clone();
+        c.app.panes[0].fuzzy_timestamps = true;
+        let buffer = draw(&c.app, 180, 40, ColorLevel::NoColor);
+        find(&buffer, "Modified:");
+        find(&buffer, "yesterday");
+        find(&buffer, "1 hour ago");
+        let (_, accessed) = find(&buffer, "Accessed:");
+        assert!(
+            (0..180)
+                .map(|x| buffer[(x, accessed)].symbol())
+                .collect::<String>()
+                .contains("unavailable")
+        );
+        c.app.now += Duration::from_secs(86_400);
+        find(&draw(&c.app, 180, 40, ColorLevel::NoColor), "2 days ago");
+        c.app.panes[0].fuzzy_timestamps = false;
+        let buffer = draw(&c.app, 180, 40, ColorLevel::NoColor);
+        find(&buffer, "Modified UTC:");
+        find(&buffer, "1970-01-11 00:00:00.123456700");
+        find(&buffer, "Created UTC:");
+        find(&buffer, "Accessed UTC:");
+        assert_eq!(c.app.details[0].path, detail.path);
+        assert_eq!(c.app.details[0].generation, detail.generation);
+        assert_eq!(
+            c.app.details[0].entry.as_ref().unwrap().modified,
+            detail.entry.unwrap().modified
+        );
+        assert!(c.app.request_metadata(0).is_none());
+    }
+}
+
+#[test]
+fn each_metadata_time_value_toggles_only_active_mode_and_restart_preference() {
+    for floating in [false, true] {
+        for (label, text) in [
+            ("Modified UTC:", "1970-01-11 00:00:00.123456700"),
+            ("Created UTC:", "1970-01-11 23:00:00.123456700"),
+            ("Accessed UTC:", "unavailable"),
+        ] {
+            let (_root, mut c) = loaded();
+            cached_times(&mut c);
+            c.app.popup = floating;
+            let buffer = draw(&c.app, 180, 40, ColorLevel::NoColor);
+            let geometry = ui::geometry(&c.app, Rect::new(0, 0, 180, 40));
+            let (x, y) = visible_value(&buffer, &geometry, text);
+            click(&mut c, x, y, &geometry);
+            assert!(
+                c.app.panes[0].fuzzy_timestamps && c.preferences.fuzzy_timestamps,
+                "{floating} {label} {x},{y} controls={:?}",
+                geometry.metadata_controls
+            );
+            assert!(!c.app.panes[1].fuzzy_timestamps);
+            assert!(c.preferences_changed && c.app.panes[0].profile_modified);
+            let settings = terminal_file_manager::settings::Settings::parse(
+                &toml::to_string(&c.preferences).unwrap(),
+            )
+            .unwrap();
+            assert!(settings.fuzzy_timestamps);
+            assert!(c.app.request_metadata(0).is_none());
+            let buffer = draw(&c.app, 180, 40, ColorLevel::NoColor);
+            let geometry = ui::geometry(&c.app, Rect::new(0, 0, 180, 40));
+            let (x, y) = visible_value(&buffer, &geometry, "yesterday");
+            click(&mut c, x, y, &geometry);
+            assert!(!c.app.panes[0].fuzzy_timestamps && !c.preferences.fuzzy_timestamps);
+        }
+    }
+}
+
+fn show_time_tail(c: &mut Controller, bounds: Rect, floating: bool, tail: &str) -> Rect {
+    use terminal_file_manager::input::Action;
+    let geometry = ui::geometry(&c.app, bounds);
+    let limit = if floating {
+        geometry.overlay_scroll_limit
+    } else {
+        geometry.metadata_scroll_limit
+    };
+    (0..=limit)
+        .find_map(|scroll| {
+            if floating {
+                c.app.overlay_scroll = scroll;
+            } else {
+                c.app.metadata_scroll = scroll;
+            }
+            let buffer = draw(&c.app, bounds.width, bounds.height, ColorLevel::NoColor);
+            ui::geometry(&c.app, bounds)
+                .metadata_controls
+                .into_iter()
+                .find_map(|control| {
+                    let value: String = (control.area.x..control.area.right())
+                        .map(|x| buffer[(x, control.area.y)].symbol())
+                        .collect();
+                    (control.action == Action::FuzzyTimestamps && value == tail)
+                        .then_some(control.area)
+                })
+        })
+        .expect("visible wrapped timestamp continuation")
+}
+
+#[test]
+fn timestamp_continuations_remain_clickable_after_narrow_overlay_and_sidebar_scroll() {
+    for (floating, width, tail) in [
+        (true, 24, "00"),
+        (true, 40, "123456700"),
+        (false, 120, "56700"),
+    ] {
+        let (_root, mut c) = loaded();
+        cached_times(&mut c);
+        c.app.popup = floating;
+        let bounds = Rect::new(0, 0, width, 12);
+        let position = show_time_tail(&mut c, bounds, floating, tail);
+        let geometry = ui::geometry(&c.app, bounds);
+        click(&mut c, position.x - 1, position.y, &geometry);
+        click(&mut c, position.right(), position.y, &geometry);
+        assert!(!c.app.panes[0].fuzzy_timestamps);
+        c.handle(
+            Event::Mouse(MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Right),
+                column: position.x,
+                row: position.y,
+                modifiers: KeyModifiers::NONE,
+            }),
+            &geometry,
+            Duration::ZERO,
+        );
+        assert!(!c.app.panes[0].fuzzy_timestamps);
+        click(&mut c, position.x, position.y, &geometry);
+        assert!(c.app.panes[0].fuzzy_timestamps && c.preferences.fuzzy_timestamps);
+        assert!(c.app.request_metadata(0).is_none());
     }
 }
 

@@ -102,6 +102,9 @@ available; unsupported reparse objects stay visible with an explanation.
 Sidebar and popup attributes use the listing's permission format and character
 colours. Click an attribute value (including a wrapped continuation) to switch
 symbolic/octal display for that pane; labels and padding stay inactive.
+Modified, created and accessed values follow that pane's exact UTC/fuzzy time
+setting. Click any time value to switch modes. Relative times update from cached
+timestamps without rescanning files.
 
 Each pane reports its visible item count separately from selection. Excluded
 selection counts refer only to marked entries hidden by visibility or filtering,

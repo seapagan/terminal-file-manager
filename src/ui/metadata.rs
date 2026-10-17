@@ -1,7 +1,7 @@
 //! Shared label/value presentation for the metadata sidebar and floating popup.
 use super::{
     clean,
-    listing::{permission_spans, size, timestamp},
+    listing::{listing_timestamp, permission_spans, size},
     text::wrap_line,
 };
 use crate::{
@@ -75,8 +75,8 @@ pub(super) fn render(frame: &mut Frame, app: &App, bounds: Rect, theme: &Theme, 
     );
 }
 
-fn fields(detail: &Detail, pane: &Pane, theme: &Theme) -> Vec<Field> {
-    let mut fields = entry_fields(detail, pane);
+fn fields(detail: &Detail, pane: &Pane, now: std::time::SystemTime, theme: &Theme) -> Vec<Field> {
+    let mut fields = entry_fields(detail, pane, now);
     if let Some(totals) = &detail.totals {
         match totals {
             Ok(totals) => {
@@ -112,13 +112,40 @@ fn fields(detail: &Detail, pane: &Pane, theme: &Theme) -> Vec<Field> {
             {
                 field.value = Line::from(permission_spans(entry, pane.permissions, theme));
                 field.action = Some(Action::Permissions);
+            } else if time_label(label) {
+                field.action = Some(Action::FuzzyTimestamps);
             }
             field
         })
         .collect()
 }
 
-fn entry_fields(detail: &Detail, pane: &Pane) -> Vec<(&'static str, String)> {
+fn time_label(label: &str) -> bool {
+    matches!(
+        label,
+        "Modified" | "Modified UTC" | "Created" | "Created UTC" | "Accessed" | "Accessed UTC"
+    )
+}
+
+fn time_field(
+    label: &'static str,
+    time: Option<std::time::SystemTime>,
+    pane: &Pane,
+    now: std::time::SystemTime,
+) -> (&'static str, String) {
+    let label = if pane.fuzzy_timestamps {
+        label.split_once(' ').map_or(label, |(name, _)| name)
+    } else {
+        label
+    };
+    (label, listing_timestamp(time, pane.fuzzy_timestamps, now))
+}
+
+fn entry_fields(
+    detail: &Detail,
+    pane: &Pane,
+    now: std::time::SystemTime,
+) -> Vec<(&'static str, String)> {
     let Some(entry) = &detail.entry else {
         return vec![(
             "Status",
@@ -142,9 +169,9 @@ fn entry_fields(detail: &Detail, pane: &Pane) -> Vec<(&'static str, String)> {
         ),
         ("Type", format!("{:?}", entry.kind)),
         ("Size", size(entry.size)),
-        ("Modified UTC", timestamp(entry.modified)),
-        ("Created UTC", timestamp(entry.created)),
-        ("Accessed UTC", timestamp(entry.accessed)),
+        time_field("Modified UTC", entry.modified, pane, now),
+        time_field("Created UTC", entry.created, pane, now),
+        time_field("Accessed UTC", entry.accessed, pane, now),
         (
             "Attributes",
             crate::permissions::attributes(entry, pane.permissions),
@@ -202,7 +229,12 @@ fn label_width(fields: &[Field], width: u16) -> usize {
 }
 
 fn layout(app: &App, bounds: Rect, theme: &Theme, floating: bool) -> Layout {
-    let fields = fields(&app.details[app.active], &app.panes[app.active], theme);
+    let fields = fields(
+        &app.details[app.active],
+        &app.panes[app.active],
+        app.now,
+        theme,
+    );
     let width = if floating {
         bounds.width.saturating_sub(4).min(90)
     } else {

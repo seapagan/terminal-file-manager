@@ -352,7 +352,7 @@ pub(super) fn permission_spans(
         .collect()
 }
 
-fn listing_timestamp(
+pub(super) fn listing_timestamp(
     time: Option<std::time::SystemTime>,
     fuzzy: bool,
     now: std::time::SystemTime,
