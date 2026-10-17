@@ -13,6 +13,13 @@ Git-ignore reference code and associated native regression cases:
 `tests/crate/`. TFM adapts these areas for independent panes, asynchronous
 requests, native path identity and explicit errors when rule status is unknown.
 
+Size formatting is a direct port of `lsplus/src/utils/format.rs` at that
+revision (`SizeScale`, `human_readable_format`, `show_size` and rounding).
+`tests/sizes.rs` retains its seven size regressions from `tests/format.rs`.
+The numeric/unit columns adapt `src/utils/render.rs`'s separate right/left
+alignment; TFM caches escaped display widths when the working set changes.
+TFM uses binary units by default and supports exact bytes in configuration.
+
 [Labeldeck](https://github.com/seapagan/labeldeck/tree/8c0fdea354bf0b0bd8abafb293af78c34ac9fe1d),
 Copyright (c) Grant Ramsay, supplied terminal guards, colour mapping, semantic
 styling and the PTY/ConPTY session driver. The relevant sources include

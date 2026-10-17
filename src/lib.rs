@@ -9,6 +9,7 @@ pub mod fs;
 pub mod input;
 pub mod listing;
 pub mod settings;
+pub mod size;
 pub mod terminal;
 pub mod ui;
 pub mod workers;

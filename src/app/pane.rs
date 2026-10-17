@@ -49,6 +49,8 @@ pub struct Pane {
     pub sort: SortPolicy,
     pub show_hidden: bool,
     pub ignore: IgnoreMode,
+    pub human_sizes: bool,
+    pub measurements: crate::ui::Measurements,
     pub generation: u64,
     pub pending: Option<PathBuf>,
     pub error: Option<String>,
@@ -73,6 +75,8 @@ impl Pane {
             sort: SortPolicy::default(),
             show_hidden: false,
             ignore: IgnoreMode::Dim,
+            human_sizes: true,
+            measurements: crate::ui::Measurements::default(),
             generation: 1,
             pending: None,
             error: None,
@@ -149,6 +153,10 @@ impl Pane {
             .enumerate()
             .filter_map(|(i, e)| self.in_scope(e).then_some(i))
             .collect();
+        self.measurements = crate::ui::Measurements::collect(
+            self.visible.iter().map(|i| &self.entries[*i]),
+            self.human_sizes,
+        );
         if !self
             .visible
             .iter()

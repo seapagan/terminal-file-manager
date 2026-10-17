@@ -23,6 +23,7 @@ pub struct Settings {
     pub reverse: bool,
     pub hidden: bool,
     pub ignore: IgnoreMode,
+    pub human_sizes: bool,
     pub bindings: BTreeMap<String, Action>,
 }
 
@@ -37,6 +38,7 @@ impl Default for Settings {
             reverse: false,
             hidden: false,
             ignore: IgnoreMode::Dim,
+            human_sizes: true,
             bindings: BTreeMap::new(),
         }
     }
@@ -65,6 +67,7 @@ impl Settings {
             };
             pane.show_hidden = self.hidden;
             pane.ignore = self.ignore;
+            pane.human_sizes = self.human_sizes;
             pane.resort();
         }
     }

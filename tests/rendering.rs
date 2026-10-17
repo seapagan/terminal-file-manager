@@ -229,3 +229,93 @@ fn metadata_fields_have_separate_rows_and_share_the_cached_entry() {
     assert!(path > name);
     assert!(!rows.iter().any(|row| row.contains("\\n")));
 }
+
+#[test]
+fn compact_size_columns_align_values_and_units_without_a_fill_gap() {
+    let root = tempfile::tempdir().unwrap();
+    for (name, size) in [("one", 1), ("partial", 1536), ("promoted", 1_048_525)] {
+        let file = fs::File::create(root.path().join(name)).unwrap();
+        file.set_len(size).unwrap();
+    }
+    let mut app = App::new(root.path().to_path_buf());
+    app.complete_listing(
+        0,
+        1,
+        Ok(list(
+            root.path(),
+            &IgnoreContext::isolated(),
+            &AtomicBool::new(false),
+        )
+        .unwrap()),
+    );
+    let mut terminal = Terminal::new(TestBackend::new(180, 24)).unwrap();
+    terminal
+        .draw(|frame| {
+            ui::render(frame, &app, &Theme::new(ColorLevel::NoColor));
+        })
+        .unwrap();
+    let buffer = terminal.backend().buffer();
+    let row = |y: u16| {
+        (0..180)
+            .map(|x| buffer[(x, y)].symbol())
+            .collect::<String>()
+    };
+    let lines = [row(2), row(3), row(4)];
+    let first_unit = lines[0].find(" B").unwrap();
+    assert_eq!(lines[1].find(" K"), Some(first_unit));
+    assert_eq!(lines[2].find(" M"), Some(first_unit));
+    assert!(
+        first_unit < 35,
+        "size should follow the compact filename column"
+    );
+    assert!(lines[1][..first_unit].ends_with("1.5"));
+    assert!(lines[2][..first_unit].ends_with("  1"));
+}
+
+#[test]
+fn exact_sizes_remeasure_on_settings_and_filter_changes_with_unicode_names() {
+    let root = tempfile::tempdir().unwrap();
+    for name in ["界e\u{301}", "a much longer filename"] {
+        let file = fs::File::create(root.path().join(name)).unwrap();
+        file.set_len(1_048_525).unwrap();
+    }
+    let mut app = App::new(root.path().to_path_buf());
+    app.complete_listing(
+        0,
+        1,
+        Ok(list(
+            root.path(),
+            &IgnoreContext::isolated(),
+            &AtomicBool::new(false),
+        )
+        .unwrap()),
+    );
+    assert_eq!(app.panes[0].measurements.number, 4);
+    let settings = terminal_file_manager::settings::Settings::parse("human_sizes = false").unwrap();
+    settings.apply(&mut app);
+    assert_eq!(app.panes[0].measurements.number, 7);
+    app.panes[0].set_filter("界".into());
+    assert_eq!(app.panes[0].measurements.name, 4);
+    for width in [1, 7, 8, 25, 45, 47, 70, 90, 125, 180] {
+        let mut terminal = Terminal::new(TestBackend::new(width, 12)).unwrap();
+        terminal
+            .draw(|frame| {
+                ui::render(frame, &app, &Theme::new(ColorLevel::NoColor));
+            })
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        assert!(
+            buffer
+                .content()
+                .iter()
+                .all(|cell| !cell.symbol().contains('\u{1b}'))
+        );
+        if width >= 47 {
+            let row = (0..width)
+                .map(|x| buffer[(x, 2)].symbol())
+                .collect::<String>();
+            assert!(row.contains("1048525"));
+            assert!(!row.contains(" KiB"));
+        }
+    }
+}

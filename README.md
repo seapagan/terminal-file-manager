@@ -85,6 +85,7 @@ linked/nonregular config files are rejected.
 ```toml
 sidebar = true
 sidebar_left = false
+human_sizes = true # false shows exact bytes; human values use B/K/M/G/T/P
 mouse = true
 sort = "natural"
 grouping = "first"

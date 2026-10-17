@@ -6,7 +6,7 @@ use crate::{
 };
 use ratatui::{
     Frame,
-    layout::{Constraint, Rect},
+    layout::{Alignment, Constraint, Rect},
     widgets::{Block, Borders, Cell, Paragraph, Row, Table},
 };
 
@@ -102,7 +102,7 @@ fn render_status(frame: &mut Frame, pane: &Pane, inner: Rect, theme: &Theme) {
 fn render_rows(frame: &mut Frame, pane: &Pane, area: Rect, theme: &Theme, active: bool) {
     let height = usize::from(area.height.saturating_sub(1));
     let start = pane.viewport_start(height);
-    let (widths, headers) = columns(area.width);
+    let (widths, headers) = columns(pane, area.width);
     let rows = pane.visible.iter().skip(start).take(height).map(|i| {
         let entry = &pane.entries[*i];
         let cursor = pane.cursor.as_ref() == Some(&entry.path);
@@ -138,28 +138,47 @@ fn render_rows(frame: &mut Frame, pane: &Pane, area: Rect, theme: &Theme, active
     }
 }
 
-fn columns(width: u16) -> (Vec<Constraint>, Vec<&'static str>) {
+fn columns(pane: &Pane, width: u16) -> (Vec<Constraint>, Vec<Cell<'static>>) {
     if width < 8 {
-        return (vec![Constraint::Fill(1)], vec!["Name"]);
+        return (vec![Constraint::Length(width)], vec![Cell::from("Name")]);
     }
-    let mut widths = vec![
-        Constraint::Length(3),
-        Constraint::Length(1),
-        Constraint::Fill(1),
-    ];
-    let mut names = vec!["Mark", "T", "Name"];
+    let mut widths = vec![Constraint::Length(3), Constraint::Length(1)];
+    let mut headers = vec![Cell::from(""), Cell::from("T"), Cell::from("Name")];
+    let mut details = Vec::new();
+    if width >= 45 {
+        details.extend([
+            Constraint::Length(pane.measurements.number),
+            Constraint::Length(1),
+        ]);
+        headers.push(Cell::from(
+            ratatui::text::Line::from("Size").alignment(Alignment::Right),
+        ));
+        headers.push(Cell::from(""));
+    }
     for (minimum, length, name) in [
-        (45, 9, "Size"),
         (70, 16, "Modified UTC"),
         (90, 10, "Mode/attrs"),
-        (125, 18, "Owner"),
+        (125, pane.measurements.owner.min(24), "Owner"),
     ] {
         if width >= minimum {
-            widths.push(Constraint::Length(length));
-            names.push(name);
+            details.push(Constraint::Length(length));
+            headers.push(Cell::from(name));
         }
     }
-    (widths, names)
+    let reserved: u16 = details
+        .iter()
+        .map(|c| match c {
+            Constraint::Length(n) => *n,
+            _ => 0,
+        })
+        .sum();
+    let spacing = (headers.len() - 1) as u16;
+    let available = width.saturating_sub(4 + reserved + spacing);
+    widths.push(Constraint::Length(
+        pane.measurements.name.clamp(16, 64).min(available),
+    ));
+    widths.extend(details);
+    (widths, headers)
 }
 
 fn cells(entry: &Entry, pane: &Pane, width: u16) -> Vec<Cell<'static>> {
@@ -181,11 +200,11 @@ fn cells(entry: &Entry, pane: &Pane, width: u16) -> Vec<Cell<'static>> {
         Cell::from(name),
     ];
     if width >= 45 {
-        cells.push(Cell::from(if entry.enterable {
-            "—".into()
-        } else {
-            size(entry.size)
-        }));
+        let (number, unit) = super::measure::parts(entry, pane.human_sizes);
+        cells.push(Cell::from(
+            ratatui::text::Line::from(number).alignment(Alignment::Right),
+        ));
+        cells.push(Cell::from(unit));
     }
     if width >= 70 {
         cells.push(Cell::from(timestamp(entry.modified)));
@@ -237,21 +256,13 @@ fn role(entry: &Entry, ignore: IgnoreMode) -> Role {
 }
 
 pub(super) fn size(bytes: Option<u64>) -> String {
-    let Some(bytes) = bytes else {
-        return "unavailable".into();
-    };
-    let units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
-    let mut value = bytes as f64;
-    let mut unit = 0;
-    while value >= 1024.0 && unit < units.len() - 1 {
-        value /= 1024.0;
-        unit += 1;
-    }
-    if unit == 0 {
-        format!("{bytes} B")
-    } else {
-        format!("{value:.1} {}", units[unit])
-    }
+    bytes.map_or_else(
+        || "unavailable".into(),
+        |bytes| {
+            let (value, unit) = crate::size::show_size(bytes, Some(crate::size::SizeScale::Binary));
+            format!("{value} {unit}")
+        },
+    )
 }
 
 pub(super) fn timestamp(time: Option<std::time::SystemTime>) -> String {
