@@ -47,9 +47,8 @@ semantics changed. All dependency exceptions are exact and approved; see
 | Windows source/cross-build | Hidden attributes, junction/broken target/trailing separator, symlink/native-ID replacement, failed queries and lossless native UTF-16/drive/UNC normalization regressions compile under xwin; this is not native execution |
 | Hosted native acceptance | Existing Linux/macOS/Windows jobs run the real application tests and native PTY/ConPTY; results belong to the draft PR, not to configuration or cross-compilation claims |
 
-The [native Linux PTY recording](m1-browser.cast) shows the real executable
-listing an owned fixture, toggling dual panes, opening help and quitting.
-It is a fast scripted transcript in asciicast v2 format, with original timings.
+The native Linux PTY check exercised the real executable with an owned fixture:
+listing files, toggling dual panes, opening help and quitting.
 
 ### Local coverage and complexity baseline
 
