@@ -93,28 +93,29 @@ fn build(directory: &Path, context: &IgnoreContext) -> Result<Rules, String> {
         matchers.push(global);
     }
     if let Some(global) = &context.global_file {
-        matchers.push(matcher(&root, global)?);
+        matchers.push(matcher(&root, global, true)?);
     }
-    matchers.push(matcher(&root, &git.join("info/exclude"))?);
+    matchers.push(matcher(&root, &git.join("info/exclude"), true)?);
     let mut parents: Vec<_> = directory
         .ancestors()
         .take_while(|p| p.starts_with(&root))
         .collect();
     parents.reverse();
     for parent in parents {
-        matchers.push(matcher(parent, &parent.join(".gitignore"))?);
+        matchers.push(matcher(parent, &parent.join(".gitignore"), false)?);
     }
     Ok(Rules { root, matchers })
 }
 
-fn matcher(root: &Path, file: &Path) -> Result<Gitignore, String> {
+fn matcher(root: &Path, file: &Path, follow_symlinks: bool) -> Result<Gitignore, String> {
     let mut builder = GitignoreBuilder::new(root);
     match fs::symlink_metadata(file) {
-        Ok(_) => {
+        Ok(metadata) if follow_symlinks || !metadata.file_type().is_symlink() => {
             if let Some(error) = builder.add(file) {
                 return Err(error.to_string());
             }
         }
+        Ok(_) => {}
         Err(error) if error.kind() == io::ErrorKind::NotFound => {}
         Err(error) => return Err(error.to_string()),
     }

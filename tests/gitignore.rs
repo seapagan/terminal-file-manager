@@ -6,7 +6,10 @@ use std::{
     process::{Command, Stdio},
     sync::atomic::AtomicBool,
 };
-use terminal_file_manager::fs::{IgnoreContext, list};
+use terminal_file_manager::{
+    app::{App, IgnoreMode},
+    fs::{IgnoreContext, Snapshot, list},
+};
 
 struct Repository {
     temp: tempfile::TempDir,
@@ -102,6 +105,7 @@ impl Repository {
             "TFM: {relative:?}"
         );
         assert_eq!(entry.path, path);
+        assert_ignore_modes(snapshot, &path, oracle.unwrap_or(false));
     }
 }
 
@@ -257,5 +261,98 @@ fn raw_names_remain_distinct_when_matching_git_rules() {
         let name = PathBuf::from(OsString::from_vec(vec![b'n', byte, b'.', b'l', b'o', b'g']));
         fs::write(repo.path.join(&name), "fixture").unwrap();
         repo.compare(&repo.path, name, Some(true));
+    }
+}
+
+fn assert_ignore_modes(snapshot: Snapshot, path: &Path, ignored: bool) {
+    let mut app = App::new(snapshot.path.clone());
+    app.complete_listing(0, 1, Ok(snapshot));
+    let pane = &mut app.panes[0];
+    pane.show_hidden = true;
+    for (mode, visible) in [(IgnoreMode::Dim, true), (IgnoreMode::Hide, !ignored)] {
+        pane.ignore = mode;
+        pane.refilter();
+        assert_eq!(
+            pane.visible
+                .iter()
+                .any(|index| pane.entries[*index].path == path),
+            visible,
+            "{mode:?}: {path:?}"
+        );
+    }
+}
+
+#[cfg(unix)]
+fn symlink_file(target: &Path, link: &Path) {
+    std::os::unix::fs::symlink(target, link).unwrap();
+}
+
+#[cfg(windows)]
+fn symlink_file(target: &Path, link: &Path) {
+    std::os::windows::fs::symlink_file(target, link).unwrap();
+}
+
+#[test]
+fn symlinked_root_ignore_is_skipped_and_regular_replacement_is_reloaded() {
+    let repo = Repository::new();
+    let rules = repo.path.join("rules");
+    let ignore = repo.path.join(".gitignore");
+    fs::write(&rules, "victim\n").unwrap();
+    fs::write(repo.path.join("victim"), "fixture").unwrap();
+    symlink_file(Path::new("rules"), &ignore);
+    repo.compare(&repo.path, "victim", None);
+    fs::remove_file(&ignore).unwrap();
+    fs::write(&ignore, "victim\n").unwrap();
+    repo.compare(&repo.path, "victim", Some(true));
+    fs::remove_file(&ignore).unwrap();
+    symlink_file(Path::new("rules"), &ignore);
+    fs::remove_file(&rules).unwrap();
+    repo.compare(&repo.path, "victim", None);
+}
+
+#[test]
+fn nested_symlinked_ignore_cannot_override_parent_or_child_rules() {
+    let repo = Repository::new();
+    fs::create_dir_all(repo.path.join("nested/deep")).unwrap();
+    fs::write(repo.path.join(".gitignore"), "*.log\n").unwrap();
+    fs::write(repo.path.join("rules"), "!keep.log\nvictim\n{a,b\n").unwrap();
+    symlink_file(Path::new("../rules"), &repo.path.join("nested/.gitignore"));
+    fs::write(
+        repo.path.join("nested/deep/.gitignore"),
+        "!keep.log\nlocal\n",
+    )
+    .unwrap();
+    for (path, expected) in [
+        ("nested/keep.log", Some(true)),
+        ("nested/victim", None),
+        ("nested/deep/victim", None),
+        ("nested/deep/keep.log", Some(false)),
+        ("nested/deep/local", Some(true)),
+    ] {
+        fs::write(repo.path.join(path), "fixture").unwrap();
+        repo.compare(&repo.path, path, expected);
+    }
+}
+
+#[test]
+fn global_and_info_exclude_symlinks_keep_their_distinct_policy() {
+    let repo = Repository::new();
+    let global_rules = repo.temp.path().join("global-rules");
+    let info_rules = repo.temp.path().join("info-rules");
+    fs::write(&global_rules, "global-victim\nglobal-keep\n").unwrap();
+    fs::write(&info_rules, "info-victim\ninfo-keep\n").unwrap();
+    fs::remove_file(&repo.global).unwrap();
+    symlink_file(&global_rules, &repo.global);
+    fs::remove_file(repo.path.join(".git/info/exclude")).unwrap();
+    symlink_file(&info_rules, &repo.path.join(".git/info/exclude"));
+    fs::write(repo.path.join(".gitignore"), "!global-keep\n!info-keep\n").unwrap();
+    for (path, expected) in [
+        ("global-victim", Some(true)),
+        ("info-victim", Some(true)),
+        ("global-keep", Some(false)),
+        ("info-keep", Some(false)),
+    ] {
+        fs::write(repo.path.join(path), "fixture").unwrap();
+        repo.compare(&repo.path, path, expected);
     }
 }
