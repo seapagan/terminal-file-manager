@@ -6,6 +6,7 @@ pub mod app;
 pub mod browser;
 pub mod color;
 pub mod fs;
+pub mod fuzzy_time;
 pub mod input;
 pub mod listing;
 pub mod settings;

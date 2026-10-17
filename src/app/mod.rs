@@ -44,6 +44,7 @@ pub struct App {
     pub help: bool,
     pub overlay_scroll: u16,
     pub status: String,
+    pub now: std::time::SystemTime,
     pub details: [Detail; 2],
 }
 
@@ -60,6 +61,7 @@ impl App {
             help: false,
             overlay_scroll: 0,
             status: "Read-only — ? for help".into(),
+            now: std::time::SystemTime::now(),
             details: std::array::from_fn(|_| Detail::default()),
         }
     }

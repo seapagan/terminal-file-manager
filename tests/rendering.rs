@@ -319,3 +319,41 @@ fn exact_sizes_remeasure_on_settings_and_filter_changes_with_unicode_names() {
         }
     }
 }
+
+#[test]
+fn fuzzy_timestamp_setting_uses_one_fixed_frame_clock_and_preserves_exact_utc() {
+    use std::time::{Duration, UNIX_EPOCH};
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("entry"), "one").unwrap();
+    let mut app = App::new(root.path().to_path_buf());
+    app.complete_listing(
+        0,
+        1,
+        Ok(list(
+            root.path(),
+            &IgnoreContext::isolated(),
+            &AtomicBool::new(false),
+        )
+        .unwrap()),
+    );
+    app.now = UNIX_EPOCH + Duration::from_secs(1_000_000);
+    app.panes[0].entries[0].modified = app.now.checked_sub(Duration::from_secs(86_400));
+    for (config, expected) in [
+        ("fuzzy_timestamps = true", "yesterday"),
+        ("fuzzy_timestamps = false", "1970-01-11"),
+    ] {
+        terminal_file_manager::settings::Settings::parse(config)
+            .unwrap()
+            .apply(&mut app);
+        let mut terminal = Terminal::new(TestBackend::new(100, 12)).unwrap();
+        terminal
+            .draw(|frame| {
+                ui::render(frame, &app, &Theme::new(ColorLevel::NoColor));
+            })
+            .unwrap();
+        let row = (0..100)
+            .map(|x| terminal.backend().buffer()[(x, 2)].symbol())
+            .collect::<String>();
+        assert!(row.contains(expected), "{row}");
+    }
+}

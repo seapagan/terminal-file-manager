@@ -20,6 +20,16 @@ The numeric/unit columns adapt `src/utils/render.rs`'s separate right/left
 alignment; TFM caches escaped display widths when the working set changes.
 TFM uses binary units by default and supports exact bytes in configuration.
 
+Relative timestamps port the complete `src/utils/fuzzy_time.rs` algorithm and
+`src/utils/time.rs` constants from the same lsplus revision. All 16 original
+`tests/fuzzy_time.rs` cases are retained with an explicit fixed clock instead
+of wall-clock sampling. TFM supplies one frame clock and a once-per-second
+refresh; thresholds, subsecond truncation, past/future phrases and duration
+semantics are unchanged. Exact timestamps retain TFM's UTC precision/fallback.
+The original past-bucket function measured CCN 12 against TFM's limit 10;
+its unchanged day-and-older branches are extracted into one helper. Boundary
+regressions cover both sides of that split and all bucket transitions.
+
 [Labeldeck](https://github.com/seapagan/labeldeck/tree/8c0fdea354bf0b0bd8abafb293af78c34ac9fe1d),
 Copyright (c) Grant Ramsay, supplied terminal guards, colour mapping, semantic
 styling and the PTY/ConPTY session driver. The relevant sources include

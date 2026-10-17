@@ -67,6 +67,7 @@ fn drive(
     let mut dirty = true;
     let mut geometry = ui::geometry(&controller.app, terminal.size()?.into());
     while !controller.quit {
+        dirty |= tick(&mut controller.app);
         dirty |= collect(controller, pool);
         dirty |= schedule_metadata(controller, pool, &mut metadata);
         if dirty {
@@ -85,6 +86,16 @@ fn drive(
         }
     }
     Ok(())
+}
+
+fn tick(app: &mut App) -> bool {
+    let now = std::time::SystemTime::now();
+    let elapsed = now.duration_since(app.now).unwrap_or(Duration::MAX);
+    if elapsed < Duration::from_secs(1) {
+        return false;
+    }
+    app.now = now;
+    app.panes.iter().any(|pane| pane.fuzzy_timestamps)
 }
 
 fn collect(controller: &mut Controller, pool: &mut Pool) -> bool {

@@ -24,6 +24,7 @@ pub struct Settings {
     pub hidden: bool,
     pub ignore: IgnoreMode,
     pub human_sizes: bool,
+    pub fuzzy_timestamps: bool,
     pub bindings: BTreeMap<String, Action>,
 }
 
@@ -39,6 +40,7 @@ impl Default for Settings {
             hidden: false,
             ignore: IgnoreMode::Dim,
             human_sizes: true,
+            fuzzy_timestamps: false,
             bindings: BTreeMap::new(),
         }
     }
@@ -68,6 +70,7 @@ impl Settings {
             pane.show_hidden = self.hidden;
             pane.ignore = self.ignore;
             pane.human_sizes = self.human_sizes;
+            pane.fuzzy_timestamps = self.fuzzy_timestamps;
             pane.resort();
         }
     }

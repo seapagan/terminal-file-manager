@@ -43,7 +43,7 @@ pub(super) fn render(frame: &mut Frame, app: &App, id: usize, area: Rect, theme:
         inner.width,
         inner.height.saturating_sub(2),
     );
-    render_rows(frame, pane, rows_area, theme, id == app.active);
+    render_rows(frame, pane, rows_area, theme, id == app.active, app.now);
     render_summary(frame, pane, inner);
     render_status(frame, pane, inner, theme);
 }
@@ -99,7 +99,14 @@ fn render_status(frame: &mut Frame, pane: &Pane, inner: Rect, theme: &Theme) {
     );
 }
 
-fn render_rows(frame: &mut Frame, pane: &Pane, area: Rect, theme: &Theme, active: bool) {
+fn render_rows(
+    frame: &mut Frame,
+    pane: &Pane,
+    area: Rect,
+    theme: &Theme,
+    active: bool,
+    now: std::time::SystemTime,
+) {
     let height = usize::from(area.height.saturating_sub(1));
     let start = pane.viewport_start(height);
     let (widths, headers) = columns(pane, area.width);
@@ -113,7 +120,7 @@ fn render_rows(frame: &mut Frame, pane: &Pane, area: Rect, theme: &Theme, active
         } else {
             role(entry, pane.ignore)
         });
-        Row::new(cells(entry, pane, area.width)).style(style)
+        Row::new(cells(entry, pane, area.width, now)).style(style)
     });
     frame.render_widget(
         Table::new(rows, widths)
@@ -156,7 +163,15 @@ fn columns(pane: &Pane, width: u16) -> (Vec<Constraint>, Vec<Cell<'static>>) {
         headers.push(Cell::from(""));
     }
     for (minimum, length, name) in [
-        (70, 16, "Modified UTC"),
+        (
+            70,
+            16,
+            if pane.fuzzy_timestamps {
+                "Modified"
+            } else {
+                "Modified UTC"
+            },
+        ),
         (90, 10, "Mode/attrs"),
         (125, pane.measurements.owner.min(24), "Owner"),
     ] {
@@ -181,7 +196,7 @@ fn columns(pane: &Pane, width: u16) -> (Vec<Constraint>, Vec<Cell<'static>>) {
     (widths, headers)
 }
 
-fn cells(entry: &Entry, pane: &Pane, width: u16) -> Vec<Cell<'static>> {
+fn cells(entry: &Entry, pane: &Pane, width: u16, now: std::time::SystemTime) -> Vec<Cell<'static>> {
     let name = format!(
         "{}{}",
         if entry.hidden { "[h] " } else { "" },
@@ -207,7 +222,11 @@ fn cells(entry: &Entry, pane: &Pane, width: u16) -> Vec<Cell<'static>> {
         cells.push(Cell::from(unit));
     }
     if width >= 70 {
-        cells.push(Cell::from(timestamp(entry.modified)));
+        cells.push(Cell::from(listing_timestamp(
+            entry.modified,
+            pane.fuzzy_timestamps,
+            now,
+        )));
     }
     if width >= 90 {
         cells.push(Cell::from(entry.attributes.clone()));
@@ -218,6 +237,21 @@ fn cells(entry: &Entry, pane: &Pane, width: u16) -> Vec<Cell<'static>> {
         ));
     }
     cells
+}
+
+fn listing_timestamp(
+    time: Option<std::time::SystemTime>,
+    fuzzy: bool,
+    now: std::time::SystemTime,
+) -> String {
+    if fuzzy {
+        time.map_or_else(
+            || "unavailable".into(),
+            |time| crate::fuzzy_time::fuzzy_time(time, now),
+        )
+    } else {
+        timestamp(time)
+    }
 }
 
 fn indicator(entry: &Entry) -> &'static str {

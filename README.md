@@ -86,6 +86,7 @@ linked/nonregular config files are rejected.
 sidebar = true
 sidebar_left = false
 human_sizes = true # false shows exact bytes; human values use B/K/M/G/T/P
+fuzzy_timestamps = false # true uses relative phrases, including future times
 mouse = true
 sort = "natural"
 grouping = "first"
