@@ -368,4 +368,67 @@ mod tests {
         assert_eq!(wrap_value("", 1), [""]);
         assert_eq!(wrap_value("value", 0), [""]);
     }
+    fn metadata_text(app: &App, floating: bool) -> String {
+        use ratatui::{Terminal, backend::TestBackend};
+        let width = if floating { 180 } else { 48 };
+        let bounds = Rect::new(0, 0, width, 40);
+        let theme = Theme::new(ColorLevel::NoColor);
+        let area = layout(app, bounds, &theme, floating).area;
+        let mut terminal = Terminal::new(TestBackend::new(width, 40)).unwrap();
+        terminal
+            .draw(|frame| render(frame, app, bounds, &theme, floating))
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        // Rejoin wrapped metadata values without borders or continuation padding.
+        (area.y + 1..area.bottom() - 1)
+            .map(|y| {
+                (area.x + 1..area.right() - 1)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect::<String>()
+                    .trim()
+                    .to_owned()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn totals_views_distinguish_running_complete_incomplete_and_failed_results() {
+        for floating in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let mut app = App::new(root.path().into());
+            app.details[0].entry = Some(crate::fs::inspect(root.path()));
+            app.details[0].path = Some(root.path().into());
+            app.popup = floating;
+            app.sidebar = !floating;
+            app.details[0].counting = true;
+            assert!(metadata_text(&app, floating).contains("Calculating totals"));
+            app.details[0].counting = false;
+            app.details[0].totals = Some(Ok(crate::fs::Totals {
+                files: 1,
+                directories: 2,
+                bytes: 3,
+                errors: vec![],
+            }));
+            let complete = metadata_text(&app, floating);
+            assert!(complete.contains("1 files, 2 directories, 3 B"));
+            assert!(!complete.contains("INCOMPLETE") && !complete.contains("Calculating totals"));
+            app.details[0]
+                .totals
+                .as_mut()
+                .unwrap()
+                .as_mut()
+                .unwrap()
+                .errors
+                .push("unreadable descendant".into());
+            let incomplete = metadata_text(&app, floating);
+            assert!(incomplete.contains("1 files, 2 directories, 3 B"));
+            assert!(
+                incomplete.contains("INCOMPLETE") && incomplete.contains("unreadable descendant")
+            );
+            app.details[0].totals = Some(Err("root unavailable".into()));
+            let failed = metadata_text(&app, floating);
+            assert!(failed.contains("root unavailable"));
+            assert!(!failed.contains("Descendants") && !failed.contains("INCOMPLETE"));
+        }
+    }
 }

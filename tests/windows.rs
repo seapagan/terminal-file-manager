@@ -32,6 +32,7 @@ fn junctions_are_native_nonrecursive_and_preserve_trailing_paths() {
     let target = root.path().join("target");
     let junction = root.path().join("junction");
     fs::create_dir(&target).unwrap();
+    fs::write(target.join("payload"), b"1234").unwrap();
     let output = Command::new("cmd")
         .args(["/D", "/C", "mklink", "/J"])
         .arg(&junction)
@@ -64,11 +65,33 @@ fn junctions_are_native_nonrecursive_and_preserve_trailing_paths() {
         link.identity.as_ref().unwrap().object
     );
     assert!(local::totals(&junction, &AtomicBool::new(false)).is_err());
+    assert_totals(root.path(), (1, 1, 4), None);
+    fs::remove_file(target.join("payload")).unwrap();
     fs::remove_dir(&target).unwrap();
     let broken = local::inspect(&junction);
     assert_eq!(broken.kind, EntryKind::Junction);
     assert!(broken.error.is_some());
+    assert_totals(root.path(), (0, 0, 0), Some(&junction));
     fs::remove_dir(&junction).unwrap();
+}
+
+#[test]
+fn symlinks_are_classified_without_counting_their_targets() {
+    let root = tempfile::tempdir().unwrap();
+    let scan = root.path().join("scan");
+    let target = root.path().join("target");
+    fs::create_dir(&scan).unwrap();
+    fs::create_dir(&target).unwrap();
+    fs::write(scan.join("ordinary"), b"123").unwrap();
+    fs::write(target.join("excluded"), b"12345").unwrap();
+    let link = scan.join("link");
+    std::os::windows::fs::symlink_dir(&target, &link).unwrap();
+    let entry = local::inspect(&link);
+    assert_eq!(entry.kind, EntryKind::Link);
+    assert!(entry.enterable && !entry.may_recurse());
+    assert!(entry.link_target.is_some());
+    assert_totals(&scan, (1, 0, 3), None);
+    assert_eq!(fs::read(target.join("excluded")).unwrap(), b"12345");
 }
 
 fn assert_junction_rendering(snapshot: &local::Snapshot) {
@@ -116,5 +139,20 @@ fn unc_drive_and_extended_paths_survive_cli_parsing_without_network_access() {
             Invocation::Browse(native) => assert_eq!(native, std::path::PathBuf::from(path)),
             _ => panic!("path was not preserved"),
         }
+    }
+}
+
+fn assert_totals(
+    path: &std::path::Path,
+    expected: (u64, u64, u64),
+    error_path: Option<&std::path::Path>,
+) {
+    let totals = local::totals(path, &AtomicBool::new(false)).unwrap();
+    assert_eq!((totals.files, totals.directories, totals.bytes), expected);
+    if let Some(path) = error_path {
+        assert_eq!(totals.errors.len(), 1);
+        assert!(totals.errors[0].contains(&path.display().to_string()));
+    } else {
+        assert!(totals.errors.is_empty());
     }
 }
