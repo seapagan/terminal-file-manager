@@ -12,7 +12,7 @@ use crate::{
 use colored_text::{ColorizeConfig, RenderTarget};
 use std::{
     io::{self, IsTerminal},
-    path::{Path, PathBuf},
+    path::Path,
     time::{Duration, Instant},
 };
 
@@ -23,7 +23,7 @@ use std::{
 pub fn run(path: &Path) -> Result<(), String> {
     run_startup(&crate::startup::Startup {
         paths: vec![path.into()],
-        two_panes: false,
+        ..Default::default()
     })
 }
 
@@ -32,17 +32,23 @@ pub fn run(path: &Path) -> Result<(), String> {
 /// # Errors
 /// Reports either selected path's error before terminal setup; never substitutes a path.
 pub fn run_startup(options: &crate::startup::Startup) -> Result<(), String> {
-    let [left, right] = startup_locations(options)?;
     let mut store = crate::settings::config_path()
         .map(Store::load)
         .transpose()?;
     let settings = store
         .as_ref()
         .map_or_else(Settings::default, |store| store.settings.clone());
-    let mut app = App::new(left);
-    app.panes[1].path = right;
-    settings.apply(&mut app);
-    app.dual |= options.two_panes || options.paths.len() == 2;
+    let app = options.prepare(&settings)?;
+    if options.save_session {
+        return crate::startup::session_store()?.save(&app);
+    }
+    if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
+        return Err("interactive browsing requires a terminal on stdin and stdout".into());
+    }
+    browse(app, settings, &mut store)
+}
+
+fn browse(app: App, settings: Settings, store: &mut Option<Store>) -> Result<(), String> {
     let bindings = Bindings::new(&settings.bindings)?;
     let mut controller = Controller::new(app, bindings, settings.clone());
     let theme = Theme::new(ColorizeConfig::color_level(RenderTarget::Stdout));
@@ -59,6 +65,9 @@ pub fn run_startup(options: &crate::startup::Startup) -> Result<(), String> {
         drive(terminal, &mut controller, &mut pool, &theme)
     })
     .map_err(|e| e.to_string())?;
+    if controller.save_session {
+        crate::startup::session_store()?.save(&controller.app)?;
+    }
     if controller.preferences_changed {
         let Some(store) = store.as_mut() else {
             return Err("preferences changed but no user config directory is available".into());
@@ -67,19 +76,6 @@ pub fn run_startup(options: &crate::startup::Startup) -> Result<(), String> {
         store.save()?;
     }
     Ok(())
-}
-
-fn startup_locations(options: &crate::startup::Startup) -> Result<[PathBuf; 2], String> {
-    if options.paths.len() > 2 {
-        return Err("at most two directory paths are supported".into());
-    }
-    let [left, right] = options.locations();
-    let left = startup_path(&left)?;
-    let right = startup_path(&right)?;
-    if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
-        return Err("interactive browsing requires a terminal on stdin and stdout".into());
-    }
-    Ok([left, right])
 }
 
 fn drive(
@@ -179,12 +175,6 @@ fn schedule_metadata(
         }
     }
     changed
-}
-
-fn startup_path(path: &Path) -> Result<PathBuf, String> {
-    let path = std::path::absolute(path).map_err(|e| e.to_string())?;
-    std::fs::read_dir(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-    Ok(path)
 }
 
 #[cfg(test)]

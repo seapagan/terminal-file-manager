@@ -20,7 +20,7 @@ pub mod view;
 pub mod workers;
 
 /// Help for the implemented local browsing contract.
-pub const HELP: &str = "Usage: tfm [-2 | --two-panes] [DIRECTORY [OTHER_DIRECTORY]]\n       tfm [--help | --version]\n\nBrowse local files read-only. Starts in the shell's current directory,\nor the explicit DIRECTORY. Requires an interactive terminal.\nFiles are never launched; mutations, SSH and viewers are unavailable in M1.\n\nOptions:\n  -2, --two-panes  Start with two panes\n  -h, --help     Print help\n  -V, --version  Print version\n  -- DIRECTORY  Browse a directory whose name starts with a hyphen\n\nInside the browser: ? for shortcuts, q/F10 to quit.";
+pub const HELP: &str = "Usage: tfm [-2 | --two-panes] [DIRECTORY [OTHER_DIRECTORY]]\n       tfm [--help | --version]\n\nBrowse local files read-only. Starts in the shell's current directory,\nor the explicit DIRECTORY. Requires an interactive terminal.\nFiles are never launched; mutations, SSH and viewers are unavailable in M1.\n\nOptions:\n  --save-session     Save selected locations/layout and exit\n  --restore-session  Restore saved navigation (no explicit paths)\n  -2, --two-panes  Start with two panes\n  -h, --help     Print help\n  -V, --version  Print version\n  -- DIRECTORY  Browse a directory whose name starts with a hyphen\n\nInside the browser: ? for shortcuts, q/F10 to quit, Q to save session and quit.";
 
 /// Parsed startup intent, preserving native directory identity.
 #[derive(Debug)]
@@ -45,7 +45,7 @@ pub enum Invocation {
 /// ```
 pub fn run(arguments: &[OsString]) -> Result<Invocation, &'static str> {
     match arguments {
-        [] => Ok(Invocation::Browse(".".into())),
+        [] => Ok(Invocation::BrowseOptions(startup::Startup::default())),
         [argument] if argument == "--help" || argument == "-h" => {
             Ok(Invocation::Output(HELP.to_owned()))
         }

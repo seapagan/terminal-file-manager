@@ -26,6 +26,7 @@ pub enum MetadataPresentation {
 pub struct Settings {
     pub sidebar: bool,
     pub two_panes: bool,
+    pub restore_session: bool,
     pub split_percent: u16,
     pub sidebar_left: bool,
     pub mouse: bool,
@@ -48,6 +49,7 @@ impl Default for Settings {
         Self {
             sidebar: false,
             two_panes: false,
+            restore_session: false,
             split_percent: 50,
             sidebar_left: false,
             mouse: true,

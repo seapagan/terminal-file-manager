@@ -45,7 +45,8 @@ help/version also work in scripts. Errors return exit code 2.
 | V | View options: arrows, Space/Enter to change, Esc to close; mouse supported |
 | Alt+V | View profiles: Enter applies to active; Space selects explicit apply-to-both |
 | c; Esc | Count an ordinary directory's descendants; cancel count/close overlay |
-| ?; q/F10/Ctrl+C | Help; quit without changing the shell directory |
+| ?; q/F10/Ctrl+C | Help; quit without replacing the saved navigation session |
+| Q | Save current navigation session and quit |
 
 Mouse clicks focus a pane and position its cursor. Double-click enters a
 directory; files stay unopened. The wheel moves the pane under the pointer
@@ -77,13 +78,35 @@ report incomplete scans. They never recurse into links, junctions or other
 reparse points. Interactive navigation into supported directory links remains
 available; unsupported reparse objects stay visible with an explanation.
 
+## Navigation sessions
+
+`q`, F10 and Ctrl+C never replace a saved navigation session. `Q` saves the two
+current local pane locations, active pane, desired one/two-pane layout, split
+ratio and temporary maximise state, then quits. History, marks, selection,
+filters and view profiles are excluded. Saving happens after terminal restoration.
+
+Use `tfm --restore-session` to restore explicitly, or `restore_session = true`
+in preferences to restore only when no directory paths are supplied. Explicit
+paths always override configured restoration; combining paths with the explicit
+restore flag is rejected. `tfm --save-session [-2] [LEFT [RIGHT]]` validates and
+saves those startup locations/layout, then exits without opening a terminal.
+With no paths, it uses current startup locations (including opted-in restoration).
+`-2` overrides a restored single/maximised layout for that invocation.
+
+Sessions use `tfm/session.toml` beside config, with a strict version-1 schema.
+Native Unix bytes or Windows UTF-16 units retain non-Unicode paths; sessions
+are platform-specific. Writes use the same synced, atomic regular-file staging
+as preferences. No session file is created by ordinary browsing. Missing,
+deleted, unreadable or invalid saved locations fail visibly; there is no silent
+fallback to another directory. Correct the location or supply explicit paths.
+
 ## Preferences
 
 No config file is created just by browsing. Deliberate changes to sidebar,
 sorting, grouping, hidden or ignore preferences are saved atomically on normal
 exit. Each preference keeps its last explicit change from either pane; switching
 panes never replaces it. Pane policies remain independent during the session.
-Pane locations, marks, filters, history and startup layout are not saved.
+Marks, filters and history are not saved. Navigation sessions are separate and opt-in.
 
 The config is `tfm/config.toml` under `$XDG_CONFIG_HOME` (or `~/.config`) on
 Linux, `$XDG_CONFIG_HOME` (or `~/Library/Application Support`) on macOS, and
@@ -92,6 +115,7 @@ linked/nonregular config files are rejected.
 
 ```toml
 sidebar = true
+restore_session = false # opt-in navigation restore when no paths are supplied
 two_panes = false # -2/--two-panes overrides this for one invocation
 split_percent = 50 # 20–80; each visible pane retains at least 24 columns
 sidebar_left = false

@@ -14,6 +14,7 @@ use std::{path::PathBuf, time::Duration};
 pub struct Controller {
     pub app: App,
     pub quit: bool,
+    pub save_session: bool,
     pub preferences_changed: bool,
     pub preferences: Settings,
     bindings: Bindings,
@@ -31,6 +32,7 @@ impl Controller {
         Self {
             app,
             quit: false,
+            save_session: false,
             preferences_changed: false,
             preferences,
             bindings,
@@ -84,7 +86,7 @@ impl Controller {
         if self.app.help
             && !matches!(
                 action,
-                Up | Down | Home | End | PageUp | PageDown | Help | Cancel | Quit
+                Up | Down | Home | End | PageUp | PageDown | Help | Cancel | Quit | SaveQuit
             )
         {
             return Vec::new();
@@ -117,7 +119,7 @@ impl Controller {
             TogglePanes | Maximise | FocusPane | ToggleSidebar | Metadata | Help => {
                 self.layout(action, geometry)
             }
-            Quit => self.quit = true,
+            Quit | SaveQuit => self.exit(action),
             Filter => {
                 self.filter_before = Some(self.app.panes[self.app.active].filter.clone());
                 self.app.status = "Filter: type to narrow; Enter accepts, Esc restores".into();
@@ -127,6 +129,11 @@ impl Controller {
             _ => {}
         }
         Vec::new()
+    }
+
+    fn exit(&mut self, action: Action) {
+        self.save_session = action == Action::SaveQuit;
+        self.quit = true;
     }
 
     fn preferred_action(&self, action: Action) -> Action {

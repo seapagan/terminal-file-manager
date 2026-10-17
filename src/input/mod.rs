@@ -25,6 +25,7 @@ pub enum Action {
     Back,
     Forward,
     Quit,
+    SaveQuit,
     Help,
     TogglePanes,
     FocusPane,

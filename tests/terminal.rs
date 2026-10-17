@@ -142,3 +142,47 @@ fn isolate(command: &mut CommandBuilder, root: &std::path::Path) {
     command.env("NO_COLOR", "1");
     command.env("TERM", "xterm-256color");
 }
+
+#[test]
+fn save_quit_restores_both_navigated_locations_and_normal_quit_keeps_session() {
+    use terminal_file_manager::session::SessionStore;
+    let root = tempfile::tempdir().unwrap();
+    let left = root.path().join("left");
+    let right = root.path().join("right");
+    fs::create_dir_all(left.join("child")).unwrap();
+    fs::create_dir_all(&right).unwrap();
+    fs::write(left.join("child/left-session"), "one").unwrap();
+    fs::write(right.join("right-session"), "two").unwrap();
+    let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+    command.arg("-2");
+    command.arg(&left);
+    command.arg(&right);
+    command.cwd(root.path());
+    isolate(&mut command, root.path());
+    drive(
+        command,
+        &[("child", "\r"), ("left-session", "\t"), ("Pane 2", "Q")],
+        false,
+    );
+    let store = SessionStore {
+        path: root.path().join("config/tfm/session.toml"),
+    };
+    assert_eq!(
+        store.load().unwrap().locations().unwrap(),
+        [left.join("child"), right]
+    );
+    let saved = fs::read(&store.path).unwrap();
+    let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+    command.arg("--restore-session");
+    command.cwd(root.path());
+    isolate(&mut command, root.path());
+    let output = drive(command, &[("left-session", "\t"), ("Pane 1", "q")], false);
+    assert!(output.contains("right-session"));
+    assert_eq!(fs::read(&store.path).unwrap(), saved);
+    let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+    command.arg(root.path());
+    command.cwd(root.path());
+    isolate(&mut command, root.path());
+    drive(command, &[("left", "q")], false);
+    assert_eq!(fs::read(&store.path).unwrap(), saved);
+}

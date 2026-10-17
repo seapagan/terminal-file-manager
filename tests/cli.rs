@@ -150,3 +150,129 @@ fn noninteractive_startup_fails_clearly_without_creating_config() {
     );
     assert!(!config.exists());
 }
+
+fn isolated_session_command(root: &std::path::Path) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_tfm"));
+    command
+        .current_dir(root)
+        .env("HOME", root)
+        .env("USERPROFILE", root)
+        .env("XDG_CONFIG_HOME", root.join("config"))
+        .env("APPDATA", root.join("config"));
+    command
+}
+
+#[test]
+fn explicit_headless_session_save_and_restore_failures_preserve_intent() {
+    use terminal_file_manager::session::SessionStore;
+    let root = tempfile::tempdir().unwrap();
+    let directory = root.path().join("saved-location");
+    std::fs::create_dir(&directory).unwrap();
+    let output = isolated_session_command(root.path())
+        .arg("--save-session")
+        .arg("-2")
+        .arg(&directory)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{:?}", output.stderr);
+    let store = SessionStore {
+        path: root.path().join("config/tfm/session.toml"),
+    };
+    assert_eq!(
+        store.load().unwrap().locations().unwrap(),
+        [directory.clone(), directory.clone()]
+    );
+    let saved = std::fs::read(&store.path).unwrap();
+    std::fs::remove_dir(&directory).unwrap();
+    let output = isolated_session_command(root.path())
+        .arg("--restore-session")
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(
+        String::from_utf8(output.stderr)
+            .unwrap()
+            .contains("saved-location")
+    );
+    assert_eq!(std::fs::read(&store.path).unwrap(), saved);
+    assert_eq!(std::fs::read(&store.path).unwrap(), saved);
+}
+
+#[test]
+fn explicit_paths_bypass_configured_restore_and_conflicting_cli_restore_fails() {
+    use terminal_file_manager::session::SessionStore;
+    let root = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(root.path().join("config/tfm")).unwrap();
+    let store = SessionStore {
+        path: root.path().join("config/tfm/session.toml"),
+    };
+    std::fs::write(
+        root.path().join("config/tfm/config.toml"),
+        "restore_session=true",
+    )
+    .unwrap();
+    let output = isolated_session_command(root.path())
+        .arg("explicit-missing")
+        .output()
+        .unwrap();
+    assert!(
+        String::from_utf8(output.stderr)
+            .unwrap()
+            .contains("explicit-missing")
+    );
+    let output = isolated_session_command(root.path())
+        .arg("--save-session")
+        .arg(root.path())
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_eq!(
+        store.load().unwrap().locations().unwrap(),
+        [root.path().to_owned(), root.path().to_owned()]
+    );
+    let output = isolated_session_command(root.path())
+        .args(["--restore-session", "."])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(
+        String::from_utf8(output.stderr)
+            .unwrap()
+            .contains("cannot be combined")
+    );
+}
+
+#[test]
+fn configured_restore_uses_saved_locations_instead_of_cwd() {
+    use terminal_file_manager::session::SessionStore;
+    let root = tempfile::tempdir().unwrap();
+    let directory = root.path().join("remembered");
+    std::fs::create_dir(&directory).unwrap();
+    assert!(
+        isolated_session_command(root.path())
+            .arg("--save-session")
+            .arg(&directory)
+            .status()
+            .unwrap()
+            .success()
+    );
+    std::fs::write(
+        root.path().join("config/tfm/config.toml"),
+        "restore_session=true",
+    )
+    .unwrap();
+    assert!(
+        isolated_session_command(root.path())
+            .arg("--save-session")
+            .status()
+            .unwrap()
+            .success()
+    );
+    let store = SessionStore {
+        path: root.path().join("config/tfm/session.toml"),
+    };
+    assert_eq!(
+        store.load().unwrap().locations().unwrap(),
+        [directory.clone(), directory]
+    );
+}

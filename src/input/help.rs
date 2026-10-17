@@ -54,6 +54,7 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
     (Parent, "Parent directory"),
     (Back, "Back in pane history"),
     (Forward, "Forward in pane history"),
+    (SaveQuit, "Save navigation session and quit"),
     (Quit, "Quit without saving a navigation session"),
     (Help, "Toggle help"),
     (TogglePanes, "Toggle one/two panes"),

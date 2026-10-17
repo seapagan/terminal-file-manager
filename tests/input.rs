@@ -178,7 +178,7 @@ fn help_scrolling_reaches_last_action_without_changing_pane_policy() {
                 .iter()
                 .map(|cell| cell.symbol())
                 .collect::<String>();
-            assert!(text.contains("shell handoff"));
+            assert!(text.contains(&controller.app.help_rows.last().unwrap().1));
         }
     }
     key(&mut controller, "Esc");

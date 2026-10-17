@@ -167,5 +167,5 @@ const DEFAULT_BINDINGS: &[(&str, Action)] = &[
     ("Ctrl+l", Path),
     ("z", Zoxide),
     ("Z", OppositeZoxide),
-    ("Q", ExitDirectory),
+    ("Q", SaveQuit),
 ];
