@@ -26,6 +26,7 @@ impl Controller {
     pub fn new(mut app: App, bindings: Bindings, preferences: Settings) -> Self {
         app.help_rows = bindings.help_rows();
         app.metadata_presentation = preferences.metadata_presentation;
+        app.profile_names = preferences.profiles.keys().cloned().collect();
         Self {
             app,
             quit: false,
@@ -47,6 +48,10 @@ impl Controller {
                 }
                 if self.filter_before.is_some() {
                     self.filter_key(key);
+                    return Vec::new();
+                }
+                if self.app.profile_menu.is_some() {
+                    super::profiles::key(self, key);
                     return Vec::new();
                 }
                 if self.app.view_menu.is_some() {
@@ -83,6 +88,7 @@ impl Controller {
             return Vec::new();
         }
         match action {
+            ViewProfiles => super::profiles::open(self),
             ViewOptions => {
                 self.app.view_menu = if self.app.view_menu.is_some() {
                     None
@@ -222,6 +228,7 @@ impl Controller {
             }
             _ => {}
         }
+        pane.profile_modified = pane.profile.is_some();
         pane.resort();
         self.preferences.capture(&self.app, action);
         self.preferences_changed = true;
@@ -231,10 +238,14 @@ impl Controller {
         match action {
             Action::TogglePanes => self.app.dual = !self.app.dual,
             Action::FocusPane if geometry.panes.iter().all(Option::is_some) => {
-                self.app.active = 1 - self.app.active
+                self.app.active = 1 - self.app.active;
+                self.app.sidebar = self.app.panes[self.app.active].sidebar;
             }
             Action::ToggleSidebar => {
                 self.app.sidebar = !self.app.sidebar;
+                let pane = &mut self.app.panes[self.app.active];
+                pane.sidebar = self.app.sidebar;
+                pane.profile_modified = pane.profile.is_some();
                 self.preferences.capture(&self.app, action);
                 self.preferences_changed = true;
             }
@@ -315,6 +326,12 @@ impl Controller {
     }
 
     fn mouse(&mut self, event: MouseEvent, geometry: &Geometry, now: Duration) -> Vec<Request> {
+        if self.app.profile_menu.is_some() {
+            if let Some(area) = geometry.menu {
+                super::profiles::mouse(self, event, area);
+            }
+            return Vec::new();
+        }
         if self.app.view_menu.is_some() {
             super::view::mouse(self, event, geometry);
             return Vec::new();
@@ -362,6 +379,7 @@ impl Controller {
 
     fn click(&mut self, id: usize, row: u16, geometry: &Geometry, now: Duration) -> Vec<Request> {
         self.app.active = id;
+        self.app.sidebar = self.app.panes[id].sidebar;
         let area = geometry.panes[id].expect("hit pane");
         if row < area.y + 2 || row >= area.bottom().saturating_sub(3) {
             return Vec::new();

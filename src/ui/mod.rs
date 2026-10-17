@@ -4,6 +4,7 @@ mod layout;
 mod listing;
 mod measure;
 mod metadata;
+mod profiles;
 mod text;
 mod view;
 use crate::{
@@ -54,7 +55,11 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
         help::render(frame, app, theme);
     }
     if let Some(area) = geometry.menu {
-        view::render(frame, app, area, theme);
+        if app.view_menu.is_some() {
+            view::render(frame, app, area, theme);
+        } else {
+            profiles::render(frame, app, area, theme);
+        }
     }
     geometry
 }

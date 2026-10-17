@@ -78,7 +78,8 @@ fn render_status(frame: &mut Frame, pane: &Pane, inner: Rect, theme: &Theme) {
         .as_deref()
         .or_else(|| pane.warnings.first().map(String::as_str));
     let policy = format!(
-        "/{}/ {:?}{} {:?} hidden:{} ignore:{:?}",
+        "{} | /{}/ {:?}{} {:?} hidden:{} ignore:{:?}",
+        clean(&pane.profile_label()),
         clean(&pane.filter),
         pane.sort.sort,
         if pane.sort.reverse { " reverse" } else { "" },

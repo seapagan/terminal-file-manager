@@ -18,7 +18,7 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
     let mut geometry = Geometry {
         panes: [None, None],
         sidebar: None,
-        menu: app.view_menu.map(|_| super::view::area(area)),
+        menu: menu_area(app, area),
         status: Rect::new(
             area.x,
             area.y + height,
@@ -61,4 +61,14 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
         geometry.panes[app.active] = Some(body);
     }
     geometry
+}
+
+fn menu_area(app: &App, area: Rect) -> Option<Rect> {
+    if app.view_menu.is_some() {
+        Some(super::view::area(area, crate::input::view::OPTIONS.len()))
+    } else if app.profile_menu.is_some() {
+        Some(super::view::area(area, app.profile_names.len() + 2))
+    } else {
+        None
+    }
 }

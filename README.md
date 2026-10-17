@@ -38,6 +38,7 @@ help/version also work in scripts. Errors return exit code 2.
 | Alt+I; Alt+Enter | Toggle metadata sidebar; open full metadata |
 | F2 | Toggle preferred metadata presentation |
 | V | View options: arrows, Space/Enter to change, Esc to close; mouse supported |
+| Alt+V | View profiles: Enter applies to active; Space selects explicit apply-to-both |
 | c; Esc | Count an ordinary directory's descendants; cancel count/close overlay |
 | ?; q/F10/Ctrl+C | Help; quit without changing the shell directory |
 
@@ -106,6 +107,15 @@ owner = true
 "F12" = "toggle-panes"
 "Ctrl+f" = "filter"
 ```
+
+View profiles contain formatting, columns, sorting, visibility and an optional
+sidebar preference. Compact, Detailed and Minimal are built in. Alt+V also
+offers **Save active as…**: enter a name and press Enter to save explicitly.
+Changes show **Modified: name** until saved; they never change a saved profile
+implicitly. Profiles contain no directories, marks, cursor, filter or history.
+User profiles use `[profiles.NAME]` and optional `[profiles.NAME.columns]` TOML
+tables with the view fields above. Sidebar preference follows the active pane;
+ordinary pane focus changes never choose restart defaults.
 
 Other preference fields are `reverse` and `hidden` (booleans). Grouping is
 `first`, `last` or `mixed`; ignore is `dim`, `hide` or `off`. Sort values are

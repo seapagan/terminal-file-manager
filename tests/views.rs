@@ -41,6 +41,95 @@ fn view_menu_changes_active_formatting_and_preserves_last_explicit_defaults() {
 }
 
 #[test]
+fn profiles_apply_only_view_settings_and_edits_do_not_mutate_saved_profiles() {
+    let root = tempfile::tempdir().unwrap();
+    let settings = Settings::default();
+    let saved = settings.profiles["Detailed"].clone();
+    let mut controller = Controller::new(
+        App::new(root.path().into()),
+        Bindings::new(&Default::default()).unwrap(),
+        settings,
+    );
+    key(&mut controller, "Alt+v");
+    key(&mut controller, "Down");
+    key(&mut controller, "Enter");
+    assert_eq!(controller.app.panes[0].profile.as_deref(), Some("Detailed"));
+    assert!(controller.app.panes[0].fuzzy_timestamps);
+    assert!(!controller.app.panes[1].fuzzy_timestamps);
+    assert_eq!(controller.app.panes[0].path, root.path());
+    key(&mut controller, "h");
+    assert!(controller.app.panes[0].profile_modified);
+    assert_eq!(controller.preferences.profiles["Detailed"], saved);
+    assert_eq!(
+        controller.app.panes[0].profile_label(),
+        "Modified: Detailed"
+    );
+}
+
+#[test]
+fn profiles_save_explicitly_round_trip_and_apply_to_both_without_locations() {
+    let root = tempfile::tempdir().unwrap();
+    let opposite = root.path().join("other");
+    std::fs::create_dir(&opposite).unwrap();
+    let mut controller = Controller::new(
+        App::new(root.path().into()),
+        Bindings::new(&Default::default()).unwrap(),
+        Settings::default(),
+    );
+    controller.app.panes[1].path = opposite.clone();
+    key(&mut controller, "h");
+    key(&mut controller, "Alt+v");
+    key(&mut controller, "End");
+    key(&mut controller, "Enter");
+    for letter in ["W", "o", "r", "k"] {
+        key(&mut controller, letter);
+    }
+    key(&mut controller, "Enter");
+    assert!(controller.preferences.profiles["Work"].hidden);
+    let store = terminal_file_manager::settings::Store {
+        path: root.path().join("config.toml"),
+        settings: controller.preferences.clone(),
+    };
+    store.save().unwrap();
+    assert_eq!(
+        terminal_file_manager::settings::Store::load(store.path)
+            .unwrap()
+            .settings
+            .profiles["Work"],
+        controller.preferences.profiles["Work"]
+    );
+    key(&mut controller, "Alt+v");
+    key(&mut controller, "Down");
+    key(&mut controller, "Space");
+    key(&mut controller, "Enter");
+    assert_eq!(controller.app.panes[0].path, root.path());
+    assert_eq!(controller.app.panes[1].path, opposite);
+    for pane in &controller.app.panes {
+        assert_eq!(pane.profile.as_deref(), Some("Detailed"));
+        assert!(pane.fuzzy_timestamps);
+        assert!(!pane.profile_modified);
+    }
+}
+
+#[test]
+fn profiles_reject_navigation_fields_and_invalid_names() {
+    for text in [
+        "[profiles.Work]\npath='/tmp'",
+        "[profiles.Work]\ncursor=4",
+        "[profiles.' ']\nhuman_sizes=false",
+    ] {
+        assert!(Settings::parse(text).is_err());
+    }
+    let settings =
+        Settings::parse("[profiles.Work]\nhuman_sizes=false\n[profiles.Work.columns]\nowner=false")
+            .unwrap();
+    assert!(!settings.profiles["Work"].human_sizes);
+    assert!(settings.profiles.contains_key("Compact"));
+    assert!(settings.profiles.contains_key("Detailed"));
+    assert!(settings.profiles.contains_key("Minimal"));
+}
+
+#[test]
 fn view_menu_mouse_uses_drawn_geometry_and_column_settings_round_trip() {
     use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
     let mut controller = Controller::new(

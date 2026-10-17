@@ -84,7 +84,7 @@ impl ViewSettings {
             reverse: pane.sort.reverse,
             hidden: pane.show_hidden,
             ignore: pane.ignore,
-            sidebar: None,
+            sidebar: Some(pane.sidebar),
         }
     }
 
@@ -101,6 +101,44 @@ impl ViewSettings {
         };
         pane.show_hidden = self.hidden;
         pane.ignore = self.ignore;
+        if let Some(sidebar) = self.sidebar {
+            pane.sidebar = sidebar;
+        }
         pane.resort();
     }
+}
+
+/// Built-in views; saving explicitly can replace any named profile.
+pub fn profiles() -> std::collections::BTreeMap<String, ViewSettings> {
+    let compact = ViewSettings {
+        fuzzy_timestamps: true,
+        columns: Columns {
+            size: true,
+            modified: false,
+            attributes: false,
+            owner: false,
+        },
+        ..Default::default()
+    };
+    let detailed = ViewSettings {
+        fuzzy_timestamps: true,
+        sidebar: Some(true),
+        ..Default::default()
+    };
+    let minimal = ViewSettings {
+        columns: Columns {
+            size: false,
+            modified: false,
+            attributes: false,
+            owner: false,
+        },
+        sidebar: Some(false),
+        ..Default::default()
+    };
+    [
+        ("Compact".into(), compact),
+        ("Detailed".into(), detailed),
+        ("Minimal".into(), minimal),
+    ]
+    .into()
 }

@@ -84,6 +84,9 @@ pub(super) fn formatting(controller: &mut Controller, action: Action) {
         }
         _ => {}
     }
+    if action != Action::MetadataPresentation {
+        pane.profile_modified = pane.profile.is_some();
+    }
     pane.refilter();
     controller.app.metadata_presentation = controller.preferences.metadata_presentation;
     controller.preferences.capture(&controller.app, action);

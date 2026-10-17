@@ -43,6 +43,10 @@ pub struct App {
     pub popup: bool,
     pub help: bool,
     pub view_menu: Option<usize>,
+    pub profile_menu: Option<usize>,
+    pub profile_choice: usize,
+    pub profile_name: Option<String>,
+    pub profile_names: Vec<String>,
     pub metadata_presentation: crate::settings::MetadataPresentation,
     pub help_rows: Vec<(String, String)>,
     pub overlay_scroll: u16,
@@ -64,6 +68,10 @@ impl App {
             popup: false,
             help: false,
             view_menu: None,
+            profile_menu: None,
+            profile_choice: 0,
+            profile_name: None,
+            profile_names: Vec::new(),
             metadata_presentation: crate::settings::MetadataPresentation::default(),
             help_rows: crate::input::Bindings::new(&Default::default())
                 .expect("default bindings")

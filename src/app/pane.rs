@@ -53,6 +53,9 @@ pub struct Pane {
     pub fuzzy_timestamps: bool,
     pub permissions: crate::permissions::PermissionDisplay,
     pub columns: crate::view::Columns,
+    pub sidebar: bool,
+    pub profile: Option<String>,
+    pub profile_modified: bool,
     pub measurements: crate::ui::Measurements,
     pub generation: u64,
     pub pending: Option<PathBuf>,
@@ -66,6 +69,15 @@ pub struct Pane {
 }
 
 impl Pane {
+    /// Profile identity remains separate from navigation and saved profile bytes.
+    pub fn profile_label(&self) -> String {
+        match (&self.profile, self.profile_modified) {
+            (Some(name), true) => format!("Modified: {name}"),
+            (Some(name), false) => name.clone(),
+            _ => "Custom".into(),
+        }
+    }
+
     pub(super) fn new(path: PathBuf) -> Self {
         Self {
             path,
@@ -82,6 +94,9 @@ impl Pane {
             fuzzy_timestamps: false,
             permissions: crate::permissions::PermissionDisplay::default(),
             columns: crate::view::Columns::default(),
+            sidebar: false,
+            profile: None,
+            profile_modified: false,
             measurements: crate::ui::Measurements::default(),
             generation: 1,
             pending: None,

@@ -36,6 +36,7 @@ pub struct Settings {
     pub fuzzy_timestamps: bool,
     pub permissions: crate::permissions::PermissionDisplay,
     pub columns: crate::view::Columns,
+    pub profiles: BTreeMap<String, crate::view::ViewSettings>,
     pub metadata_presentation: MetadataPresentation,
     pub bindings: BTreeMap<String, Action>,
 }
@@ -55,6 +56,7 @@ impl Default for Settings {
             fuzzy_timestamps: false,
             permissions: crate::permissions::PermissionDisplay::default(),
             columns: crate::view::Columns::default(),
+            profiles: crate::view::profiles(),
             metadata_presentation: MetadataPresentation::default(),
             bindings: BTreeMap::new(),
         }
@@ -62,12 +64,34 @@ impl Default for Settings {
 }
 
 impl Settings {
+    /// Explicit profile application updates restart defaults without mutating its source.
+    pub fn capture_view(&mut self, view: &crate::view::ViewSettings) {
+        self.human_sizes = view.human_sizes;
+        self.fuzzy_timestamps = view.fuzzy_timestamps;
+        self.permissions = view.permissions;
+        self.columns = view.columns.clone();
+        self.sort = view.sort;
+        self.grouping = view.grouping;
+        self.reverse = view.reverse;
+        self.hidden = view.hidden;
+        self.ignore = view.ignore;
+        if let Some(sidebar) = view.sidebar {
+            self.sidebar = sidebar;
+        }
+    }
+
     /// Parse strict settings and detect malformed/conflicting keybindings.
     ///
     /// # Errors
     /// Returns the TOML or normalized-key diagnostic without resetting preferences.
     pub fn parse(text: &str) -> Result<Self, String> {
-        let settings: Self = toml::from_str(text).map_err(|e| e.to_string())?;
+        let mut settings: Self = toml::from_str(text).map_err(|e| e.to_string())?;
+        for name in settings.profiles.keys() {
+            validate_profile_name(name)?;
+        }
+        for (name, view) in crate::view::profiles() {
+            settings.profiles.entry(name).or_insert(view);
+        }
         Bindings::new(&settings.bindings)?;
         Ok(settings)
     }
@@ -78,6 +102,7 @@ impl Settings {
         app.sidebar_left = self.sidebar_left;
         app.metadata_presentation = self.metadata_presentation;
         for pane in &mut app.panes {
+            pane.sidebar = self.sidebar;
             pane.sort = SortPolicy {
                 sort: self.sort,
                 grouping: self.grouping,
@@ -195,4 +220,20 @@ fn default_unix_config() -> Option<PathBuf> {
     return Some(home.join("Library/Application Support"));
     #[cfg(not(target_os = "macos"))]
     Some(home.join(".config"))
+}
+
+/// Profile names are bounded, printable TOML keys, not paths.
+///
+/// # Errors
+/// Rejects empty, padded, overlong or control/bidi-containing names.
+pub fn validate_profile_name(name: &str) -> Result<(), String> {
+    if name.trim().is_empty()
+        || name.trim() != name
+        || name.chars().count() > 64
+        || crate::ui::clean(name) != name
+    {
+        Err("profile name must be 1–64 printable characters without surrounding whitespace".into())
+    } else {
+        Ok(())
+    }
 }

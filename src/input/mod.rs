@@ -2,6 +2,7 @@
 mod bindings;
 mod controller;
 mod help;
+mod profiles;
 pub(crate) mod view;
 pub use bindings::{Bindings, chord};
 pub use controller::Controller;
@@ -30,6 +31,7 @@ pub enum Action {
     Metadata,
     Info,
     ViewOptions,
+    ViewProfiles,
     HumanSizes,
     FuzzyTimestamps,
     Permissions,

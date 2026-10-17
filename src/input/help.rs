@@ -32,6 +32,7 @@ pub(super) fn description(action: Action) -> &'static str {
 use Action::*;
 const DESCRIPTIONS: &[(Action, &str)] = &[
     (ViewOptions, "View options"),
+    (ViewProfiles, "Select or save a named view profile"),
     (HumanSizes, "Toggle human sizes"),
     (FuzzyTimestamps, "Toggle fuzzy timestamps"),
     (Permissions, "Cycle permission display"),
