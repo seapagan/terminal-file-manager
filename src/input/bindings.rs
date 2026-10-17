@@ -53,14 +53,14 @@ impl Bindings {
                 .get(&(KeyCode::Tab, event.modifiers | KeyModifiers::SHIFT))
                 .copied();
         }
-        if let Some(action) = self.keys.get(&(event.code, event.modifiers)) {
+        let (code, mut modifiers) = normalize_chord(event.code, event.modifiers);
+        if let Some(action) = self.keys.get(&(code, modifiers)) {
             return Some(*action);
         }
-        let mut modifiers = event.modifiers;
-        if matches!(event.code, KeyCode::Char(_)) {
+        if matches!(code, KeyCode::Char(_)) {
             modifiers.remove(KeyModifiers::SHIFT);
         }
-        self.keys.get(&(event.code, modifiers)).copied()
+        self.keys.get(&(code, modifiers)).copied()
     }
 }
 
@@ -87,7 +87,19 @@ pub fn chord(text: &str) -> Result<(KeyCode, KeyModifiers), String> {
             chars.next().is_none().then_some(KeyCode::Char(c))
         })
         .ok_or_else(|| format!("unknown keybinding: {text}"))?;
-    Ok((code, modifiers))
+    Ok(normalize_chord(code, modifiers))
+}
+
+fn normalize_chord(code: KeyCode, mut modifiers: KeyModifiers) -> (KeyCode, KeyModifiers) {
+    if let KeyCode::Char(c) = code
+        && c.is_ascii_alphabetic()
+        && modifiers.contains(KeyModifiers::SHIFT)
+    {
+        // Uppercase characters also arrive without SHIFT on legacy terminals.
+        modifiers.remove(KeyModifiers::SHIFT);
+        return (KeyCode::Char(c.to_ascii_uppercase()), modifiers);
+    }
+    (code, modifiers)
 }
 
 fn named_key(key: &str) -> Option<KeyCode> {
