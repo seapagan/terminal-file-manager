@@ -62,6 +62,39 @@ fn preference_change_survives_exit_from_other_pane_and_real_restart() {
 }
 
 #[test]
+fn two_explicit_locations_and_configured_dual_startup_run_in_a_real_terminal() {
+    let root = tempfile::tempdir().unwrap();
+    let left = root.path().join("left");
+    let right = root.path().join("right");
+    fs::create_dir(&left).unwrap();
+    fs::create_dir(&right).unwrap();
+    fs::write(left.join("left-startup"), "one").unwrap();
+    fs::write(right.join("right-startup"), "two").unwrap();
+    let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+    command.arg("-2");
+    command.arg(&left);
+    command.arg(&right);
+    command.cwd(root.path());
+    isolate(&mut command, root.path());
+    let output = drive(
+        command,
+        &[("left-startup", "\t"), ("right-startup", "q")],
+        false,
+    );
+    assert!(output.contains("left-startup"));
+    assert_eq!(fs::read(right.join("right-startup")).unwrap(), b"two");
+    let config = root.path().join("config/tfm/config.toml");
+    fs::create_dir_all(config.parent().unwrap()).unwrap();
+    fs::write(&config, "two_panes=true\nmouse=false").unwrap();
+    let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+    command.arg(&left);
+    command.cwd(root.path());
+    isolate(&mut command, root.path());
+    let output = drive(command, &[("left-startup", "\t"), ("Pane 2", "q")], false);
+    assert!(output.contains("left"));
+}
+
+#[test]
 fn terminal_restores_after_returned_error_and_unwind() {
     let root = tempfile::tempdir().unwrap();
     for mode in ["error", "panic"] {

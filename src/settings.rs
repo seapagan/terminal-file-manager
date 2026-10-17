@@ -1,4 +1,4 @@
-//! Optional TOML preferences; no session location/layout persistence and no eager writes.
+//! Optional TOML preferences; no eager writes or navigation persistence.
 use crate::{
     app::{App, IgnoreMode},
     input::{Action, Bindings},
@@ -25,6 +25,7 @@ pub enum MetadataPresentation {
 #[serde(default, deny_unknown_fields)]
 pub struct Settings {
     pub sidebar: bool,
+    pub two_panes: bool,
     pub sidebar_left: bool,
     pub mouse: bool,
     pub sort: Sort,
@@ -45,6 +46,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             sidebar: false,
+            two_panes: false,
             sidebar_left: false,
             mouse: true,
             sort: Sort::Natural,
@@ -96,9 +98,10 @@ impl Settings {
         Ok(settings)
     }
 
-    /// Apply only preferences; startup location and single-pane mode remain authoritative.
+    /// Apply startup/view preferences without replacing native locations.
     pub fn apply(&self, app: &mut App) {
         app.sidebar = self.sidebar;
+        app.dual = self.two_panes;
         app.sidebar_left = self.sidebar_left;
         app.metadata_presentation = self.metadata_presentation;
         for pane in &mut app.panes {

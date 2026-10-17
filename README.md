@@ -16,8 +16,11 @@ cargo run --locked -- --version
 ```
 
 The package is `terminal-file-manager`; the command is `tfm`. Each invocation
-starts in a single pane at the shell's current directory, or the supplied
-native directory path. Use `tfm -- -directory` for names starting with a hyphen.
+starts at the shell's current directory, or the supplied native directory paths.
+`tfm -2` / `--two-panes` requests two panes; `two_panes = true` configures that
+startup default. Two path arguments also start dual-pane mode. One explicit
+path initializes both panes. Use `tfm -- -left -right` for leading-hyphen paths.
+Alt+P changes the current layout without changing the configured startup default.
 An explicit invalid/unreadable directory reports an error without falling back
 to another location. Browsing requires a terminal on stdin and stdout;
 help/version also work in scripts. Errors return exit code 2.
@@ -87,6 +90,7 @@ linked/nonregular config files are rejected.
 
 ```toml
 sidebar = true
+two_panes = false # -2/--two-panes overrides this for one invocation
 sidebar_left = false
 human_sizes = true # false shows exact bytes; human values use B/K/M/G/T/P
 fuzzy_timestamps = false # true uses relative phrases, including future times

@@ -43,9 +43,11 @@ feasibility results do not certify a future shipping build.
 ## Current CLI
 
 The Cargo package is `terminal-file-manager`; the executable is `tfm`.
-`tfm` browses the shell cwd; `tfm DIRECTORY` browses the explicit native path.
-Both start single-pane and require a terminal on stdin/stdout. `-- DIRECTORY`
-accepts a leading hyphen. Explicit-path failures never substitute another path.
+`tfm` browses the shell cwd; `tfm DIRECTORY [OTHER_DIRECTORY]` accepts up to two
+native paths. `-2` / `--two-panes`, two paths or `two_panes = true` request dual
+startup. One explicit path initializes both panes. Browsing requires a terminal
+on stdin/stdout. `--` accepts leading-hyphen paths. Explicit-path failures never
+substitute another path.
 `tfm --help` / `-h` and `tfm --version` / `-V` print output and return 0;
 unsupported arguments and startup failures report stderr and return 2.
 M1 browsing is read-only; Enter never launches files. See README for bindings

@@ -40,12 +40,75 @@ fn unsupported_arguments_fail_without_stdout() {
     for arguments in [
         &["--unknown"][..],
         &["--help", "extra"][..],
-        &["one", "two"][..],
+        &["one", "two", "three"][..],
     ] {
         let output = tfm(arguments);
         assert_eq!(output.status.code(), Some(2));
         assert!(output.stdout.is_empty());
         assert_eq!(output.stderr, b"tfm: unsupported arguments; use --help\n");
+    }
+}
+
+#[test]
+fn two_directory_arguments_validate_the_second_path_without_fallback() {
+    let root = tempfile::tempdir().unwrap();
+    let missing = root.path().join("missing-second-path");
+    let output = Command::new(env!("CARGO_BIN_EXE_tfm"))
+        .arg("-2")
+        .arg(root.path())
+        .arg(&missing)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(
+        String::from_utf8(output.stderr)
+            .unwrap()
+            .contains("missing-second-path")
+    );
+}
+
+#[test]
+fn two_pane_options_preserve_native_locations_and_option_termination() {
+    use terminal_file_manager::{Invocation, run};
+    for args in [
+        vec!["-2"],
+        vec!["--two-panes", "one"],
+        vec!["one", "two"],
+        vec!["-2", "--", "-one", "-two"],
+    ] {
+        let native = args
+            .iter()
+            .map(std::ffi::OsString::from)
+            .collect::<Vec<_>>();
+        let Invocation::BrowseOptions(options) = run(&native).unwrap() else {
+            panic!("startup options");
+        };
+        let locations = options.locations();
+        if args == ["-2"] {
+            assert_eq!(
+                locations,
+                [std::path::PathBuf::from("."), std::path::PathBuf::from(".")]
+            );
+        }
+        if args.contains(&"-one") {
+            assert_eq!(
+                locations,
+                [
+                    std::path::PathBuf::from("-one"),
+                    std::path::PathBuf::from("-two")
+                ]
+            );
+        }
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStringExt;
+        let raw = std::ffi::OsString::from_vec(vec![b'x', 0xff]);
+        let Invocation::BrowseOptions(options) = run(&["-2".into(), raw.clone()]).unwrap() else {
+            panic!("native path");
+        };
+        assert_eq!(options.locations()[0].as_os_str(), raw);
+        assert_eq!(options.locations()[1].as_os_str(), raw);
     }
 }
 

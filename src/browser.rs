@@ -21,15 +21,28 @@ use std::{
 /// # Errors
 /// Reports path/configuration/nonterminal/setup/application/persistence errors.
 pub fn run(path: &Path) -> Result<(), String> {
-    let path = startup_path(path)?;
+    run_startup(&crate::startup::Startup {
+        paths: vec![path.into()],
+        two_panes: false,
+    })
+}
+
+/// Browse zero, one or two explicit native locations with optional dual layout.
+///
+/// # Errors
+/// Reports either selected path's error before terminal setup; never substitutes a path.
+pub fn run_startup(options: &crate::startup::Startup) -> Result<(), String> {
+    let [left, right] = startup_locations(options)?;
     let mut store = crate::settings::config_path()
         .map(Store::load)
         .transpose()?;
     let settings = store
         .as_ref()
         .map_or_else(Settings::default, |store| store.settings.clone());
-    let mut app = App::new(path);
+    let mut app = App::new(left);
+    app.panes[1].path = right;
     settings.apply(&mut app);
+    app.dual |= options.two_panes || options.paths.len() == 2;
     let bindings = Bindings::new(&settings.bindings)?;
     let mut controller = Controller::new(app, bindings, settings.clone());
     let theme = Theme::new(ColorizeConfig::color_level(RenderTarget::Stdout));
@@ -54,6 +67,19 @@ pub fn run(path: &Path) -> Result<(), String> {
         store.save()?;
     }
     Ok(())
+}
+
+fn startup_locations(options: &crate::startup::Startup) -> Result<[PathBuf; 2], String> {
+    if options.paths.len() > 2 {
+        return Err("at most two directory paths are supported".into());
+    }
+    let [left, right] = options.locations();
+    let left = startup_path(&left)?;
+    let right = startup_path(&right)?;
+    if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
+        return Err("interactive browsing requires a terminal on stdin and stdout".into());
+    }
+    Ok([left, right])
 }
 
 fn drive(
@@ -158,9 +184,6 @@ fn schedule_metadata(
 fn startup_path(path: &Path) -> Result<PathBuf, String> {
     let path = std::path::absolute(path).map_err(|e| e.to_string())?;
     std::fs::read_dir(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-    if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
-        return Err("interactive browsing requires a terminal on stdin and stdout".into());
-    }
     Ok(path)
 }
 

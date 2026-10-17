@@ -13,6 +13,12 @@ fn main() -> ExitCode {
                 Err(error) => failure(&error),
             }
         }
+        Ok(terminal_file_manager::Invocation::BrowseOptions(options)) => {
+            match terminal_file_manager::browser::run_startup(&options) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(error) => failure(&error),
+            }
+        }
         Err(error) => failure(error),
     }
 }
