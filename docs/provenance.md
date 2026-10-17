@@ -30,6 +30,14 @@ The original past-bucket function measured CCN 12 against TFM's limit 10;
 its unchanged day-and-older branches are extracted into one helper. Boundary
 regressions cover both sides of that split and all bucket transitions.
 
+Permission rendering ports `src/utils/format.rs`'s complete `mode_to_rwx`,
+`mode_to_octal` and special-bit helpers, plus the type mapping from
+`src/platform/unix.rs`/`src/platform/mod.rs` at the same lsplus revision.
+The five original permission tests from `tests/format.rs` are retained alongside
+native link/special-bit and missing-metadata tests. TFM uses cached full native
+mode bits, never follows link targets for permissions, and leaves Windows
+attributes intact for either preference. No Unix permissions are fabricated.
+
 [Labeldeck](https://github.com/seapagan/labeldeck/tree/8c0fdea354bf0b0bd8abafb293af78c34ac9fe1d),
 Copyright (c) Grant Ramsay, supplied terminal guards, colour mapping, semantic
 styling and the PTY/ConPTY session driver. The relevant sources include

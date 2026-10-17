@@ -50,6 +50,7 @@ pub struct Entry {
     pub created: Option<SystemTime>,
     pub accessed: Option<SystemTime>,
     pub attributes: String,
+    pub mode: Option<u32>,
     pub owner: Option<String>,
     pub hidden: bool,
     pub executable: bool,
@@ -126,6 +127,7 @@ pub fn inspect(path: &Path) -> Entry {
         created: None,
         accessed: None,
         attributes: String::new(),
+        mode: None,
         owner: None,
         hidden: false,
         executable: false,
@@ -149,6 +151,7 @@ fn fill(entry: &mut Entry, metadata: &Metadata) {
     entry.hidden = platform::hidden(&entry.name, metadata);
     entry.executable = platform::executable(metadata);
     entry.attributes = platform::attributes(metadata);
+    entry.mode = platform::mode(metadata);
     entry.owner = platform::owner(metadata);
     entry.size = Some(metadata.len());
     entry.modified = metadata.modified().ok();

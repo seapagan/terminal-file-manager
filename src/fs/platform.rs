@@ -69,7 +69,18 @@ pub(super) fn executable(_metadata: &Metadata) -> bool {
 #[cfg(unix)]
 pub(super) fn attributes(metadata: &Metadata) -> String {
     use std::os::unix::fs::PermissionsExt;
-    format!("{:04o}", metadata.permissions().mode() & 0o7777)
+    crate::permissions::mode_to_octal(metadata.permissions().mode())
+}
+
+#[cfg(unix)]
+pub(super) fn mode(metadata: &Metadata) -> Option<u32> {
+    use std::os::unix::fs::PermissionsExt;
+    Some(metadata.permissions().mode())
+}
+
+#[cfg(windows)]
+pub(super) fn mode(_metadata: &Metadata) -> Option<u32> {
+    None
 }
 
 #[cfg(windows)]

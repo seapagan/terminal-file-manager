@@ -87,6 +87,7 @@ sidebar = true
 sidebar_left = false
 human_sizes = true # false shows exact bytes; human values use B/K/M/G/T/P
 fuzzy_timestamps = false # true uses relative phrases, including future times
+permissions = "symbolic" # or "octal" on Unix; Windows keeps native attributes
 mouse = true
 sort = "natural"
 grouping = "first"

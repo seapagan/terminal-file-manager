@@ -229,7 +229,10 @@ fn cells(entry: &Entry, pane: &Pane, width: u16, now: std::time::SystemTime) -> 
         )));
     }
     if width >= 90 {
-        cells.push(Cell::from(entry.attributes.clone()));
+        cells.push(Cell::from(crate::permissions::attributes(
+            entry,
+            pane.permissions,
+        )));
     }
     if width >= 125 {
         cells.push(Cell::from(

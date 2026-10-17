@@ -5,6 +5,7 @@ use super::{
 use crate::{
     app::App,
     color::{Role, Theme},
+    permissions::{PermissionDisplay, attributes},
 };
 use ratatui::{
     Frame,
@@ -15,7 +16,7 @@ use ratatui::{
 pub(super) fn render(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     frame.render_widget(Clear, area);
     let detail = &app.details[app.active];
-    let mut lines = entry_lines(detail);
+    let mut lines = entry_lines(detail, app.panes[app.active].permissions);
     append_totals(detail, &mut lines);
     if detail.counting {
         lines.push("Calculating totals… Esc cancels".into());
@@ -36,7 +37,7 @@ pub(super) fn render(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     );
 }
 
-fn entry_lines(detail: &crate::app::Detail) -> Vec<String> {
+fn entry_lines(detail: &crate::app::Detail, permissions: PermissionDisplay) -> Vec<String> {
     let mut lines = Vec::new();
     if let Some(entry) = &detail.entry {
         lines.extend([
@@ -54,7 +55,7 @@ fn entry_lines(detail: &crate::app::Detail) -> Vec<String> {
             format!("Modified UTC: {}", timestamp(entry.modified)),
             format!("Created UTC: {}", timestamp(entry.created)),
             format!("Accessed UTC: {}", timestamp(entry.accessed)),
-            format!("Mode/attributes: {}", entry.attributes),
+            format!("Mode/attributes: {}", attributes(entry, permissions)),
             format!(
                 "Owner/group: {}",
                 entry.owner.as_deref().unwrap_or("unavailable")

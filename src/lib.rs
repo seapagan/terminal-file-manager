@@ -9,6 +9,7 @@ pub mod fs;
 pub mod fuzzy_time;
 pub mod input;
 pub mod listing;
+pub mod permissions;
 pub mod settings;
 pub mod size;
 pub mod terminal;
