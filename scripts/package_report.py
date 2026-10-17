@@ -23,6 +23,7 @@ STATIC_REQUIRED_PATHS = (
     "LICENSE-APACHE",
     "LICENSE-MIT",
     "README.md",
+    "THIRD_PARTY_NOTICES.md",
 )
 FORBIDDEN_PREFIXES = (
     ".github",

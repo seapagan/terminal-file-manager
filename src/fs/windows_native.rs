@@ -80,6 +80,9 @@ pub(super) fn object_id(path: &Path) -> io::Result<(u64, u64)> {
         return Err(io::Error::last_os_error());
     }
     // SAFETY: success initialized this zero-backed SDK structure.
+    // The synchronous query succeeded into zero-backed BY_HANDLE_FILE_INFORMATION;
+    // the owned File stayed live throughout the call and remains live for this read.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     let data = unsafe { data.assume_init() };
     let index = (u64::from(data.nFileIndexHigh) << 32) | u64::from(data.nFileIndexLow);
     Ok((u64::from(data.dwVolumeSerialNumber), index))
