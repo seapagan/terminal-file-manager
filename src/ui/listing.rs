@@ -13,6 +13,11 @@ use ratatui::{
 pub(super) fn render(frame: &mut Frame, app: &App, id: usize, area: Rect, theme: &Theme) {
     let pane = &app.panes[id];
     let block = Block::default()
+        .style(theme.style(if id == app.active {
+            Role::ActivePane
+        } else {
+            Role::Normal
+        }))
         .borders(Borders::ALL)
         .title(format!(
             "{} Pane {}: {}{}",
@@ -38,7 +43,7 @@ pub(super) fn render(frame: &mut Frame, app: &App, id: usize, area: Rect, theme:
         inner.width,
         inner.height.saturating_sub(2),
     );
-    render_rows(frame, pane, rows_area, theme);
+    render_rows(frame, pane, rows_area, theme, id == app.active);
     render_summary(frame, pane, inner);
     render_status(frame, pane, inner, theme);
 }
@@ -94,15 +99,17 @@ fn render_status(frame: &mut Frame, pane: &Pane, inner: Rect, theme: &Theme) {
     );
 }
 
-fn render_rows(frame: &mut Frame, pane: &Pane, area: Rect, theme: &Theme) {
+fn render_rows(frame: &mut Frame, pane: &Pane, area: Rect, theme: &Theme, active: bool) {
     let height = usize::from(area.height.saturating_sub(1));
     let start = pane.viewport_start(height);
     let (widths, headers) = columns(area.width);
     let rows = pane.visible.iter().skip(start).take(height).map(|i| {
         let entry = &pane.entries[*i];
         let cursor = pane.cursor.as_ref() == Some(&entry.path);
-        let style = theme.style(if cursor {
+        let style = theme.style(if cursor && active {
             Role::Cursor
+        } else if cursor {
+            Role::InactiveCursor
         } else {
             role(entry, pane.ignore)
         });

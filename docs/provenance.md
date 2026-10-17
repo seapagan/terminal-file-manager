@@ -20,6 +20,11 @@ styling and the PTY/ConPTY session driver. The relevant sources include
 `tests/common/terminal*.rs`. TFM adapts them to its browser state and terminal
 restoration contract.
 
+Pane focus roles also adapt Labeldeck's `src/edit/ui/theme.rs` paired palette
+and dimmed-focus handling at that revision, with buffer regressions adapted
+from `tests/suite/edit/rendering/selection.rs`. TFM keeps active reverse/bold
+and retained dim/bold cursors distinct, including without colour.
+
 TFM calls `colored_text`'s public detection and resolution APIs as a dependency.
 Its internal colour implementation was not copied into TFM.
 

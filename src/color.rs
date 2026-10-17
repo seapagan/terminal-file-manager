@@ -13,6 +13,13 @@ pub enum Role {
     Warning,
     Ignored,
     Cursor,
+    InactiveCursor,
+    ActivePane,
+    Label,
+    Value,
+    Key,
+    Status,
+    Error,
     Marked,
     Disabled,
 }
@@ -39,7 +46,9 @@ impl Theme {
     /// Focus, cursor and marks remain distinguishable in monochrome terminals.
     pub fn style(&self, role: Role) -> Style {
         let named = match role {
-            Role::Header | Role::Link => Some(AnsiColor::Cyan),
+            Role::Header | Role::Link | Role::Label | Role::Key => Some(AnsiColor::Cyan),
+            Role::Status => Some(AnsiColor::Green),
+            Role::Error => Some(AnsiColor::Red),
             Role::Directory => Some(AnsiColor::Blue),
             Role::Executable => Some(AnsiColor::Green),
             Role::Warning => Some(AnsiColor::Yellow),
@@ -51,8 +60,23 @@ impl Theme {
             style = style.fg(map_color(color));
         }
         match role {
-            Role::Cursor => style.add_modifier(Modifier::REVERSED | Modifier::BOLD),
-            Role::Header | Role::Marked => style.add_modifier(Modifier::BOLD),
+            Role::ActivePane => {
+                // Use a paired terminal palette foreground/background, never an RGB theme.
+                if let Some(bg) = resolve_named(AnsiColor::BrightBlack, self.level) {
+                    style = style.bg(map_color(bg));
+                }
+                if let Some(fg) = resolve_named(AnsiColor::BrightWhite, self.level) {
+                    style = style.fg(map_color(fg));
+                }
+                style
+            }
+            Role::Cursor => style
+                .remove_modifier(Modifier::DIM)
+                .add_modifier(Modifier::REVERSED | Modifier::BOLD),
+            Role::InactiveCursor => style.add_modifier(Modifier::DIM | Modifier::BOLD),
+            Role::Header | Role::Marked | Role::Label | Role::Key | Role::Error => {
+                style.add_modifier(Modifier::BOLD)
+            }
             Role::Ignored | Role::Disabled => style.add_modifier(Modifier::DIM),
             _ => style,
         }

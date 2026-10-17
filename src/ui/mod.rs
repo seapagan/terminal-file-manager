@@ -37,7 +37,10 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     if let Some(area) = geometry.sidebar {
         metadata::render(frame, app, area, theme);
     }
-    frame.render_widget(Paragraph::new(clean(&app.status)), geometry.status);
+    frame.render_widget(
+        Paragraph::new(clean(&app.status)).style(theme.style(Role::Status)),
+        geometry.status,
+    );
     frame.render_widget(
         Paragraph::new("? Help  ^P Panes  Alt-I Info  / Filter  q Quit | F3–F8 unavailable")
             .style(theme.style(Role::Disabled)),
