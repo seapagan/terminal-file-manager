@@ -4,15 +4,14 @@ use crate::{
     fs::{Entry, EntryKind},
     fuzzy_time::{DAY, MONTH, WEEK, YEAR},
 };
-use colored_text::{AnsiColor, ColorLevel, resolve_ansi256, resolve_named};
+use colored_text::{AnsiColor, ColorLevel, resolve_ansi256};
 use ratatui::style::{Modifier, Style};
 use std::time::SystemTime;
 
 impl Theme {
     fn named(&self, color: AnsiColor) -> Style {
-        resolve_named(color, self.level).map_or_else(Style::default, |color| {
-            Style::default().fg(map_color(color))
-        })
+        self.accent(color)
+            .map_or_else(Style::default, |color| Style::default().fg(color))
     }
 
     /// Preserve lsplus name classes; errors stay visible above type accents.

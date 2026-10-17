@@ -54,6 +54,11 @@ fn theme_resolves_all_capability_levels_and_keeps_noncolour_cursor() {
         assert!(style.add_modifier.contains(Modifier::REVERSED));
         let directory = theme.style(Role::Directory);
         assert_eq!(directory.fg.is_none(), level == ColorLevel::NoColor);
+        match level {
+            ColorLevel::TrueColor => assert!(matches!(directory.fg, Some(Color::Rgb(..)))),
+            ColorLevel::Ansi256 => assert!(matches!(directory.fg, Some(Color::Indexed(_)))),
+            _ => {}
+        }
         let custom = theme.resolve("#2468ab").unwrap();
         match level {
             ColorLevel::NoColor => assert_eq!(custom, None),
@@ -87,31 +92,33 @@ fn dual_pane_focus_distinguishes_retained_cursor_and_background() {
         ColorLevel::Ansi256,
         ColorLevel::TrueColor,
     ] {
-        for active in 0..2 {
-            app.active = active;
-            let mut terminal = Terminal::new(TestBackend::new(120, 24)).unwrap();
-            terminal
-                .draw(|frame| {
-                    ui::render(frame, &app, &Theme::new(level));
-                })
-                .unwrap();
-            let buffer = terminal.backend().buffer();
-            let focused = &buffer[(1 + active as u16 * 60, 2)];
-            let retained = &buffer[(1 + (1 - active) as u16 * 60, 2)];
-            assert!(
-                focused
-                    .modifier
-                    .contains(Modifier::REVERSED | Modifier::BOLD)
-            );
-            assert!(!focused.modifier.contains(Modifier::DIM));
-            assert!(retained.modifier.contains(Modifier::DIM));
-            assert!(!retained.modifier.contains(Modifier::REVERSED));
-            let active_space = &buffer[(58 + active as u16 * 60, 10)];
-            let inactive_space = &buffer[(58 + (1 - active) as u16 * 60, 10)];
-            assert_eq!(
-                active_space.bg == inactive_space.bg,
-                level == ColorLevel::NoColor
-            );
+        for (width, height) in [(80, 12), (120, 24), (200, 40)] {
+            for active in 0..2 {
+                app.active = active;
+                let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+                terminal
+                    .draw(|frame| {
+                        ui::render(frame, &app, &Theme::new(level));
+                    })
+                    .unwrap();
+                let buffer = terminal.backend().buffer();
+                let focused = &buffer[(1 + active as u16 * (width / 2), 2)];
+                let retained = &buffer[(1 + (1 - active) as u16 * (width / 2), 2)];
+                assert!(
+                    focused
+                        .modifier
+                        .contains(Modifier::REVERSED | Modifier::BOLD)
+                );
+                assert!(!focused.modifier.contains(Modifier::DIM));
+                assert!(!retained.modifier.contains(Modifier::DIM));
+                assert!(retained.modifier.contains(Modifier::REVERSED));
+                assert!(!retained.modifier.contains(Modifier::BOLD));
+                let active_space = &buffer[((width / 2 - 2) + active as u16 * (width / 2), 10)];
+                let inactive_space =
+                    &buffer[((width / 2 - 2) + (1 - active) as u16 * (width / 2), 10)];
+                assert_eq!(active_space.bg, Color::Reset);
+                assert_eq!(inactive_space.bg, Color::Reset);
+            }
         }
     }
 }

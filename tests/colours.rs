@@ -115,7 +115,8 @@ fn ignored_hidden_executable_and_mark_cues_compose_beneath_active_cursor() {
             assert_eq!(name.modifier.contains(Modifier::REVERSED), cursor);
             assert!(name.modifier.contains(Modifier::BOLD));
             if level != ColorLevel::NoColor && !cursor {
-                assert_eq!(name.fg, Color::Green);
+                let expected = Theme::new(level).entry_style(&app.panes[0].entries[0]).fg;
+                assert_eq!(Some(name.fg), expected);
             }
             assert_eq!(buffer[(2, 2)].symbol(), "*");
             assert_eq!(buffer[(7, 2)].symbol(), "[");
@@ -125,7 +126,7 @@ fn ignored_hidden_executable_and_mark_cues_compose_beneath_active_cursor() {
 
 #[test]
 fn permission_spans_and_age_palette_match_original_lsplus_cases() {
-    let theme = Theme::new(ColorLevel::Ansi256);
+    let theme = Theme::new(ColorLevel::Ansi16);
     for (value, colour, bold, dim) in [
         ('r', Some(Color::Green), false, false),
         ('w', Some(Color::Yellow), false, false),
@@ -141,6 +142,7 @@ fn permission_spans_and_age_palette_match_original_lsplus_cases() {
         assert_eq!(style.add_modifier.contains(Modifier::BOLD), bold);
         assert_eq!(style.add_modifier.contains(Modifier::DIM), dim);
     }
+    let theme = Theme::new(ColorLevel::Ansi256);
     let now = UNIX_EPOCH + Duration::from_secs(100_000_000);
     for (age, index) in [
         (0, 222),

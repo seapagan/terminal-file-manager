@@ -1,6 +1,6 @@
 //! Renderer-neutral adapter adapted from Labeldeck's edit/color.rs and UI theme.
 mod listing;
-use colored_text::{AnsiColor, ColorLevel, ResolvedColor, resolve_hex, resolve_named};
+use colored_text::{AnsiColor, ColorLevel, ResolvedColor, resolve_hex, resolve_named, resolve_rgb};
 use ratatui::style::{Color, Modifier, Style};
 
 /// Semantic styles never embed ANSI escape strings in widgets.
@@ -44,6 +44,24 @@ impl Theme {
         resolve_hex(hex, self.level).map(|color| color.map(map_color))
     }
 
+    // Mid-range accents leave the unknown terminal foreground/background alone.
+    fn accent(&self, named: AnsiColor) -> Option<Color> {
+        let rgb = match named {
+            AnsiColor::Red => (190, 65, 70),
+            AnsiColor::Green => (50, 145, 90),
+            AnsiColor::Yellow => (165, 125, 35),
+            AnsiColor::Blue => (70, 120, 185),
+            AnsiColor::Magenta => (155, 90, 160),
+            AnsiColor::Cyan => (35, 140, 150),
+            _ => return resolve_named(named, self.level).map(map_color),
+        };
+        if self.level >= ColorLevel::Ansi256 {
+            resolve_rgb(rgb.0, rgb.1, rgb.2, self.level).map(map_color)
+        } else {
+            resolve_named(named, self.level).map(map_color)
+        }
+    }
+
     /// Focus, cursor and marks remain distinguishable in monochrome terminals.
     pub fn style(&self, role: Role) -> Style {
         let named = match role {
@@ -57,25 +75,21 @@ impl Theme {
             _ => None,
         };
         let mut style = Style::default();
-        if let Some(color) = named.and_then(|c| resolve_named(c, self.level)) {
-            style = style.fg(map_color(color));
+        if let Some(color) = named.and_then(|c| self.accent(c)) {
+            style = style.fg(color);
         }
         match role {
-            Role::ActivePane => {
-                // Use a paired terminal palette foreground/background, never an RGB theme.
-                if let Some(bg) = resolve_named(AnsiColor::BrightBlack, self.level) {
-                    style = style.bg(map_color(bg));
-                }
-                if let Some(fg) = resolve_named(AnsiColor::BrightWhite, self.level) {
-                    style = style.fg(map_color(fg));
-                }
-                style
-            }
-            Role::Cursor => self
-                .style(Role::ActivePane)
+            Role::ActivePane => style,
+            Role::Cursor => Style::default()
+                .fg(Color::Reset)
+                .bg(Color::Reset)
                 .remove_modifier(Modifier::DIM)
                 .add_modifier(Modifier::REVERSED | Modifier::BOLD),
-            Role::InactiveCursor => style.add_modifier(Modifier::DIM | Modifier::BOLD),
+            Role::InactiveCursor => Style::default()
+                .fg(Color::Reset)
+                .bg(Color::Reset)
+                .remove_modifier(Modifier::DIM | Modifier::BOLD)
+                .add_modifier(Modifier::REVERSED),
             Role::Header | Role::Marked | Role::Label | Role::Key | Role::Error => {
                 style.add_modifier(Modifier::BOLD)
             }
