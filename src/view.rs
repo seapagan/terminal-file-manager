@@ -28,12 +28,22 @@ impl Default for Columns {
 
 impl Columns {
     /// One responsive visibility contract for headers and data cells.
-    pub fn visible(&self, width: u16) -> Self {
+    pub fn visible(&self, width: u16, measured: &crate::ui::Measurements) -> Self {
+        // Marks (3), type (1), name (16), and their two spaces are mandatory.
+        let mut remaining = width.saturating_sub(22);
+        let mut fit = |enabled: bool, required: u16| {
+            if enabled && required <= remaining {
+                remaining -= required;
+                true
+            } else {
+                false
+            }
+        };
         Self {
-            size: self.size && width >= 45,
-            modified: self.modified && width >= 70,
-            attributes: self.attributes && width >= 90,
-            owner: self.owner && width >= 125,
+            size: fit(self.size, measured.number.saturating_add(3)),
+            modified: fit(self.modified, 17),
+            attributes: fit(self.attributes, measured.attributes.saturating_add(1)),
+            owner: fit(self.owner, measured.owner.min(24).saturating_add(1)),
         }
     }
 }

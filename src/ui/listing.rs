@@ -161,7 +161,7 @@ fn render_empty(frame: &mut Frame, pane: &Pane, area: Rect) {
 }
 
 fn columns(pane: &Pane, width: u16) -> (Vec<Constraint>, Vec<Cell<'static>>) {
-    let columns = pane.columns.visible(width);
+    let columns = pane.columns.visible(width, &pane.measurements);
     if width < 8 {
         return (vec![Constraint::Length(width)], vec![Cell::from("Name")]);
     }
@@ -180,7 +180,11 @@ fn columns(pane: &Pane, width: u16) -> (Vec<Constraint>, Vec<Cell<'static>>) {
     }
     for (length, name, enabled) in [
         (16, modified_header(pane.fuzzy_timestamps), columns.modified),
-        (10, "Mode/attrs", columns.attributes),
+        (
+            pane.measurements.attributes,
+            "Mode/attrs",
+            columns.attributes,
+        ),
         (pane.measurements.owner.min(24), "Owner", columns.owner),
     ] {
         if enabled {
@@ -216,7 +220,7 @@ fn cells(
     theme: &Theme,
     focus: Option<Role>,
 ) -> Vec<Cell<'static>> {
-    let columns = pane.columns.visible(width);
+    let columns = pane.columns.visible(width, &pane.measurements);
     let decorate = |base: Style| focus.map_or(base, |role| base.patch(theme.style(role)));
     if width < 8 {
         let mut cells = identity_cells(entry, pane, theme, decorate);

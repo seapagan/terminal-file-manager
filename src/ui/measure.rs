@@ -11,15 +11,21 @@ pub struct Measurements {
     pub name: u16,
     pub number: u16,
     pub owner: u16,
+    pub attributes: u16,
 }
 
 impl Measurements {
     /// Measure display cells after control escaping; native identities remain untouched.
-    pub fn collect<'a>(entries: impl Iterator<Item = &'a Entry>, human: bool) -> Self {
+    pub fn collect<'a>(
+        entries: impl Iterator<Item = &'a Entry>,
+        human: bool,
+        permissions: crate::permissions::PermissionDisplay,
+    ) -> Self {
         let mut measured = Self {
             name: 4,
             number: 4,
             owner: 5,
+            attributes: 10,
         };
         for entry in entries {
             let name = format!(
@@ -28,6 +34,9 @@ impl Measurements {
                 super::clean(&entry.name.to_string_lossy())
             );
             measured.name = measured.name.max(width(&name));
+            measured.attributes = measured
+                .attributes
+                .max(width(&crate::permissions::attributes(entry, permissions)));
             let (number, _) = parts(entry, human);
             measured.number = measured.number.max(width(&number));
             measured.owner = measured

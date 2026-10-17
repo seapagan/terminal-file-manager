@@ -177,6 +177,7 @@ impl Pane {
         self.measurements = crate::ui::Measurements::collect(
             self.visible.iter().map(|i| &self.entries[*i]),
             self.human_sizes,
+            self.permissions,
         );
         if !self
             .visible
