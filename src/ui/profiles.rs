@@ -9,7 +9,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Padding, Paragraph},
 };
 
-const HINT: &str = "Enter: active pane; Space: both…; Esc: close";
+const HINT: &str = "Enter: active pane; Space: both panes; Esc: close";
 const APPLY_BOTH: &str = "Apply selected to both: ";
 
 fn block() -> Block<'static> {
