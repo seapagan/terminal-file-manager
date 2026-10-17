@@ -111,8 +111,14 @@ fn save(controller: &mut Controller) {
         .preferences
         .profiles
         .insert(name.clone(), ViewSettings::capture(pane));
-    pane.profile = Some(name);
+    pane.profile = Some(name.clone());
     pane.profile_modified = false;
+    let saved = &controller.preferences.profiles[&name];
+    for pane in &mut controller.app.panes {
+        if pane.profile.as_deref() == Some(name.as_str()) {
+            pane.profile_modified = ViewSettings::capture(pane) != *saved;
+        }
+    }
     controller.preferences_changed = true;
     controller.app.profile_name = None;
     controller.app.profile_menu = None;

@@ -204,3 +204,37 @@ fn column_headers_and_cells_hide_together_without_losing_name_or_type() {
         }
     }
 }
+
+#[test]
+fn overwriting_a_profile_reconciles_other_badges_without_changing_their_view() {
+    let root = tempfile::tempdir().unwrap();
+    let mut controller = Controller::new(
+        App::new(root.path().into()),
+        Bindings::new(&Default::default()).unwrap(),
+        Settings::default(),
+    );
+    for input in ["Alt+v", "Down", "Space", "Enter"] {
+        key(&mut controller, input);
+    }
+    let other = terminal_file_manager::view::ViewSettings::capture(&controller.app.panes[1]);
+    key(&mut controller, "h");
+    for input in ["Alt+v", "End", "Enter", "Enter"] {
+        key(&mut controller, input);
+    }
+    assert_eq!(controller.app.panes[0].profile_label(), "Detailed");
+    assert_eq!(
+        controller.app.panes[1].profile_label(),
+        "Modified: Detailed"
+    );
+    assert_eq!(
+        terminal_file_manager::view::ViewSettings::capture(&controller.app.panes[1]),
+        other
+    );
+    assert_eq!(controller.app.panes[1].path, root.path());
+    key(&mut controller, "h");
+    for input in ["Alt+v", "End", "Enter", "Enter"] {
+        key(&mut controller, input);
+    }
+    assert_eq!(controller.app.panes[1].profile_label(), "Detailed");
+    assert!(!controller.app.panes[1].profile_modified);
+}
