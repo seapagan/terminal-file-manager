@@ -160,13 +160,14 @@ fn render_empty(frame: &mut Frame, pane: &Pane, area: Rect) {
 }
 
 fn columns(pane: &Pane, width: u16) -> (Vec<Constraint>, Vec<Cell<'static>>) {
+    let columns = pane.columns.visible(width);
     if width < 8 {
         return (vec![Constraint::Length(width)], vec![Cell::from("Name")]);
     }
     let mut widths = vec![Constraint::Length(3), Constraint::Length(1)];
     let mut headers = vec![Cell::from(""), Cell::from("T"), Cell::from("Name")];
     let mut details = Vec::new();
-    if width >= 45 {
+    if columns.size {
         details.extend([
             Constraint::Length(pane.measurements.number),
             Constraint::Length(1),
@@ -176,20 +177,12 @@ fn columns(pane: &Pane, width: u16) -> (Vec<Constraint>, Vec<Cell<'static>>) {
         ));
         headers.push(Cell::from(""));
     }
-    for (minimum, length, name) in [
-        (
-            70,
-            16,
-            if pane.fuzzy_timestamps {
-                "Modified"
-            } else {
-                "Modified UTC"
-            },
-        ),
-        (90, 10, "Mode/attrs"),
-        (125, pane.measurements.owner.min(24), "Owner"),
+    for (length, name, enabled) in [
+        (16, modified_header(pane.fuzzy_timestamps), columns.modified),
+        (10, "Mode/attrs", columns.attributes),
+        (pane.measurements.owner.min(24), "Owner", columns.owner),
     ] {
-        if width >= minimum {
+        if enabled {
             details.push(Constraint::Length(length));
             headers.push(Cell::from(name));
         }
@@ -210,6 +203,10 @@ fn columns(pane: &Pane, width: u16) -> (Vec<Constraint>, Vec<Cell<'static>>) {
     (widths, headers)
 }
 
+fn modified_header(fuzzy: bool) -> &'static str {
+    if fuzzy { "Modified" } else { "Modified UTC" }
+}
+
 fn cells(
     entry: &Entry,
     pane: &Pane,
@@ -218,13 +215,14 @@ fn cells(
     theme: &Theme,
     focus: Option<Role>,
 ) -> Vec<Cell<'static>> {
+    let columns = pane.columns.visible(width);
     let decorate = |base: Style| focus.map_or(base, |role| base.patch(theme.style(role)));
     if width < 8 {
         let mut cells = identity_cells(entry, pane, theme, decorate);
         return vec![cells.pop().expect("name cell")];
     }
     let mut cells = identity_cells(entry, pane, theme, decorate);
-    if width >= 45 {
+    if columns.size {
         let (number, unit) = super::measure::parts(entry, pane.human_sizes);
         cells.push(
             Cell::from(ratatui::text::Line::from(number).alignment(Alignment::Right))
@@ -232,7 +230,7 @@ fn cells(
         );
         cells.push(Cell::from(unit).style(decorate(theme.size_style(entry.size))));
     }
-    if width >= 70 {
+    if columns.modified {
         cells.push(
             Cell::from(listing_timestamp(
                 entry.modified,
@@ -242,10 +240,10 @@ fn cells(
             .style(decorate(theme.time_style(entry.modified, now))),
         );
     }
-    if width >= 90 {
+    if columns.attributes {
         cells.push(permission_cell(entry, pane.permissions, theme, decorate));
     }
-    if width >= 125 {
+    if columns.owner {
         cells.push(
             Cell::from(entry.owner.clone().unwrap_or_else(|| "unavailable".into()))
                 .style(decorate(theme.style(Role::Label))),

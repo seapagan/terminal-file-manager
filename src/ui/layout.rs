@@ -8,6 +8,7 @@ pub struct Geometry {
     pub sidebar: Option<Rect>,
     pub status: Rect,
     pub footer: Rect,
+    pub menu: Option<Rect>,
 }
 
 /// Width-driven layout never depends on a directory's longest filename.
@@ -17,6 +18,7 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
     let mut geometry = Geometry {
         panes: [None, None],
         sidebar: None,
+        menu: app.view_menu.map(|_| super::view::area(area)),
         status: Rect::new(
             area.x,
             area.y + height,

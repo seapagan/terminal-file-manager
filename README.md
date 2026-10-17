@@ -37,6 +37,7 @@ help/version also work in scripts. Errors return exit code 2.
 | s; v; g; r | Cycle sort; reverse; cycle directory grouping; refresh |
 | Alt+I; Alt+Enter | Toggle metadata sidebar; open full metadata |
 | F2 | Toggle preferred metadata presentation |
+| V | View options: arrows, Space/Enter to change, Esc to close; mouse supported |
 | c; Esc | Count an ordinary directory's descendants; cancel count/close overlay |
 | ?; q/F10/Ctrl+C | Help; quit without changing the shell directory |
 
@@ -94,6 +95,12 @@ mouse = true
 sort = "natural"
 grouping = "first"
 ignore = "dim"
+
+[columns]
+size = true
+modified = true
+attributes = true
+owner = true
 
 [bindings]
 "F12" = "toggle-panes"

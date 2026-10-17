@@ -25,6 +25,7 @@ impl Controller {
     /// Own the authoritative app and validated keymap.
     pub fn new(mut app: App, bindings: Bindings, preferences: Settings) -> Self {
         app.help_rows = bindings.help_rows();
+        app.metadata_presentation = preferences.metadata_presentation;
         Self {
             app,
             quit: false,
@@ -48,6 +49,10 @@ impl Controller {
                     self.filter_key(key);
                     return Vec::new();
                 }
+                if self.app.view_menu.is_some() {
+                    super::view::key(self, key, geometry);
+                    return Vec::new();
+                }
                 self.bindings
                     .action(key)
                     .map_or_else(Vec::new, |action| self.dispatch(action, geometry))
@@ -64,6 +69,7 @@ impl Controller {
     /// Keyboard and clickable controls share this dispatcher and availability policy.
     pub fn dispatch(&mut self, action: Action, geometry: &Geometry) -> Vec<Request> {
         use Action::*;
+        let action = self.preferred_action(action);
         if self.app.help
             && !matches!(
                 action,
@@ -77,17 +83,18 @@ impl Controller {
             return Vec::new();
         }
         match action {
-            Info => {
-                return self.dispatch(
-                    if self.preferences.metadata_presentation
-                        == crate::settings::MetadataPresentation::Sidebar
-                    {
-                        ToggleSidebar
-                    } else {
-                        Metadata
-                    },
-                    geometry,
-                );
+            ViewOptions => {
+                self.app.view_menu = if self.app.view_menu.is_some() {
+                    None
+                } else {
+                    Some(0)
+                };
+                self.app.popup = false;
+                self.app.help = false;
+            }
+            HumanSizes | FuzzyTimestamps | Permissions | ColumnSize | ColumnModified
+            | ColumnAttributes | ColumnOwner | MetadataPresentation => {
+                super::view::formatting(self, action)
             }
             Up | Down | Home | End | PageUp | PageDown => self.movement(action, geometry),
             Enter | Parent | Back | Forward | Refresh => return self.navigate(action),
@@ -106,6 +113,16 @@ impl Controller {
             _ => {}
         }
         Vec::new()
+    }
+
+    fn preferred_action(&self, action: Action) -> Action {
+        if action != Action::Info {
+            return action;
+        }
+        match self.preferences.metadata_presentation {
+            crate::settings::MetadataPresentation::Sidebar => Action::ToggleSidebar,
+            crate::settings::MetadataPresentation::Popup => Action::Metadata,
+        }
     }
 
     fn movement(&mut self, action: Action, geometry: &Geometry) {
@@ -298,6 +315,10 @@ impl Controller {
     }
 
     fn mouse(&mut self, event: MouseEvent, geometry: &Geometry, now: Duration) -> Vec<Request> {
+        if self.app.view_menu.is_some() {
+            super::view::mouse(self, event, geometry);
+            return Vec::new();
+        }
         if self.app.help || self.app.popup {
             scroll_overlay(&mut self.app.overlay_scroll, event.kind);
             return Vec::new();

@@ -35,6 +35,7 @@ pub struct Settings {
     pub human_sizes: bool,
     pub fuzzy_timestamps: bool,
     pub permissions: crate::permissions::PermissionDisplay,
+    pub columns: crate::view::Columns,
     pub metadata_presentation: MetadataPresentation,
     pub bindings: BTreeMap<String, Action>,
 }
@@ -53,6 +54,7 @@ impl Default for Settings {
             human_sizes: true,
             fuzzy_timestamps: false,
             permissions: crate::permissions::PermissionDisplay::default(),
+            columns: crate::view::Columns::default(),
             metadata_presentation: MetadataPresentation::default(),
             bindings: BTreeMap::new(),
         }
@@ -74,6 +76,7 @@ impl Settings {
     pub fn apply(&self, app: &mut App) {
         app.sidebar = self.sidebar;
         app.sidebar_left = self.sidebar_left;
+        app.metadata_presentation = self.metadata_presentation;
         for pane in &mut app.panes {
             pane.sort = SortPolicy {
                 sort: self.sort,
@@ -85,6 +88,7 @@ impl Settings {
             pane.human_sizes = self.human_sizes;
             pane.fuzzy_timestamps = self.fuzzy_timestamps;
             pane.permissions = self.permissions;
+            pane.columns = self.columns.clone();
             pane.resort();
         }
     }
@@ -93,6 +97,13 @@ impl Settings {
     pub fn capture(&mut self, app: &App, action: Action) {
         let pane = &app.panes[app.active];
         match action {
+            Action::HumanSizes => self.human_sizes = pane.human_sizes,
+            Action::FuzzyTimestamps => self.fuzzy_timestamps = pane.fuzzy_timestamps,
+            Action::Permissions => self.permissions = pane.permissions,
+            Action::ColumnSize => self.columns.size = pane.columns.size,
+            Action::ColumnModified => self.columns.modified = pane.columns.modified,
+            Action::ColumnAttributes => self.columns.attributes = pane.columns.attributes,
+            Action::ColumnOwner => self.columns.owner = pane.columns.owner,
             Action::ToggleSidebar => self.sidebar = app.sidebar,
             Action::Sort => self.sort = pane.sort.sort,
             Action::Group => self.grouping = pane.sort.grouping,

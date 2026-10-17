@@ -31,6 +31,18 @@ pub(super) fn description(action: Action) -> &'static str {
 
 use Action::*;
 const DESCRIPTIONS: &[(Action, &str)] = &[
+    (ViewOptions, "View options"),
+    (HumanSizes, "Toggle human sizes"),
+    (FuzzyTimestamps, "Toggle fuzzy timestamps"),
+    (Permissions, "Cycle permission display"),
+    (ColumnSize, "Toggle size column"),
+    (ColumnModified, "Toggle date column"),
+    (ColumnAttributes, "Toggle attribute column"),
+    (ColumnOwner, "Toggle owner column"),
+    (
+        MetadataPresentation,
+        "Cycle preferred metadata presentation",
+    ),
     (Up, "Move cursor up"),
     (Down, "Move cursor down"),
     (Home, "First entry"),

@@ -42,6 +42,8 @@ pub struct App {
     pub sidebar_left: bool,
     pub popup: bool,
     pub help: bool,
+    pub view_menu: Option<usize>,
+    pub metadata_presentation: crate::settings::MetadataPresentation,
     pub help_rows: Vec<(String, String)>,
     pub overlay_scroll: u16,
     pub metadata_scroll: u16,
@@ -61,6 +63,8 @@ impl App {
             sidebar_left: false,
             popup: false,
             help: false,
+            view_menu: None,
+            metadata_presentation: crate::settings::MetadataPresentation::default(),
             help_rows: crate::input::Bindings::new(&Default::default())
                 .expect("default bindings")
                 .help_rows(),

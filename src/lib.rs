@@ -14,6 +14,7 @@ pub mod settings;
 pub mod size;
 pub mod terminal;
 pub mod ui;
+pub mod view;
 pub mod workers;
 
 /// Help for the implemented local browsing contract.

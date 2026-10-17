@@ -2,6 +2,7 @@
 mod bindings;
 mod controller;
 mod help;
+pub(crate) mod view;
 pub use bindings::{Bindings, chord};
 pub use controller::Controller;
 
@@ -28,6 +29,15 @@ pub enum Action {
     ToggleSidebar,
     Metadata,
     Info,
+    ViewOptions,
+    HumanSizes,
+    FuzzyTimestamps,
+    Permissions,
+    ColumnSize,
+    ColumnModified,
+    ColumnAttributes,
+    ColumnOwner,
+    MetadataPresentation,
     Count,
     Cancel,
     Mark,
