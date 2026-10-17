@@ -47,8 +47,8 @@ tempfile = "=3.27.0"
 
 # Level-triggered Unix input preserves pending keys when resize and input coincide.
 [target.'cfg(unix)'.dependencies]
-# Reuse the locked PTY dependency for lsplus account lookups without duplicates.
-nix = { version = "=0.28.0", default-features = false, features = ["user"] }
+# Account lookups use the current Unix API; portable-pty retains its dev-only version.
+nix = { version = "=0.31.3", default-features = false, features = ["user"] }
 crossterm = { version = "=0.29.0", default-features = false, features = ["use-dev-tty"] }
 
 [target.'cfg(windows)'.dependencies]
