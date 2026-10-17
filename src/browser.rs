@@ -204,6 +204,99 @@ mod tests {
         )
     }
 
+    fn collect_until_idle(controller: &mut Controller, pool: &mut Pool) {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut changed = false;
+        while pool.active_count() != 0 {
+            assert!(Instant::now() < deadline, "worker completion timed out");
+            changed |= collect(controller, pool);
+            std::thread::yield_now();
+        }
+        assert!(changed);
+        assert!(!collect(controller, pool));
+    }
+
+    #[test]
+    fn metadata_debounce_waits_for_the_active_visible_view_and_installs_native_results() {
+        let root = tempfile::tempdir().unwrap();
+        let mut controller = counting_controller(root.path());
+        let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
+        let mut pending = [None, None];
+        assert!(schedule_metadata(&mut controller, &mut pool, &mut pending));
+        let request = pending[0].as_ref().unwrap().0.clone();
+        pending[0].as_mut().unwrap().1 = Instant::now() + Duration::from_secs(60);
+        controller.app.popup = true;
+        schedule_metadata(&mut controller, &mut pool, &mut pending);
+        assert_eq!(pool.active_count(), 0);
+        pending[0].as_mut().unwrap().1 = Instant::now() - Duration::from_secs(1);
+        controller.app.popup = false;
+        schedule_metadata(&mut controller, &mut pool, &mut pending);
+        assert_eq!(pool.active_count(), 0);
+        controller.app.popup = true;
+        controller.app.active = 1;
+        schedule_metadata(&mut controller, &mut pool, &mut pending);
+        assert_eq!(pool.active_count(), 0);
+        controller.app.active = 0;
+        schedule_metadata(&mut controller, &mut pool, &mut pending);
+        assert!(pending[0].is_none());
+        assert_eq!(pool.active_count(), 1);
+        collect_until_idle(&mut controller, &mut pool);
+        let detail = &controller.app.details[0];
+        assert_eq!(detail.entry.as_ref().unwrap().path, request.path);
+        assert_eq!(
+            detail.entry.as_ref().unwrap().kind,
+            fs::EntryKind::Directory
+        );
+        assert_eq!(
+            detail.canonical,
+            Some(std::fs::canonicalize(&request.path).unwrap())
+        );
+        assert!(controller.app.details[1].entry.is_none());
+        assert!(!controller.preferences_changed);
+    }
+
+    #[test]
+    fn collected_totals_update_the_requesting_pane_and_report_disappearing_roots() {
+        let root = tempfile::tempdir().unwrap();
+        let mut controller = counting_controller(root.path());
+        let snapshot = fs::list(
+            root.path(),
+            &IgnoreContext::isolated(),
+            &AtomicBool::new(false),
+        )
+        .unwrap();
+        controller.app.complete_listing(1, 1, Ok(snapshot));
+        let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
+        for pane in 0..2 {
+            controller.app.active = pane;
+            controller.app.request_metadata(pane).unwrap();
+            pool.submit(controller.app.request_totals().unwrap());
+        }
+        controller.app.active = 0;
+        collect_until_idle(&mut controller, &mut pool);
+        for detail in &controller.app.details {
+            let totals = detail.totals.as_ref().unwrap().as_ref().unwrap();
+            assert_eq!((totals.files, totals.directories, totals.bytes), (1, 0, 4));
+            assert!(!detail.counting);
+        }
+        let request = controller.app.request_totals().unwrap();
+        std::fs::remove_dir_all(&request.path).unwrap();
+        pool.submit(request);
+        collect_until_idle(&mut controller, &mut pool);
+        assert!(controller.app.details[0].totals.as_ref().unwrap().is_err());
+        assert!(!controller.app.details[0].counting);
+        assert_eq!(
+            controller.app.details[1]
+                .totals
+                .as_ref()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .bytes,
+            4
+        );
+    }
+
     #[test]
     fn temporary_fuzzy_metadata_requests_clock_redraw_with_exact_listing_defaults() {
         let root = tempfile::tempdir().unwrap();
