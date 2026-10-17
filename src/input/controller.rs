@@ -18,7 +18,7 @@ pub struct Controller {
     pub preferences_changed: bool,
     pub preferences: Settings,
     pub(super) bindings: Bindings,
-    filter_before: Option<String>,
+    filter_before: Option<(usize, String)>,
     pub(super) last_click: Option<(usize, PathBuf, Duration)>,
     pub(super) dragging_divider: bool,
 }
@@ -126,7 +126,10 @@ impl Controller {
             }
             Quit | SaveQuit => self.exit(action),
             Filter => {
-                self.filter_before = Some(self.app.panes[self.app.active].filter.clone());
+                self.filter_before = Some((
+                    self.app.active,
+                    self.app.panes[self.app.active].filter.clone(),
+                ));
                 self.app.status = "Filter: type to narrow; Enter accepts, Esc restores".into();
             }
             Count => return self.count(),
@@ -341,10 +344,14 @@ impl Controller {
     }
 
     fn filter_key(&mut self, key: crossterm::event::KeyEvent) {
+        let Some((id, _)) = self.filter_before.as_ref() else {
+            return;
+        };
+        let id = *id;
         match key.code {
             KeyCode::Esc => {
-                let before = self.filter_before.take().unwrap_or_default();
-                self.app.panes[self.app.active].set_filter(before);
+                let (_, before) = self.filter_before.take().expect("editing filter");
+                self.app.panes[id].set_filter(before);
                 self.app.status = "Filter cancelled".into();
             }
             KeyCode::Enter => {
@@ -352,9 +359,9 @@ impl Controller {
                 self.app.status = "Filter applied".into();
             }
             KeyCode::Backspace => {
-                let mut text = self.app.panes[self.app.active].filter.clone();
+                let mut text = self.app.panes[id].filter.clone();
                 text.pop();
-                self.app.panes[self.app.active].set_filter(text);
+                self.app.panes[id].set_filter(text);
             }
             KeyCode::Char(c)
                 if !key
@@ -368,14 +375,17 @@ impl Controller {
     }
 
     fn append_filter(&mut self, text: &str) {
-        let mut query = self.app.panes[self.app.active].filter.clone();
+        let Some((id, _)) = self.filter_before.as_ref() else {
+            return;
+        };
+        let mut query = self.app.panes[*id].filter.clone();
         for c in text.chars().filter(|c| !c.is_control()) {
             if query.len() + c.len_utf8() > 4096 {
                 break;
             }
             query.push(c);
         }
-        self.app.panes[self.app.active].set_filter(query);
+        self.app.panes[*id].set_filter(query);
     }
 
     fn overlay_mouse(&mut self, event: MouseEvent, geometry: &Geometry) -> bool {

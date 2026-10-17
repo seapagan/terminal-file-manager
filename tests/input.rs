@@ -271,3 +271,88 @@ fn footer_hit_testing_dispatches_the_labelled_action_and_ignores_disabled_tail()
     controller.handle(click(quit), &geometry, Duration::ZERO);
     assert!(controller.quit);
 }
+
+fn switch_filter_focus(controller: &mut Controller, mouse: bool) {
+    let geometry = ui::geometry(&controller.app, ratatui::layout::Rect::new(0, 0, 120, 24));
+    if mouse {
+        let area = geometry.panes[1 - controller.app.active].unwrap();
+        controller.handle(
+            Event::Mouse(MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: area.x + 1,
+                row: area.y,
+                modifiers: KeyModifiers::NONE,
+            }),
+            &geometry,
+            Duration::ZERO,
+        );
+    } else {
+        controller.dispatch(terminal_file_manager::input::Action::FocusPane, &geometry);
+    }
+}
+
+fn edit_across_focus(origin: usize, mouse: bool, finish: &str) {
+    let (_root, mut c) = controller();
+    c.app.dual = true;
+    c.app.active = origin;
+    let other = 1 - origin;
+    c.app.panes[origin].set_filter("al".into());
+    c.app.panes[other].set_filter("bet".into());
+    c.app.panes[origin].select_all();
+    c.app.panes[other].select_all();
+    let cursor = c.app.panes[other].cursor.clone();
+    let marks = c.app.panes[other].marks.clone();
+    key(&mut c, "/");
+    key(&mut c, "x");
+    switch_filter_focus(&mut c, mouse);
+    assert_eq!(c.app.active, other);
+    key(&mut c, "Backspace");
+    let geometry = ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 120, 24));
+    c.handle(Event::Paste("p\n".into()), &geometry, Duration::ZERO);
+    assert_eq!(c.app.panes[origin].filter, "alp");
+    key(&mut c, finish);
+    assert_eq!(c.app.active, other);
+    assert_eq!(
+        c.app.panes[origin].filter,
+        if finish == "Esc" { "al" } else { "alp" }
+    );
+    assert_eq!(c.app.panes[origin].current().unwrap().name, "alpha");
+    assert_eq!(c.app.panes[origin].marks.len(), 1);
+    assert_eq!(c.app.panes[other].filter, "bet");
+    assert_eq!(c.app.panes[other].cursor, cursor);
+    assert_eq!(c.app.panes[other].marks, marks);
+    switch_filter_focus(&mut c, mouse);
+    assert_eq!(c.app.active, origin);
+    assert_eq!(c.app.panes[origin].current().unwrap().name, "alpha");
+}
+
+#[test]
+fn filter_edits_accept_and_cancel_in_the_origin_after_mouse_focus_changes() {
+    for origin in 0..2 {
+        edit_across_focus(origin, true, "Esc");
+        edit_across_focus(origin, true, "Enter");
+    }
+}
+
+#[test]
+fn filter_edits_accept_and_cancel_in_the_origin_after_focus_actions() {
+    for origin in 0..2 {
+        edit_across_focus(origin, false, "Esc");
+        edit_across_focus(origin, false, "Enter");
+    }
+}
+
+#[test]
+fn filter_editor_keeps_tab_keys_modal_until_accept_or_cancel() {
+    let (_root, mut c) = controller();
+    c.app.dual = true;
+    key(&mut c, "/");
+    for chord in ["Tab", "Shift+Tab"] {
+        key(&mut c, chord);
+        assert_eq!(c.app.active, 0);
+        assert_eq!(c.app.panes[0].filter, "");
+    }
+    key(&mut c, "Esc");
+    key(&mut c, "Tab");
+    assert_eq!(c.app.active, 1);
+}
