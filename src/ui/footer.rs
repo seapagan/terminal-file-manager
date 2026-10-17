@@ -25,7 +25,7 @@ pub(super) fn controls(area: Rect) -> Vec<FooterControl> {
         ("Alt-P Panes", Action::TogglePanes),
         ("V View", Action::ViewOptions),
         ("Alt-V Profiles", Action::ViewProfiles),
-        ("Alt-I Info", Action::ToggleSidebar),
+        ("Alt+Enter Info", Action::Metadata),
         ("/ Filter", Action::Filter),
         ("q Quit", Action::Quit),
     ] {

@@ -253,12 +253,14 @@ fn footer_hit_testing_dispatches_the_labelled_action_and_ignores_disabled_tail()
     let info = geometry
         .footer_controls
         .iter()
-        .find(|control| control.action == terminal_file_manager::input::Action::ToggleSidebar)
+        .find(|control| control.action == terminal_file_manager::input::Action::Metadata)
         .unwrap()
         .area
         .x;
     controller.handle(click(info), &geometry, Duration::ZERO);
-    assert!(controller.app.sidebar);
+    assert!(controller.app.popup);
+    assert!(!controller.app.sidebar);
+    key(&mut controller, "Esc");
     let quit = geometry
         .footer_controls
         .iter()

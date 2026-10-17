@@ -82,3 +82,71 @@ fn narrow_policy_omits_whole_segments_and_retains_reverse_filter_when_they_fit()
         assert!(!line.contains("hidden:") && !line.contains("//"));
     }
 }
+
+#[test]
+fn footer_info_uses_the_popup_binding_and_fits_whole_controls_in_both_layouts() {
+    use crossterm::event::KeyEvent;
+    use terminal_file_manager::input::{Action, Bindings, chord};
+    let bindings = Bindings::new(&Default::default()).unwrap();
+    let (code, mods) = chord("Alt+Enter").unwrap();
+    assert_eq!(
+        bindings.action(KeyEvent::new(code, mods)),
+        Some(Action::Metadata)
+    );
+    let (code, mods) = chord("Alt+i").unwrap();
+    assert_eq!(
+        bindings.action(KeyEvent::new(code, mods)),
+        Some(Action::ToggleSidebar)
+    );
+    for dual in [false, true] {
+        for width in [1, 20, 60, 80, 120] {
+            let mut app = App::new(".".into());
+            app.dual = dual;
+            let buffer = draw(&app, width, ColorLevel::NoColor);
+            let g = ui::geometry(&app, ratatui::layout::Rect::new(0, 0, width, 12));
+            assert!(
+                g.footer_controls
+                    .iter()
+                    .all(|c| c.area.intersection(g.footer) == c.area)
+            );
+            let info = g
+                .footer_controls
+                .iter()
+                .find(|c| c.action == Action::Metadata);
+            if width >= 80 {
+                let info = info.unwrap();
+                assert_eq!(info.label, "Alt+Enter Info");
+                let value: String = (info.area.x..info.area.right())
+                    .map(|x| buffer[(x, g.footer.y)].symbol())
+                    .collect();
+                assert_eq!(value, info.label);
+                click_info(app, &g, info);
+            }
+            assert!(
+                g.footer_controls
+                    .iter()
+                    .all(|c| c.action != Action::ToggleSidebar)
+            );
+        }
+    }
+}
+
+fn click_info(app: App, g: &ui::Geometry, info: &ui::FooterControl) {
+    use terminal_file_manager::input::Bindings;
+    let mut c = terminal_file_manager::input::Controller::new(
+        app,
+        Bindings::new(&Default::default()).unwrap(),
+        Default::default(),
+    );
+    c.handle(
+        crossterm::event::Event::Mouse(crossterm::event::MouseEvent {
+            kind: crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left),
+            column: info.area.x,
+            row: info.area.y,
+            modifiers: crossterm::event::KeyModifiers::NONE,
+        }),
+        g,
+        std::time::Duration::ZERO,
+    );
+    assert!(c.app.popup && !c.app.sidebar);
+}

@@ -87,7 +87,7 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
     (Maximise, "Temporarily maximise active pane / restore split"),
     (SplitLeft, "Move pane divider left"),
     (SplitRight, "Move pane divider right"),
-    (ToggleSidebar, "Toggle metadata sidebar"),
+    (ToggleSidebar, "Toggle metadata sidebar (wide single pane)"),
     (Metadata, "Toggle metadata popup"),
     (Info, "Toggle preferred metadata presentation"),
     (Count, "Count directory descendants (cancellable)"),
