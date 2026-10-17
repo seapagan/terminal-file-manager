@@ -111,8 +111,8 @@ fn dual_pane_focus_distinguishes_retained_cursor_and_background() {
                 );
                 assert!(!focused.modifier.contains(Modifier::DIM));
                 assert!(!retained.modifier.contains(Modifier::DIM));
-                assert!(retained.modifier.contains(Modifier::REVERSED));
-                assert!(!retained.modifier.contains(Modifier::BOLD));
+                assert!(!retained.modifier.contains(Modifier::REVERSED));
+                assert!(retained.modifier.contains(Modifier::BOLD));
                 let active_space = &buffer[((width / 2 - 2) + active as u16 * (width / 2), 10)];
                 let inactive_space =
                     &buffer[((width / 2 - 2) + (1 - active) as u16 * (width / 2), 10)];

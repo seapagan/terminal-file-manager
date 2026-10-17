@@ -88,8 +88,8 @@ impl Theme {
             Role::InactiveCursor => Style::default()
                 .fg(Color::Reset)
                 .bg(Color::Reset)
-                .remove_modifier(Modifier::DIM | Modifier::BOLD)
-                .add_modifier(Modifier::REVERSED),
+                .remove_modifier(Modifier::DIM | Modifier::REVERSED)
+                .add_modifier(Modifier::BOLD),
             Role::Header | Role::Marked | Role::Label | Role::Key | Role::Error => {
                 style.add_modifier(Modifier::BOLD)
             }

@@ -67,7 +67,9 @@ when hidden. Narrow terminals show the active pane and restore requested dual
 view when width permits. A single-pane sidebar similarly returns when there is
 space. Columns shrink with terminal width; names take priority over optional
 metadata. Plain Unicode, explicit marks, active-pane labels and reverse-video
-cursor keep the browser usable without a special font or colour.
+cursor keep the browser usable without a special font or colour. The active
+cursor uses `>` and reverse video; the other pane's retained cursor uses `:`
+and bold text. Both keep the terminal's default colours and show `*` when marked.
 
 Natural name order with directories first is the default. Other sort modes are
 name, extension, size (largest first), modified/created time (newest first),

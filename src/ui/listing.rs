@@ -251,10 +251,10 @@ fn cells(
     let columns = pane.columns.visible(width, &pane.measurements);
     let decorate = |base: Style| focus.map_or(base, |role| base.patch(theme.style(role)));
     if width < 8 {
-        let mut cells = identity_cells(entry, pane, theme, decorate);
+        let mut cells = identity_cells(entry, pane, theme, focus, decorate);
         return vec![cells.pop().expect("name cell")];
     }
-    let mut cells = identity_cells(entry, pane, theme, decorate);
+    let mut cells = identity_cells(entry, pane, theme, focus, decorate);
     if columns.size {
         let (number, unit) = super::measure::parts(entry, pane.human_sizes);
         cells.push(
@@ -289,27 +289,30 @@ fn identity_cells(
     entry: &Entry,
     pane: &Pane,
     theme: &Theme,
+    focus: Option<Role>,
     decorate: impl Fn(Style) -> Style,
 ) -> Vec<Cell<'static>> {
     let name_style = decorate(theme.entry_style(entry));
+    let marked = pane.marks.contains_key(&entry.path);
+    let marker = match (focus, marked) {
+        (Some(Role::Cursor), true) => ">* ",
+        (Some(Role::Cursor), false) => ">  ",
+        (Some(Role::InactiveCursor), true) => ":* ",
+        (Some(Role::InactiveCursor), false) => ":  ",
+        (_, true) => "[*]",
+        _ => "   ",
+    };
     let name = format!(
         "{}{}",
         if entry.hidden { "[h] " } else { "" },
         clean(&entry.name.to_string_lossy())
     );
     vec![
-        Cell::from(if pane.marks.contains_key(&entry.path) {
-            "[*]"
+        Cell::from(marker).style(decorate(theme.style(if marked {
+            Role::Marked
         } else {
-            "   "
-        })
-        .style(decorate(theme.style(
-            if pane.marks.contains_key(&entry.path) {
-                Role::Marked
-            } else {
-                Role::Normal
-            },
-        ))),
+            Role::Normal
+        }))),
         Cell::from(indicator(entry)).style(name_style),
         Cell::from(name).style(name_style),
     ]
