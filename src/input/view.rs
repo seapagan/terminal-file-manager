@@ -2,7 +2,7 @@ use super::{Action, Controller};
 use crate::{
     app::App, permissions::PermissionDisplay, settings::MetadataPresentation, ui::Geometry,
 };
-use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, MouseButton, MouseEvent, MouseEventKind};
 
 /// Menu rows dispatch the same actions as direct shortcuts.
 pub(crate) const OPTIONS: &[(&str, Action)] = &[
@@ -24,6 +24,9 @@ pub(crate) const OPTIONS: &[(&str, Action)] = &[
 ];
 
 pub(super) fn key(controller: &mut Controller, key: KeyEvent, geometry: &Geometry) {
+    if key.kind == KeyEventKind::Repeat && !matches!(key.code, KeyCode::Up | KeyCode::Down) {
+        return;
+    }
     let index = controller.app.view_menu.as_mut().expect("view menu");
     match key.code {
         KeyCode::Up => *index = index.saturating_sub(1),

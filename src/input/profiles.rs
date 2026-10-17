@@ -1,6 +1,8 @@
 use super::Controller;
 use crate::{settings::validate_profile_name, view::ViewSettings};
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{
+    KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 
 pub(super) fn open(controller: &mut Controller) {
     controller.app.profile_menu = Some(0);
@@ -13,6 +15,19 @@ pub(super) fn open(controller: &mut Controller) {
 }
 
 pub(super) fn key(controller: &mut Controller, key: KeyEvent) {
+    if key.kind == KeyEventKind::Repeat
+        && !matches!(
+            key.code,
+            KeyCode::Up | KeyCode::Down | KeyCode::Home | KeyCode::End
+        )
+    {
+        if controller.app.profile_name.is_some()
+            && matches!(key.code, KeyCode::Char(_) | KeyCode::Backspace)
+        {
+            edit(controller, key);
+        }
+        return;
+    }
     if controller.app.profile_name.is_some() {
         edit(controller, key);
         return;

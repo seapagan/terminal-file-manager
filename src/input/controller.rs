@@ -71,6 +71,7 @@ impl Controller {
                 }
                 self.bindings
                     .action(key)
+                    .filter(|action| key.kind == KeyEventKind::Press || action.repeatable())
                     .map_or_else(Vec::new, |action| self.dispatch(action, geometry))
             }
             Event::Paste(text) if self.filter_before.is_some() => {

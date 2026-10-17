@@ -80,3 +80,26 @@ pub enum Action {
     OppositeZoxide,
     ExitDirectory,
 }
+
+impl Action {
+    pub(super) fn repeatable(self) -> bool {
+        matches!(
+            self,
+            Action::Up
+                | Action::Down
+                | Action::Home
+                | Action::End
+                | Action::PageUp
+                | Action::PageDown
+                | Action::ExtendUp
+                | Action::ExtendDown
+                | Action::Parent
+                | Action::Back
+                | Action::Forward
+                | Action::SplitLeft
+                | Action::SplitRight
+                | Action::DiagnosticsUp
+                | Action::DiagnosticsDown
+        )
+    }
+}

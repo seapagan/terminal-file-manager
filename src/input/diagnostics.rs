@@ -13,7 +13,9 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
                 action @ (Action::Diagnostics | Action::DiagnosticsUp | Action::DiagnosticsDown),
             ) = controller.bindings.action(*key)
             {
-                controller.dispatch(action, geometry);
+                if action != Action::Diagnostics || key.kind == KeyEventKind::Press {
+                    controller.dispatch(action, geometry);
+                }
                 return true;
             }
             false
