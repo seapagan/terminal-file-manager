@@ -126,6 +126,7 @@ impl ViewSettings {
 pub fn profiles() -> std::collections::BTreeMap<String, ViewSettings> {
     let compact = ViewSettings {
         fuzzy_timestamps: true,
+        sidebar: Some(false),
         columns: Columns {
             size: true,
             modified: false,

@@ -164,7 +164,9 @@ owner = true
 ```
 
 View profiles contain formatting, columns, sorting, visibility and an optional
-sidebar preference. Compact, Detailed and Minimal are built in. Alt+V also
+sidebar preference. The built-in Detailed view enables the sidebar; Compact and
+Minimal disable it. User profiles that omit `sidebar` retain the current pane's
+preference. Dual-pane and narrow layouts temporarily hide the sidebar. Alt+V also
 offers **Save active as…**: enter a name and press Enter to save explicitly.
 Changes show **Modified: name** until saved; they never change a saved profile
 implicitly. Profiles contain no directories, marks, cursor, filter or history.
