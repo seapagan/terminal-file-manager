@@ -222,7 +222,12 @@ fn wheel_does_not_change_focus_and_double_click_never_launches_files() {
 #[test]
 fn shifted_printable_help_chord_and_user_override_remain_usable() {
     let (_root, mut controller) = controller();
-    key(&mut controller, "Shift+?");
+    raw_key(
+        &mut controller,
+        KeyCode::Char('?'),
+        KeyModifiers::SHIFT,
+        crossterm::event::KeyEventKind::Press,
+    );
     assert!(controller.app.help);
     let mut overrides = std::collections::BTreeMap::new();
     overrides.insert(

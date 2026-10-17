@@ -87,6 +87,13 @@ pub fn chord(text: &str) -> Result<(KeyCode, KeyModifiers), String> {
             chars.next().is_none().then_some(KeyCode::Char(c))
         })
         .ok_or_else(|| format!("unknown keybinding: {text}"))?;
+    if modifiers.contains(KeyModifiers::SHIFT)
+        && matches!(code, KeyCode::Char(c) if !c.is_alphabetic())
+    {
+        return Err(format!(
+            "nonportable keybinding {text}: use the produced character without Shift"
+        ));
+    }
     Ok(normalize_chord(code, modifiers))
 }
 

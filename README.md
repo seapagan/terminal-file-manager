@@ -126,6 +126,9 @@ Use `[profiles.NAME]` and `[profiles.NAME.columns]` for named views in TOML.
 Custom keybindings override defaults; `?` shows your effective bindings.
 Exact Ctrl+C remains an emergency exit in menus and filters, even when rebound.
 Ctrl+Alt+C and other modified variants follow their configured bindings.
+For symbols, bind the character your keyboard produces without `Shift+`.
+TFM rejects shifted symbol, digit and Space bindings because legacy terminals
+cannot distinguish their physical Shift state. Shifted letters remain supported.
 F12 opens colour diagnostics by default. Set `NO_COLOR` to disable colours.
 
 ## Links

@@ -144,6 +144,36 @@ fn isolate(command: &mut CommandBuilder, root: &std::path::Path) {
 }
 
 #[test]
+fn printable_bindings_match_legacy_and_enhanced_layout_characters() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("keyboard-sentinel"), "read only").unwrap();
+    let config = root.path().join("config/tfm/config.toml");
+    fs::create_dir_all(config.parent().unwrap()).unwrap();
+    fs::write(
+        &config,
+        "[bindings]\n'?'='quit'\n'§'='quit'\n'Shift+x'='quit'\n",
+    )
+    .unwrap();
+    for encoded in [
+        "?",
+        "\u{1b}[63;2u",
+        "\u{1b}[49:167;2u",
+        "§",
+        "X",
+        "\u{1b}[120;2u",
+    ] {
+        let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+        command.cwd(root.path());
+        isolate(&mut command, root.path());
+        drive(command, &[("keyboard-sentinel", encoded)], false);
+    }
+    assert_eq!(
+        fs::read(root.path().join("keyboard-sentinel")).unwrap(),
+        b"read only"
+    );
+}
+
+#[test]
 fn diagnostics_uses_startup_capability_in_a_controlled_real_terminal() {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("diagnostics-sentinel"), "read only").unwrap();

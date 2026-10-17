@@ -67,10 +67,21 @@ fn equivalent_shifted_spellings_conflict_and_distinct_modifiers_do_not() {
 }
 
 #[test]
-fn nonletter_shift_and_default_uppercase_actions_keep_their_semantics() {
-    let keys = bindings(&[("Shift+?", Action::Quit)]);
-    assert_eq!(keys.action(letter("?", Mods::SHIFT)), Some(Action::Quit));
-    assert_eq!(keys.action(letter("?", Mods::NONE)), Some(Action::Help));
+fn ambiguous_nonletter_shift_is_rejected_and_printed_symbols_match_both_protocols() {
+    for text in ["Shift+?", "Shift+1", "Shift+Space", "Alt+Shift+§"] {
+        let error = Bindings::new(&BTreeMap::from([(text.into(), Action::Quit)]))
+            .err()
+            .expect("nonportable shifted symbol");
+        assert!(
+            error.contains("use the produced character without Shift"),
+            "{error}"
+        );
+    }
+    let keys = bindings(&[("?", Action::Quit), ("§", Action::Mark)]);
+    for modifiers in [Mods::NONE, Mods::SHIFT] {
+        assert_eq!(keys.action(letter("?", modifiers)), Some(Action::Quit));
+        assert_eq!(keys.action(letter("§", modifiers)), Some(Action::Mark));
+    }
     assert_eq!(
         keys.action(KeyEvent::new(KeyCode::Up, Mods::SHIFT)),
         Some(Action::ExtendUp)
