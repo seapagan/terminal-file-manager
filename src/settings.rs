@@ -180,18 +180,21 @@ impl Store {
     }
 
     fn write(&self) -> io::Result<()> {
-        regular_or_missing(&self.path)?;
         let text = toml::to_string_pretty(&self.settings).map_err(io::Error::other)?;
-        let parent = self
-            .path
-            .parent()
-            .ok_or_else(|| io::Error::other("config has no parent"))?;
-        fs::create_dir_all(parent)?;
-        let stage = prepare_config(parent, &text)?;
-        regular_or_missing(&self.path)?;
-        stage.persist(&self.path).map_err(|e| e.error)?;
-        Ok(())
+        atomic_write(&self.path, &text)
     }
+}
+
+pub(crate) fn atomic_write(path: &Path, text: &str) -> io::Result<()> {
+    regular_or_missing(path)?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| io::Error::other("destination has no parent"))?;
+    fs::create_dir_all(parent)?;
+    let stage = prepare_config(parent, text)?;
+    regular_or_missing(path)?;
+    stage.persist(path).map_err(|e| e.error)?;
+    Ok(())
 }
 
 fn prepare_config(parent: &Path, text: &str) -> io::Result<tempfile::NamedTempFile> {
@@ -201,10 +204,10 @@ fn prepare_config(parent: &Path, text: &str) -> io::Result<tempfile::NamedTempFi
     Ok(stage)
 }
 
-fn regular_or_missing(path: &Path) -> io::Result<()> {
+pub(crate) fn regular_or_missing(path: &Path) -> io::Result<()> {
     match fs::symlink_metadata(path) {
         Ok(metadata) if !metadata.is_file() || metadata.is_symlink() => Err(io::Error::other(
-            "config must be a regular file, not a link",
+            "destination must be a regular file, not a link",
         )),
         Err(error) if error.kind() != io::ErrorKind::NotFound => Err(error),
         _ => Ok(()),

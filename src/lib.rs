@@ -10,6 +10,7 @@ pub mod fuzzy_time;
 pub mod input;
 pub mod listing;
 pub mod permissions;
+pub mod session;
 pub mod settings;
 pub mod size;
 pub mod startup;
