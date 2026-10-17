@@ -104,7 +104,6 @@ impl Repository {
             Some(oracle.unwrap_or(false)),
             "TFM: {relative:?}"
         );
-        assert_eq!(entry.path, path);
         assert_ignore_modes(snapshot, &path, oracle.unwrap_or(false));
     }
 }

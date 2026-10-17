@@ -18,8 +18,9 @@ and `get_groupname` at that revision, including numeric fallback for missing
 or failed lookups. The original `tests/crate/file_unix.rs` fallback assertions
 are retained; macOS additionally accepts its native `wheel` group for GID 0.
 TFM caches names with raw UID/GID in worker snapshots and makes Names/Numeric a
-per-pane view preference. The existing locked nix 0.28 dependency supplies the
-safe lookup API. lsplus's Windows `file_details` leaves user/group empty;
+per-pane view preference. The locked runtime dependency nix 0.31.3 supplies the
+safe lookup API. A separate nix 0.28.0 comes through the dev-only `portable-pty`
+dependency. lsplus's Windows `file_details` leaves user/group empty;
 Windows account resolution remains deferred in TFM as well.
 
 Size formatting is a direct port of `lsplus/src/utils/format.rs` at that

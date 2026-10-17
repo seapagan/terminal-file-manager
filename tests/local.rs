@@ -7,7 +7,7 @@ use terminal_file_manager::listing::{Grouping, Sort, SortPolicy};
 #[test]
 fn natural_default_keeps_directories_first_and_reverse_is_independent() {
     let root = tempfile::tempdir().unwrap();
-    fs::write(root.path().join("file10"), "ten").unwrap();
+    fs::write(root.path().join("file10"), "ten bytes").unwrap();
     fs::write(root.path().join("file2"), "two").unwrap();
     fs::create_dir(root.path().join("zdir")).unwrap();
     let mut snapshot = list(
@@ -38,6 +38,13 @@ fn natural_default_keeps_directories_first_and_reverse_is_independent() {
         reverse: false,
     }
     .apply(&mut snapshot.entries);
+    let files: Vec<_> = snapshot
+        .entries
+        .iter()
+        .filter(|entry| entry.kind == EntryKind::File)
+        .map(|entry| entry.name.to_str().unwrap())
+        .collect();
+    assert_eq!(files, ["file10", "file2"]);
     assert_eq!(fs::read(root.path().join("file2")).unwrap(), b"two");
 }
 

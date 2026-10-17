@@ -61,6 +61,37 @@ fn every_sort_mode_obeys_its_metadata_direction_and_stable_ties() {
 }
 
 #[test]
+fn equal_metadata_sorts_by_native_name_independently_of_enumeration_order() {
+    let (_root, mut original) = entries();
+    for entry in &mut original {
+        entry.size = Some(7);
+        entry.modified = Some(UNIX_EPOCH);
+        entry.created = Some(UNIX_EPOCH);
+    }
+    for sort in [Sort::Size, Sort::Modified, Sort::Created] {
+        for reverse in [false, true] {
+            let mut entries = original.clone();
+            SortPolicy {
+                sort,
+                grouping: Grouping::Mixed,
+                reverse,
+            }
+            .apply(&mut entries);
+            let names: Vec<_> = entries
+                .iter()
+                .map(|entry| entry.name.to_str().unwrap())
+                .collect();
+            let expected = if reverse {
+                ["file2.rs", "file10.txt", "file1.rs"]
+            } else {
+                ["file1.rs", "file10.txt", "file2.rs"]
+            };
+            assert_eq!(names, expected, "{sort:?} reverse={reverse}");
+        }
+    }
+}
+
+#[test]
 fn type_sort_and_grouping_do_not_confuse_reversal_with_directory_position() {
     let (_root, mut entries) = entries();
     entries[0].kind = EntryKind::Link;

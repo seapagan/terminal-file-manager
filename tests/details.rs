@@ -26,12 +26,15 @@ fn counts_reject_cursor_changes_cancellation_and_old_generations() {
     app.panes[0].move_cursor(1, 10);
     assert!(!app.complete_totals(&first, Ok(Totals::default())));
     app.request_metadata(0).unwrap();
+    assert!(!app.details[0].counting);
     let second = app.request_totals().unwrap();
     app.cancel_totals();
     assert!(!app.complete_totals(&second, Ok(Totals::default())));
     let third = app.request_totals().unwrap();
     assert!(!app.complete_totals(&second, Ok(Totals::default())));
+    assert!(app.details[0].counting && app.details[0].totals.is_none());
     assert!(app.complete_totals(&third, Ok(Totals::default())));
+    assert!(!app.details[0].counting && app.details[0].totals.is_some());
 }
 
 #[test]
@@ -73,10 +76,9 @@ fn same_path_replacement_refresh_reloads_metadata_and_rejects_old_responses() {
     assert!(app.details[0].entry.is_none());
     assert!(app.details[0].canonical.is_none());
     let fresh = terminal_file_manager::fs::inspect(&path);
-    assert_ne!(
-        old.identity.as_ref().unwrap().object,
-        fresh.identity.as_ref().unwrap().object
-    );
+    let old_object = old.identity.as_ref().unwrap().object.unwrap();
+    let fresh_object = fresh.identity.as_ref().unwrap().object.unwrap();
+    assert_ne!(old_object, fresh_object);
     assert!(!app.complete_metadata(&old_request, old.clone(), None));
     assert!(app.complete_metadata(&fresh_request, fresh.clone(), Some(path.clone())));
     assert!(!app.complete_metadata(&old_request, old, None));

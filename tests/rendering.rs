@@ -216,6 +216,7 @@ fn metadata_fields_have_separate_rows_and_share_the_cached_entry() {
         terminal_file_manager::fs::inspect(&request.path),
         None,
     );
+    app.details[0].entry.as_mut().unwrap().name = "selected\nname".into();
     app.popup = true;
     let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
     terminal
@@ -231,11 +232,16 @@ fn metadata_fields_have_separate_rows_and_share_the_cached_entry() {
         .collect();
     let name = rows
         .iter()
-        .position(|row| row.contains("Name:") && row.contains("selected"))
+        .position(|row| row.contains("Name:") && row.contains(r"selected\nname"))
         .unwrap();
     let path = rows.iter().position(|row| row.contains("Path:")).unwrap();
     assert!(path > name);
-    assert!(!rows.iter().any(|row| row.contains("\\n")));
+    assert!(
+        buffer
+            .content()
+            .iter()
+            .all(|cell| !cell.symbol().chars().any(char::is_control))
+    );
 }
 
 #[test]

@@ -6,11 +6,7 @@ use terminal_file_manager::color::{Role, Theme};
 #[test]
 fn environment_policy_preserves_no_color_and_force_precedence() {
     if let Ok(expected) = std::env::var("TFM_EXPECT_LEVEL") {
-        let level = ColorizeConfig::color_level(RenderTarget::Stdout);
-        assert_eq!(format!("{level:?}"), expected);
-        let style = Theme::new(level).style(Role::Directory);
-        assert_eq!(style.fg.is_none(), expected == "NoColor");
-        assert_rendered_policy(level);
+        assert_detected_policy(&expected);
         return;
     }
     for (values, expected) in [
@@ -22,6 +18,10 @@ fn environment_policy_preserves_no_color_and_force_precedence() {
         (vec![("FORCE_COLOR", "3"), ("CLICOLOR", "0")], "TrueColor"),
         (vec![("CLICOLOR", "0")], "NoColor"),
         (vec![("TERM", "dumb")], "NoColor"),
+        (
+            vec![("TERM", "xterm-256color"), ("COLORTERM", "truecolor")],
+            "NoColor",
+        ),
     ] {
         // Relaunches this test for colour precedence without a security decision.
         // nosemgrep: rust.lang.security.current-exe.current-exe
@@ -50,6 +50,22 @@ fn environment_policy_preserves_no_color_and_force_precedence() {
             String::from_utf8_lossy(&result.stdout)
         );
     }
+}
+
+fn assert_detected_policy(expected: &str) {
+    let level = ColorizeConfig::color_level(RenderTarget::Stdout);
+    assert_eq!(format!("{level:?}"), expected);
+    let terminal = ColorizeConfig::color_level(RenderTarget::Terminal(true));
+    // The xterm/truecolor fixture is the positive terminal control.
+    let terminal_expected = if std::env::var("TERM").as_deref() == Ok("xterm-256color") {
+        "TrueColor"
+    } else {
+        expected
+    };
+    assert_eq!(format!("{terminal:?}"), terminal_expected);
+    let style = Theme::new(level).style(Role::Directory);
+    assert_eq!(style.fg.is_none(), expected == "NoColor");
+    assert_rendered_policy(level);
 }
 
 fn assert_rendered_policy(level: colored_text::ColorLevel) {

@@ -37,7 +37,17 @@ fn loaded() -> (tempfile::TempDir, Controller) {
 
 fn key(c: &mut Controller, text: &str, kind: KeyEventKind) {
     let (code, modifiers) = chord(text).unwrap();
-    let g = ui::geometry(&c.app, Rect::new(0, 0, 120, 24));
+    let mut g = ui::geometry(&c.app, Rect::new(0, 0, 120, 24));
+    let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 24)).unwrap();
+    terminal
+        .draw(|frame| {
+            g = ui::render(
+                frame,
+                &c.app,
+                &terminal_file_manager::color::Theme::new(colored_text::ColorLevel::NoColor),
+            );
+        })
+        .unwrap();
     assert!(
         c.handle(
             Event::Key(KeyEvent::new_with_kind(code, modifiers, kind)),
@@ -85,6 +95,12 @@ fn view_and_diagnostics_toggle_once_but_menu_navigation_repeats() {
     key(&mut c, "Down", Release);
     assert_eq!(c.app.view_menu, Some(1));
     key(&mut c, "F12", Press);
+    key(&mut c, "Alt+PageDown", Repeat);
+    assert_eq!(c.app.diagnostics_scroll, 1);
+    key(&mut c, "Alt+PageDown", Release);
+    assert_eq!(c.app.diagnostics_scroll, 1);
+    key(&mut c, "Alt+PageUp", Repeat);
+    assert_eq!(c.app.diagnostics_scroll, 0);
     for kind in [Repeat, Release] {
         key(&mut c, "F12", kind);
         assert!(c.app.diagnostics);

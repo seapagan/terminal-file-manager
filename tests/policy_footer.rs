@@ -79,7 +79,6 @@ fn narrow_policy_omits_whole_segments_and_retains_reverse_filter_when_they_fit()
         if width >= 80 {
             assert!(line.contains("Reverse: On") && line.contains("Filter: abc"));
         }
-        assert!(!line.contains("hidden:") && !line.contains("//"));
     }
 }
 

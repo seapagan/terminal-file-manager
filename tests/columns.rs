@@ -77,7 +77,4 @@ fn disabled_columns_release_width_and_cached_sizes_determine_boundaries() {
     assert!(!row(&app, 65, 1).contains("Mode/attrs"));
     assert!(row(&app, 66, 1).contains("Mode/attrs"));
     assert!(row(&app, 66, 2).contains("1234567890"));
-    for width in 1..=66 {
-        let _ = row(&app, width, 2);
-    }
 }

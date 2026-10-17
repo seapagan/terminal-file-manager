@@ -53,28 +53,29 @@ fn unsupported_arguments_fail_without_stdout() {
 fn two_directory_arguments_validate_the_second_path_without_fallback() {
     let root = tempfile::tempdir().unwrap();
     let missing = root.path().join("missing-second-path");
-    let output = Command::new(env!("CARGO_BIN_EXE_tfm"))
+    let output = isolated_session_command(root.path())
         .arg("-2")
         .arg(root.path())
         .arg(&missing)
         .output()
         .unwrap();
     assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
     assert!(
         String::from_utf8(output.stderr)
             .unwrap()
-            .contains("missing-second-path")
+            .contains(&missing.display().to_string())
     );
 }
 
 #[test]
 fn two_pane_options_preserve_native_locations_and_option_termination() {
     use terminal_file_manager::{Invocation, run};
-    for args in [
-        vec!["-2"],
-        vec!["--two-panes", "one"],
-        vec!["one", "two"],
-        vec!["-2", "--", "-one", "-two"],
+    for (args, expected) in [
+        (vec!["-2"], [".", "."]),
+        (vec!["--two-panes", "one"], ["one", "one"]),
+        (vec!["one", "two"], ["one", "two"]),
+        (vec!["-2", "--", "-one", "-two"], ["-one", "-two"]),
     ] {
         let native = args
             .iter()
@@ -83,22 +84,7 @@ fn two_pane_options_preserve_native_locations_and_option_termination() {
         let Invocation::BrowseOptions(options) = run(&native).unwrap() else {
             panic!("startup options");
         };
-        let locations = options.locations();
-        if args == ["-2"] {
-            assert_eq!(
-                locations,
-                [std::path::PathBuf::from("."), std::path::PathBuf::from(".")]
-            );
-        }
-        if args.contains(&"-one") {
-            assert_eq!(
-                locations,
-                [
-                    std::path::PathBuf::from("-one"),
-                    std::path::PathBuf::from("-two")
-                ]
-            );
-        }
+        assert_eq!(options.locations(), expected.map(std::path::PathBuf::from));
     }
     #[cfg(unix)]
     {
@@ -116,7 +102,7 @@ fn two_pane_options_preserve_native_locations_and_option_termination() {
 fn explicit_missing_path_reports_failure_without_fallback() {
     let root = tempfile::tempdir().unwrap();
     let missing = root.path().join("explicit-missing-directory");
-    let output = Command::new(env!("CARGO_BIN_EXE_tfm"))
+    let output = isolated_session_command(root.path())
         .arg(&missing)
         .output()
         .unwrap();
@@ -125,7 +111,7 @@ fn explicit_missing_path_reports_failure_without_fallback() {
     assert!(
         String::from_utf8(output.stderr)
             .unwrap()
-            .contains("explicit-missing-directory")
+            .contains(&missing.display().to_string())
     );
     assert!(!missing.exists());
 }
@@ -143,10 +129,9 @@ fn noninteractive_startup_fails_clearly_without_creating_config() {
         .unwrap();
     assert_eq!(output.status.code(), Some(2));
     assert!(output.stdout.is_empty());
-    assert!(
-        String::from_utf8(output.stderr)
-            .unwrap()
-            .contains("terminal")
+    assert_eq!(
+        output.stderr,
+        b"tfm: interactive browsing requires a terminal on stdin and stdout\n"
     );
     assert!(!config.exists());
 }
@@ -175,6 +160,7 @@ fn explicit_headless_session_save_and_restore_failures_preserve_intent() {
         .output()
         .unwrap();
     assert!(output.status.success(), "{:?}", output.stderr);
+    assert!(output.stdout.is_empty() && output.stderr.is_empty());
     let store = SessionStore {
         path: root.path().join("config/tfm/session.toml"),
     };
@@ -195,7 +181,6 @@ fn explicit_headless_session_save_and_restore_failures_preserve_intent() {
             .contains("saved-location")
     );
     assert_eq!(std::fs::read(&store.path).unwrap(), saved);
-    assert_eq!(std::fs::read(&store.path).unwrap(), saved);
 }
 
 #[test]
@@ -215,6 +200,8 @@ fn explicit_paths_bypass_configured_restore_and_conflicting_cli_restore_fails() 
         .arg("explicit-missing")
         .output()
         .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
     assert!(
         String::from_utf8(output.stderr)
             .unwrap()

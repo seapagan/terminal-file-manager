@@ -49,7 +49,12 @@ fn text(app: &App, width: u16, level: ColorLevel) -> String {
 #[test]
 fn no_selection_has_no_zero_breakdown_and_unmarked_hidden_entries_do_not_count() {
     let (_root, mut app) = loaded();
-    app.panes[0].entries[0].hidden = true;
+    app.panes[0]
+        .entries
+        .iter_mut()
+        .find(|entry| entry.name == "hidden")
+        .unwrap()
+        .hidden = true;
     app.panes[0].refilter();
     let rendered = text(&app, 120, ColorLevel::NoColor);
     assert!(rendered.contains("3 items  │  No selection"));
