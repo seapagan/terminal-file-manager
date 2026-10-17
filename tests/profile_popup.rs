@@ -8,7 +8,7 @@ use std::time::Duration;
 use terminal_file_manager::{
     app::App,
     color::Theme,
-    input::{Bindings, Controller},
+    input::{Action, Bindings, Controller},
     settings::Settings,
     ui,
 };
@@ -49,6 +49,114 @@ fn click(c: &mut Controller, g: &ui::Geometry, x: u16, y: u16) {
         g,
         Duration::ZERO,
     );
+}
+
+fn editor() -> Controller {
+    let mut c = controller();
+    let g = ui::geometry(&c.app, Rect::new(0, 0, 120, 24));
+    c.dispatch(Action::ViewProfiles, &g);
+    key(&mut c, KeyCode::End, 120, 24);
+    key(&mut c, KeyCode::Enter, 120, 24);
+    assert_eq!(c.app.profile_name.as_deref(), Some(""));
+    c
+}
+
+fn type_name(c: &mut Controller, name: &str) {
+    for character in name.chars() {
+        key(c, KeyCode::Char(character), 120, 24);
+    }
+}
+
+#[test]
+fn invalid_profile_submission_can_be_corrected_with_unicode_and_saved_explicitly() {
+    let root = tempfile::tempdir().unwrap();
+    let mut c = editor();
+    let original = c.preferences.profiles.clone();
+    let view = terminal_file_manager::view::ViewSettings::capture(&c.app.panes[0]);
+    for invalid in [None, Some(' ')] {
+        if let Some(character) = invalid {
+            key(&mut c, KeyCode::Char(character), 120, 24);
+        }
+        key(&mut c, KeyCode::Enter, 120, 24);
+        assert!(c.app.status.contains("profile name must be"));
+        assert!(c.app.profile_name.is_some() && c.app.profile_menu.is_some());
+        assert_eq!(c.preferences.profiles, original);
+        assert!(!c.preferences_changed);
+    }
+    key(&mut c, KeyCode::Backspace, 120, 24);
+    type_name(&mut c, "Wé");
+    key(&mut c, KeyCode::Backspace, 120, 24);
+    type_name(&mut c, "界");
+    assert_eq!(c.app.profile_name.as_deref(), Some("W界"));
+    key(&mut c, KeyCode::Enter, 120, 24);
+    assert!(c.app.profile_name.is_none() && c.app.profile_menu.is_none());
+    assert_eq!(c.preferences.profiles["W界"], view);
+    assert_eq!(c.app.panes[0].profile.as_deref(), Some("W界"));
+    assert!(c.app.panes[1].profile.is_none());
+    assert!(c.preferences_changed);
+    let store = terminal_file_manager::settings::Store {
+        path: root.path().join("config.toml"),
+        settings: c.preferences,
+    };
+    store.save().unwrap();
+    let restored = terminal_file_manager::settings::Store::load(store.path).unwrap();
+    assert_eq!(restored.settings.profiles["W界"], view);
+    for (name, profile) in original {
+        assert_eq!(restored.settings.profiles[&name], profile);
+    }
+}
+
+#[test]
+fn cancelling_profile_name_editing_preserves_views_profiles_and_persistence_state() {
+    let mut c = editor();
+    let original = toml::to_string(&c.preferences).unwrap();
+    let views = c
+        .app
+        .panes
+        .each_ref()
+        .map(terminal_file_manager::view::ViewSettings::capture);
+    type_name(&mut c, "Draft界");
+    key(&mut c, KeyCode::Esc, 120, 24);
+    assert!(c.app.profile_name.is_none() && c.app.profile_menu.is_some());
+    key(&mut c, KeyCode::Esc, 120, 24);
+    assert!(c.app.profile_menu.is_none());
+    assert_eq!(toml::to_string(&c.preferences).unwrap(), original);
+    assert!(!c.preferences_changed);
+    for (pane, view) in c.app.panes.iter().zip(views) {
+        assert_eq!(
+            terminal_file_manager::view::ViewSettings::capture(pane),
+            view
+        );
+        assert!(pane.profile.is_none() && !pane.profile_modified);
+    }
+}
+
+#[test]
+fn unicode_name_editor_wraps_within_its_popup_after_resize() {
+    let mut c = editor();
+    type_name(&mut c, "界é界é界é");
+    for width in [120, 40, 24, 120] {
+        let (buffer, geometry) = draw(&c, width, 24);
+        let area = geometry.menu.unwrap();
+        assert!(area.x > 0 && area.right() < width && area.bottom() < 24);
+        let mut text = String::new();
+        for y in area.y + 1..area.bottom() - 1 {
+            assert_eq!(buffer[(area.x, y)].symbol(), "│");
+            assert_eq!(buffer[(area.right() - 1, y)].symbol(), "│");
+            text.extend((area.x + 2..area.right() - 2).map(|x| buffer[(x, y)].symbol().trim()));
+        }
+        assert!(text.contains("Name:界é界é界é"));
+        c.app.profile_menu = None;
+        let (background, _) = draw(&c, width, 24);
+        c.app.profile_menu = Some(c.app.profile_names.len() + 1);
+        for y in 0..24 {
+            for x in 0..width {
+                if !area.contains((x, y).into()) {
+                    assert_eq!(buffer[(x, y)], background[(x, y)]);
+                }
+            }
+        }
+    }
 }
 #[test]
 fn profile_popup_has_one_instruction_and_intact_padding_and_borders() {
