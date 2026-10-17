@@ -67,6 +67,54 @@ fn missing_config_does_not_create_files_and_preferences_round_trip() {
 }
 
 #[test]
+fn clean_settings_and_every_builtin_profile_start_without_reverse() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("config.toml");
+    let store = Store::load(path.clone()).unwrap();
+    assert!(!path.exists());
+    assert!(!store.settings.reverse);
+    assert!(!terminal_file_manager::listing::SortPolicy::default().reverse);
+    assert!(!terminal_file_manager::view::ViewSettings::default().reverse);
+    let mut app = App::new(root.path().into());
+    store.settings.apply(&mut app);
+    assert!(app.panes.iter().all(|pane| !pane.sort.reverse));
+    for profile in store.settings.profiles.values() {
+        app.panes[0].sort.reverse = true;
+        profile.apply(&mut app.panes[0]);
+        assert!(!app.panes[0].sort.reverse);
+    }
+}
+
+#[test]
+fn saved_reverse_true_and_explicit_false_survive_restart_and_focus_changes() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("config.toml");
+    let mut store = Store::load(path.clone()).unwrap();
+    store.settings.reverse = true;
+    store.save().unwrap();
+    store = Store::load(path.clone()).unwrap();
+    let mut app = App::new(root.path().into());
+    store.settings.apply(&mut app);
+    assert!(app.panes.iter().all(|pane| pane.sort.reverse));
+    app.dual = true;
+    let mut controller = Controller::new(
+        app,
+        Bindings::new(&Default::default()).unwrap(),
+        store.settings,
+    );
+    let geometry = ui::geometry(&controller.app, ratatui::layout::Rect::new(0, 0, 120, 24));
+    controller.dispatch(Action::Reverse, &geometry);
+    controller.dispatch(Action::FocusPane, &geometry);
+    assert!(controller.app.panes[1].sort.reverse);
+    assert!(!controller.preferences.reverse);
+    store.settings = controller.preferences;
+    store.save().unwrap();
+    let restored = Store::load(path).unwrap();
+    restored.settings.apply(&mut controller.app);
+    assert!(controller.app.panes.iter().all(|pane| !pane.sort.reverse));
+}
+
+#[test]
 fn invalid_settings_and_key_conflicts_are_actionable_errors() {
     for text in [
         "mouse = 'yes'",
