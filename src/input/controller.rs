@@ -350,13 +350,13 @@ impl Controller {
         if geometry.footer.contains((event.column, event.row).into())
             && event.kind == MouseEventKind::Down(MouseButton::Left)
         {
-            let action = match event.column.saturating_sub(geometry.footer.x) {
-                0..=5 => Action::Help,
-                8..=15 => Action::TogglePanes,
-                18..=27 => Action::ToggleSidebar,
-                30..=37 => Action::Filter,
-                40..=45 => Action::Quit,
-                _ => return Vec::new(),
+            let Some(action) = geometry.footer_controls.iter().find_map(|control| {
+                control
+                    .area
+                    .contains((event.column, event.row).into())
+                    .then_some(control.action)
+            }) else {
+                return Vec::new();
             };
             return self.dispatch(action, geometry);
         }

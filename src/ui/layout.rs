@@ -8,6 +8,7 @@ pub struct Geometry {
     pub sidebar: Option<Rect>,
     pub status: Rect,
     pub footer: Rect,
+    pub footer_controls: Vec<super::FooterControl>,
     pub menu: Option<Rect>,
 }
 
@@ -18,6 +19,7 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
     let mut geometry = Geometry {
         panes: [None, None],
         sidebar: None,
+        footer_controls: Vec::new(),
         menu: menu_area(app, area),
         status: Rect::new(
             area.x,
@@ -32,6 +34,7 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
             u16::from(area.height >= 1),
         ),
     };
+    geometry.footer_controls = super::footer::controls(geometry.footer);
     if app.visible_panes(area.width).len() == 2 {
         let width = body.width / 2;
         geometry.panes = [
@@ -44,19 +47,7 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
             )),
         ];
     } else if app.sidebar && !app.dual && body.width >= 100 {
-        let width = (body.width / 3).min(48);
-        let info_x = if app.sidebar_left {
-            body.x
-        } else {
-            body.right() - width
-        };
-        let pane_x = if app.sidebar_left {
-            body.x + width
-        } else {
-            body.x
-        };
-        geometry.sidebar = Some(Rect::new(info_x, body.y, width, height));
-        geometry.panes[app.active] = Some(Rect::new(pane_x, body.y, body.width - width, height));
+        sidebar(&mut geometry, app, body);
     } else {
         geometry.panes[app.active] = Some(body);
     }
@@ -71,4 +62,20 @@ fn menu_area(app: &App, area: Rect) -> Option<Rect> {
     } else {
         None
     }
+}
+
+fn sidebar(geometry: &mut Geometry, app: &App, body: Rect) {
+    let width = (body.width / 3).min(48);
+    let info_x = if app.sidebar_left {
+        body.x
+    } else {
+        body.right() - width
+    };
+    let pane_x = if app.sidebar_left {
+        body.x + width
+    } else {
+        body.x
+    };
+    geometry.sidebar = Some(Rect::new(info_x, body.y, width, body.height));
+    geometry.panes[app.active] = Some(Rect::new(pane_x, body.y, body.width - width, body.height));
 }

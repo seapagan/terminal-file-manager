@@ -1,5 +1,7 @@
 //! Render cached state only. No filesystem calls, subprocesses or worker submission.
+mod footer;
 mod help;
+pub use footer::FooterControl;
 mod layout;
 mod listing;
 mod measure;
@@ -43,11 +45,7 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
         Paragraph::new(clean(&app.status)).style(theme.style(Role::Status)),
         geometry.status,
     );
-    frame.render_widget(
-        Paragraph::new("? Help  ^P Panes  Alt-I Info  / Filter  q Quit | F3–F8 unavailable")
-            .style(theme.style(Role::Disabled)),
-        geometry.footer,
-    );
+    footer::render(frame, geometry.footer, &geometry.footer_controls, theme);
     if app.popup {
         metadata::render(frame, app, frame.area(), theme, true);
     }

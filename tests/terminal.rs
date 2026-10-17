@@ -19,7 +19,7 @@ fn browser_starts_at_cwd_and_explicit_path_and_restores_terminal() {
             command,
             &[
                 ("browser-sentinel", "\r"),
-                ("Viewer unavailable until M6", "\u{10}"),
+                ("Viewer unavailable until M6", "\u{1b}p"),
                 ("Pane 2", "q"),
             ],
             true,
@@ -45,7 +45,7 @@ fn preference_change_survives_exit_from_other_pane_and_real_restart() {
         "mouse = false\nsidebar_left = true\n[bindings]\nF12 = 'quit'\n",
     )
     .unwrap();
-    for step in [("preference-sentinel", "s\u{10}\tq"), ("Name", "q")] {
+    for step in [("preference-sentinel", "s\u{1b}p\tq"), ("Name", "q")] {
         let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
         command.cwd(root.path());
         isolate(&mut command, root.path());

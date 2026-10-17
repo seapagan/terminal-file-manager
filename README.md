@@ -29,7 +29,7 @@ help/version also work in scripts. Errors return exit code 2.
 | Up/Down or k/j; Home/End/PageUp/PageDown | Move the cursor |
 | Enter; Backspace or Alt+Up | Enter a directory; go to its parent |
 | Alt+Left / Alt+Right | Back/forward in this pane's session history |
-| Ctrl+P; Tab | Toggle one/two panes; focus the other visible pane |
+| Alt+P; Tab/Shift+Tab | Toggle one/two panes; focus the other visible pane |
 | Space; Insert | Mark/unmark; mark/unmark and advance |
 | Ctrl+A / Ctrl+U | Select all / clear marks in the visible working set |
 | /; Enter; Esc | Edit fuzzy filter; accept; cancel/clear |

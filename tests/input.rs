@@ -72,6 +72,26 @@ fn files_and_mutations_explain_unavailability_without_launching() {
 }
 
 #[test]
+fn alt_p_and_both_tab_encodings_share_the_two_pane_focus_action() {
+    let (_root, mut controller) = controller();
+    key(&mut controller, "Ctrl+p");
+    assert!(!controller.app.dual);
+    key(&mut controller, "Alt+p");
+    assert!(controller.app.dual);
+    key(&mut controller, "Tab");
+    assert_eq!(controller.app.active, 1);
+    key(&mut controller, "Shift+Tab");
+    assert_eq!(controller.app.active, 0);
+    let geometry = ui::geometry(&controller.app, ratatui::layout::Rect::new(0, 0, 120, 24));
+    controller.handle(
+        Event::Key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::NONE)),
+        &geometry,
+        Duration::ZERO,
+    );
+    assert_eq!(controller.app.active, 1);
+}
+
+#[test]
 fn preferred_metadata_presentation_keeps_both_direct_shortcuts() {
     let (_root, mut controller) = controller();
     controller.preferences =
@@ -224,10 +244,24 @@ fn footer_hit_testing_dispatches_the_labelled_action_and_ignores_disabled_tail()
             modifiers: KeyModifiers::NONE,
         })
     };
-    controller.handle(click(60), &geometry, Duration::ZERO);
+    controller.handle(click(119), &geometry, Duration::ZERO);
     assert!(!controller.app.sidebar);
-    controller.handle(click(20), &geometry, Duration::ZERO);
+    let info = geometry
+        .footer_controls
+        .iter()
+        .find(|control| control.action == terminal_file_manager::input::Action::ToggleSidebar)
+        .unwrap()
+        .area
+        .x;
+    controller.handle(click(info), &geometry, Duration::ZERO);
     assert!(controller.app.sidebar);
-    controller.handle(click(42), &geometry, Duration::ZERO);
+    let quit = geometry
+        .footer_controls
+        .iter()
+        .find(|control| control.action == terminal_file_manager::input::Action::Quit)
+        .unwrap()
+        .area
+        .x;
+    controller.handle(click(quit), &geometry, Duration::ZERO);
     assert!(controller.quit);
 }

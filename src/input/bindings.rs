@@ -47,6 +47,12 @@ impl Bindings {
 
     /// Crossterm Shift on uppercase printable keys is normalized consistently.
     pub fn action(&self, event: KeyEvent) -> Option<Action> {
+        if event.code == KeyCode::BackTab {
+            return self
+                .keys
+                .get(&(KeyCode::Tab, event.modifiers | KeyModifiers::SHIFT))
+                .copied();
+        }
         if let Some(action) = self.keys.get(&(event.code, event.modifiers)) {
             return Some(*action);
         }
@@ -127,8 +133,9 @@ const DEFAULT_BINDINGS: &[(&str, Action)] = &[
     ("F10", Quit),
     ("Ctrl+c", Quit),
     ("?", Help),
-    ("Ctrl+p", TogglePanes),
+    ("Alt+p", TogglePanes),
     ("Tab", FocusPane),
+    ("Shift+Tab", FocusPane),
     ("Alt+i", ToggleSidebar),
     ("Alt+Enter", Metadata),
     ("F2", Info),
