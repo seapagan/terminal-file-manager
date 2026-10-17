@@ -1,4 +1,4 @@
-//! Metadata values share listing styles and dispatch ordinary pane preferences.
+//! Metadata values share listing styles while keeping formatting local to each open view.
 use colored_text::ColorLevel;
 use crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::{Terminal, backend::TestBackend, buffer::Buffer, layout::Rect};
@@ -121,7 +121,7 @@ fn metadata_attributes_keep_symbolic_and_octal_character_styles_at_every_depth()
 }
 
 #[test]
-fn attribute_value_click_changes_only_active_pane_and_persisted_explicit_preference() {
+fn attribute_value_click_changes_only_the_open_metadata_view() {
     for floating in [false, true] {
         let (_root, mut c) = loaded();
         c.app.popup = floating;
@@ -132,15 +132,19 @@ fn attribute_value_click_changes_only_active_pane_and_persisted_explicit_prefere
         assert_eq!(c.app.panes[0].permissions, PermissionDisplay::Symbolic);
         assert!(!c.preferences_changed);
         click(&mut c, x + 1, y, &geometry);
-        assert_eq!(c.app.panes[0].permissions, PermissionDisplay::Octal);
+        assert_eq!(c.app.panes[0].permissions, PermissionDisplay::Symbolic);
         assert_eq!(c.app.panes[1].permissions, PermissionDisplay::Symbolic);
-        assert_eq!(c.preferences.permissions, PermissionDisplay::Octal);
-        assert!(c.preferences_changed && c.app.panes[0].profile_modified);
+        assert_eq!(c.preferences.permissions, PermissionDisplay::Symbolic);
+        assert_eq!(
+            c.app.metadata_format(floating).permissions,
+            PermissionDisplay::Octal
+        );
+        assert!(!c.preferences_changed && !c.app.panes[0].profile_modified);
         let restored = terminal_file_manager::settings::Settings::parse(
             &toml::to_string(&c.preferences).unwrap(),
         )
         .unwrap();
-        assert_eq!(restored.permissions, PermissionDisplay::Octal);
+        assert_eq!(restored.permissions, PermissionDisplay::Symbolic);
         let buffer = draw(&c.app, 120, 32, ColorLevel::NoColor);
         let geometry = ui::geometry(&c.app, Rect::new(0, 0, 120, 32));
         let (x, y) = visible_value(&buffer, &geometry, "- 4754");
@@ -214,8 +218,12 @@ fn wrapped_scrolled_values_match_click_regions_and_exclude_padding_and_overlays(
             click(&mut c, control.area.right(), control.area.y, &geometry);
             assert_eq!(c.app.panes[0].permissions, PermissionDisplay::Symbolic);
             click(&mut c, control.area.x, control.area.y, &geometry);
-            assert_eq!(c.app.panes[0].permissions, PermissionDisplay::Octal);
-            c.app.panes[0].permissions = PermissionDisplay::Symbolic;
+            assert_eq!(c.app.panes[0].permissions, PermissionDisplay::Symbolic);
+            assert_eq!(
+                c.app.metadata_format(floating).permissions,
+                PermissionDisplay::Octal
+            );
+            c.app.metadata_formats[usize::from(floating)] = None;
         }
         if width == 24 {
             assert!(geometry.metadata_controls.len() > 1);
@@ -289,7 +297,7 @@ fn metadata_times_follow_pane_mode_and_advance_from_cached_timestamps() {
 }
 
 #[test]
-fn each_metadata_time_value_toggles_only_active_mode_and_restart_preference() {
+fn each_metadata_time_value_toggles_only_the_open_metadata_view() {
     for floating in [false, true] {
         for (label, text) in [
             ("Modified UTC:", "1970-01-11 00:00:00.123456700"),
@@ -304,17 +312,18 @@ fn each_metadata_time_value_toggles_only_active_mode_and_restart_preference() {
             let (x, y) = visible_value(&buffer, &geometry, text);
             click(&mut c, x, y, &geometry);
             assert!(
-                c.app.panes[0].fuzzy_timestamps && c.preferences.fuzzy_timestamps,
+                !c.app.panes[0].fuzzy_timestamps && !c.preferences.fuzzy_timestamps,
                 "{floating} {label} {x},{y} controls={:?}",
                 geometry.metadata_controls
             );
             assert!(!c.app.panes[1].fuzzy_timestamps);
-            assert!(c.preferences_changed && c.app.panes[0].profile_modified);
+            assert!(!c.preferences_changed && !c.app.panes[0].profile_modified);
             let settings = terminal_file_manager::settings::Settings::parse(
                 &toml::to_string(&c.preferences).unwrap(),
             )
             .unwrap();
-            assert!(settings.fuzzy_timestamps);
+            assert!(!settings.fuzzy_timestamps);
+            assert!(c.app.metadata_format(floating).fuzzy_timestamps);
             assert!(c.app.request_metadata(0).is_none());
             let buffer = draw(&c.app, 180, 40, ColorLevel::NoColor);
             let geometry = ui::geometry(&c.app, Rect::new(0, 0, 180, 40));
@@ -383,7 +392,8 @@ fn timestamp_continuations_remain_clickable_after_narrow_overlay_and_sidebar_scr
         );
         assert!(!c.app.panes[0].fuzzy_timestamps);
         click(&mut c, position.x, position.y, &geometry);
-        assert!(c.app.panes[0].fuzzy_timestamps && c.preferences.fuzzy_timestamps);
+        assert!(!c.app.panes[0].fuzzy_timestamps && !c.preferences.fuzzy_timestamps);
+        assert!(c.app.metadata_format(floating).fuzzy_timestamps);
         assert!(c.app.request_metadata(0).is_none());
     }
 }
@@ -408,5 +418,93 @@ fn native_attribute_text_survives_both_formats_and_excess_scroll_resize() {
                 find(&buffer, "readonly, hidden");
             }
         }
+    }
+}
+
+#[test]
+fn ordinary_entries_omit_link_target_and_link_objects_retain_unavailable_detail() {
+    for floating in [false, true] {
+        let (_root, mut c) = loaded();
+        c.app.popup = floating;
+        for kind in [
+            fs::EntryKind::File,
+            fs::EntryKind::Directory,
+            fs::EntryKind::Link,
+            fs::EntryKind::Junction,
+            fs::EntryKind::ReparsePoint,
+        ] {
+            c.app.details[0].entry.as_mut().unwrap().kind = kind;
+            let buffer = draw(&c.app, 180, 40, ColorLevel::NoColor);
+            let text: String = buffer.content().iter().map(|c| c.symbol()).collect();
+            assert_eq!(
+                text.contains("Link target:"),
+                !matches!(kind, fs::EntryKind::File | fs::EntryKind::Directory)
+            );
+        }
+    }
+}
+
+fn owner_continuation(c: &mut Controller, bounds: Rect, floating: bool) -> Rect {
+    use terminal_file_manager::input::Action;
+    let g = ui::geometry(&c.app, bounds);
+    let limit = if floating {
+        g.overlay_scroll_limit
+    } else {
+        g.metadata_scroll_limit
+    };
+    for scroll in 0..=limit {
+        if floating {
+            c.app.overlay_scroll = scroll;
+        } else {
+            c.app.metadata_scroll = scroll;
+        }
+        let controls: Vec<_> = ui::geometry(&c.app, bounds)
+            .metadata_controls
+            .into_iter()
+            .filter(|control| control.action == Action::OwnerDisplay)
+            .collect();
+        if controls.len() > 1 {
+            return controls[1].area;
+        }
+    }
+    panic!("wrapped owner continuation");
+}
+#[test]
+fn owner_values_and_continuations_exclude_labels_padding_and_borders() {
+    use terminal_file_manager::{
+        input::Action,
+        owner::{OwnerDisplay, Ownership},
+    };
+    for (floating, width) in [(true, 24), (true, 40), (false, 120)] {
+        let (_root, mut c) = loaded();
+        c.app.popup = floating;
+        c.app.details[0].entry.as_mut().unwrap().owner = Some(Ownership {
+            uid: 12,
+            gid: 34,
+            user: "cached-user-".repeat(6),
+            group: "cached-group".into(),
+        });
+        let bounds = Rect::new(0, 0, width, 12);
+        let value = owner_continuation(&mut c, bounds, floating);
+        let g = ui::geometry(&c.app, bounds);
+        click(&mut c, value.x - 1, value.y, &g);
+        click(&mut c, value.right(), value.y, &g);
+        assert_eq!(
+            c.app.metadata_format(floating).owner_display,
+            OwnerDisplay::Names
+        );
+        click(&mut c, value.x, value.y, &g);
+        assert_eq!(
+            c.app.metadata_format(floating).owner_display,
+            OwnerDisplay::Numeric
+        );
+        assert_eq!(c.app.panes[0].owner_display, OwnerDisplay::Names);
+        assert_eq!(c.preferences.owner_display, OwnerDisplay::Names);
+        assert!(!c.preferences_changed);
+        assert!(
+            g.metadata_controls
+                .iter()
+                .any(|control| control.action == Action::OwnerDisplay)
+        );
     }
 }

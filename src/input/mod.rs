@@ -5,6 +5,7 @@ mod controller;
 mod diagnostics;
 mod divider;
 mod help;
+mod metadata;
 mod profiles;
 mod scroll;
 pub(crate) mod view;

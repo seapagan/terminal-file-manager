@@ -117,6 +117,11 @@ fn tick(app: &mut App) -> bool {
     }
     app.now = now;
     app.panes.iter().any(|pane| pane.fuzzy_timestamps)
+        || app
+            .metadata_formats
+            .iter()
+            .flatten()
+            .any(|format| format.fuzzy_timestamps)
 }
 
 fn collect(controller: &mut Controller, pool: &mut Pool) -> bool {
@@ -197,6 +202,22 @@ mod tests {
             Bindings::new(&Default::default()).unwrap(),
             Settings::default(),
         )
+    }
+
+    #[test]
+    fn temporary_fuzzy_metadata_requests_clock_redraw_with_exact_listing_defaults() {
+        let root = tempfile::tempdir().unwrap();
+        let mut c = counting_controller(root.path());
+        let g = ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 120, 24));
+        c.dispatch(Action::Metadata, &g);
+        c.app.metadata_formats[1]
+            .as_mut()
+            .unwrap()
+            .toggle(Action::FuzzyTimestamps);
+        c.app.now = std::time::SystemTime::UNIX_EPOCH;
+        assert!(tick(&mut c.app));
+        assert!(c.app.panes.iter().all(|p| !p.fuzzy_timestamps));
+        assert!(!c.preferences.fuzzy_timestamps && !c.preferences_changed);
     }
 
     fn hold_first_count(

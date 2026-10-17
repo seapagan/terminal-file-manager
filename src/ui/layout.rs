@@ -40,7 +40,7 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
                 height,
             )),
         ];
-    } else if app.sidebar && !app.dual && body.width >= 100 {
+    } else if app.sidebar_visible(body.width) {
         sidebar(&mut geometry, app, body);
     } else {
         geometry.panes[app.active] = Some(body);

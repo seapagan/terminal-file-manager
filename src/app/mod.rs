@@ -1,5 +1,7 @@
 //! Authoritative pane state and pure transitions. No filesystem calls.
+mod metadata;
 mod pane;
+pub use metadata::MetadataFormat;
 mod selection;
 use crate::fs::{Entry, Snapshot, Totals};
 pub use pane::{IgnoreMode, Pane, SelectionCounts};
@@ -56,6 +58,7 @@ pub struct App {
     pub help_rows: Vec<(String, String)>,
     pub overlay_scroll: u16,
     pub metadata_scroll: u16,
+    pub metadata_formats: [Option<MetadataFormat>; 2],
     pub status: String,
     pub now: std::time::SystemTime,
     pub details: [Detail; 2],
@@ -87,6 +90,7 @@ impl App {
                 .help_rows(),
             overlay_scroll: 0,
             metadata_scroll: 0,
+            metadata_formats: [None; 2],
             status: "Read-only — ? for help".into(),
             now: std::time::SystemTime::now(),
             details: std::array::from_fn(|_| Detail::default()),

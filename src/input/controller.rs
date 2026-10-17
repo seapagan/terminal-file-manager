@@ -42,8 +42,12 @@ impl Controller {
         }
     }
 
-    /// Normalize terminal input. Clock/geometry are explicit deterministic inputs.
-    pub fn handle(&mut self, event: Event, geometry: &Geometry, now: Duration) -> Vec<Request> {
+    pub(super) fn handle_event(
+        &mut self,
+        event: Event,
+        geometry: &Geometry,
+        now: Duration,
+    ) -> Vec<Request> {
         if super::diagnostics::handle(self, &event, geometry) {
             return Vec::new();
         }
@@ -82,8 +86,7 @@ impl Controller {
         }
     }
 
-    /// Keyboard and clickable controls share this dispatcher and availability policy.
-    pub fn dispatch(&mut self, action: Action, geometry: &Geometry) -> Vec<Request> {
+    pub(super) fn dispatch_action(&mut self, action: Action, geometry: &Geometry) -> Vec<Request> {
         use Action::*;
         let action = self.preferred_action(action);
         if self.app.help && !super::help::accepts(action) {
@@ -382,7 +385,9 @@ impl Controller {
                 .iter()
                 .find(|control| control.area.contains((event.column, event.row).into()))
         {
-            self.dispatch(control.action, geometry);
+            if let Some(format) = &mut self.app.metadata_formats[usize::from(self.app.popup)] {
+                format.toggle(control.action);
+            }
             return true;
         }
         if self.app.profile_menu.is_some() {

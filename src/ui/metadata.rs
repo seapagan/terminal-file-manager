@@ -5,7 +5,7 @@ use super::{
     text::wrap_line,
 };
 use crate::{
-    app::{App, Detail, Pane},
+    app::{App, Detail, MetadataFormat},
     color::{Role, Theme},
     input::Action,
 };
@@ -34,6 +34,19 @@ impl Field {
             value: Line::styled(clean(&value), theme.style(role)),
             action: None,
         }
+    }
+    fn interactive(mut self, detail: &Detail, format: &MetadataFormat, theme: &Theme) -> Self {
+        if self.label == "Attributes"
+            && let Some(entry) = &detail.entry
+        {
+            self.value = Line::from(permission_spans(entry, format.permissions, theme));
+            self.action = Some(Action::Permissions);
+        } else if self.label == "Owner/group" {
+            self.action = Some(Action::OwnerDisplay);
+        } else if time_label(self.label) {
+            self.action = Some(Action::FuzzyTimestamps);
+        }
+        self
     }
 }
 
@@ -75,7 +88,12 @@ pub(super) fn render(frame: &mut Frame, app: &App, bounds: Rect, theme: &Theme, 
     );
 }
 
-fn fields(detail: &Detail, pane: &Pane, now: std::time::SystemTime, theme: &Theme) -> Vec<Field> {
+fn fields(
+    detail: &Detail,
+    pane: &MetadataFormat,
+    now: std::time::SystemTime,
+    theme: &Theme,
+) -> Vec<Field> {
     let mut fields = entry_fields(detail, pane, now);
     if let Some(totals) = &detail.totals {
         match totals {
@@ -105,18 +123,7 @@ fn fields(detail: &Detail, pane: &Pane, now: std::time::SystemTime, theme: &Them
     fields.push(("Keys", "c: count/size on demand; Esc cancels/closes".into()));
     fields
         .into_iter()
-        .map(|(label, value)| {
-            let mut field = Field::plain(label, value, theme);
-            if label == "Attributes"
-                && let Some(entry) = &detail.entry
-            {
-                field.value = Line::from(permission_spans(entry, pane.permissions, theme));
-                field.action = Some(Action::Permissions);
-            } else if time_label(label) {
-                field.action = Some(Action::FuzzyTimestamps);
-            }
-            field
-        })
+        .map(|(label, value)| Field::plain(label, value, theme).interactive(detail, pane, theme))
         .collect()
 }
 
@@ -130,7 +137,7 @@ fn time_label(label: &str) -> bool {
 fn time_field(
     label: &'static str,
     time: Option<std::time::SystemTime>,
-    pane: &Pane,
+    pane: &MetadataFormat,
     now: std::time::SystemTime,
 ) -> (&'static str, String) {
     let label = if pane.fuzzy_timestamps {
@@ -143,7 +150,7 @@ fn time_field(
 
 fn entry_fields(
     detail: &Detail,
-    pane: &Pane,
+    pane: &MetadataFormat,
     now: std::time::SystemTime,
 ) -> Vec<(&'static str, String)> {
     let Some(entry) = &detail.entry else {
@@ -177,18 +184,30 @@ fn entry_fields(
             crate::permissions::attributes(entry, pane.permissions),
         ),
         ("Owner/group", entry.owner_display(pane.owner_display)),
+    ];
+    fields.extend(link_field(entry));
+    if let Some(error) = &entry.error {
+        fields.push(("Error", error.clone()));
+    }
+    fields
+}
+
+fn link_field(entry: &crate::fs::Entry) -> Option<(&'static str, String)> {
+    (matches!(
+        entry.kind,
+        crate::fs::EntryKind::Link
+            | crate::fs::EntryKind::Junction
+            | crate::fs::EntryKind::ReparsePoint
+    ) || entry.link_target.is_some())
+    .then(|| {
         (
             "Link target",
             entry
                 .link_target
                 .as_ref()
                 .map_or_else(|| "unavailable".into(), |p| p.display().to_string()),
-        ),
-    ];
-    if let Some(error) = &entry.error {
-        fields.push(("Error", error.clone()));
-    }
-    fields
+        )
+    })
 }
 
 fn rows(fields: &[Field], width: u16, theme: &Theme) -> Vec<Row> {
@@ -231,7 +250,7 @@ fn label_width(fields: &[Field], width: u16) -> usize {
 fn layout(app: &App, bounds: Rect, theme: &Theme, floating: bool) -> Layout {
     let fields = fields(
         &app.details[app.active],
-        &app.panes[app.active],
+        &app.metadata_format(floating),
         app.now,
         theme,
     );
