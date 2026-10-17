@@ -53,7 +53,7 @@ impl Controller {
         }
         match event {
             Event::Key(key) if key.kind != KeyEventKind::Release => {
-                if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+                if key.code == KeyCode::Char('c') && key.modifiers == KeyModifiers::CONTROL {
                     self.quit = true;
                     return Vec::new();
                 }

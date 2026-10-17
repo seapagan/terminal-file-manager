@@ -356,3 +356,78 @@ fn filter_editor_keeps_tab_keys_modal_until_accept_or_cancel() {
     key(&mut c, "Tab");
     assert_eq!(c.app.active, 1);
 }
+
+fn raw_key(
+    c: &mut Controller,
+    code: KeyCode,
+    modifiers: KeyModifiers,
+    kind: crossterm::event::KeyEventKind,
+) {
+    let g = ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 120, 24));
+    c.handle(
+        Event::Key(KeyEvent::new_with_kind(code, modifiers, kind)),
+        &g,
+        Duration::ZERO,
+    );
+}
+
+#[test]
+fn emergency_exit_requires_exact_control_c_and_ignores_releases() {
+    use crossterm::event::KeyEventKind::{Press, Release, Repeat};
+    for modifiers in [
+        KeyModifiers::ALT,
+        KeyModifiers::SHIFT,
+        KeyModifiers::SUPER,
+        KeyModifiers::META,
+    ] {
+        let (_root, mut c) = controller();
+        raw_key(
+            &mut c,
+            KeyCode::Char('c'),
+            KeyModifiers::CONTROL | modifiers,
+            Press,
+        );
+        assert!(!c.quit, "{modifiers:?}");
+    }
+    let (_root, mut c) = controller();
+    raw_key(&mut c, KeyCode::Char('c'), KeyModifiers::CONTROL, Release);
+    assert!(!c.quit);
+    for kind in [Press, Repeat] {
+        raw_key(&mut c, KeyCode::Char('c'), KeyModifiers::CONTROL, kind);
+        assert!(c.quit);
+        c.quit = false;
+    }
+}
+
+#[test]
+fn exact_emergency_exit_survives_all_modals_and_user_overrides() {
+    use terminal_file_manager::input::Action;
+    for modal in ["/", "Alt+v", "V", "?", "Alt+Enter", "F12"] {
+        let (_root, mut c) = controller();
+        c = Controller::new(
+            c.app,
+            Bindings::new(&std::collections::BTreeMap::from([
+                ("Ctrl+c".into(), Action::Hidden),
+                ("Ctrl+Alt+c".into(), Action::Diagnostics),
+            ]))
+            .unwrap(),
+            Default::default(),
+        );
+        key(&mut c, modal);
+        key(&mut c, "Ctrl+c");
+        assert!(c.quit, "{modal}");
+        assert!(!c.app.panes[0].show_hidden);
+    }
+    let (_root, mut c) = controller();
+    c = Controller::new(
+        c.app,
+        Bindings::new(&std::collections::BTreeMap::from([(
+            "Ctrl+Alt+c".into(),
+            Action::Diagnostics,
+        )]))
+        .unwrap(),
+        Default::default(),
+    );
+    key(&mut c, "Ctrl+Alt+c");
+    assert!(!c.quit && c.app.diagnostics);
+}

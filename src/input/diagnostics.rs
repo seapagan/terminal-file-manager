@@ -6,7 +6,7 @@ use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, MouseEvent};
 pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geometry) -> bool {
     match event {
         Event::Key(key) if key.kind != KeyEventKind::Release => {
-            if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+            if key.code == KeyCode::Char('c') && key.modifiers == KeyModifiers::CONTROL {
                 return false;
             }
             if let Some(

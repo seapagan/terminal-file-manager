@@ -124,6 +124,8 @@ owner = false
 
 Use `[profiles.NAME]` and `[profiles.NAME.columns]` for named views in TOML.
 Custom keybindings override defaults; `?` shows your effective bindings.
+Exact Ctrl+C remains an emergency exit in menus and filters, even when rebound.
+Ctrl+Alt+C and other modified variants follow their configured bindings.
 F12 opens colour diagnostics by default. Set `NO_COLOR` to disable colours.
 
 ## Links
