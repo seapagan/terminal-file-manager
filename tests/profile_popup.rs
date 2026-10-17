@@ -121,3 +121,23 @@ fn long_profile_names_truncate_without_drawing_or_clicking_outside_content() {
         }
     }
 }
+
+#[test]
+fn confirmation_row_fits_long_names_when_terminal_width_allows() {
+    for name in ["x".repeat(60), "界e\u{301}".repeat(20)] {
+        let mut c = controller();
+        c.app.profile_names = vec![name.clone()];
+        c.app.profile_menu = Some(1);
+        let expected = format!("Apply selected to both: {name}");
+        let (buffer, g) = draw(&c, 120, 24);
+        let area = g.menu.unwrap();
+        let row: String = (area.x + 2..area.right() - 2)
+            .map(|x| buffer[(x, area.y + 2)].symbol())
+            .collect();
+        // TestBackend retains padding cells after wide graphemes.
+        let expected = expected.replace('界', "界 ");
+        assert_eq!(row.trim_end(), expected);
+        click(&mut c, &g, area.right() - 2, area.y + 2);
+        assert_eq!(c.app.profile_menu, Some(1));
+    }
+}

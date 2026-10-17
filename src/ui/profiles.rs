@@ -10,6 +10,7 @@ use ratatui::{
 };
 
 const HINT: &str = "Enter: active pane; Space: both…; Esc: close";
+const APPLY_BOTH: &str = "Apply selected to both: ";
 
 fn block() -> Block<'static> {
     Block::default()
@@ -21,7 +22,11 @@ pub(super) fn area(app: &App, bounds: Rect) -> Rect {
     let width = app
         .profile_names
         .iter()
-        .map(|s| Line::raw(super::clean(s)).width())
+        .map(|s| {
+            Line::raw(super::clean(s))
+                .width()
+                .saturating_add(APPLY_BOTH.len())
+        })
         .chain([HINT.len()])
         .max()
         .unwrap_or(0)
@@ -113,7 +118,7 @@ pub(super) fn render(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
 fn render_rows(frame: &mut Frame, app: &App, area: Rect, start: usize, theme: &Theme) {
     let mut labels = app.profile_names.clone();
     labels.push(format!(
-        "Apply selected to both: {}",
+        "{APPLY_BOTH}{}",
         app.profile_names
             .get(app.profile_choice)
             .map_or("", String::as_str)
