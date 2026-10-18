@@ -355,6 +355,7 @@ class RepositoryDistributionTests(unittest.TestCase):
                 "LICENSE-APACHE",
                 "LICENSE-MIT",
                 "README.md",
+                "THIRD_PARTY_NOTICES.md",
             ),
         )
 
