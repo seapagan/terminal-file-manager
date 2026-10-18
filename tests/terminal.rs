@@ -246,6 +246,7 @@ fn printable_bindings_match_legacy_and_enhanced_layout_characters() {
     .unwrap();
     for encoded in printable_inputs() {
         let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+        command.env("TFM_TEST_TRACE_INPUT", "1");
         command.cwd(root.path());
         isolate(&mut command, root.path());
         drive(command, &[("keyboard-sentinel", encoded)], false);
