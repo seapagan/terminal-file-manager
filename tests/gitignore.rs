@@ -317,12 +317,19 @@ fn git_directory_links_and_pointer_files_follow_git_without_hiding_broken_links(
     for name in ["info-victim", "global-victim", "local-victim"] {
         fs::write(repo.path.join(name), "fixture").unwrap();
     }
-    directory_link(Path::new("../linked-administration"), &dot);
+    // CreateSymbolicLinkW stores relative targets verbatim; use native separators.
+    directory_link(&Path::new("..").join("linked-administration"), &dot);
+    assert!(fs::metadata(&dot).unwrap().is_dir());
+    assert_eq!(
+        fs::canonicalize(&dot).unwrap(),
+        fs::canonicalize(&admin).unwrap()
+    );
+    repo.run(&repo.path, &["rev-parse", "--show-toplevel"]);
     for name in ["info-victim", "global-victim", "local-victim"] {
         repo.compare(&repo.path, name, Some(true));
     }
     remove_directory_link(&dot);
-    directory_link(Path::new("../missing-administration"), &dot);
+    directory_link(&Path::new("..").join("missing-administration"), &dot);
     let output = repo
         .command(&repo.path)
         .args(["check-ignore", "info-victim"])
@@ -335,6 +342,26 @@ fn git_directory_links_and_pointer_files_follow_git_without_hiding_broken_links(
     for name in ["info-victim", "global-victim", "local-victim"] {
         repo.compare(&repo.path, name, Some(true));
     }
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_slash_directory_link_is_a_malformed_oracle_fixture() {
+    let repo = Repository::new();
+    let dot = repo.path.join(".git");
+    fs::rename(&dot, repo.temp.path().join("linked-administration")).unwrap();
+    // Reproduce the old fixture: Win32 does not normalize slashes in this target.
+    directory_link(Path::new("../linked-administration"), &dot);
+    assert!(fs::symlink_metadata(&dot).unwrap().file_type().is_symlink());
+    assert!(fs::metadata(&dot).is_err());
+    let output = repo
+        .command(&repo.path)
+        .args(["check-ignore", "info-victim"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(128), "{output:?}");
+    assert_unknown(&repo);
+    remove_directory_link(&dot);
 }
 
 #[test]
