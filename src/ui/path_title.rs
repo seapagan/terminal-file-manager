@@ -33,22 +33,40 @@ fn shorten(path: &Path, width: usize) -> String {
     } else {
         String::new()
     };
-    let mut used = cells(&anchor) + cells(last) + 2;
-    let mut end = parts.len() - 1;
-    while end > 1 && used + cells(&parts[end - 1]) <= width {
-        end -= 1;
-        used += cells(&parts[end]);
-    }
-    let mut start = 0;
-    while start + 1 < end && used + cells(&parts[start]) <= width {
-        used += cells(&parts[start]);
-        start += 1;
-    }
+    let remaining = width - cells(&anchor) - cells(last) - 2;
+    let (start, end) = retained_ends(&parts, remaining);
     format!(
         "{anchor}{}…{separator}{}",
         parts[..start].concat(),
         parts[end..].concat()
     )
+}
+
+fn retained_ends(parts: &[String], mut remaining: usize) -> (usize, usize) {
+    let widths = parts.iter().map(|part| cells(part)).collect::<Vec<_>>();
+    let mut start = 0;
+    let mut end = parts.len() - 1;
+    while start + 1 < end {
+        // Balance complete components, counting the final directory; prefer the start on ties.
+        let choices = if start <= parts.len() - end {
+            [(start, true), (end - 1, false)]
+        } else {
+            [(end - 1, false), (start, true)]
+        };
+        let Some((index, leading)) = choices
+            .into_iter()
+            .find(|(index, _)| widths[*index] <= remaining)
+        else {
+            break;
+        };
+        remaining -= widths[index];
+        if leading {
+            start += 1;
+        } else {
+            end -= 1;
+        }
+    }
+    (start, end)
 }
 
 fn components(path: &Path, raw: &str) -> (String, Vec<String>, char) {

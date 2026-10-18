@@ -80,10 +80,10 @@ fn path_budgets_preserve_exact_fits_and_elide_only_complete_middle_components() 
     let app = App::new("/alpha/beta/gamma/leaf".into());
     for (budget, expected) in [
         (22, "/alpha/beta/gamma/leaf"),
-        (21, "/…/beta/gamma/leaf"),
-        (18, "/…/beta/gamma/leaf"),
-        (17, "/…/gamma/leaf"),
-        (13, "/…/gamma/leaf"),
+        (21, "/alpha/beta/…/leaf"),
+        (18, "/alpha/beta/…/leaf"),
+        (17, "/alpha/…/leaf"),
+        (13, "/alpha/…/leaf"),
         (12, "/…/leaf"),
         (7, "/…/leaf"),
         (6, "…/leaf"),
@@ -100,6 +100,67 @@ fn path_budgets_preserve_exact_fits_and_elide_only_complete_middle_components() 
     }
     let app = App::new("/a/verylongparent/b/leaf".into());
     assert_eq!(titles(&app, 23)[0], "> Pane 1: /a/…/b/leaf");
+}
+
+#[test]
+fn balanced_middle_elision_uses_whole_components_at_both_ends() {
+    for (path, budget, expected) in [
+        (LONG, 24, "/…/terminal-file-manager"),
+        (LONG, 29, "/home/…/terminal-file-manager"),
+        (LONG, 38, "/home/seapagan/…/terminal-file-manager"),
+        (LONG, 42, "/home/seapagan/…/own/terminal-file-manager"),
+        ("/a/b/c/d/e/final", 14, "/a/b/…/e/final"),
+        ("/long-leading-name/b/c/d/final", 14, "/…/b/c/d/final"),
+        ("/a/b/c/long-trailing-name/final", 14, "/a/b/c/…/final"),
+        ("/lengthy/b/c/d/final", 18, "/lengthy/b/…/final"),
+        ("/界/e\u{301}/middle/d/leaf", 12, "/界 /e\u{301}/…/leaf"),
+    ] {
+        let app = App::new(path.into());
+        assert_eq!(
+            titles(&app, budget + 12)[0].trim_end_matches('─'),
+            format!("> Pane 1: {expected}"),
+            "{path}, budget {budget}"
+        );
+        assert_eq!(
+            app.panes[0].path.as_os_str().as_encoded_bytes(),
+            path.as_bytes()
+        );
+    }
+}
+
+#[test]
+fn both_panes_retain_leading_context_at_their_independent_widths_after_resize() {
+    let mut app = App::new(LONG.into());
+    app.dual = true;
+    assert_eq!(
+        titles(&app, 100),
+        [
+            "> Pane 1: /home/seapagan/…/terminal-file-manager",
+            "  Pane 2: /home/seapagan/…/terminal-file-manager",
+        ]
+    );
+    assert_eq!(
+        titles(&app, 82),
+        [
+            "> Pane 1: /home/…/terminal-file-manager",
+            "  Pane 2: /home/…/terminal-file-manager",
+        ]
+    );
+    app.split_percent = 41;
+    assert_eq!(
+        titles(&app, 100),
+        [
+            "> Pane 1: /home/…/terminal-file-manager",
+            "  Pane 2: /home/seapagan/data/…/own/terminal-file-manager",
+        ]
+    );
+    app.maximized = true;
+    assert!(titles(&app, 100)[0].contains(LONG));
+    app.maximized = false;
+    assert_eq!(
+        titles(&app, 100)[0],
+        "> Pane 1: /home/…/terminal-file-manager"
+    );
 }
 
 #[test]
