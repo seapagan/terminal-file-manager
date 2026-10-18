@@ -39,7 +39,7 @@ ignore = "=0.4.33"
 ratatui = { version = "=0.30.2", default-features = false, features = ["crossterm_0_29", "layout-cache"] }
 serde = { version = "=1.0.229", features = ["derive"] }
 toml = { version = "=1.1.8", default-features = false, features = ["parse", "serde", "display"] }
-tokio = { version = "=1.53.3", default-features = false, features = ["rt-multi-thread", "sync", "time"] }
+tokio = { version = "=1.53.3", default-features = false, features = ["rt-multi-thread"] }
 time = { version = "=0.3.55", default-features = false, features = ["std"] }
 vsort = "=0.2.0"
 
