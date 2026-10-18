@@ -19,6 +19,7 @@ pub enum Value {
     Listing(Result<Snapshot, String>),
     Metadata(Box<Entry>, Option<PathBuf>),
     Totals(Result<Totals, String>),
+    Failed(String),
 }
 
 /// A terminal completion always releases its lane, including cancelled requests.
@@ -145,12 +146,19 @@ impl Pool {
             self.runtime
                 .as_ref()
                 .expect("live runtime")
-                .spawn_blocking(move || {
-                    #[cfg(test)]
-                    if let Some(before_execute) = before_execute {
-                        before_execute(&request, &cancelled);
-                    }
-                    let value = execute(&request, &context, &cancelled);
+                .spawn(async move {
+                    let work = request.clone();
+                    let result = tokio::task::spawn_blocking(move || {
+                        #[cfg(test)]
+                        if let Some(before_execute) = before_execute {
+                            before_execute(&work, &cancelled);
+                        }
+                        execute(&work, &context, &cancelled)
+                    })
+                    .await;
+                    let value = result.unwrap_or_else(|error| {
+                        Value::Failed(format!("{:?} worker failed: {error}", request.kind))
+                    });
                     let _ = sender.send(Completion { request, value });
                 });
         }
@@ -197,3 +205,6 @@ fn execute(request: &Request, context: &IgnoreContext, cancelled: &AtomicBool) -
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

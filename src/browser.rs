@@ -146,6 +146,9 @@ fn collect(controller: &mut Controller, pool: &mut Pool) -> bool {
             Value::Totals(result) => {
                 controller.app.complete_totals(&request, result);
             }
+            Value::Failed(error) => {
+                controller.app.complete_failure(&request, error);
+            }
         }
     }
     changed
@@ -214,6 +217,77 @@ mod tests {
         }
         assert!(changed);
         assert!(!collect(controller, pool));
+    }
+
+    #[test]
+    fn worker_panics_are_visible_in_the_requesting_model() {
+        for kind in [
+            RequestKind::Listing,
+            RequestKind::Metadata,
+            RequestKind::Totals,
+        ] {
+            let root = tempfile::tempdir().unwrap();
+            let mut controller = counting_controller(root.path());
+            let metadata = controller.app.request_metadata(0).unwrap();
+            let request = match kind {
+                RequestKind::Listing => controller.app.request_listing(0, root.path().into()),
+                RequestKind::Metadata => metadata,
+                RequestKind::Totals => controller.app.request_totals().unwrap(),
+            };
+            let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
+            pool.before_execute = Some(Arc::new(|_, _| panic!("visible panic")));
+            pool.submit(request.clone());
+            collect_until_idle(&mut controller, &mut pool);
+            let error = match kind {
+                RequestKind::Listing => controller.app.panes[0].error.as_ref().unwrap(),
+                RequestKind::Metadata => controller.app.details[0]
+                    .entry
+                    .as_ref()
+                    .unwrap()
+                    .error
+                    .as_ref()
+                    .unwrap(),
+                RequestKind::Totals => controller.app.details[0]
+                    .totals
+                    .as_ref()
+                    .unwrap()
+                    .as_ref()
+                    .unwrap_err(),
+            };
+            assert!(error.contains("visible panic"));
+            assert!(!controller.app.details[0].counting);
+            assert!(controller.app.panes[1].error.is_none());
+        }
+    }
+
+    #[test]
+    fn stale_worker_failures_cannot_replace_newer_requests() {
+        let root = tempfile::tempdir().unwrap();
+        let mut controller = counting_controller(root.path());
+        let metadata = controller.app.request_metadata(0).unwrap();
+        let totals = controller.app.request_totals().unwrap();
+        controller.app.request_totals().unwrap();
+        assert!(
+            !controller
+                .app
+                .complete_failure(&totals, "old count panic".into())
+        );
+        assert!(controller.app.details[0].counting);
+        assert!(controller.app.details[0].totals.is_none());
+        let listing = controller.app.request_listing(0, root.path().into());
+        controller.app.request_listing(0, root.path().into());
+        assert!(
+            !controller
+                .app
+                .complete_failure(&listing, "old listing panic".into())
+        );
+        controller.app.details[0].generation += 1;
+        assert!(
+            !controller
+                .app
+                .complete_failure(&metadata, "old metadata panic".into())
+        );
+        assert!(controller.app.details[0].entry.is_none());
     }
 
     #[test]

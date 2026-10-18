@@ -269,6 +269,24 @@ impl App {
         true
     }
 
+    /// Report worker failures through the same generation checks as successful work.
+    pub fn complete_failure(&mut self, request: &Request, error: String) -> bool {
+        match request.kind {
+            RequestKind::Listing => {
+                self.complete_listing(request.pane, request.generation, Err(error))
+            }
+            RequestKind::Totals => self.complete_totals(request, Err(error)),
+            RequestKind::Metadata => {
+                if !self.detail_matches(request) {
+                    return false;
+                }
+                let mut entry = self.panes[request.pane].current().unwrap().clone();
+                entry.error = Some(error);
+                self.complete_metadata(request, entry, None)
+            }
+        }
+    }
+
     /// Cancel counts in state immediately; the worker cooperatively stops traversal.
     pub fn cancel_totals(&mut self) {
         let detail = &mut self.details[self.active];
