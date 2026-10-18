@@ -133,7 +133,7 @@ impl Controller {
                 ));
                 self.app.status = "Filter: type to narrow; Enter accepts, Esc restores".into();
             }
-            Count => return self.count(),
+            Count => return self.count(geometry),
             Cancel => self.cancel(),
             _ => {}
         }
@@ -318,7 +318,7 @@ impl Controller {
         }
     }
 
-    fn count(&mut self) -> Vec<Request> {
+    fn count(&mut self, geometry: &Geometry) -> Vec<Request> {
         let mut requests: Vec<_> = self
             .app
             .request_metadata(self.app.active)
@@ -326,7 +326,7 @@ impl Controller {
             .collect();
         if let Some(request) = self.app.request_totals() {
             requests.push(request);
-            self.app.popup = true;
+            self.app.popup |= geometry.sidebar.is_none();
         } else {
             self.app.status = "Directory totals require a visible directory".into();
         }
