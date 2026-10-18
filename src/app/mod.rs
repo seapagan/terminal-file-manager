@@ -290,6 +290,9 @@ impl App {
     /// Cancel counts in state immediately; the worker cooperatively stops traversal.
     pub fn cancel_totals(&mut self) {
         let detail = &mut self.details[self.active];
+        if !detail.counting {
+            return;
+        }
         detail.totals_generation += 1;
         detail.counting = false;
         detail.totals = None;
