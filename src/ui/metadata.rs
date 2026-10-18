@@ -95,6 +95,7 @@ fn fields(
     pane: &MetadataFormat,
     now: std::time::SystemTime,
     theme: &Theme,
+    floating: bool,
 ) -> Vec<Field> {
     let mut fields = entry_fields(detail, pane, now);
     if let Some(totals) = &detail.totals {
@@ -122,7 +123,15 @@ fn fields(
     if detail.counting {
         fields.push(("Status", "Calculating totals… Esc cancels".into()));
     }
-    fields.push(("Keys", "c: count/size on demand; Esc cancels/closes".into()));
+    fields.push((
+        "Keys",
+        if floating {
+            "c: count/size on demand; Esc cancels/closes"
+        } else {
+            "c: count/size on demand; Esc cancels the count"
+        }
+        .into(),
+    ));
     fields
         .into_iter()
         .map(|(label, value)| Field::plain(label, value, theme).interactive(detail, pane, theme))
@@ -250,6 +259,7 @@ fn layout(app: &App, bounds: Rect, theme: &Theme, floating: bool) -> Layout {
         &app.metadata_format(floating),
         app.now,
         theme,
+        floating,
     );
     let width = if floating {
         bounds.width.saturating_sub(4).min(90)
@@ -390,6 +400,44 @@ mod tests {
                     .to_owned()
             })
             .collect()
+    }
+
+    #[test]
+    fn keys_help_describes_escape_for_the_rendered_metadata_view() {
+        use ratatui::{Terminal, backend::TestBackend};
+        let root = tempfile::tempdir().unwrap();
+        let mut app = App::new(root.path().into());
+        let theme = Theme::new(ColorLevel::NoColor);
+        for (floating, expected) in [
+            (false, "c: count/size on demand; Esc cancels the count"),
+            (true, "c: count/size on demand; Esc cancels/closes"),
+        ] {
+            for counting in [false, true] {
+                app.details[0].counting = counting;
+                let mut terminal = Terminal::new(TestBackend::new(100, 40)).unwrap();
+                terminal
+                    .draw(|frame| render(frame, &app, Rect::new(0, 0, 100, 40), &theme, floating))
+                    .unwrap();
+                let buffer = terminal.backend().buffer();
+                let row = (0..40)
+                    .map(|y| {
+                        (0..100)
+                            .map(|x| buffer[(x, y)].symbol())
+                            .collect::<String>()
+                    })
+                    .find(|row| row.contains("Keys:"))
+                    .expect("visible metadata Keys row");
+                assert_eq!(
+                    row.split("Keys:")
+                        .nth(1)
+                        .unwrap()
+                        .trim()
+                        .trim_end_matches('│')
+                        .trim(),
+                    expected
+                );
+            }
+        }
     }
 
     #[test]
