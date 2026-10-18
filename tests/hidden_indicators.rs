@@ -86,7 +86,7 @@ fn type_and_hidden_indicators_are_adjacent_for_each_existing_kind() {
         (EntryKind::ReparsePoint, "r"),
         (EntryKind::Socket, "s"),
         (EntryKind::Fifo, "p"),
-        (EntryKind::Device, "d"),
+        (EntryKind::Device, "D"),
         (EntryKind::Unknown, "?"),
     ] {
         for hidden in [false, true] {

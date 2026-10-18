@@ -381,7 +381,7 @@ fn indicator(entry: &Entry) -> &'static str {
         EntryKind::ReparsePoint => "r",
         EntryKind::Socket => "s",
         EntryKind::Fifo => "p",
-        EntryKind::Device => "d",
+        EntryKind::Device => "D",
         EntryKind::Unknown => "?",
     }
 }

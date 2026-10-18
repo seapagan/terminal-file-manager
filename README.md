@@ -57,6 +57,7 @@ the wheel to scroll. Press `?` for the full list of your configured shortcuts.
 
 Hidden entries start off; `h` beside the file-type indicator marks hidden entries
 (for example, `dh` or `-h`). The blank hidden cell keeps filenames aligned.
+The type indicator uses `d` for directories and `D` for devices.
 Ignored filenames start dimmed. Marks outside the current filter or visibility
 settings remain marked. Each pane keeps its own location, filter and marks while
 you switch focus or layouts.
