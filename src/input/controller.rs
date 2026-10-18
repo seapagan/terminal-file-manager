@@ -48,12 +48,6 @@ impl Controller {
         geometry: &Geometry,
         now: Duration,
     ) -> Vec<Request> {
-        #[cfg(windows)]
-        if std::env::var_os("TFM_TEST_TRACE_INPUT").is_some()
-            && let Event::Key(key) = event
-        {
-            eprintln!("TFM-INPUT {key:?}; binding={:?}", self.bindings.action(key));
-        }
         if super::diagnostics::handle(self, &event, geometry) {
             return Vec::new();
         }

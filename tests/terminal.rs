@@ -152,6 +152,7 @@ const CONSOLE_PROBES: &[(&str, &str)] = &[
     ("PROBE-UNSUPPORTED-CSI-QUESTION", "\u{1b}[63;2u"),
     ("PROBE-UNSUPPORTED-CSI-ALTERNATE", "\u{1b}[49:167;2u"),
     ("PROBE-UNSUPPORTED-CSI-LETTER", "\u{1b}[120;2u"),
+    ("PROBE-RAW-SECTION", "§"),
 ];
 
 fn console_steps(mode: &str) -> Vec<(&'static str, String)> {
@@ -188,6 +189,8 @@ fn windows_console_probe() {
                 assert_eq!(keys[0].code, KeyCode::Char(['?', '§', 'X'][index]));
                 assert_eq!(keys[0].modifiers, KeyModifiers::SHIFT);
                 assert_eq!(bindings.action(keys[0]), Some(Action::Quit));
+            } else if *label == "PROBE-RAW-SECTION" {
+                assert_raw_section_dispatch(&keys);
             } else {
                 assert!(
                     keys.iter()
@@ -204,14 +207,44 @@ fn windows_console_probe() {
 }
 
 #[cfg(windows)]
+fn assert_raw_section_dispatch(keys: &[crossterm::event::KeyEvent]) {
+    use crossterm::event::{Event, KeyCode, KeyEventKind};
+    use terminal_file_manager::{
+        app::App,
+        input::{Action, Bindings, Controller},
+        ui,
+    };
+    assert!(
+        !keys.is_empty(),
+        "ConPTY did not deliver the raw section sign"
+    );
+    for key in keys {
+        assert_eq!(key.code, KeyCode::Char('§'));
+        let bindings = Bindings::new(&std::collections::BTreeMap::from([(
+            "§".into(),
+            Action::Quit,
+        )]))
+        .unwrap();
+        let expected =
+            key.kind == KeyEventKind::Press && bindings.action(*key) == Some(Action::Quit);
+        let mut controller = Controller::new(
+            App::new("owned-native-probe".into()),
+            bindings,
+            Default::default(),
+        );
+        let geometry = ui::geometry(&controller.app, ratatui::layout::Rect::new(0, 0, 120, 24));
+        controller.handle(Event::Key(*key), &geometry, std::time::Duration::ZERO);
+        assert_eq!(controller.quit, expected, "{key:?}");
+    }
+}
+
+#[cfg(windows)]
 fn read_console_probe() -> std::io::Result<Vec<crossterm::event::KeyEvent>> {
     use crossterm::event::{Event, KeyCode, KeyEventKind};
     let mut keys = Vec::new();
     loop {
-        if let Event::Key(key) = crossterm::event::read()?
-            && key.kind == KeyEventKind::Press
-        {
-            if key.code == KeyCode::F(24) {
+        if let Event::Key(key) = crossterm::event::read()? {
+            if key.code == KeyCode::F(24) && key.kind == KeyEventKind::Press {
                 return Ok(keys);
             }
             assert!(keys.len() < 64, "input barrier missing: {keys:?}");
@@ -246,7 +279,6 @@ fn printable_bindings_match_legacy_and_enhanced_layout_characters() {
     .unwrap();
     for encoded in printable_inputs() {
         let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
-        command.env("TFM_TEST_TRACE_INPUT", "1");
         command.cwd(root.path());
         isolate(&mut command, root.path());
         drive(command, &[("keyboard-sentinel", encoded)], false);
@@ -261,7 +293,9 @@ fn printable_inputs() -> Vec<&'static str> {
     if cfg!(windows) {
         vec![
             "?",
-            "§",
+            // Raw § can become an Alt-code release on ConPTY's active layout.
+            // Express the intended unmodified press through its requested protocol.
+            "\u{1b}[0;0;167;1;0;1_",
             "X",
             CONSOLE_PROBES[0].1,
             CONSOLE_PROBES[1].1,
