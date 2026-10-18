@@ -90,10 +90,11 @@ pub fn list(path: &Path, context: &IgnoreContext, cancelled: &AtomicBool) -> io:
     let directory = fs::read_dir(path)?;
     let (rules, mut errors) = rules::load(path, context);
     let mut entries = Vec::new();
+    let mut owners = crate::owner::Cache::default();
     for item in directory {
         check_cancelled(cancelled)?;
         match item {
-            Ok(item) => entries.push(inspect(&item.path())),
+            Ok(item) => entries.push(inspect_with_cache(&item.path(), &mut owners)),
             Err(error) => errors.push(error.to_string()),
         }
     }
@@ -124,7 +125,11 @@ pub(crate) fn check_cancelled(cancelled: &AtomicBool) -> io::Result<()> {
 
 /// Inspect an entry itself, retaining broken links and metadata errors.
 pub fn inspect(path: &Path) -> Entry {
-    let mut entry = inspect_no_follow(path);
+    inspect_with_cache(path, &mut crate::owner::Cache::default())
+}
+
+fn inspect_with_cache(path: &Path, owners: &mut crate::owner::Cache) -> Entry {
+    let mut entry = inspect_no_follow(path, owners);
     if matches!(entry.kind, EntryKind::Link | EntryKind::Junction) {
         entry.link_target = fs::read_link(&entry.path).ok();
         match fs::metadata(&entry.path) {
@@ -138,7 +143,7 @@ pub fn inspect(path: &Path) -> Entry {
     entry
 }
 
-fn inspect_no_follow(path: &Path) -> Entry {
+fn inspect_no_follow(path: &Path, owners: &mut crate::owner::Cache) -> Entry {
     let mut entry = Entry {
         path: path.to_path_buf(),
         name: path.file_name().unwrap_or(path.as_os_str()).to_owned(),
@@ -159,13 +164,13 @@ fn inspect_no_follow(path: &Path) -> Entry {
         error: None,
     };
     match fs::symlink_metadata(path) {
-        Ok(metadata) => fill(&mut entry, &metadata),
+        Ok(metadata) => fill(&mut entry, &metadata, owners),
         Err(error) => entry.error = Some(error.to_string()),
     }
     entry
 }
 
-fn fill(entry: &mut Entry, metadata: &Metadata) {
+fn fill(entry: &mut Entry, metadata: &Metadata, owners: &mut crate::owner::Cache) {
     entry.kind = platform::kind(&entry.path, metadata).unwrap_or_else(|error| {
         entry.error = Some(error.to_string());
         EntryKind::ReparsePoint
@@ -174,7 +179,7 @@ fn fill(entry: &mut Entry, metadata: &Metadata) {
     entry.executable = platform::executable(metadata);
     entry.attributes = platform::attributes(metadata);
     entry.mode = platform::mode(metadata);
-    entry.owner = platform::owner(metadata);
+    entry.owner = platform::owner(metadata, owners);
     entry.size = Some(metadata.len());
     entry.modified = metadata.modified().ok();
     entry.created = metadata.created().ok();

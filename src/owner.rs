@@ -28,21 +28,40 @@ impl Ownership {
     }
 }
 
+/// Account names live only for one filesystem operation, including failed resolutions.
+#[derive(Default)]
+pub(crate) struct Cache {
+    #[cfg(unix)]
+    users: std::collections::HashMap<u32, String>,
+    #[cfg(unix)]
+    groups: std::collections::HashMap<u32, String>,
+}
+
 #[cfg(unix)]
-pub(crate) fn lookup(uid: u32, gid: u32) -> Ownership {
-    Ownership {
-        uid,
-        gid,
-        user: get_username(uid),
-        group: get_groupname(gid),
+impl Cache {
+    pub(crate) fn lookup(&mut self, uid: u32, gid: u32) -> Ownership {
+        Ownership {
+            uid,
+            gid,
+            user: self
+                .users
+                .entry(uid)
+                .or_insert_with(|| get_username(uid))
+                .clone(),
+            group: self
+                .groups
+                .entry(gid)
+                .or_insert_with(|| get_groupname(gid))
+                .clone(),
+        }
     }
 }
 
 /// Look up a username, falling back to the numeric UID.
 #[cfg(unix)]
 fn get_username(uid: u32) -> String {
-    match nix::unistd::User::from_uid(uid.into()) {
-        Ok(Some(user)) => user.name,
+    match user_name(uid) {
+        Ok(Some(name)) => name,
         _ => uid.to_string(),
     }
 }
@@ -50,8 +69,8 @@ fn get_username(uid: u32) -> String {
 /// Look up a group name, falling back to the numeric GID.
 #[cfg(unix)]
 fn get_groupname(gid: u32) -> String {
-    match nix::unistd::Group::from_gid(gid.into()) {
-        Ok(Some(group)) => group.name,
+    match group_name(gid) {
+        Ok(Some(name)) => name,
         _ => gid.to_string(),
     }
 }
@@ -93,3 +112,24 @@ mod tests {
         assert_eq!(get_groupname(gid), gid.to_string());
     }
 }
+
+#[cfg(unix)]
+fn user_name(uid: u32) -> nix::Result<Option<String>> {
+    #[cfg(test)]
+    if let Some(result) = cache_tests::lookup(false, uid) {
+        return result;
+    }
+    nix::unistd::User::from_uid(uid.into()).map(|user| user.map(|user| user.name))
+}
+
+#[cfg(unix)]
+fn group_name(gid: u32) -> nix::Result<Option<String>> {
+    #[cfg(test)]
+    if let Some(result) = cache_tests::lookup(true, gid) {
+        return result;
+    }
+    nix::unistd::Group::from_gid(gid.into()).map(|group| group.map(|group| group.name))
+}
+
+#[cfg(all(test, unix))]
+mod cache_tests;
