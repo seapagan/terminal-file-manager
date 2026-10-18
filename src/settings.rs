@@ -228,6 +228,7 @@ pub fn config_path() -> Option<PathBuf> {
     #[cfg(unix)]
     let base = std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
         .or_else(default_unix_config)?;
     Some(base.join("tfm/config.toml"))
 }

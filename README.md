@@ -100,6 +100,9 @@ does not create a config file. Edit `tfm/config.toml` in your config directory:
 - macOS: `$XDG_CONFIG_HOME`, or `~/Library/Application Support`.
 - Windows: `%APPDATA%`.
 
+On Unix, TFM ignores empty or relative `XDG_CONFIG_HOME` values for both
+configuration and saved sessions.
+
 Example settings:
 
 ```toml
