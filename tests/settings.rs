@@ -186,7 +186,7 @@ fn invalid_utf8_config_fails_without_replacing_bytes_with_defaults() {
 }
 
 #[test]
-fn linked_config_is_rejected_without_modifying_the_target() {
+fn linked_config_loads_but_saving_refuses_to_replace_the_link_or_target() {
     let root = tempfile::tempdir().unwrap();
     let target = root.path().join("target");
     fs::write(&target, "mouse = false\n").unwrap();
@@ -194,6 +194,72 @@ fn linked_config_is_rejected_without_modifying_the_target() {
     std::os::unix::fs::symlink(&target, root.path().join("config.toml")).unwrap();
     #[cfg(windows)]
     std::os::windows::fs::symlink_file(&target, root.path().join("config.toml")).unwrap();
-    assert!(Store::load(root.path().join("config.toml")).is_err());
+    let path = root.path().join("config.toml");
+    let store = Store::load(path.clone()).unwrap();
+    assert!(!store.settings.mouse);
+    assert!(store.save().unwrap_err().contains("not a link"));
+    assert!(fs::symlink_metadata(path).unwrap().is_symlink());
     assert_eq!(fs::read_to_string(target).unwrap(), "mouse = false\n");
+}
+
+fn config_link(target: &std::path::Path, link: &std::path::Path, directory: bool) {
+    #[cfg(unix)]
+    {
+        let _ = directory;
+        std::os::unix::fs::symlink(target, link).unwrap();
+    }
+    #[cfg(windows)]
+    if directory {
+        std::os::windows::fs::symlink_dir(target, link).unwrap();
+    } else {
+        std::os::windows::fs::symlink_file(target, link).unwrap();
+    }
+}
+
+#[test]
+fn dangling_and_nonregular_config_links_fail_without_defaults_or_writes() {
+    let root = tempfile::tempdir().unwrap();
+    let target = root.path().join("target");
+    let link = root.path().join("config.toml");
+    config_link(&target, &link, false);
+    assert!(Store::load(link.clone()).is_err());
+    let store = Store {
+        path: link.clone(),
+        settings: Settings::default(),
+    };
+    assert!(store.save().is_err());
+    assert!(!target.exists());
+    fs::remove_file(&link).unwrap();
+    fs::create_dir(&target).unwrap();
+    config_link(&target, &link, true);
+    assert!(Store::load(link.clone()).is_err());
+    assert!(store.save().is_err());
+    assert!(fs::symlink_metadata(link).unwrap().is_symlink());
+    assert!(fs::read_dir(target).unwrap().next().is_none());
+}
+
+#[test]
+fn regular_and_linked_config_reads_are_bounded_and_strict() {
+    let root = tempfile::tempdir().unwrap();
+    let target = root.path().join("target");
+    let link = root.path().join("config.toml");
+    config_link(&target, &link, false);
+    let mut text = "mouse = false\n#".to_owned();
+    text.push_str(&" ".repeat(1_048_576 - text.len()));
+    fs::write(&target, &text).unwrap();
+    assert!(!Store::load(target.clone()).unwrap().settings.mouse);
+    text.push(' ');
+    fs::write(&target, &text).unwrap();
+    for path in [&target, &link] {
+        let error = Store::load(path.clone()).err().expect("oversize must fail");
+        assert!(error.contains("config exceeds 1 MiB"));
+    }
+    text.pop();
+    fs::write(&target, &text).unwrap();
+    assert!(!Store::load(link.clone()).unwrap().settings.mouse);
+    for bytes in [b"unknown = true".as_slice(), b"mouse = false\n\xff"] {
+        fs::write(&target, bytes).unwrap();
+        assert!(Store::load(link.clone()).is_err());
+        assert_eq!(fs::read(&target).unwrap(), bytes);
+    }
 }

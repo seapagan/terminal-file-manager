@@ -7,7 +7,7 @@ use crate::{
 use std::{
     collections::BTreeMap,
     fs,
-    io::{self, Write},
+    io::{self, Read, Write},
     path::{Path, PathBuf},
 };
 
@@ -166,13 +166,12 @@ impl Store {
     /// Missing config uses defaults without creating any files.
     ///
     /// # Errors
-    /// Returns invalid settings, access errors or a nonregular/linked config error.
+    /// Returns invalid/oversized settings, access errors or a nonregular config error.
     pub fn load(path: PathBuf) -> Result<Self, String> {
-        regular_or_missing(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-        let settings = match fs::read_to_string(&path) {
-            Ok(text) => Settings::parse(&text).map_err(|e| format!("{}: {e}", path.display()))?,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => Settings::default(),
-            Err(error) => return Err(format!("{}: {error}", path.display())),
+        let text = config_text(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let settings = match text {
+            Some(text) => Settings::parse(&text).map_err(|e| format!("{}: {e}", path.display()))?,
+            None => Settings::default(),
         };
         Ok(Self { path, settings })
     }
@@ -190,6 +189,25 @@ impl Store {
         let text = toml::to_string_pretty(&self.settings).map_err(io::Error::other)?;
         atomic_write(&self.path, &text)
     }
+}
+
+fn config_text(path: &Path) -> io::Result<Option<String>> {
+    match fs::symlink_metadata(path) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+        Ok(_) => {}
+    }
+    if !fs::metadata(path)?.is_file() {
+        return Err(io::Error::other("config must resolve to a regular file"));
+    }
+    let mut text = String::new();
+    fs::File::open(path)?
+        .take(1_048_577)
+        .read_to_string(&mut text)?;
+    if text.len() > 1_048_576 {
+        return Err(io::Error::other("config exceeds 1 MiB"));
+    }
+    Ok(Some(text))
 }
 
 pub(crate) fn atomic_write(path: &Path, text: &str) -> io::Result<()> {

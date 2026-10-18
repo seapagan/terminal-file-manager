@@ -103,6 +103,9 @@ does not create a config file. Edit `tfm/config.toml` in your config directory:
 On Unix, TFM ignores empty or relative `XDG_CONFIG_HOME` values for both
 configuration and saved sessions.
 
+TFM can read a config symlink pointing to a regular file, up to 1 MiB.
+Saving preferences refuses linked destinations; edit the target file yourself.
+
 Example settings:
 
 ```toml
