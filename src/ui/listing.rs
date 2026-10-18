@@ -28,24 +28,20 @@ pub(super) fn render(
             Role::Normal
         }))
         .borders(Borders::ALL)
-        .title(format!(
-            "{} Pane {}: {}{}",
-            if id == app.active { ">" } else { " " },
-            id + 1,
-            clean(&pane.path.to_string_lossy()),
-            if pane.pending.is_some() {
-                " [loading]"
-            } else {
-                ""
-            }
-        ))
         .border_style(theme.style(if id == app.active {
             Role::Header
         } else {
             Role::Normal
         }));
     let inner = block.inner(area);
-    frame.render_widget(block, area);
+    let title = super::path_title::title(
+        &pane.path,
+        id,
+        id == app.active,
+        pane.pending.is_some(),
+        inner.width,
+    );
+    frame.render_widget(block.title(title), area);
     let summary = super::summary::lines(
         pane.visible.len(),
         geometry.selection_counts[id],

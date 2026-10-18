@@ -30,8 +30,9 @@ tfm --help
 
 Browsing requires an interactive terminal. A single path starts both panes at
 that location. On narrow terminals, you see the active pane until space permits
-both. Click a pane to focus it, double-click a directory to enter it, and use
-the wheel to scroll. Press `?` for the full list of your configured shortcuts.
+both. Pane headers shorten long paths from the middle to keep the current
+directory visible. Click a pane to focus it, double-click a directory to enter
+it, and use the wheel to scroll. Press `?` for your configured shortcuts.
 
 ## Keybindings
 
