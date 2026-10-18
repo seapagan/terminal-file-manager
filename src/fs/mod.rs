@@ -124,6 +124,21 @@ pub(crate) fn check_cancelled(cancelled: &AtomicBool) -> io::Result<()> {
 
 /// Inspect an entry itself, retaining broken links and metadata errors.
 pub fn inspect(path: &Path) -> Entry {
+    let mut entry = inspect_no_follow(path);
+    if matches!(entry.kind, EntryKind::Link | EntryKind::Junction) {
+        entry.link_target = fs::read_link(&entry.path).ok();
+        match fs::metadata(&entry.path) {
+            Ok(target) => entry.enterable = target.is_dir(),
+            Err(error) => {
+                entry.enterable = false;
+                entry.error = Some(error.to_string());
+            }
+        }
+    }
+    entry
+}
+
+fn inspect_no_follow(path: &Path) -> Entry {
     let mut entry = Entry {
         path: path.to_path_buf(),
         name: path.file_name().unwrap_or(path.as_os_str()).to_owned(),
@@ -179,15 +194,5 @@ fn fill(entry: &mut Entry, metadata: &Metadata) {
         entry
             .error
             .get_or_insert_with(|| "Unsupported reparse point; navigation disabled".into());
-    }
-    if matches!(entry.kind, EntryKind::Link | EntryKind::Junction) {
-        entry.link_target = fs::read_link(&entry.path).ok();
-        match fs::metadata(&entry.path) {
-            Ok(target) => entry.enterable = target.is_dir(),
-            Err(error) => {
-                entry.enterable = false;
-                entry.error = Some(error.to_string());
-            }
-        }
     }
 }

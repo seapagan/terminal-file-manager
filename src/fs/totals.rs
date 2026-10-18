@@ -1,6 +1,6 @@
 //! On-demand traversal uses a depth-bounded stack of open iterators, not a tree copy.
 
-use super::{check_cancelled, inspect};
+use super::{check_cancelled, inspect_no_follow as inspect};
 use std::{fs, io, path::Path, sync::atomic::AtomicBool};
 
 /// Observed regular-file bytes and descendants. Errors mean an incomplete scan.

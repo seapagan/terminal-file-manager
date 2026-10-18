@@ -50,18 +50,42 @@ fn depth_limited_totals_preserve_observed_bytes_and_report_the_omitted_subtree()
 
 #[cfg(unix)]
 #[test]
-fn broken_descendants_report_incomplete_totals_without_losing_regular_files() {
+fn broken_links_do_not_make_no_follow_totals_incomplete() {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("one"), b"123").unwrap();
     let broken = root.path().join("broken");
     std::os::unix::fs::symlink("missing", &broken).unwrap();
     let result = totals(root.path(), &AtomicBool::new(false)).unwrap();
     assert_eq!((result.files, result.directories, result.bytes), (1, 0, 3));
-    assert_eq!(result.errors.len(), 1);
-    assert!(result.errors[0].contains(&broken.display().to_string()));
+    assert!(result.errors.is_empty());
+    assert!(terminal_file_manager::fs::inspect(&broken).error.is_some());
     assert_eq!(
         fs::read_link(&broken).unwrap(),
         std::path::Path::new("missing")
     );
     assert_eq!(fs::read(root.path().join("one")).unwrap(), b"123");
+}
+
+#[cfg(unix)]
+#[test]
+fn unreadable_descendants_remain_incomplete_without_following_links() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let denied = root.path().join("denied");
+    fs::create_dir(&denied).unwrap();
+    fs::write(denied.join("omitted"), b"secret").unwrap();
+    fs::write(root.path().join("visible"), b"123").unwrap();
+    fs::set_permissions(&denied, fs::Permissions::from_mode(0o0)).unwrap();
+    let readable = fs::read_dir(&denied).is_ok();
+    let result = totals(root.path(), &AtomicBool::new(false));
+    fs::set_permissions(&denied, fs::Permissions::from_mode(0o700)).unwrap();
+    if readable {
+        // Privileged hosts cannot establish a permission-denied traversal.
+        assert_eq!(result.unwrap().bytes, 9);
+    } else {
+        let result = result.unwrap();
+        assert_eq!((result.files, result.directories, result.bytes), (1, 1, 3));
+        assert_eq!(result.errors.len(), 1);
+        assert!(result.errors[0].contains(&denied.display().to_string()));
+    }
 }

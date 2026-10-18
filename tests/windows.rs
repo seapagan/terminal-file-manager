@@ -71,7 +71,7 @@ fn junctions_are_native_nonrecursive_and_preserve_trailing_paths() {
     let broken = local::inspect(&junction);
     assert_eq!(broken.kind, EntryKind::Junction);
     assert!(broken.error.is_some());
-    assert_totals(root.path(), (0, 0, 0), Some(&junction));
+    assert_totals(root.path(), (0, 0, 0), None);
     assert_broken_junction_navigation_and_grouping(root.path(), &junction);
     fs::remove_dir(&junction).unwrap();
 }
@@ -93,6 +93,10 @@ fn symlinks_are_classified_without_counting_their_targets() {
     assert!(entry.link_target.is_some());
     assert_totals(&scan, (1, 0, 3), None);
     assert_eq!(fs::read(target.join("excluded")).unwrap(), b"12345");
+    fs::remove_file(target.join("excluded")).unwrap();
+    fs::remove_dir(&target).unwrap();
+    assert!(local::inspect(&link).error.is_some());
+    assert_totals(&scan, (1, 0, 3), None);
 }
 
 fn assert_junction_rendering(snapshot: &local::Snapshot) {
