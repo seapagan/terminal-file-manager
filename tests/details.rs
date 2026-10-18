@@ -73,7 +73,11 @@ fn same_path_replacement_refresh_reloads_metadata_and_rejects_old_responses() {
     assert_eq!(app.panes[0].current().unwrap().path, path);
     let fresh_request = app.request_metadata(0).unwrap();
     assert!(fresh_request.generation > old_request.generation);
-    assert!(app.details[0].entry.is_none());
+    assert_eq!(
+        app.details[0].entry.as_ref().unwrap().identity,
+        app.panes[0].current().unwrap().identity
+    );
+    assert_eq!(app.details[0].entry.as_ref().unwrap().size, Some(11));
     assert!(app.details[0].canonical.is_none());
     let fresh = terminal_file_manager::fs::inspect(&path);
     let old_object = old.identity.as_ref().unwrap().object.unwrap();

@@ -1,4 +1,6 @@
 //! Shared label/value presentation for the metadata sidebar and floating popup.
+#[cfg(test)]
+mod cached_tests;
 use super::{
     clean,
     listing::{listing_timestamp, permission_spans, size},
@@ -150,15 +152,7 @@ fn entry_fields(
     now: std::time::SystemTime,
 ) -> Vec<(&'static str, String)> {
     let Some(entry) = &detail.entry else {
-        return vec![(
-            "Status",
-            if detail.path.is_some() {
-                "Loading metadata…"
-            } else {
-                "No visible entry"
-            }
-            .into(),
-        )];
+        return vec![("Status", "No visible entry".into())];
     };
     let mut fields = vec![
         ("Name", entry.name.to_string_lossy().into_owned()),
@@ -168,7 +162,7 @@ fn entry_fields(
             detail
                 .canonical
                 .as_ref()
-                .map_or_else(|| "unavailable".into(), |p| p.display().to_string()),
+                .map_or_else(|| "—".into(), |p| p.display().to_string()),
         ),
         ("Type", format!("{:?}", entry.kind)),
         ("Size", size(entry.size)),
@@ -368,7 +362,7 @@ mod tests {
         assert_eq!(wrap_value("", 1), [""]);
         assert_eq!(wrap_value("value", 0), [""]);
     }
-    fn metadata_text(app: &App, floating: bool) -> String {
+    pub(super) fn metadata_text(app: &App, floating: bool) -> String {
         use ratatui::{Terminal, backend::TestBackend};
         let width = if floating { 180 } else { 48 };
         let bounds = Rect::new(0, 0, width, 40);

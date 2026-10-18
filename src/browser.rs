@@ -287,7 +287,10 @@ mod tests {
                 .app
                 .complete_failure(&metadata, "old metadata panic".into())
         );
-        assert!(controller.app.details[0].entry.is_none());
+        let cached = controller.app.details[0].entry.as_ref().unwrap();
+        assert_eq!(cached.path, metadata.path);
+        assert!(cached.error.is_none());
+        assert!(controller.app.details[0].canonical.is_none());
     }
 
     #[test]

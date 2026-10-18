@@ -165,7 +165,8 @@ impl App {
 
     /// Coalesce metadata work by current native path and selection generation.
     pub fn request_metadata(&mut self, pane: usize) -> Option<Request> {
-        let path = self.panes[pane].current().map(|e| e.path.clone());
+        let entry = self.panes[pane].current();
+        let path = entry.map(|entry| entry.path.clone());
         let detail = &mut self.details[pane];
         if path == detail.path {
             return None;
@@ -175,7 +176,7 @@ impl App {
         }
         detail.generation += 1;
         detail.path = path.clone();
-        detail.entry = None;
+        detail.entry = entry.cloned();
         detail.canonical = None;
         detail.totals = None;
         detail.totals_generation += 1;
