@@ -31,23 +31,36 @@ pub enum Role {
 pub struct Theme {
     pub level: ColorLevel,
     pub(crate) evidence: Vec<String>,
+    vte: bool,
 }
 
 impl Theme {
     /// Capability detection and environment precedence belong to colored_text.
     pub fn new(level: ColorLevel) -> Self {
+        Self::with_vte_version(level, None)
+    }
+
+    /// Resolve an explicitly supplied terminal identity without reading the environment.
+    pub fn with_vte_version(level: ColorLevel, version: Option<&str>) -> Self {
         Self {
             level,
             evidence: Vec::new(),
+            vte: version.is_some_and(|value| {
+                !value.is_empty()
+                    && value.bytes().all(|byte| byte.is_ascii_digit())
+                    && value.parse::<u32>().is_ok_and(|version| version > 0)
+            }),
         }
     }
 
     /// Detect stdout capability once, retaining the startup evidence for diagnostics.
     pub fn for_stdout() -> Self {
-        let mut theme = Self::new(colored_text::ColorizeConfig::color_level(
-            colored_text::RenderTarget::Stdout,
-        ));
-        theme.evidence = evidence::startup();
+        let version = std::env::var_os("VTE_VERSION");
+        let mut theme = Self::with_vte_version(
+            colored_text::ColorizeConfig::color_level(colored_text::RenderTarget::Stdout),
+            version.as_deref().and_then(std::ffi::OsStr::to_str),
+        );
+        theme.evidence = evidence::startup(version.as_deref());
         theme
     }
 

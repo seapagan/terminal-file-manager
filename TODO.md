@@ -12,6 +12,7 @@ separate approved scope and review; none removes a v1 acceptance obligation.
 | Remote external editing | Requires a safe upload lifecycle | Download/edit/revalidate/upload/commit and cleanup; no silent overwrite |
 | Keyboard/right-click context menu | Additional action access beyond v1 dispatcher | Shared dispatcher, visible disabled reasons and accessible navigation |
 | Configurable pane-header path display | Choose absolute paths with smart middle elision (default) or paths relative to an explicit base, likely startup; consider basename-only if justified | Design the base, navigation outside it, independently navigated panes and Windows roots before implementing a display toggle |
+| Terminal identification through SSH and multiplexers | `VTE_VERSION` may not reach TFM, leaving terminal-specific faint behaviour unidentified | Investigate environment forwarding, terminal capability queries and reliable fallback strategies before extending detection |
 | Detached transfers and persistent queue | Requires durable ownership and recovery | Reconnect/orphan/cancel lifecycle, desktop/OS notifications including Wayland/headless fallback; no v1 daemon or OS notifications |
 | Recursive content search | V1 searches filenames | Optional local/remote ripgrep with safe framing and usable fallback |
 | Bidirectional synchronization | Needs history and conflict/deletion model | Separate model after one-way Update/Mirror; conflict, stale history and deletion/recovery tests |

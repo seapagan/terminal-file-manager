@@ -9,6 +9,21 @@ use ratatui::style::{Modifier, Style};
 use std::time::SystemTime;
 
 impl Theme {
+    /// Keep faint effective on VTE, which ignores it on direct RGB foregrounds.
+    /// Cursor styling is applied afterwards and retains precedence.
+    pub fn ignored_name_style(&self, entry: &Entry, active: bool) -> Style {
+        let mut style = self.entry_style(entry).patch(self.style(Role::Ignored));
+        if self.vte && self.level == ColorLevel::TrueColor {
+            let inherited = active
+                .then(|| self.style(Role::ActivePane))
+                .and_then(|s| s.fg);
+            if let Some(ratatui::style::Color::Rgb(r, g, b)) = style.fg.or(inherited) {
+                style.fg = colored_text::resolve_rgb(r, g, b, ColorLevel::Ansi256).map(map_color);
+            }
+        }
+        style
+    }
+
     fn named(&self, color: AnsiColor) -> Style {
         self.accent(color)
             .map_or_else(Style::default, |color| Style::default().fg(color))

@@ -117,7 +117,7 @@ fn render_rows(
         };
         let style = focus.map_or_else(Style::default, |role| theme.style(role));
         Row::new(cells(
-            entry, pane, area.width, name_width, now, theme, focus,
+            entry, pane, area.width, name_width, now, theme, focus, active,
         ))
         .style(style)
     });
@@ -208,14 +208,15 @@ fn cells(
     now: std::time::SystemTime,
     theme: &Theme,
     focus: Option<Role>,
+    active: bool,
 ) -> Vec<Cell<'static>> {
     let columns = pane.columns.visible(width, &pane.measurements);
     let decorate = |base: Style| focus.map_or(base, |role| base.patch(theme.style(role)));
     if width < 8 {
-        let mut cells = identity_cells(entry, pane, theme, focus, name_width, decorate);
+        let mut cells = identity_cells(entry, pane, theme, focus, name_width, decorate, active);
         return vec![cells.pop().expect("name cell")];
     }
-    let mut cells = identity_cells(entry, pane, theme, focus, name_width, decorate);
+    let mut cells = identity_cells(entry, pane, theme, focus, name_width, decorate, active);
     if columns.size {
         let (number, unit) = super::measure::parts(entry, pane.human_sizes);
         cells.push(
@@ -253,11 +254,12 @@ fn identity_cells(
     focus: Option<Role>,
     name_width: u16,
     decorate: impl Fn(Style) -> Style,
+    active: bool,
 ) -> Vec<Cell<'static>> {
     let type_style = decorate(theme.entry_style(entry));
     let name_style = decorate(
         if pane.ignore == IgnoreMode::Dim && entry.ignored == Some(true) {
-            theme.entry_style(entry).patch(theme.style(Role::Ignored))
+            theme.ignored_name_style(entry, active)
         } else {
             theme.entry_style(entry)
         },

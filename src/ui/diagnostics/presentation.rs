@@ -61,6 +61,8 @@ mod tests {
     fn formatting_preserves_path_and_environment_values() {
         let theme = Theme::new(colored_text::ColorLevel::Ansi16);
         for (text, expected) in [
+            ("VTE_VERSION=unset", "VTE_VERSION: unset"),
+            ("VTE_VERSION=\"8400\"", "VTE_VERSION: \"8400\""),
             ("Cursor: /tmp/fg=one | two", "Cursor: /tmp/fg=one | two"),
             (
                 "TERM=\"modifiers=one | two\"",

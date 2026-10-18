@@ -264,6 +264,7 @@ fn isolate(command: &mut CommandBuilder, root: &std::path::Path) {
     command.env("GIT_CONFIG_NOSYSTEM", "1");
     command.env("NO_COLOR", "1");
     command.env("TERM", "xterm-256color");
+    command.env_remove("VTE_VERSION");
 }
 
 #[test]
@@ -317,12 +318,12 @@ fn printable_inputs() -> Vec<&'static str> {
 fn diagnostics_uses_startup_capability_in_a_controlled_real_terminal() {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("diagnostics-sentinel"), "read only").unwrap();
-    for (forced, expected) in [
-        (None, "TrueColor"),
-        (Some("0"), "NoColor"),
-        (Some("1"), "Ansi16"),
-        (Some("2"), "Ansi256"),
-        (Some("3"), "TrueColor"),
+    for (forced, expected, vte) in [
+        (None, "TrueColor", None),
+        (Some("0"), "NoColor", Some("8400")),
+        (Some("1"), "Ansi16", Some("")),
+        (Some("2"), "Ansi256", Some("bad")),
+        (Some("3"), "TrueColor", Some("8400")),
     ] {
         let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
         command.cwd(root.path());
@@ -332,20 +333,31 @@ fn diagnostics_uses_startup_capability_in_a_controlled_real_terminal() {
             command.env_remove(name);
         }
         command.env("COLORTERM", "truecolor");
+        if let Some(value) = vte {
+            command.env("VTE_VERSION", value);
+        }
         if let Some(value) = forced {
             command.env("FORCE_COLOR", value);
         }
         let scroll = "\u{1b}[6;3~".repeat(200);
-        drive(
+        let output = drive(
             command,
             &[
                 ("diagnostics-sentinel", "\u{1b}[24~"),
                 (&format!("Applied ColorLevel: {expected}"), &scroll),
-                ("Startup stdout TTY: true", "\u{1b}[24~\r"),
+                (
+                    &format!(
+                        "VTE_VERSION: {}",
+                        vte.map_or_else(|| "unset".into(), |v| format!("{v:?}"))
+                    ),
+                    "\u{1b}[24~\r",
+                ),
                 ("Viewer unavailable until M6", "q"),
             ],
             true,
         );
+        assert!(output.contains("Startup stdout TTY"));
+        assert!(output.contains("xterm-256color"));
     }
     assert_eq!(
         fs::read(root.path().join("diagnostics-sentinel")).unwrap(),
