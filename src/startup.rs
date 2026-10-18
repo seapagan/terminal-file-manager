@@ -93,5 +93,33 @@ impl Startup {
 fn validate_path(path: &std::path::Path) -> Result<PathBuf, String> {
     let path = std::path::absolute(path).map_err(|e| e.to_string())?;
     std::fs::read_dir(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-    Ok(path)
+    normalize_path(&path).map_err(|e| format!("{}: {e}", path.display()))
 }
+
+fn normalize_path(path: &std::path::Path) -> std::io::Result<PathBuf> {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        if component != std::path::Component::ParentDir {
+            normalized.push(component.as_os_str());
+        } else if normalized.parent().is_some() {
+            let metadata = std::fs::symlink_metadata(&normalized)?;
+            #[cfg(unix)]
+            let linked = metadata.is_symlink();
+            #[cfg(windows)]
+            let linked = {
+                use std::os::windows::fs::MetadataExt;
+                metadata.file_attributes() & 0x400 != 0
+            };
+            if linked {
+                // Resolve only the parent step whose meaning depends on a link target.
+                normalized = std::fs::canonicalize(normalized.join(".."))?;
+            } else {
+                normalized.pop();
+            }
+        }
+    }
+    Ok(normalized)
+}
+
+#[cfg(test)]
+mod tests;
