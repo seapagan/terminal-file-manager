@@ -97,14 +97,23 @@ fn two_explicit_locations_and_configured_dual_startup_run_in_a_real_terminal() {
 #[test]
 fn terminal_restores_after_returned_error_and_unwind() {
     let root = tempfile::tempdir().unwrap();
-    for mode in ["error", "panic"] {
+    let mut modes = vec!["error", "panic"];
+    if cfg!(windows) {
+        modes.push("keys");
+    }
+    for mode in modes {
         // Relaunches this test child without a security decision; reassess if privileged.
         // nosemgrep: rust.lang.security.current-exe.current-exe
         let mut command = CommandBuilder::new(std::env::current_exe().unwrap());
         command.args(["--ignored", "--exact", "terminal_child", "--nocapture"]);
         command.env("TFM_TEST_TERMINAL_MODE", mode);
         isolate(&mut command, root.path());
-        let output = drive(command, &[], true);
+        let owned = console_steps(mode);
+        let steps: Vec<_> = owned
+            .iter()
+            .map(|(label, input)| (*label, input.as_str()))
+            .collect();
+        let output = drive(command, &steps, true);
         assert!(output.contains("RESTORATION-CHECK-PASSED"));
     }
 }
@@ -113,6 +122,11 @@ fn terminal_restores_after_returned_error_and_unwind() {
 #[ignore = "Owned PTY child entry point; exercised by terminal_restores_after_returned_error_and_unwind"]
 fn terminal_child() {
     let mode = std::env::var("TFM_TEST_TERMINAL_MODE").unwrap();
+    #[cfg(windows)]
+    if mode == "keys" {
+        windows_console_probe();
+        return;
+    }
     let result = std::panic::catch_unwind(|| {
         terminal_file_manager::terminal::with_terminal(true, |_| -> std::io::Result<()> {
             if mode == "panic" {
@@ -128,6 +142,82 @@ fn terminal_child() {
     }
     assert!(!crossterm::terminal::is_raw_mode_enabled().unwrap());
     println!("RESTORATION-CHECK-PASSED");
+}
+
+// ConPTY requests Win32 input mode, not Kitty CSI-u. Keep the unsupported probes.
+const CONSOLE_PROBES: &[(&str, &str)] = &[
+    ("PROBE-WIN32-QUESTION", "\u{1b}[0;0;63;1;16;1_"),
+    ("PROBE-WIN32-SECTION", "\u{1b}[0;0;167;1;16;1_"),
+    ("PROBE-WIN32-LETTER", "\u{1b}[0;0;88;1;16;1_"),
+    ("PROBE-UNSUPPORTED-CSI-QUESTION", "\u{1b}[63;2u"),
+    ("PROBE-UNSUPPORTED-CSI-ALTERNATE", "\u{1b}[49:167;2u"),
+    ("PROBE-UNSUPPORTED-CSI-LETTER", "\u{1b}[120;2u"),
+];
+
+fn console_steps(mode: &str) -> Vec<(&'static str, String)> {
+    if mode != "keys" {
+        return Vec::new();
+    }
+    CONSOLE_PROBES
+        .iter()
+        .map(|(label, input)| {
+            // F24 is an ordered input barrier, so unsupported input needs no sleep.
+            (*label, format!("{input}\u{1b}[135;0;0;1;0;1_"))
+        })
+        .collect()
+}
+
+#[cfg(windows)]
+fn windows_console_probe() {
+    use crossterm::event::{KeyCode, KeyModifiers};
+    use terminal_file_manager::input::{Action, Bindings};
+    terminal_file_manager::terminal::with_terminal(false, |_| {
+        assert!(!crossterm::terminal::supports_keyboard_enhancement()?);
+        let bindings = Bindings::new(&std::collections::BTreeMap::from([
+            ("?".into(), Action::Quit),
+            ("§".into(), Action::Quit),
+            ("Shift+x".into(), Action::Quit),
+        ]))
+        .unwrap();
+        for (index, (label, _)) in CONSOLE_PROBES.iter().enumerate() {
+            println!("{label}");
+            let keys = read_console_probe()?;
+            println!("EVENTS-{label}: {keys:?}");
+            if index < 3 {
+                assert_eq!(keys.len(), 1, "{label}: {keys:?}");
+                assert_eq!(keys[0].code, KeyCode::Char(['?', '§', 'X'][index]));
+                assert_eq!(keys[0].modifiers, KeyModifiers::SHIFT);
+                assert_eq!(bindings.action(keys[0]), Some(Action::Quit));
+            } else {
+                assert!(
+                    keys.iter()
+                        .all(|key| bindings.action(*key) != Some(Action::Quit)),
+                    "{label}: {keys:?}"
+                );
+            }
+        }
+        Ok(())
+    })
+    .unwrap();
+    assert!(!crossterm::terminal::is_raw_mode_enabled().unwrap());
+    println!("RESTORATION-CHECK-PASSED");
+}
+
+#[cfg(windows)]
+fn read_console_probe() -> std::io::Result<Vec<crossterm::event::KeyEvent>> {
+    use crossterm::event::{Event, KeyCode, KeyEventKind};
+    let mut keys = Vec::new();
+    loop {
+        if let Event::Key(key) = crossterm::event::read()?
+            && key.kind == KeyEventKind::Press
+        {
+            if key.code == KeyCode::F(24) {
+                return Ok(keys);
+            }
+            assert!(keys.len() < 64, "input barrier missing: {keys:?}");
+            keys.push(key);
+        }
+    }
 }
 
 fn isolate(command: &mut CommandBuilder, root: &std::path::Path) {
@@ -154,14 +244,7 @@ fn printable_bindings_match_legacy_and_enhanced_layout_characters() {
         "[bindings]\n'?'='quit'\n'§'='quit'\n'Shift+x'='quit'\n",
     )
     .unwrap();
-    for encoded in [
-        "?",
-        "\u{1b}[63;2u",
-        "\u{1b}[49:167;2u",
-        "§",
-        "X",
-        "\u{1b}[120;2u",
-    ] {
+    for encoded in printable_inputs() {
         let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
         command.cwd(root.path());
         isolate(&mut command, root.path());
@@ -171,6 +254,28 @@ fn printable_bindings_match_legacy_and_enhanced_layout_characters() {
         fs::read(root.path().join("keyboard-sentinel")).unwrap(),
         b"read only"
     );
+}
+
+fn printable_inputs() -> Vec<&'static str> {
+    if cfg!(windows) {
+        vec![
+            "?",
+            "§",
+            "X",
+            CONSOLE_PROBES[0].1,
+            CONSOLE_PROBES[1].1,
+            CONSOLE_PROBES[2].1,
+        ]
+    } else {
+        vec![
+            "?",
+            "\u{1b}[63;2u",
+            "\u{1b}[49:167;2u",
+            "§",
+            "X",
+            "\u{1b}[120;2u",
+        ]
+    }
 }
 
 #[test]

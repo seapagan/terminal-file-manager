@@ -99,8 +99,12 @@ impl Session {
                 return Err(io::Error::new(
                     io::ErrorKind::TimedOut,
                     format!(
-                        "terminal driver timed out; next step: {:?}",
-                        steps.get(script.step)
+                        "terminal driver timed out; next step: {:?}; last sent: {:?}",
+                        steps.get(script.step),
+                        script
+                            .step
+                            .checked_sub(1)
+                            .and_then(|index| steps.get(index))
                     ),
                 ));
             }
