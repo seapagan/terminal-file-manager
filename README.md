@@ -78,6 +78,9 @@ active as…** to save your view under a name. You must save again to update a
 named profile after changing its options. Profiles store display and listing
 preferences; use sessions to save locations.
 
+Metadata appears immediately from the listing. Canonical shows “Resolving…”
+until resolution finishes, then the path or “Unavailable”.
+
 Metadata values have temporary display controls: click attributes for symbolic/octal,
 timestamps for exact/fuzzy, or owner/group for names/numbers. These choices affect
 only that open metadata view. Reopening it uses the active pane's View defaults.

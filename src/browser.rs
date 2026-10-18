@@ -333,6 +333,24 @@ mod tests {
     }
 
     #[test]
+    fn failed_native_canonicalization_finishes_the_pending_request() {
+        let root = tempfile::tempdir().unwrap();
+        let mut controller = counting_controller(root.path());
+        let request = controller.app.request_metadata(0).unwrap();
+        assert!(controller.app.details[0].canonical_pending);
+        std::fs::remove_dir_all(&request.path).unwrap();
+        assert!(std::fs::canonicalize(&request.path).is_err());
+        let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
+        pool.submit(request.clone());
+        collect_until_idle(&mut controller, &mut pool);
+        let detail = &controller.app.details[0];
+        assert!(!detail.canonical_pending);
+        assert!(detail.canonical.is_none());
+        assert_eq!(detail.entry.as_ref().unwrap().path, request.path);
+        assert!(detail.entry.as_ref().unwrap().error.is_some());
+    }
+
+    #[test]
     fn collected_totals_update_the_requesting_pane_and_report_disappearing_roots() {
         let root = tempfile::tempdir().unwrap();
         let mut controller = counting_controller(root.path());

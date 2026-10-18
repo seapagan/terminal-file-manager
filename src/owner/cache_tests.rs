@@ -97,21 +97,27 @@ fn listing_resolves_repeated_ids_once_and_starts_fresh_on_the_next_operation() {
 }
 
 #[test]
-fn recursive_totals_share_resolution_across_directories_but_not_operations() {
+fn recursive_totals_never_resolve_accounts_for_roots_or_descendants() {
     let root = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(root.path().join("a/b")).unwrap();
     for name in ["one", "a/two", "a/b/three"] {
         std::fs::write(root.path().join(name), b"x").unwrap();
     }
-    let metadata = std::fs::metadata(root.path()).unwrap();
-    let (uid, gid) = (metadata.uid(), metadata.gid());
     controlled(|| {
-        for expected in 1..=2 {
+        for _ in 0..2 {
             let result = fs::totals(root.path(), &AtomicBool::new(false)).unwrap();
             assert_eq!((result.files, result.directories, result.bytes), (3, 2, 3));
             assert!(result.errors.is_empty());
-            assert_eq!(calls(), [vec![uid; expected], vec![gid; expected]]);
+            assert_eq!(calls(), [vec![], vec![]]);
         }
+        assert!(fs::totals(&root.path().join("one"), &AtomicBool::new(false)).is_err());
+        assert_eq!(calls(), [vec![], vec![]]);
+        let empty = root.path().join("empty");
+        std::fs::create_dir(&empty).unwrap();
+        let result = fs::totals(&empty, &AtomicBool::new(false)).unwrap();
+        assert_eq!((result.files, result.directories, result.bytes), (0, 0, 0));
+        assert!(result.errors.is_empty());
+        assert_eq!(calls(), [vec![], vec![]]);
     });
 }
 

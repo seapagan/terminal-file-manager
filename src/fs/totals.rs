@@ -18,8 +18,7 @@ pub struct Totals {
 /// Returns Interrupted on cancellation or the explicit root's access error.
 pub fn totals(path: &Path, cancelled: &AtomicBool) -> io::Result<Totals> {
     check_cancelled(cancelled)?;
-    let mut owners = crate::owner::Cache::default();
-    if !inspect(path, &mut owners).may_recurse() {
+    if !inspect(path, None).may_recurse() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "Totals require an ordinary directory, not a link/reparse point",
@@ -35,7 +34,7 @@ pub fn totals(path: &Path, cancelled: &AtomicBool) -> io::Result<Totals> {
             }
             Some(Err(error)) => record_error(&mut result, error.to_string()),
             Some(Ok(item)) => {
-                let entry = inspect(&item.path(), &mut owners);
+                let entry = inspect(&item.path(), None);
                 count_entry(&entry, &mut result);
                 if entry.may_recurse() {
                     descend(&entry.path, &mut stack, &mut result);
@@ -90,7 +89,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("file");
         fs::write(&path, "data").unwrap();
-        let mut entry = inspect(&path, &mut crate::owner::Cache::default());
+        let mut entry = inspect(&path, None);
         entry.size = Some(u64::MAX);
         let mut result = Totals {
             bytes: 1,

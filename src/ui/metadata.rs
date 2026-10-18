@@ -159,10 +159,17 @@ fn entry_fields(
         ("Path", entry.path.display().to_string()),
         (
             "Canonical",
-            detail
-                .canonical
-                .as_ref()
-                .map_or_else(|| "—".into(), |p| p.display().to_string()),
+            detail.canonical.as_ref().map_or_else(
+                || {
+                    if detail.canonical_pending {
+                        "Resolving…"
+                    } else {
+                        "Unavailable"
+                    }
+                    .into()
+                },
+                |p| p.display().to_string(),
+            ),
         ),
         ("Type", format!("{:?}", entry.kind)),
         ("Size", size(entry.size)),

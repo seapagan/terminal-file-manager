@@ -31,6 +31,7 @@ pub struct Detail {
     pub path: Option<PathBuf>,
     pub entry: Option<Entry>,
     pub canonical: Option<PathBuf>,
+    pub canonical_pending: bool,
     pub totals: Option<Result<Totals, String>>,
     pub totals_generation: u64,
     pub counting: bool,
@@ -178,6 +179,7 @@ impl App {
         detail.path = path.clone();
         detail.entry = entry.cloned();
         detail.canonical = None;
+        detail.canonical_pending = path.is_some();
         detail.totals = None;
         detail.totals_generation += 1;
         detail.counting = false;
@@ -202,6 +204,7 @@ impl App {
         let detail = &mut self.details[request.pane];
         detail.entry = Some(entry);
         detail.canonical = canonical;
+        detail.canonical_pending = false;
         true
     }
 

@@ -129,7 +129,7 @@ pub fn inspect(path: &Path) -> Entry {
 }
 
 fn inspect_with_cache(path: &Path, owners: &mut crate::owner::Cache) -> Entry {
-    let mut entry = inspect_no_follow(path, owners);
+    let mut entry = inspect_no_follow(path, Some(owners));
     if matches!(entry.kind, EntryKind::Link | EntryKind::Junction) {
         entry.link_target = fs::read_link(&entry.path).ok();
         match fs::metadata(&entry.path) {
@@ -143,7 +143,8 @@ fn inspect_with_cache(path: &Path, owners: &mut crate::owner::Cache) -> Entry {
     entry
 }
 
-fn inspect_no_follow(path: &Path, owners: &mut crate::owner::Cache) -> Entry {
+// Totals share no-follow classification and diagnostics without resolving accounts.
+fn inspect_no_follow(path: &Path, owners: Option<&mut crate::owner::Cache>) -> Entry {
     let mut entry = Entry {
         path: path.to_path_buf(),
         name: path.file_name().unwrap_or(path.as_os_str()).to_owned(),
@@ -170,7 +171,7 @@ fn inspect_no_follow(path: &Path, owners: &mut crate::owner::Cache) -> Entry {
     entry
 }
 
-fn fill(entry: &mut Entry, metadata: &Metadata, owners: &mut crate::owner::Cache) {
+fn fill(entry: &mut Entry, metadata: &Metadata, owners: Option<&mut crate::owner::Cache>) {
     entry.kind = platform::kind(&entry.path, metadata).unwrap_or_else(|error| {
         entry.error = Some(error.to_string());
         EntryKind::ReparsePoint
@@ -179,7 +180,7 @@ fn fill(entry: &mut Entry, metadata: &Metadata, owners: &mut crate::owner::Cache
     entry.executable = platform::executable(metadata);
     entry.attributes = platform::attributes(metadata);
     entry.mode = platform::mode(metadata);
-    entry.owner = platform::owner(metadata, owners);
+    entry.owner = owners.and_then(|owners| platform::owner(metadata, owners));
     entry.size = Some(metadata.len());
     entry.modified = metadata.modified().ok();
     entry.created = metadata.created().ok();

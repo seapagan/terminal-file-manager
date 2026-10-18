@@ -89,3 +89,19 @@ fn unreadable_descendants_remain_incomplete_without_following_links() {
         assert!(result.errors[0].contains(&denied.display().to_string()));
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn totals_reject_link_roots_and_never_count_external_targets() {
+    let root = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    fs::write(outside.path().join("excluded"), b"12345").unwrap();
+    let link = root.path().join("outside");
+    std::os::unix::fs::symlink(outside.path(), &link).unwrap();
+    let error = totals(&link, &AtomicBool::new(false)).unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+    let result = totals(root.path(), &AtomicBool::new(false)).unwrap();
+    assert_eq!((result.files, result.directories, result.bytes), (0, 0, 0));
+    assert!(result.errors.is_empty());
+    assert_eq!(fs::read(outside.path().join("excluded")).unwrap(), b"12345");
+}
