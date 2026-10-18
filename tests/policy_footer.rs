@@ -33,7 +33,7 @@ fn policy_uses_labels_and_semantic_styles_without_changing_selection_summary() {
         let buffer = draw(&app, 120, level);
         assert_eq!(
             policy(&buffer, 120),
-            "Custom │ Sort: Natural │ Group: First │ Hidden: Off │ Ignore: Dim"
+            "Custom │ Sort: Natural │ Group: First │ Hidden: Hide │ Ignore: Dim"
         );
         assert_eq!(
             buffer[(10, 8)].fg == Color::Reset,
@@ -67,7 +67,7 @@ fn narrow_policy_omits_whole_segments_and_retains_reverse_filter_when_they_fit()
                     "Custom",
                     "Sort: Natural",
                     "Group: First",
-                    "Hidden: Off",
+                    "Hidden: Hide",
                     "Ignore: Dim",
                     "Reverse: On",
                     "Filter: abc"
@@ -148,4 +148,20 @@ fn click_info(app: App, g: &ui::Geometry, info: &ui::FooterControl) {
         std::time::Duration::ZERO,
     );
     assert!(c.app.popup && !c.app.sidebar);
+}
+
+#[test]
+fn hidden_policy_labels_match_both_visibility_states() {
+    let mut app = App::new(".".into());
+    for (shown, expected) in [(false, "Hidden: Hide"), (true, "Hidden: Show")] {
+        app.panes[0].show_hidden = shown;
+        for level in [
+            ColorLevel::NoColor,
+            ColorLevel::Ansi16,
+            ColorLevel::Ansi256,
+            ColorLevel::TrueColor,
+        ] {
+            assert!(policy(&draw(&app, 120, level), 120).contains(expected));
+        }
+    }
 }

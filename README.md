@@ -56,7 +56,8 @@ it, and use the wheel to scroll. Press `?` for your configured shortcuts.
 | ?; q/F10/Ctrl+C | Help; quit |
 | Q | Save navigation session and quit |
 
-Hidden entries start off; `h` beside the file-type indicator marks hidden entries
+Hidden entries start excluded (`Hidden: Hide`); toggle to `Hidden: Show` in the
+View menu or with `h`. The `h` beside the file-type indicator marks hidden entries
 (for example, `dh` or `-h`). The blank hidden cell keeps filenames aligned.
 The type indicator uses `d` for directories and `D` for devices.
 Ignored filenames start dimmed. Marks outside the current filter or visibility

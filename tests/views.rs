@@ -238,3 +238,43 @@ fn overwriting_a_profile_reconciles_other_badges_without_changing_their_view() {
     assert_eq!(controller.app.panes[1].profile_label(), "Detailed");
     assert!(!controller.app.panes[1].profile_modified);
 }
+
+#[test]
+fn hidden_menu_labels_follow_the_existing_toggle_and_preference() {
+    use colored_text::ColorLevel;
+    use ratatui::{Terminal, backend::TestBackend};
+    let mut controller = Controller::new(
+        App::new(".".into()),
+        Bindings::new(&Default::default()).unwrap(),
+        Settings::default(),
+    );
+    key(&mut controller, "V");
+    for _ in 0..3 {
+        key(&mut controller, "Down");
+    }
+    let mut terminal = Terminal::new(TestBackend::new(120, 24)).unwrap();
+    for (shown, expected) in [(false, "Hide"), (true, "Show"), (false, "Hide")] {
+        terminal
+            .draw(|frame| {
+                ui::render(
+                    frame,
+                    &controller.app,
+                    &terminal_file_manager::color::Theme::new(ColorLevel::NoColor),
+                );
+            })
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        let row = buffer
+            .content()
+            .chunks(120)
+            .map(|row| row.iter().map(|cell| cell.symbol()).collect::<String>())
+            .find(|row| row.contains("Hidden"))
+            .unwrap();
+        assert!(row.contains(expected), "{row}");
+        assert!(!row.contains("[x]") && !row.contains("[ ]"));
+        assert_eq!(controller.app.panes[0].show_hidden, shown);
+        assert_eq!(controller.preferences.hidden, shown);
+        assert!(!controller.app.panes[1].show_hidden);
+        key(&mut controller, "Space");
+    }
+}

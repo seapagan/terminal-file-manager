@@ -30,7 +30,7 @@ pub(super) fn line(pane: &Pane, width: u16, theme: &Theme) -> Line<'static> {
         field("Group", format!("{:?}", pane.sort.grouping), theme),
         field(
             "Hidden",
-            if pane.show_hidden { "On" } else { "Off" }.into(),
+            if pane.show_hidden { "Show" } else { "Hide" }.into(),
             theme,
         ),
         field("Ignore", format!("{:?}", pane.ignore), theme),

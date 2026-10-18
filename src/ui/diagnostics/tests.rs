@@ -147,3 +147,24 @@ fn tiny_panes_do_not_report_neighbouring_frame_cells_as_their_title() {
             .any(|line| line.starts_with("title rendered ("))
     );
 }
+
+#[test]
+fn environment_diagnostics_render_unset_empty_and_quoted_values() {
+    let (_root, mut app) = fixture();
+    app.diagnostics = true;
+    app.diagnostics_scroll = u16::MAX;
+    for value in ["<unset>", "\"\"", "\"8400\""] {
+        let mut theme = Theme::new(ColorLevel::NoColor);
+        theme.evidence = vec![format!("TERM={value}"), format!("VTE_VERSION={value}")];
+        let (buffer, _) = buffer(&app, &theme, 160, 40);
+        let text = buffer
+            .content()
+            .chunks(160)
+            .map(|row| row.iter().map(|cell| cell.symbol()).collect::<String>())
+            .collect::<Vec<_>>()
+            .join("\n");
+        for name in ["TERM", "VTE_VERSION"] {
+            assert!(text.contains(&format!("{name}: {value}")), "{text}");
+        }
+    }
+}

@@ -12,7 +12,7 @@ separate approved scope and review; none removes a v1 acceptance obligation.
 | Remote external editing | Requires a safe upload lifecycle | Download/edit/revalidate/upload/commit and cleanup; no silent overwrite |
 | Keyboard/right-click context menu | Additional action access beyond v1 dispatcher | Shared dispatcher, visible disabled reasons and accessible navigation |
 | Configurable pane-header path display | Choose absolute paths with smart middle elision (default) or paths relative to an explicit base, likely startup; consider basename-only if justified | Design the base, navigation outside it, independently navigated panes and Windows roots before implementing a display toggle |
-| Terminal identification through SSH and multiplexers | `VTE_VERSION` may not reach TFM, leaving terminal-specific faint behaviour unidentified | Investigate environment forwarding, terminal capability queries and reliable fallback strategies before extending detection |
+| Terminal identification through SSH and multiplexers | `VTE_VERSION` may not reach TFM, leaving terminal-specific faint behaviour unidentified | Test whether forwarding `VTE_VERSION` is necessary and effective across SSH; compare GNOME Terminal, Ptyxis and Ghostty with and without forwarding; verify OpenSSH `SendEnv`/`AcceptEnv` behaviour and the effect of multiplexers; investigate terminal capability queries and reliable fallbacks. Only after confirming the results, add concise README troubleshooting with tested configuration examples and a verification command |
 | Detached transfers and persistent queue | Requires durable ownership and recovery | Reconnect/orphan/cancel lifecycle, desktop/OS notifications including Wayland/headless fallback; no v1 daemon or OS notifications |
 | Recursive content search | V1 searches filenames | Optional local/remote ripgrep with safe framing and usable fallback |
 | Bidirectional synchronization | Needs history and conflict/deletion model | Separate model after one-way Update/Mirror; conflict, stale history and deletion/recovery tests |
@@ -25,10 +25,16 @@ embedded terminal, plugin/scripting ecosystem, drag-and-drop and cloud backends
 remain excluded from v1. No sync/resume/editor implementation is added merely
 for future readiness.
 
-## Deferred native Windows ownership
+## Future Windows-focused PR: attributes and ownership
 
-Resolve Windows owner/group accounts with native SID/account semantics in a
-separately approved change. M1 intentionally displays `unavailable` for both
-Names and Numeric modes on Windows; lsplus does not implement this lookup.
-Cover local/domain and missing/unresolvable accounts, access failures and
-worker-side caching on native Windows without blocking rendering.
+Add compact `RHSA` attributes with `-` for unset flags, retaining the existing
+full hexadecimal display as an alternative. Propose compact RHSA as the Windows
+default, subject to implementation review. Select the display through the
+existing View-menu mechanisms and keep Info presentation consistent. Reuse
+`lsplus` behaviour and tests where appropriate.
+
+Include native SID/account resolution for Windows owner/group names and IDs in
+the same PR. Cover local and domain users, unresolved identities, lookup and
+access failures, and worker-side caching without blocking rendering. M1 keeps
+`unavailable` for Names and Numeric modes until this work is approved and
+implemented; `lsplus` does not implement account lookup.
