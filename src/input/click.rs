@@ -1,4 +1,4 @@
-//! Entry-row clicks share the listing's owner-cell geometry.
+//! Entry-row clicks select and navigate independently of the displayed columns.
 use super::{Action, Controller, controller::page_height};
 use crate::{app::Request, ui::Geometry};
 use crossterm::event::{KeyModifiers, MouseEvent};
@@ -32,12 +32,6 @@ impl Controller {
         }
         pane.cursor = Some(path.clone());
         pane.anchor_range();
-        if crate::ui::owner_column(pane, area, geometry.listing_rows[id])
-            .is_some_and(|cell| cell.contains((event.column, row).into()))
-        {
-            self.last_click = None;
-            return self.dispatch(Action::OwnerDisplay, geometry);
-        }
         let double = self
             .last_click
             .as_ref()

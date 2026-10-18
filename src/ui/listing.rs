@@ -196,32 +196,6 @@ fn columns(pane: &Pane, width: u16) -> (Vec<Constraint>, Vec<Cell<'static>>) {
     (widths, headers)
 }
 
-/// Match drawn owner data cells, excluding borders, headers and summaries.
-pub(crate) fn owner_column(pane: &Pane, area: Rect, rows: usize) -> Option<Rect> {
-    let width = area.width.saturating_sub(2);
-    if !pane.columns.visible(width, &pane.measurements).owner {
-        return None;
-    }
-    let (widths, _) = columns(pane, width);
-    let lengths = widths
-        .iter()
-        .map(|constraint| match constraint {
-            Constraint::Length(length) => *length,
-            _ => 0,
-        })
-        .collect::<Vec<_>>();
-    let offset: u16 = lengths[..lengths.len() - 1]
-        .iter()
-        .map(|length| length + 1)
-        .sum();
-    Some(Rect::new(
-        area.x + 1 + offset,
-        area.y + 2,
-        *lengths.last()?,
-        rows as u16,
-    ))
-}
-
 fn modified_header(fuzzy: bool) -> &'static str {
     if fuzzy { "Modified" } else { "Modified UTC" }
 }

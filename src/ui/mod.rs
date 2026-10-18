@@ -5,7 +5,6 @@ mod help;
 pub use footer::FooterControl;
 mod layout;
 mod listing;
-pub(crate) use listing::owner_column;
 mod measure;
 mod metadata;
 mod path_title;

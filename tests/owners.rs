@@ -29,6 +29,7 @@ use terminal_file_manager::{
 fn loaded() -> (tempfile::TempDir, Controller) {
     let root = tempfile::tempdir().unwrap();
     std::fs::create_dir(root.path().join("entry")).unwrap();
+    std::fs::create_dir(root.path().join("other")).unwrap();
     let mut app = App::new(root.path().into());
     for id in 0..2 {
         app.complete_listing(
@@ -91,23 +92,31 @@ fn click(
 }
 
 #[test]
-fn only_entry_owner_cells_toggle_and_directory_double_click_still_enters() {
-    let (_root, mut c) = loaded();
+fn owner_clicks_select_focus_and_double_click_directories_without_toggling() {
+    let (root, mut c) = loaded();
+    c.app.panes[1].owner_display = OwnerDisplay::Numeric;
+    c.app.panes[1].refilter();
     for id in 0..2 {
         let (geometry, x) = owner_cell(&c.app, id, 300);
+        let mode = c.app.panes[id].owner_display;
+        c.app.panes[id].cursor = Some(root.path().join("other"));
         click(&mut c, &geometry, x, 1);
-        assert_eq!(c.app.panes[id].owner_display, OwnerDisplay::Names);
+        assert_eq!(c.app.panes[id].owner_display, mode);
         click(&mut c, &geometry, x, 12);
-        assert_eq!(c.app.panes[id].owner_display, OwnerDisplay::Names);
+        assert_eq!(c.app.panes[id].owner_display, mode);
         assert!(click(&mut c, &geometry, x, 2).is_empty());
-        assert_eq!(c.app.panes[id].owner_display, OwnerDisplay::Numeric);
+        assert_eq!(c.app.panes[id].owner_display, mode);
+        assert_eq!(
+            c.app.panes[id].cursor.as_deref(),
+            Some(root.path().join("entry").as_path())
+        );
         assert_eq!(c.app.active, id);
-        assert_eq!(c.preferences.owner_display, OwnerDisplay::Numeric);
-        assert!(click(&mut c, &geometry, x, 2).is_empty());
-        assert_eq!(c.app.panes[id].owner_display, OwnerDisplay::Names);
-        let name = geometry.panes[id].unwrap().x + 8;
-        assert!(click(&mut c, &geometry, name, 2).is_empty());
-        assert_eq!(click(&mut c, &geometry, name, 2).len(), 1);
+        let requests = click(&mut c, &geometry, x, 2);
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].path, root.path().join("entry"));
+        assert_eq!(c.app.panes[id].owner_display, mode);
+        assert_eq!(c.preferences.owner_display, OwnerDisplay::Names);
+        assert!(!c.preferences_changed);
     }
 }
 
@@ -180,8 +189,10 @@ fn windows_ownership_remains_unavailable_in_both_representations() {
 }
 
 #[test]
-fn owner_hit_regions_follow_resizing_and_do_not_consume_marks_or_blank_space() {
+fn every_owner_column_cell_preserves_display_mode_and_marks_after_resize() {
     let (_root, mut c) = loaded();
+    c.app.panes[1].owner_display = OwnerDisplay::Numeric;
+    c.app.panes[1].refilter();
     for id in 0..2 {
         c.app.panes[id].select_all();
     }
@@ -192,13 +203,16 @@ fn owner_hit_regions_follow_resizing_and_do_not_consume_marks_or_blank_space() {
                 let (geometry, x) = owner_cell(&c.app, id, width);
                 let marks = c.app.panes[id].marks.clone();
                 let previous = c.app.panes[id].owner_display;
-                click(&mut c, &geometry, x, 2);
-                assert_ne!(c.app.panes[id].owner_display, previous);
-                assert_eq!(c.app.panes[id].marks, marks);
-                let previous = c.app.panes[id].owner_display;
                 let edge = geometry.panes[id].unwrap().right() - 1;
-                click(&mut c, &geometry, edge, 2);
-                assert_eq!(c.app.panes[id].owner_display, previous);
+                for column in x..=edge {
+                    for row in [1, 2, 3, 12] {
+                        click(&mut c, &geometry, column, row);
+                        assert_eq!(c.app.panes[id].owner_display, previous);
+                        assert_eq!(c.app.panes[id].marks, marks);
+                        assert_eq!(c.preferences.owner_display, OwnerDisplay::Names);
+                        assert!(!c.preferences_changed);
+                    }
+                }
             }
         }
     }
