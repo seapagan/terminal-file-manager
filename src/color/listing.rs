@@ -24,6 +24,19 @@ impl Theme {
         style
     }
 
+    /// VTE needs indexed cyan for faint hidden markers; blank cells keep their style.
+    pub(crate) fn hidden_indicator_style(&self, hidden: bool) -> Style {
+        let mut style = self.style(Role::Hidden);
+        if hidden
+            && self.vte
+            && self.level == ColorLevel::TrueColor
+            && let Some(ratatui::style::Color::Rgb(r, g, b)) = style.fg
+        {
+            style.fg = colored_text::resolve_rgb(r, g, b, ColorLevel::Ansi256).map(map_color);
+        }
+        style
+    }
+
     fn named(&self, color: AnsiColor) -> Style {
         self.accent(color)
             .map_or_else(Style::default, |color| Style::default().fg(color))

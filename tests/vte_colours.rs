@@ -1,4 +1,4 @@
-//! VTE compatibility changes only ignored name foregrounds, including native ANSI emission.
+//! VTE compatibility changes only ignored names and visible hidden-marker foregrounds.
 use colored_text::ColorLevel;
 use ratatui::{
     Terminal,
@@ -45,6 +45,16 @@ fn fixture() -> (tempfile::TempDir, App) {
             )
             .unwrap()),
         );
+        app.panes[id].show_hidden = true;
+        for entry in &mut app.panes[id].entries {
+            if matches!(
+                entry.name.to_str(),
+                Some("ignored-file" | "ordinary-dir" | "selected-file")
+            ) {
+                entry.hidden = true;
+            }
+        }
+        app.panes[id].refilter();
         app.panes[id].cursor = Some(root.path().join("selected-file"));
         app.panes[id].select_all();
     }
@@ -63,7 +73,7 @@ fn draw(terminal: &mut Terminal<TestBackend>, app: &App, theme: &Theme, width: u
 }
 
 #[test]
-fn only_vte_truecolor_ignored_names_change_after_focus_selection_and_resize() {
+fn only_vte_truecolor_names_and_hidden_markers_change_after_focus_selection_and_resize() {
     let (root, mut app) = fixture();
     let mut terminal = Terminal::new(TestBackend::new(240, 18)).unwrap();
     for level in LEVELS {
@@ -95,6 +105,7 @@ fn only_vte_truecolor_ignored_names_change_after_focus_selection_and_resize() {
                         let mut expected = baseline.clone();
                         if version == Some("8400") && level == ColorLevel::TrueColor {
                             palette_names(&mut expected, &app);
+                            palette_hidden_markers(&mut expected, &app);
                         }
                         assert_eq!(
                             actual, expected,
@@ -134,7 +145,7 @@ fn palette_names(buffer: &mut Buffer, app: &App) {
 }
 
 #[test]
-fn vte_off_and_hide_modes_preserve_the_entire_frame() {
+fn vte_off_and_hide_modes_change_only_visible_unfocused_hidden_markers() {
     let (_root, mut app) = fixture();
     let mut terminal = Terminal::new(TestBackend::new(180, 18)).unwrap();
     for mode in [IgnoreMode::Off, IgnoreMode::Hide] {
@@ -150,13 +161,17 @@ fn vte_off_and_hide_modes_preserve_the_entire_frame() {
                 &Theme::with_vte_version(level, Some("8400")),
                 180,
             );
-            assert_eq!(vte, baseline);
+            let mut expected = baseline;
+            if level == ColorLevel::TrueColor {
+                palette_hidden_markers(&mut expected, &app);
+            }
+            assert_eq!(vte, expected);
         }
     }
 }
 
 #[test]
-fn ignored_names_emit_palette_or_rgb_faint_and_reset_before_padding() {
+fn ignored_names_and_hidden_markers_emit_palette_or_rgb_faint_and_reset_before_padding() {
     crossterm::style::force_color_output(true);
     let (_root, mut app) = fixture();
     let mut terminal = Terminal::new(TestBackend::new(180, 18)).unwrap();
@@ -172,6 +187,7 @@ fn ignored_names_emit_palette_or_rgb_faint_and_reset_before_padding() {
                 );
                 for id in 0..2 {
                     assert_names_and_output(&buffer, &app, id, level, version.is_some());
+                    assert_hidden_output(&buffer, &app, id, level, version.is_some());
                 }
             }
         }
@@ -231,8 +247,62 @@ fn assert_foreground_sequence(output: &str, foreground: Color) {
         Color::Rgb(r, g, b) => format!("38;2;{r};{g};{b}"),
         Color::Indexed(n) => format!("38;5;{n}"),
         Color::Blue => "38;5;4".into(),
+        Color::Cyan => "38;5;6".into(),
         Color::Reset => return,
         other => panic!("unexpected foreground {other:?}"),
     };
     assert!(output.contains(&sequence), "{output:?}");
+}
+
+fn palette_hidden_markers(buffer: &mut Buffer, app: &App) {
+    let geometry = ui::geometry(app, buffer.area);
+    for (id, area) in geometry.panes.iter().enumerate() {
+        let Some(area) = area.filter(|area| area.width >= 10) else {
+            continue;
+        };
+        for (row, index) in app.panes[id].visible.iter().enumerate() {
+            let entry = &app.panes[id].entries[*index];
+            if entry.hidden && app.panes[id].cursor.as_ref() != Some(&entry.path) {
+                let cell = &mut buffer[(area.x + 6, area.y + 2 + row as u16)];
+                assert_eq!(cell.symbol(), "h");
+                assert_eq!(cell.fg, Color::Rgb(35, 140, 150));
+                assert_eq!(cell.modifier, Modifier::DIM);
+                cell.fg = Color::Indexed(30);
+            }
+        }
+    }
+}
+
+fn assert_hidden_output(buffer: &Buffer, app: &App, id: usize, level: ColorLevel, vte: bool) {
+    let area = ui::geometry(app, buffer.area).panes[id].unwrap();
+    for (row, index) in app.panes[id].visible.iter().enumerate() {
+        let entry = &app.panes[id].entries[*index];
+        if !entry.hidden || app.panes[id].cursor.as_ref() == Some(&entry.path) {
+            continue;
+        }
+        let (x, y) = (area.x + 6, area.y + 2 + row as u16);
+        let cell = &buffer[(x, y)];
+        let fg = match (level, vte) {
+            (ColorLevel::NoColor, _) => Color::Reset,
+            (ColorLevel::Ansi16, _) => Color::Cyan,
+            (ColorLevel::Ansi256, _) | (ColorLevel::TrueColor, true) => Color::Indexed(30),
+            _ => Color::Rgb(35, 140, 150),
+        };
+        assert_eq!(cell.symbol(), "h");
+        assert_eq!(cell.fg, fg);
+        assert_eq!(cell.modifier, Modifier::DIM);
+        let mut bytes = Vec::new();
+        CrosstermBackend::new(&mut bytes)
+            .draw((x..x + 2).map(|x| (x, y, &buffer[(x, y)])))
+            .unwrap();
+        let output = String::from_utf8(bytes).unwrap();
+        assert!(
+            output.starts_with(&format!("\x1b[{};{}H\x1b[2m", y + 1, x + 1)),
+            "{output:?}"
+        );
+        assert_foreground_sequence(&output, fg);
+        assert!(output.contains("h\x1b[22m"), "{output:?}");
+        assert!(!buffer[(x + 1, y)].modifier.contains(Modifier::DIM));
+        assert!(output.ends_with("\x1b[0m"));
+    }
 }

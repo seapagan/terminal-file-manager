@@ -10,7 +10,7 @@ use ratatui::{
 use std::{path::Path, sync::atomic::AtomicBool, time::Duration};
 use terminal_file_manager::{
     app::App,
-    color::Theme,
+    color::{Role, Theme},
     fs::{self, EntryKind},
     input::{Bindings, Controller},
     ui,
@@ -272,4 +272,79 @@ fn native_windows_hidden_attribute_drives_the_indicator_instead_of_dot_names() {
             if name == "secret" { "s" } else { "." }
         );
     }
+}
+
+#[test]
+fn vte_hidden_markers_preserve_both_pane_cursors_marks_and_colour_levels() {
+    let (root, mut app) = fixture();
+    app.dual = true;
+    for pane in &mut app.panes {
+        pane.entries
+            .iter_mut()
+            .find(|e| e.name == "secret")
+            .unwrap()
+            .ignored = Some(true);
+    }
+    for level in [
+        ColorLevel::NoColor,
+        ColorLevel::Ansi16,
+        ColorLevel::Ansi256,
+        ColorLevel::TrueColor,
+    ] {
+        for active in 0..2 {
+            app.active = active;
+            for marked in [false, true] {
+                for cursor in ["normal", "secret"] {
+                    for pane in &mut app.panes {
+                        pane.marks.clear();
+                        if marked {
+                            pane.select_all();
+                        }
+                        pane.cursor = Some(root.path().join(cursor));
+                    }
+                    let theme = Theme::with_vte_version(level, Some("8400"));
+                    let mut terminal = Terminal::new(TestBackend::new(180, 16)).unwrap();
+                    terminal
+                        .draw(|f| {
+                            ui::render(f, &app, &theme);
+                        })
+                        .unwrap();
+                    for id in 0..2 {
+                        assert_vte_marker_cells(terminal.backend().buffer(), &app, id, &theme);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn assert_vte_marker_cells(buffer: &Buffer, app: &App, id: usize, theme: &Theme) {
+    let area = ui::geometry(app, buffer.area).panes[id].unwrap();
+    let row = entry_row(app, id, "secret");
+    let h = &buffer[(area.x + 6, row)];
+    assert_eq!(h.symbol(), "h");
+    if app.panes[id].current().unwrap().name == "secret" {
+        let focus = theme.style(if id == app.active {
+            Role::Cursor
+        } else {
+            Role::InactiveCursor
+        });
+        assert_eq!(Some(h.fg), focus.fg);
+        assert_eq!(Some(h.bg), focus.bg);
+        assert!(!h.modifier.contains(Modifier::DIM));
+        assert_eq!(h.modifier.contains(Modifier::BOLD), id == app.active);
+    } else {
+        assert_eq!(h.modifier, Modifier::DIM);
+        let expected = match theme.level {
+            ColorLevel::NoColor => Color::Reset,
+            ColorLevel::Ansi16 => Color::Cyan,
+            _ => Color::Indexed(30),
+        };
+        assert_eq!(h.fg, expected);
+        let normal = entry_row(app, id, "normal");
+        assert_eq!(buffer[(area.x + 6, normal)].symbol(), " ");
+    }
+    assert_eq!(buffer[(area.x + 5, row)].symbol(), "-");
+    assert_eq!(buffer[(area.x + 7, row)].symbol(), " ");
+    assert_eq!(buffer[(area.x + 8, row)].symbol(), "s");
 }

@@ -281,7 +281,7 @@ fn identity_cells(
             Span::styled(indicator(entry), type_style),
             Span::styled(
                 if entry.hidden { "h" } else { " " },
-                decorate(theme.style(Role::Hidden)),
+                decorate(theme.hidden_indicator_style(entry.hidden)),
             ),
         ])),
         Cell::from(Line::from(Span::styled(name, name_style))),
