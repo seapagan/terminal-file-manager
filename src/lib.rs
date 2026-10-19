@@ -62,3 +62,6 @@ pub fn run(arguments: &[OsString]) -> Result<Invocation, &'static str> {
 
 /// Cached native ownership and presentation policy.
 pub mod owner;
+
+/// Frozen local operation requests and shared mutation coordination.
+pub mod operations;
