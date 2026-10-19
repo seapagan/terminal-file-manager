@@ -44,6 +44,7 @@ time = { version = "=0.3.55", default-features = false, features = ["std"] }
 vsort = "=0.2.0"
 
 tempfile = "=3.27.0"
+sha2 = "=0.11.1"
 
 # Level-triggered Unix input preserves pending keys when resize and input coincide.
 [target.'cfg(unix)'.dependencies]

@@ -58,6 +58,32 @@ instead of silently falling back to a subprocess.
 
 ## Planned application contracts
 
+### M2 operation engine
+
+`operations::Plan` captures native operands from the visible working set at
+submission. It rejects pending listings, unresolved ignore-hidden scope and
+changed marked objects. The shared coordinator acquires source-read and
+destructive subtree/object claims together, with at most two active jobs.
+Workers revalidate the captured objects; they do not consult later pane state.
+
+The local transfer executor recursively merges directories and stages regular
+files or links in private destination-local directories. It verifies byte counts,
+size, applicable metadata and optional SHA-256 before commit. Conflict decisions
+default to Skip; apply-to-all stays within one job and type pair. Keep both uses
+native no-clobber commit. Unsupported atomic type replacements require Keep both
+or Skip. Partial moves retain skipped children and their parent directories.
+
+Workers check parent identity and namespace around reads, commit and source
+removal. A move removes each source only after destination commit and fresh
+source/destination checks. Cancellation waits for owned cleanup; uncertain
+cleanup or removal retains recovery evidence and reports OutcomeUnknown.
+These checks do not isolate files from external writers or detect every
+same-size/time change. Checksums describe the verified read, not an atomic
+source snapshot. Crash durability remains filesystem-dependent.
+
+The browser still disables mutation controls while queue and dialog integration
+is in progress. This engine checkpoint does not establish M2 acceptance.
+
 Future milestones preserve native local byte/UTF-16 path identities separately
 from display text. Remote POSIX paths remain exact bytes on every client OS;
 Windows native paths are not remote identifiers. Stable entry/job identities,
