@@ -4,8 +4,9 @@
 
 M0's engineering foundation is complete at the accepted checkpoints below. The
 application now implements the M1 local read-only browser described below.
-M1 remains subject to native hosted results and maintainer review; M2–M8 cover
-the remaining application and final release. Genuine direct SSH-to-SSH transfer
+The maintainer merged M1 in [PR #2](https://github.com/seapagan/terminal-file-manager/pull/2)
+on 18 October 2026. M2 is the next milestone; M2–M8 cover the remaining
+application and final release. Genuine direct SSH-to-SSH transfer
 remains post-v1 work.
 
 | Checkpoint | Completed proof |
@@ -24,20 +25,51 @@ checkpoint or certify final release artifacts.
 ## M1 implementation and current proof
 
 The browser supports cwd/explicit-path startup, two independent session panes,
-width-based single/dual/sidebar restoration, all local sort/grouping modes,
-hidden/ignore/filter policies, visible-only marks and counts, session history,
+width- and cached-content-based columns, single/dual/sidebar restoration,
+all local sort/grouping modes, hidden/ignore/filter policies, visible-only marks
+and counts, session history,
 metadata popup/sidebar and cancellable on-demand totals. File mutations, SSH,
 viewer/editor and automatic launching are unavailable by design. Preferences
-are lazy/atomic; startup location/layout is never restored from preferences.
+are lazy/atomic. `-2`, two explicit paths or `two_panes = true` request dual
+startup. Navigation-session restoration is opt-in; `Q` saves both locations/layout
+and quits. Ordinary quit preserves the saved session. Shell cwd handoff remains
+future work.
 
-Local Linux proof at `d59281b`: the unchanged `cargo make verify` passed,
-including exact Rust 1.95.0, package/source/security gates, Ruff/mypy/static
-support checks, strict Rust maintainability, Lizard 1.23.0 and compulsory xwin
-check/Clippy/build. Native tests passed 44 cases; one ignored child entry point
-is explicitly executed by its PTY parent. The approved final-review fixes and documentation/acceptance slice
-must receive the same final clean-tree gate before delivery. No thresholds or scanner
-semantics changed. All dependency exceptions are exact and approved; see
-[provenance](provenance.md).
+### M1 closure checkpoint, 18 October 2026
+
+PR #2 merged at `0ea80f185dc9adad2385304c0dfc404a22236b02`, with final branch
+head `6a755883ac3308e87eee6d6ee8f4dfedff0b7888`. Its five final workflows
+succeeded: [Rust CI](https://github.com/seapagan/terminal-file-manager/actions/runs/39130775083),
+[Policy](https://github.com/seapagan/terminal-file-manager/actions/runs/39130775084),
+[GitHub Actions Security](https://github.com/seapagan/terminal-file-manager/actions/runs/39130775085),
+[Advisory Quality](https://github.com/seapagan/terminal-file-manager/actions/runs/39130775088)
+and [Source Package](https://github.com/seapagan/terminal-file-manager/actions/runs/39130775109).
+Native suites passed **Linux 284 / macOS 280 / Windows 272**. Each host reported
+one intentional skipped `terminal_child` entry point, exercised by its parent
+restoration tests through PTY/ConPTY.
+
+The maintainer's final local record reports unchanged clean-tree
+`RUSTUP_TOOLCHAIN=1.95.0 cargo make verify` success, including exact MSRV,
+package/security/static/maintainability/coverage gates and mandatory Linux xwin
+check/Clippy/build. Xwin supplies cross-build evidence, not native Windows
+execution. Final Codacy static analysis and diff coverage succeeded; the
+maintainer accepted coverage variation of −3.0% against the −1.0% target.
+Lizard 1.23.0's `permissions::file_type` 55/50 result remains an accepted parser
+false positive. No threshold, scanner or dependency-policy exception changes
+follow from this record; see [provenance](provenance.md).
+
+These results belong to the final M1 head. On 19 October, upstream `main` was
+checked at `10a2682c72de5c6428ae911ea07194d994b6822a`, the README rewrite dated
+18 October in Git. Neither that documentation commit nor this reconciliation
+constitutes a fresh foreign-native or hosted run.
+
+### Early execution checkpoint, 16 October 2026
+
+Local Linux `cargo make verify` at `d59281b` passed exact Rust 1.95.0,
+package/source/security gates, Ruff/mypy/static support checks, strict Rust
+maintainability, Lizard 1.23.0 and compulsory xwin check/Clippy/build. Its
+44 passed native cases and one owned child-entry skip describe that early
+checkpoint only; the final M1 counts above supersede them for closure.
 
 | Evidence | Scope and limits |
 | --- | --- |
@@ -45,23 +77,24 @@ semantics changed. All dependency exceptions are exact and approved; see
 | Linux filesystem | Natural and other sorts, nested/global/linked-worktree ignore refresh/precedence, invalid-byte identity, links/broken links/modes, no-follow cancelled/incomplete/overflow totals |
 | Native Linux PTY | Real cwd/explicit-path executable, file non-launch, simultaneous resize/input, quit, returned-error and unwind restoration, paired alternate/mouse/paste/keyboard modes |
 | Windows source/cross-build | Hidden attributes, junction/broken target/trailing separator, symlink/native-ID replacement, failed queries and lossless native UTF-16/drive/UNC normalization regressions compile under xwin; this is not native execution |
-| Hosted native acceptance | Existing Linux/macOS/Windows jobs run the real application tests and native PTY/ConPTY; results belong to the draft PR, not to configuration or cross-compilation claims |
+| Hosted native acceptance | Existing Linux/macOS/Windows jobs run the real application tests and native PTY/ConPTY; final results at `6a75588` are recorded above; configuration and cross-compilation alone do not establish execution |
 
 The native Linux PTY check exercised the real executable with an owned fixture:
 listing files, toggling dual panes, opening help and quitting.
 
-### Local coverage and complexity baseline
+### Early local coverage and complexity checkpoint, 16 October 2026
 
-Linux production coverage after the reviewed fixes is 1,720/2,052
+The early Linux production coverage record after the reviewed fixes was 1,720/2,052
 lines (83.82%), 198/231 functions (85.71%) and 2,679/3,264 regions (82.08%).
 LLVM supplied no branch data. This is native Linux evidence, not combined
 coverage or proof of Windows-only paths. No new coverage floor was introduced.
 
-Exact Lizard 1.23.0 reports no advisory findings under 10/50/8/500 across the
-maintained Rust/Python sources and tests. Rust maxima are CCN 10, function NLOC
-49, parameters 6 and file NCSS 363. Strict Clippy maintainability also passes.
-Hosted advisory/Codacy results still require observation; local lint is not
-an external Codacy result.
+At that early checkpoint, exact Lizard 1.23.0 reported no advisory findings under
+10/50/8/500 across the maintained Rust/Python sources and tests. Rust maxima
+were CCN 10, function NLOC
+49, parameters 6 and file NCSS 363. Strict Clippy maintainability passed.
+These historical maxima do not describe the final M1 source; its accepted
+Lizard anomaly and observed Codacy dispositions are recorded above.
 
 ### Measured M1 baseline — 16 October 2026
 
@@ -92,12 +125,13 @@ is observed. It includes terminal query responses; the owned config is absent.
 No sleeps or external filesystem/network data are used. Numeric performance,
 memory and subsystem coverage budgets remain a later reviewed decision.
 
-Remaining acceptance distinctions: hosted macOS/Windows behaviour (including
-ConPTY and Windows symlink permissions) must be inspected on the PR; UNC
-normalization/CLI identity tests do not establish access to a live SMB server.
+Remaining acceptance distinctions: final native macOS/Windows suites include
+PTY/ConPTY and applicable platform tests. UNC normalization/CLI identity tests
+do not establish access to a live SMB server.
 Representative real terminals/multiplexers, minimum OS versions, all eight
 release artifacts and final shipping graph certification retain M7/M8 ownership.
-A green local gate, code presence or a draft PR alone does not accept M1.
+M1 closure rests on the merged PR and its observed native/hosted evidence;
+these later release and compatibility limits remain open.
 
 ### M0-S: feasibility decisions and limits
 
@@ -113,6 +147,22 @@ identity. Linux PTY parser/restoration fixtures passed ten cases; they did not
 establish ConPTY or representative-terminal behaviour. Those contracts remain
 in [architecture](architecture.md) and the M1/M2/M3/M7 acceptance below. Retain
 Lizard 1.23.0; a parser upgrade needs its separate compatibility gate.
+
+## M2 baseline: upcoming, not implemented
+
+M2 will add local operation planning, shared locks and a two-job scheduler,
+copy/move/create/rename/attributes, recursive merge/conflicts, owned staging,
+verification/commit, restricted native Trash, explicit permanent deletion,
+cancellation/retry/progress/history and safe quit. Preserve the three-layer
+mutation safety and restricted Linux same-filesystem Trash contracts described
+in [architecture](architecture.md). No M2 mutations exist yet.
+
+The agreed first future implementation slice consolidates the existing
+`src/color.rs`, `Theme` and `Role` semantic style boundary while retaining M1
+visuals, monochrome cues and VTE accommodations. That extraction is planned only.
+Selectable palettes, OSC 11/background detection and theme configuration await
+separate work after M2. This baseline task changes documentation only; the
+maintainer must authorise the next implementation slice separately.
 
 ## M0-B: local foundation
 
@@ -242,8 +292,8 @@ do not establish execution on those older systems. No public release exists yet.
 
 | Milestone | Required behaviour and proof |
 | --- | --- |
-| M1 | Local panes, raw identity, natural sorting, selection/filters, key protocol and terminal lifecycle; Unix PTY and Windows ConPTY, resize and restored state |
-| M2 | Shared operation planner/conflicts, two-job queue, staging/commit/source-removal and restricted Trash; race/fault/cancel/uncertainty/source-preservation tests |
+| M1 (merged) | Local panes, raw identity, natural sorting, selection/filters, key protocol and terminal lifecycle; Unix PTY and Windows ConPTY, resize and restored state |
+| M2 (upcoming) | Shared operation planner/conflicts, two-job queue, staging/commit/source-removal and restricted Trash; race/fault/cancel/uncertainty/source-preservation tests |
 | M3 | Embedded byte-preserving SFTP; trust/auth/config, opaque handles, short writes/acknowledged close, bounded pooling/teardown and native clients with real isolated server fixtures |
 | M4 | Local/SSH transfer and explicit labelled client relay; validation, honest sent-request uncertainty, safe retry/removal; no genuine direct route |
 | M5 | Navigation/history/bookmarks, optional zoxide/fzf/clipboard/shell integration; missing capabilities, exact payloads, isolation, no implicit shell configuration changes |
