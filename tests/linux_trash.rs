@@ -1,7 +1,7 @@
 #![cfg(target_os = "linux")]
 use std::{
     fs,
-    os::unix::fs::{MetadataExt, PermissionsExt, symlink},
+    os::unix::fs::{PermissionsExt, symlink},
 };
 use terminal_file_manager::operations::trash::LinuxTrash;
 
@@ -41,7 +41,7 @@ fn restricted_trash_keeps_links_and_reserves_collision_safe_metadata() {
 }
 
 #[test]
-fn unsafe_permissions_and_cross_device_targets_fail_without_fallback() {
+fn unsafe_permissions_and_relative_storage_fail_without_fallback() {
     let root = tempfile::tempdir().unwrap();
     let data = root.path().join("data");
     fs::create_dir_all(data.join("Trash/files")).unwrap();
@@ -54,19 +54,10 @@ fn unsafe_permissions_and_cross_device_targets_fail_without_fallback() {
             .is_err()
     );
     assert_eq!(fs::read(&source).unwrap(), b"preserved");
-    let separate = tempfile::tempdir_in("/dev/shm").unwrap();
-    assert_ne!(
-        root.path().metadata().unwrap().dev(),
-        separate.path().metadata().unwrap().dev()
-    );
-    let error = LinuxTrash::new(separate.path().into())
+    let error = LinuxTrash::new("relative-data".into())
         .put(&terminal_file_manager::fs::inspect(&source))
         .unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("Cross-filesystem Trash unsupported")
-    );
+    assert!(error.to_string().contains("Relative XDG_DATA_HOME"));
     assert_eq!(fs::read(source).unwrap(), b"preserved");
 }
 
@@ -85,4 +76,36 @@ fn symlinked_parent_on_the_trash_filesystem_is_supported() {
     assert_eq!(fs::read(receipt.path).unwrap(), b"preserved");
     assert!(!source.exists());
     assert!(alias.is_symlink());
+}
+
+#[test]
+fn real_separate_volume_preserves_payload_and_relative_recovery_metadata() {
+    use std::os::unix::fs::MetadataExt;
+    let data = tempfile::tempdir().unwrap();
+    let source_root = tempfile::tempdir_in("/dev/shm").unwrap();
+    assert_ne!(
+        data.path().metadata().unwrap().dev(),
+        source_root.path().metadata().unwrap().dev()
+    );
+    let source = source_root.path().join("owned-file");
+    fs::write(&source, "recoverable volume fixture").unwrap();
+    let entry = terminal_file_manager::fs::inspect(&source);
+    let receipt = LinuxTrash::new(data.path().into()).put(&entry).unwrap();
+    assert!(!source.exists());
+    assert_eq!(
+        fs::read(&receipt.path).unwrap(),
+        b"recoverable volume fixture"
+    );
+    let info = fs::read_to_string(&receipt.info).unwrap();
+    let relative = source.strip_prefix("/dev/shm").unwrap();
+    assert!(info.contains(&format!("Path={}\n", relative.display())));
+    assert_eq!(
+        entry.identity.unwrap().object,
+        terminal_file_manager::fs::inspect(&receipt.path)
+            .identity
+            .unwrap()
+            .object
+    );
+    fs::rename(&receipt.path, &source).unwrap();
+    fs::remove_file(receipt.info).unwrap();
 }

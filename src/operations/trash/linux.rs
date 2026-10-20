@@ -1,4 +1,4 @@
-use super::Receipt;
+use super::LinuxReceipt as Receipt;
 use crate::{
     fs::Entry,
     operations::{
@@ -16,7 +16,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// Freedesktop home Trash with injectable data root and no copy/delete fallback.
+/// Freedesktop home/per-volume Trash with no copy/delete fallback.
 pub struct LinuxTrash {
     data: PathBuf,
 }
@@ -32,63 +32,155 @@ impl LinuxTrash {
     /// # Errors
     /// Rejects unsafe ownership/permissions, cross-device paths, changed identity or uncertain rename.
     pub fn put(&self, entry: &Entry) -> io::Result<Receipt> {
-        self.put_checked(entry)
+        self.put_checked(entry, &false.into())
             .map_err(|failure| io::Error::other(failure.detail))
     }
 
-    fn put_checked(&self, entry: &Entry) -> safety::Result<Receipt> {
+    pub(super) fn put_checked(
+        &self,
+        entry: &Entry,
+        cancel: &std::sync::atomic::AtomicBool,
+    ) -> safety::Result<Receipt> {
         let source_guard = Parents::capture(&entry.path)?;
         safety::revalidate(entry, true)?;
-        validate_scope(entry)?;
-        let (files, info) = self.prepare(entry)?;
-        let (destination, info_path) = reserve(entry, &files, &info)?;
-        let info_entry = crate::fs::inspect(&info_path);
-        let target_guard = Parents::capture(&destination)?;
-        let info_guard = Parents::capture(&info_path)?;
-        let result = commit(
+        validate_scope(entry, cancel)?;
+        let mounts = fs::read("/proc/self/mountinfo")?;
+        let physical = crate::operations::locks::namespace(&entry.path)?;
+        let (files, info, original) = self.prepare(entry, &physical)?;
+        let (destination, info_path) = reserve(&original, &files, &info)?;
+        if let Err(error) = crate::fs::check_cancelled(cancel) {
+            cleanup_info(entry, &destination, &crate::fs::inspect(&info_path));
+            return Err(error.into());
+        }
+        finish(entry, destination, info_path, source_guard, &mounts)
+    }
+
+    fn prepare(
+        &self,
+        source: &Entry,
+        physical: &Path,
+    ) -> safety::Result<(PathBuf, PathBuf, PathBuf)> {
+        let device = fs::symlink_metadata(physical)?.dev();
+        let (trash, original) = self.location(source, physical, device)?;
+        let (files, info) = prepare_store(&trash, device)?;
+        safety::reject_overlap(source, &files.join("reservation"))?;
+        Ok((files, info, original))
+    }
+    fn location(
+        &self,
+        source: &Entry,
+        physical: &Path,
+        device: u64,
+    ) -> safety::Result<(PathBuf, PathBuf)> {
+        validate_data(&self.data, source)?;
+        let (trash, original) = if super::volume::existing_device(&self.data)? == device {
+            fs::create_dir_all(&self.data)?;
+            (self.data.join("Trash"), physical.to_owned())
+        } else {
+            let top = super::volume::topdir(physical)?;
+            (
+                volume_trash(&top, device)?,
+                physical
+                    .strip_prefix(&top)
+                    .map_err(io::Error::other)?
+                    .to_owned(),
+            )
+        };
+        Ok((trash, original))
+    }
+}
+
+fn finish(
+    entry: &Entry,
+    destination: PathBuf,
+    info_path: PathBuf,
+    source_guard: Parents,
+    mounts: &[u8],
+) -> safety::Result<Receipt> {
+    let info_entry = crate::fs::inspect(&info_path);
+    let target_guard = Parents::capture(&destination)?;
+    let info_guard = Parents::capture(&info_path)?;
+    let result = if fs::read("/proc/self/mountinfo")? != mounts {
+        Err(safety::changed("Mount namespace changed before Trash"))
+    } else {
+        commit(
             entry,
             &destination,
             &info_entry,
             [&source_guard, &target_guard, &info_guard],
-        );
-        if let Err(error) = result {
-            cleanup_info(entry, &destination, &info_entry);
-            return Err(error);
-        }
-        Ok(Receipt {
-            path: destination,
-            info: info_path,
-        })
+        )
+    };
+    if let Err(error) = result {
+        cleanup_info(entry, &destination, &info_entry);
+        return Err(submission_failure(entry, error));
     }
+    Ok(Receipt {
+        path: destination,
+        info: info_path,
+    })
+}
 
-    fn prepare(&self, source: &Entry) -> safety::Result<(PathBuf, PathBuf)> {
-        validate_data(&self.data, source)?;
-        fs::create_dir_all(&self.data)?;
-        let trash = self.data.join("Trash");
-        private_directory(&trash)?;
-        let files = trash.join("files");
-        let info = trash.join("info");
-        private_directory(&files)?;
-        private_directory(&info)?;
-        let source_device = fs::symlink_metadata(&source.path)?.dev();
-        if source_device != fs::symlink_metadata(&files)?.dev() {
-            return Err(io::Error::other(
-                "Cross-filesystem Trash unsupported; no permanent-delete fallback",
-            )
-            .into());
+fn submission_failure(entry: &Entry, error: safety::Failure) -> safety::Failure {
+    if safety::revalidate(entry, true).is_ok() {
+        error
+    } else {
+        safety::Failure {
+            outcome: crate::operations::Outcome::OutcomeUnknown,
+            detail: format!(
+                "Trash submission unacknowledged; reconciliation required: {}",
+                error.detail
+            ),
         }
-        safety::reject_overlap(source, &files.join("reservation"))?;
-        Ok((files, info))
     }
 }
 
-fn validate_scope(entry: &Entry) -> safety::Result<()> {
+fn prepare_store(trash: &Path, device: u64) -> io::Result<(PathBuf, PathBuf)> {
+    private_directory(trash)?;
+    let files = trash.join("files");
+    let info = trash.join("info");
+    private_directory(&files)?;
+    private_directory(&info)?;
+    let mounts = crate::operations::mounts::Mounts::capture(crate::operations::Operation::Trash)?;
+    for path in [trash, &files, &info] {
+        if fs::symlink_metadata(path)?.dev() != device {
+            return Err(io::Error::other("Trash storage crosses a device; refused"));
+        }
+        mounts
+            .reject(&crate::fs::inspect(path))
+            .map_err(|error| io::Error::other(error.detail))?;
+    }
+    Ok((files, info))
+}
+
+fn volume_trash(top: &Path, device: u64) -> io::Result<PathBuf> {
+    let uid = nix::unistd::geteuid();
+    let shared = top.join(".Trash");
+    let preferred = shared.join(uid.to_string());
+    if valid_shared(&shared, device) && prepare_store(&preferred, device).is_ok() {
+        return Ok(preferred);
+    }
+    let fallback = top.join(format!(".Trash-{uid}"));
+    prepare_store(&fallback, device)?;
+    Ok(fallback)
+}
+
+fn valid_shared(path: &Path, device: u64) -> bool {
+    fs::symlink_metadata(path).is_ok_and(|metadata| {
+        metadata.is_dir()
+            && !metadata.file_type().is_symlink()
+            && metadata.dev() == device
+            && metadata.mode() & 0o1000 != 0
+            && [0, nix::unistd::geteuid().as_raw()].contains(&metadata.uid())
+    })
+}
+
+fn validate_scope(entry: &Entry, cancel: &std::sync::atomic::AtomicBool) -> safety::Result<()> {
     let plan = crate::operations::Plan::paths(
         crate::operations::Operation::Trash,
         vec![entry.path.clone()],
         None,
     )?;
-    crate::operations::Preview::capture(&plan, &false.into())?;
+    crate::operations::Preview::capture(&plan, cancel)?;
     Ok(())
 }
 
@@ -106,7 +198,7 @@ fn validate_data(data: &Path, source: &Entry) -> io::Result<()> {
     Ok(())
 }
 
-fn reserve(entry: &Entry, files: &Path, info: &Path) -> io::Result<(PathBuf, PathBuf)> {
+fn reserve(original: &Path, files: &Path, info: &Path) -> io::Result<(PathBuf, PathBuf)> {
     let mut reservation = tempfile::Builder::new()
         .prefix("tfm-")
         .suffix(".trashinfo")
@@ -117,7 +209,7 @@ fn reserve(entry: &Entry, files: &Path, info: &Path) -> io::Result<(PathBuf, Pat
         .ok_or_else(|| io::Error::other("Invalid Trash reservation"))?
         .to_owned();
     let destination = files.join(stored);
-    write_info(reservation.as_file_mut(), &entry.path)?;
+    write_info(reservation.as_file_mut(), original)?;
     let (_, info_path) = reservation.keep().map_err(io::Error::other)?;
     Ok((destination, info_path))
 }
@@ -142,9 +234,8 @@ fn private_directory(path: &Path) -> io::Result<()> {
 }
 
 fn write_info(file: &mut fs::File, path: &Path) -> io::Result<()> {
-    let absolute = std::path::absolute(path)?;
     let mut encoded = String::new();
-    for byte in absolute.as_os_str().as_bytes() {
+    for byte in path.as_os_str().as_bytes() {
         if byte.is_ascii_alphanumeric() || b"/-._~".contains(byte) {
             encoded.push(char::from(*byte));
         } else {
@@ -202,6 +293,46 @@ fn cleanup_info(source: &Entry, destination: &Path, info: &Entry) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn volume_storage_prefers_sticky_shared_and_falls_back_from_unsafe_components() {
+        let root = tempfile::tempdir().unwrap();
+        let device = root.path().metadata().unwrap().dev();
+        let uid = nix::unistd::geteuid();
+        let shared = root.path().join(".Trash");
+        fs::create_dir(&shared).unwrap();
+        fs::set_permissions(&shared, fs::Permissions::from_mode(0o1777)).unwrap();
+        let selected = volume_trash(root.path(), device).unwrap();
+        assert_eq!(selected, shared.join(uid.to_string()));
+        assert_eq!(selected.metadata().unwrap().mode() & 0o777, 0o700);
+        fs::set_permissions(&shared, fs::Permissions::from_mode(0o777)).unwrap();
+        let fallback = root.path().join(format!(".Trash-{uid}"));
+        assert_eq!(volume_trash(root.path(), device).unwrap(), fallback);
+        fs::remove_dir(fallback.join("info")).unwrap();
+        std::os::unix::fs::symlink(root.path(), fallback.join("info")).unwrap();
+        assert!(volume_trash(root.path(), device).is_err());
+        assert!(fallback.join("info").is_symlink());
+    }
+
+    #[test]
+    fn trashinfo_preserves_native_relative_bytes_and_shared_symlinks_are_refused() {
+        use std::os::unix::ffi::OsStringExt;
+        let root = tempfile::tempdir().unwrap();
+        let mut file = tempfile::tempfile().unwrap();
+        let path = PathBuf::from(std::ffi::OsString::from_vec(b"dir/a%\xff\n".to_vec()));
+        write_info(&mut file, &path).unwrap();
+        use std::io::{Read, Seek};
+        file.rewind().unwrap();
+        let mut text = String::new();
+        file.read_to_string(&mut text).unwrap();
+        assert!(text.contains("Path=dir/a%25%FF%0A\nDeletionDate="));
+        let shared = root.path().join(".Trash");
+        std::os::unix::fs::symlink(root.path(), &shared).unwrap();
+        assert!(!valid_shared(
+            &shared,
+            root.path().metadata().unwrap().dev()
+        ));
+    }
 
     #[test]
     fn changed_trash_metadata_blocks_source_rename() {

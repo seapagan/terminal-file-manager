@@ -118,12 +118,16 @@ Detectable change, uncertainty or an ambiguous sent request blocks destructive
 finalization and source removal. Cancellation after send preserves unknown
 outcomes for reconciliation; retries never invent safe completion.
 
-Trash remains mandatory. Initial Linux support is restricted to validated
-same-filesystem rename preserving link identity, with mount, ownership,
-permissions, collision and identity checks. Unsupported/cross-device/uncertain
-paths fail explicitly. No silent permanent-delete fallback is allowed; permanent
-deletion needs separate explicit confirmation. Native macOS/Windows Trash and
-safe cross-device behaviour require their own proof.
+Linux Trash uses a checked same-filesystem rename into home Trash or Freedesktop
+per-volume storage. Per-volume discovery resolves the physical source parent,
+refuses ambiguous/bind mount topology, and validates sticky shared or private
+user storage before reserving matching payload/metadata names. It never follows
+the selected final link or uses cross-device copy/delete. Native Trash results
+retain platform-specific recovery references. One top-level acknowledgement does
+not fabricate descendant operations: recursive inventory is labelled as validated
+before the move. Unknown results retain locks; a native permanent-deletion report
+during F8 is a critical safety incident. Permanent deletion needs separate explicit
+confirmation. Native macOS/Windows execution requires its own proof.
 
 V1 transfers include local/embedded-SFTP paths and explicitly approved, labelled
 client relay. Genuine server-to-server transfer is post-v1. A relay is never

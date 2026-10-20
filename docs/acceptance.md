@@ -156,7 +156,8 @@ counted permanent-delete confirmation, retained job results, reconciliation and
 safe exit.
 Local regressions include real executable/PTY creation, copy, conflict replacement,
 and permanent-delete cancellation/confirmation. Linux Trash tests use an owned
-XDG data root and reject cross-filesystem fallback. Windows/macOS native Trash
+XDG data root, sticky/private per-volume layouts and an owned file on a separate
+real filesystem; no cross-device copy/delete fallback is allowed. Windows/macOS native Trash
 and Read-only behavior still require hosted execution for this implementation.
 
 M2 is not accepted yet. Completed-tree full gates and native hosted outcomes

@@ -57,11 +57,14 @@ pub enum Outcome {
     Cancelled,
     CopiedSourceRetained,
     OutcomeUnknown,
+    /// Native OS reported permanent deletion during a recoverable Trash request.
+    SafetyIncident,
 }
 
 /// One actual recursive entry outcome; partial directories are never completed.
 #[derive(Clone, Debug)]
 pub struct EntryResult {
+    pub trash: Option<TrashResult>,
     pub recovery: Option<Box<super::Recovery>>,
     pub source: PathBuf,
     pub destination: Option<PathBuf>,
@@ -71,6 +74,14 @@ pub struct EntryResult {
     pub checksum_verified: bool,
     pub created_directory: bool,
     pub detail: String,
+}
+
+/// Recursive inventory was validated before the single top-level native move.
+#[derive(Clone, Debug)]
+pub struct TrashResult {
+    pub receipt: super::trash::Receipt,
+    pub validated_files: u64,
+    pub validated_directories: u64,
 }
 
 /// In-session evidence retained after progress and toasts expire.
@@ -102,6 +113,6 @@ impl Record {
     pub fn unresolved(&self) -> bool {
         self.entries
             .iter()
-            .any(|e| e.outcome == Outcome::OutcomeUnknown)
+            .any(|e| matches!(e.outcome, Outcome::OutcomeUnknown | Outcome::SafetyIncident))
     }
 }

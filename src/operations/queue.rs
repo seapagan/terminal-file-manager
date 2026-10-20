@@ -480,6 +480,7 @@ pub(super) fn unsuccessful(plan: &Plan, outcome: Outcome, detail: &str) -> Recor
             .iter()
             .map(|source| EntryResult {
                 recovery: None,
+                trash: None,
                 source: source.path.clone(),
                 destination: plan.destination.clone(),
                 kind: source.kind,
@@ -494,6 +495,7 @@ pub(super) fn unsuccessful(plan: &Plan, outcome: Outcome, detail: &str) -> Recor
     if record.entries.is_empty() {
         record.entries.push(EntryResult {
             recovery: None,
+            trash: None,
             source: plan.destination.clone().unwrap_or_default(),
             destination: plan.destination.clone(),
             kind: crate::fs::EntryKind::Directory,

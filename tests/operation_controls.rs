@@ -118,6 +118,7 @@ fn outcome(
     terminal_file_manager::operations::Record {
         entries: vec![terminal_file_manager::operations::EntryResult {
             recovery: None,
+            trash: None,
             source: source.path,
             destination: None,
             kind: source.kind,

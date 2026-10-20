@@ -51,6 +51,7 @@ fn apply(
 ) -> bool {
     let mut result = EntryResult {
         recovery: None,
+        trash: None,
         source: source.path.clone(),
         destination: plan.destination.clone(),
         kind: source.kind,
@@ -94,7 +95,7 @@ fn perform(
         Operation::Permissions(mode) => attributes(source, Some(mode), None),
         Operation::ReadOnly(value) => attributes(source, None, Some(value)),
         Operation::Delete => delete(source, plan, cancel, notify, record, depth, &parents),
-        Operation::Trash => recycle(source, result, record),
+        Operation::Trash => recycle(source, plan, cancel, result),
         _ => Err(io::Error::other("Unsupported mutation kind").into()),
     }
 }
@@ -262,70 +263,28 @@ fn remove(
     })
 }
 
-fn recycle(source: &Entry, result: &mut EntryResult, record: &mut Record) -> Result<()> {
-    let receipt = super::trash::put(source).map_err(|error| {
-        if safety::revalidate(source, false).is_ok() {
-            error.into()
-        } else {
-            safety::Failure {
-                outcome: Outcome::OutcomeUnknown,
-                detail: format!("Trash outcome unknown; source may already be recycled: {error}"),
-            }
-        }
-    })?;
-    result.destination = Some(receipt.path.clone());
-    result.detail = format!("Recycled; recovery location {}", receipt.path.display());
-    let moved = crate::fs::inspect(&receipt.path);
-    if moved.kind != source.kind || moved.link_target != source.link_target {
-        return Err(safety::Failure {
-            outcome: Outcome::OutcomeUnknown,
-            detail: format!(
-                "Native Trash receipt type/link unverified: {}",
-                receipt.path.display()
-            ),
-        });
-    }
-    let mut children = Vec::new();
-    scan_recycled(&moved, 0, &mut children).map_err(|error| safety::Failure {
-        outcome: Outcome::OutcomeUnknown,
-        detail: format!(
-            "Recycled at {}; recursive result counts unavailable: {error}",
-            receipt.path.display()
-        ),
-    })?;
-    for child in children {
-        let relative = child
-            .path
-            .strip_prefix(&receipt.path)
-            .map_err(io::Error::other)?;
-        record.entries.push(EntryResult {
-            recovery: None,
-            source: source.path.join(relative),
-            destination: Some(child.path.clone()),
-            kind: child.kind,
-            outcome: Outcome::Completed,
-            bytes: 0,
-            checksum_verified: false,
-            created_directory: child.may_recurse(),
-            detail: result.detail.clone(),
-        });
-    }
-    Ok(())
-}
-
-fn scan_recycled(entry: &Entry, depth: usize, entries: &mut Vec<Entry>) -> io::Result<()> {
-    if depth > 128 {
-        return Err(io::Error::other("Maximum Trash inspection depth reached"));
-    }
-    if entry.may_recurse() {
-        for child in fs::read_dir(&entry.path)? {
-            let entry = crate::fs::inspect(&child?.path());
-            if entry.identity.is_none() {
-                return Err(io::Error::other("Trashed descendant identity unavailable"));
-            }
-            scan_recycled(&entry, depth + 1, entries)?;
-            entries.push(entry);
-        }
-    }
+fn recycle(
+    source: &Entry,
+    plan: &Plan,
+    cancel: &AtomicBool,
+    result: &mut EntryResult,
+) -> Result<()> {
+    let (files, directories) = plan
+        .preview
+        .as_ref()
+        .ok_or_else(|| io::Error::other("Validated Trash inventory required"))?
+        .inventory(&source.path);
+    crate::fs::check_cancelled(cancel)?;
+    let receipt = super::trash::put(source, cancel)?;
+    result.destination = receipt.path().map(std::path::Path::to_owned);
+    result.detail = format!(
+        "{}; validated before move: {files} files, {directories} directories",
+        receipt.description()
+    );
+    result.trash = Some(super::TrashResult {
+        receipt,
+        validated_files: files,
+        validated_directories: directories,
+    });
     Ok(())
 }

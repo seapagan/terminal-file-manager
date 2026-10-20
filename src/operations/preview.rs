@@ -16,6 +16,19 @@ pub struct Preview {
 }
 
 impl Preview {
+    pub(super) fn inventory(&self, root: &std::path::Path) -> (u64, u64) {
+        self.entries
+            .values()
+            .filter(|entry| entry.path.starts_with(root))
+            .fold((0, 0), |(files, directories), entry| {
+                if entry.kind == EntryKind::Directory {
+                    (files, directories + 1)
+                } else {
+                    (files + 1, directories)
+                }
+            })
+    }
+
     pub(super) fn approved(&self, path: &std::path::Path) -> Result<Entry> {
         self.entries.get(path).cloned().ok_or_else(|| {
             safety::changed("Unapproved descendant after preview; review a fresh preview")

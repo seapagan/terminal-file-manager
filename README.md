@@ -111,7 +111,8 @@ rechecks unknown outcomes without repeating source removal.
 Completed entries stay excluded from retries.
 
 Trash can fail where the native facility cannot preserve the selected object.
-Linux Trash requires the source and home Trash to share a filesystem. Permanent
+Linux uses home Trash or a validated Trash on the source volume; it never copies
+and deletes across filesystems to emulate Trash. Permanent
 deletion requires its own confirmation and never serves as a fallback. On quit, choose Return, Wait, or
 Cancel safely; `tfm` waits for workers and cleanup. An unknown outcome blocks
 retry and safe exit until reconciliation.

@@ -1,29 +1,81 @@
 use crate::fs::Entry;
-use std::{io, path::PathBuf};
+#[cfg(target_os = "linux")]
+use std::io;
+use std::path::PathBuf;
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(target_os = "linux")]
+mod volume;
 #[cfg(target_os = "linux")]
 pub use linux::LinuxTrash;
 
 /// Native recovery evidence, never a fabricated TFM recovery directory.
 #[derive(Clone, Debug)]
-pub struct Receipt {
+pub struct LinuxReceipt {
     pub path: PathBuf,
     pub info: PathBuf,
 }
 
-pub(super) fn put(entry: &Entry) -> io::Result<Receipt> {
+/// Recovery references retain each OS's native namespace semantics.
+#[derive(Clone, Debug)]
+pub enum Receipt {
+    Linux(LinuxReceipt),
+    Mac { path: Option<PathBuf> },
+    Windows { parsing_name: Option<Vec<u16>> },
+}
+
+impl Receipt {
+    /// Only filesystem-backed native references can be inspected as paths.
+    pub fn path(&self) -> Option<&std::path::Path> {
+        match self {
+            Self::Linux(item) => Some(&item.path),
+            Self::Mac { path } => path.as_deref(),
+            Self::Windows { .. } => None,
+        }
+    }
+    pub(crate) fn description(&self) -> String {
+        match self.path() {
+            Some(path) => format!("Recycled; recovery location {}", path.display()),
+            None => "Recycled; native acknowledgement, limited recovery metadata".into(),
+        }
+    }
+}
+
+pub(super) fn put(
+    entry: &Entry,
+    cancel: &std::sync::atomic::AtomicBool,
+) -> super::safety::Result<Receipt> {
     #[cfg(target_os = "linux")]
     {
-        LinuxTrash::new(data_root()?).put(entry)
+        LinuxTrash::new(data_root()?)
+            .put_checked(entry, cancel)
+            .map(Receipt::Linux)
     }
     #[cfg(any(target_os = "macos", windows))]
     {
-        let item = junkyard::discard(&entry.path).map_err(io::Error::other)?;
-        Ok(Receipt {
-            path: item.id().into(),
-            info: PathBuf::new(),
-        })
+        crate::fs::check_cancelled(cancel)?;
+        let item = junkyard::discard(&entry.path).map_err(|error| {
+            let outcome = if super::safety::revalidate(entry, true).is_ok() {
+                super::Outcome::Failed
+            } else {
+                super::Outcome::OutcomeUnknown
+            };
+            super::safety::Failure {
+                outcome,
+                detail: format!("Native Trash error; no automatic retry: {error}"),
+            }
+        })?;
+        #[cfg(target_os = "macos")]
+        return Ok(Receipt::Mac {
+            path: Some(item.id().into()),
+        });
+        #[cfg(windows)]
+        {
+            use std::os::windows::ffi::OsStrExt;
+            Ok(Receipt::Windows {
+                parsing_name: Some(std::ffi::OsStr::new(item.id()).encode_wide().collect()),
+            })
+        }
     }
 }
 
@@ -42,4 +94,19 @@ pub(super) fn data_root() -> io::Result<PathBuf> {
         ));
     }
     Ok(root)
+}
+
+#[cfg(target_os = "linux")]
+pub(super) fn claim_roots(entry: &Entry) -> io::Result<Vec<PathBuf>> {
+    let mut roots = vec![data_root()?.join("Trash")];
+    let source = super::locks::namespace(&entry.path)?;
+    use std::os::unix::fs::MetadataExt;
+    if volume::existing_device(&data_root()?)? == std::fs::symlink_metadata(&source)?.dev() {
+        return Ok(roots);
+    }
+    let top = volume::topdir(&source)?;
+    let uid = nix::unistd::geteuid();
+    roots.push(top.join(".Trash").join(uid.to_string()));
+    roots.push(top.join(format!(".Trash-{uid}")));
+    Ok(roots)
 }

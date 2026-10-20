@@ -81,6 +81,7 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
         }
         let mut result = EntryResult {
             recovery: None,
+            trash: None,
             source: source.path.clone(),
             destination: destination.map(Path::to_owned),
             kind: source.kind,

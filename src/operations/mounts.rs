@@ -84,7 +84,7 @@ fn parse_mountinfo(bytes: &[u8]) -> io::Result<BTreeSet<PathBuf>> {
 }
 
 #[cfg(target_os = "linux")]
-fn decode_path(field: &[u8]) -> io::Result<PathBuf> {
+pub(super) fn decode_path(field: &[u8]) -> io::Result<PathBuf> {
     use std::os::unix::ffi::OsStringExt;
     let mut bytes = Vec::with_capacity(field.len());
     let mut position = 0;

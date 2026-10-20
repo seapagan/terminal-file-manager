@@ -22,4 +22,4 @@ pub mod trash;
 pub use execute::execute;
 pub use locks::Coordinator;
 pub use plan::{Operation, Plan};
-pub use results::{Decision, EntryResult, Event, Options, Outcome, Record, Stage};
+pub use results::{Decision, EntryResult, Event, Options, Outcome, Record, Stage, TrashResult};

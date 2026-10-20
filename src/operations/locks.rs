@@ -117,7 +117,11 @@ fn footprint(plan: &Plan) -> io::Result<Vec<Claim>> {
     let mut claims = Vec::new();
     #[cfg(target_os = "linux")]
     if plan.operation == Operation::Trash {
-        claims.push(trash_claim()?);
+        for entry in &plan.operands {
+            for root in super::trash::claim_roots(entry)? {
+                claims.push(trash_claim(&root)?);
+            }
+        }
     }
     if let Some(staging_namespace) = staging_claim(plan)? {
         claims.push(staging_namespace);
@@ -143,11 +147,10 @@ fn operand_claims(plan: &Plan, claims: &mut Vec<Claim>) -> io::Result<()> {
 }
 
 #[cfg(target_os = "linux")]
-fn trash_claim() -> io::Result<Claim> {
-    let root = super::trash::data_root()?.join("Trash");
+fn trash_claim(root: &Path) -> io::Result<Claim> {
     Ok(Claim {
-        path: future_namespace(&root)?,
-        object: crate::fs::inspect(&root)
+        path: future_namespace(root)?,
+        object: crate::fs::inspect(root)
             .identity
             .and_then(|identity| identity.object),
         write: true,

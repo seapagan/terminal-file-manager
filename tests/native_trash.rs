@@ -45,8 +45,14 @@ fn trash_child() {
     );
     let plan = Plan::paths(Operation::Trash, vec![root.join("selected")], None).unwrap();
     let record = execute(&plan, Options::default(), &false.into(), |_| Decision::Skip);
-    assert_eq!(record.completed_files(), 1, "{:?}", record.entries);
-    assert_eq!(record.completed_directories(), 2, "{:?}", record.entries);
+    assert_eq!(record.completed_files(), 0, "{:?}", record.entries);
+    assert_eq!(record.completed_directories(), 1, "{:?}", record.entries);
+    assert_eq!(record.entries.len(), 1, "one native top-level operation");
+    let evidence = record.entries[0].trash.as_ref().unwrap();
+    assert_eq!(
+        (evidence.validated_files, evidence.validated_directories),
+        (1, 2)
+    );
     let receipt = record.entries.last().unwrap().destination.as_ref().unwrap();
     assert_eq!(
         fs::read(receipt.join("nested/file")).unwrap(),

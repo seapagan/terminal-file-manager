@@ -157,15 +157,12 @@ pub(crate) fn summary(job: &Job) -> String {
         counts(Outcome::Skipped),
         counts(Outcome::Cancelled),
         counts(Outcome::CopiedSourceRetained),
-        counts(Outcome::OutcomeUnknown)
+        counts(Outcome::OutcomeUnknown) + counts(Outcome::SafetyIncident)
     )
 }
 
 fn completed(job: &Job, record: &Record) -> String {
     use super::Operation::*;
-    let noun = |number: usize, singular: &str, plural: &str| {
-        format!("{number} {}", if number == 1 { singular } else { plural })
-    };
     let verb = match job.plan.operation {
         Copy => "copied",
         Move => "moved",
@@ -175,6 +172,9 @@ fn completed(job: &Job, record: &Record) -> String {
         Delete => "permanently deleted",
         _ => "updated",
     };
+    if job.plan.operation == Trash {
+        return trash_completed(record);
+    }
     if job.plan.operation == Mkdir {
         return format!(
             "{} {verb}",
@@ -203,4 +203,20 @@ fn completed(job: &Job, record: &Record) -> String {
         ));
     }
     text
+}
+
+fn noun(number: usize, singular: &str, plural: &str) -> String {
+    format!("{number} {}", if number == 1 { singular } else { plural })
+}
+
+fn trash_completed(record: &Record) -> String {
+    let count = record
+        .entries
+        .iter()
+        .filter(|entry| entry.outcome == Outcome::Completed)
+        .count();
+    format!(
+        "{} trashed (native top-level acknowledgements)",
+        noun(count, "entry", "entries")
+    )
 }
