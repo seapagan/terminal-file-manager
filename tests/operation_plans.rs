@@ -95,3 +95,29 @@ fn source_aliases_and_ancestor_writes_conflict_but_independent_reads_share() {
     let alias = Plan::paths(Operation::Delete, vec![root.path().join("alias")], None).unwrap();
     assert!(!coordinator.acquire(4, &alias).unwrap());
 }
+
+#[test]
+fn replacement_destination_aliases_are_locked_as_objects() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("incoming"), "incoming").unwrap();
+    fs::write(root.path().join("victim"), "previous").unwrap();
+    fs::create_dir(root.path().join("target")).unwrap();
+    fs::hard_link(
+        root.path().join("victim"),
+        root.path().join("target/incoming"),
+    )
+    .unwrap();
+    let copy = Plan::paths(
+        Operation::Copy,
+        vec![root.path().join("incoming")],
+        Some(root.path().join("target")),
+    )
+    .unwrap();
+    let delete = Plan::paths(Operation::Delete, vec![root.path().join("victim")], None).unwrap();
+    let mut coordinator = Coordinator::default();
+    assert!(coordinator.acquire(1, &copy).unwrap());
+    assert!(!coordinator.acquire(2, &delete).unwrap());
+    coordinator.quarantine(1);
+    assert_eq!(coordinator.active(), 0);
+    assert!(!coordinator.acquire(2, &delete).unwrap());
+}

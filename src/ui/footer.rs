@@ -22,12 +22,17 @@ pub(super) fn controls(area: Rect) -> Vec<FooterControl> {
     let mut x = area.x;
     for (label, action) in [
         ("? Help", Action::Help),
+        ("F5 Copy", Action::Copy),
+        ("F6 Move", Action::Move),
+        ("F7 Mkdir", Action::Mkdir),
+        ("F8 Trash", Action::Trash),
+        ("F9 Jobs", Action::Jobs),
+        ("Alt+Enter Info", Action::Metadata),
+        ("q Quit", Action::Quit),
         ("Alt-P Panes", Action::TogglePanes),
         ("V View", Action::ViewOptions),
-        ("Alt-V Profiles", Action::ViewProfiles),
-        ("Alt+Enter Info", Action::Metadata),
         ("/ Filter", Action::Filter),
-        ("q Quit", Action::Quit),
+        ("Alt-V Profiles", Action::ViewProfiles),
     ] {
         let width = label.len() as u16;
         if u32::from(x) + u32::from(width) > u32::from(area.right()) {
@@ -54,7 +59,7 @@ pub(super) fn render(frame: &mut Frame, area: Rect, controls: &[FooterControl], 
         ));
     }
     spans.push(Span::styled(
-        "F3–F8 unavailable",
+        "F3/F4 viewer/editor unavailable",
         theme.style(Role::Disabled),
     ));
     frame.render_widget(Paragraph::new(Line::from(spans)), area);

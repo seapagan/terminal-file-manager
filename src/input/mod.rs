@@ -6,6 +6,9 @@ mod diagnostics;
 mod divider;
 mod help;
 mod metadata;
+mod operation_dialog;
+mod operation_jobs;
+mod operations;
 mod profiles;
 mod scroll;
 pub(crate) mod view;
@@ -75,6 +78,11 @@ pub enum Action {
     Mkdir,
     Trash,
     Delete,
+    Rename,
+    Attributes,
+    Jobs,
+    CopyQuick,
+    MoveQuick,
     Path,
     Zoxide,
     OppositeZoxide,

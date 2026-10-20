@@ -7,6 +7,8 @@ mod layout;
 mod listing;
 mod measure;
 mod metadata;
+mod operations;
+pub use operations::OperationControl;
 mod path_title;
 pub use metadata::MetadataControl;
 mod policy;
@@ -74,6 +76,7 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     if let Some(lines) = diagnostics {
         diagnostics::render(frame, app, theme, &mut geometry, lines);
     }
+    operations::render(frame, app, theme, &geometry.operation_controls);
     geometry
 }
 

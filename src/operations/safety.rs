@@ -47,12 +47,53 @@ pub(super) fn revalidate(expected: &Entry, contents: bool) -> Result<()> {
         }
         _ => false,
     };
-    if fresh.kind != expected.kind || !same || fresh.link_target != expected.link_target {
+    let ownership = |entry: &Entry| entry.owner.as_ref().map(|owner| (owner.uid, owner.gid));
+    if fresh.kind != expected.kind
+        || !same
+        || fresh.link_target != expected.link_target
+        || fresh.attributes != expected.attributes
+        || ownership(&fresh) != ownership(expected)
+    {
         return Err(changed("Source/object changed; fresh review required"));
     }
     Ok(())
 }
 
+pub(super) fn owned_object(expected: &Entry) -> Result<()> {
+    let fresh = crate::fs::inspect(&expected.path);
+    if fresh.kind == expected.kind
+        && fresh.link_target == expected.link_target
+        && expected
+            .identity
+            .as_ref()
+            .zip(fresh.identity.as_ref())
+            .is_some_and(|(a, b)| same_object(a, b))
+    {
+        Ok(())
+    } else {
+        Err(changed("Owned object identity changed"))
+    }
+}
+
+pub(super) fn opened_object(expected: &Entry, file: &fs::File) -> Result<()> {
+    #[cfg(unix)]
+    let object = {
+        use std::os::unix::fs::MetadataExt;
+        let metadata = file.metadata()?;
+        (metadata.dev(), metadata.ino())
+    };
+    #[cfg(windows)]
+    let object = {
+        let information = winapi_util::file::information(file)?;
+        (information.volume_serial_number(), information.file_index())
+    };
+    if expected.identity.as_ref().and_then(|id| id.object) != Some(object) {
+        return Err(changed("Opened handle differs from approved native object"));
+    }
+    Ok(())
+}
+
+#[derive(Clone, Debug)]
 pub(super) struct Parents {
     raw: PathBuf,
     resolved: PathBuf,
@@ -150,6 +191,20 @@ pub(super) fn acknowledged_remove(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn opened_handle_must_match_the_approved_native_object() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("source");
+        let other = root.path().join("other");
+        fs::write(&path, "same").unwrap();
+        fs::write(&other, "same").unwrap();
+        let expected = crate::fs::inspect(&path);
+        opened_object(&expected, &fs::File::open(&path).unwrap()).unwrap();
+        let error = opened_object(&expected, &fs::File::open(other).unwrap()).unwrap_err();
+        assert_eq!(error.outcome, Outcome::Changed);
+        assert_eq!(fs::read(path).unwrap(), b"same");
+    }
 
     #[test]
     fn lost_removal_response_never_claims_source_preservation_or_reissues_removal() {

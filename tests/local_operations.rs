@@ -252,6 +252,37 @@ fn replaced_ancestor_never_redirects_commit_or_source_removal() {
     assert_eq!(record.entries[0].outcome, Outcome::Changed);
 }
 
+#[cfg(unix)]
+#[test]
+fn source_permission_change_invalidates_the_prepared_move() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = fixture();
+    let record = execute(
+        &transfer(root.path(), Operation::Move),
+        Options::default(),
+        &false.into(),
+        |event| {
+            if matches!(
+                event,
+                Event::Progress {
+                    stage: Stage::Verified,
+                    ..
+                }
+            ) {
+                fs::set_permissions(
+                    root.path().join("source"),
+                    fs::Permissions::from_mode(0o600),
+                )
+                .unwrap();
+            }
+            Decision::Skip
+        },
+    );
+    assert!(root.path().join("source").exists());
+    assert!(!root.path().join("destination/source").exists());
+    assert_eq!(record.entries[0].outcome, Outcome::Changed);
+}
+
 #[test]
 fn aliases_and_self_descendants_are_rejected_before_any_mutation() {
     let root = fixture();
@@ -311,4 +342,34 @@ fn links_are_copied_as_links_and_special_files_never_open_as_streams() {
     );
     assert_eq!(record.entries[0].outcome, Outcome::Failed);
     assert!(fs::symlink_metadata(root.path().join("source")).is_ok());
+}
+#[test]
+fn incoming_name_cannot_escape_the_approved_destination_directory() {
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("source");
+    std::fs::write(&source, "incoming").unwrap();
+    std::fs::create_dir(root.path().join("target")).unwrap();
+    std::fs::write(root.path().join("outside"), "sentinel").unwrap();
+    let mut plan = terminal_file_manager::operations::Plan::paths(
+        terminal_file_manager::operations::Operation::Copy,
+        vec![source.clone()],
+        Some(root.path().join("target")),
+    )
+    .unwrap();
+    plan.incoming_name = Some("../outside".into());
+    let record = terminal_file_manager::operations::execute(
+        &plan,
+        Default::default(),
+        &false.into(),
+        |_| terminal_file_manager::operations::Decision::Replace,
+    );
+    assert_eq!(
+        record.entries[0].outcome,
+        terminal_file_manager::operations::Outcome::Failed
+    );
+    assert_eq!(
+        std::fs::read(root.path().join("outside")).unwrap(),
+        b"sentinel"
+    );
+    assert_eq!(std::fs::read(source).unwrap(), b"incoming");
 }

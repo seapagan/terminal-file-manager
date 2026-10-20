@@ -244,6 +244,7 @@ fn large_marked_refresh_preserves_only_matching_native_identities() {
         })
         .collect();
     let mut snapshot = Snapshot {
+        directory: None,
         path: root.path().to_path_buf(),
         entries,
         errors: vec![],

@@ -18,6 +18,12 @@ pub fn execute(
     cancel: &AtomicBool,
     mut notify: impl FnMut(Event) -> Decision,
 ) -> Record {
+    if let Err(error) = plan.validate_directories() {
+        return super::queue::unsuccessful(plan, error.outcome, &error.detail);
+    }
+    if !matches!(plan.operation, Operation::Copy | Operation::Move) {
+        return super::mutations::execute(plan, cancel, &mut notify);
+    }
     let mut worker = Worker {
         plan,
         options,
@@ -27,13 +33,18 @@ pub fn execute(
         policies: Vec::new(),
     };
     for entry in &plan.operands {
-        let destination = plan.destination.as_ref().map(|path| {
-            if matches!(plan.operation, Operation::Copy | Operation::Move) {
-                path.join(&entry.name)
+        if plan.completed.contains(&entry.path) {
+            continue;
+        }
+        let refreshed;
+        let entry =
+            if plan.retrying && entry.may_recurse() && safety::revalidate(entry, false).is_ok() {
+                refreshed = crate::fs::inspect(&entry.path);
+                &refreshed
             } else {
-                path.clone()
-            }
-        });
+                entry
+            };
+        let destination = plan.target(entry);
         worker.entry(entry, destination.as_deref(), 0);
         if worker.record.unresolved() {
             break;
@@ -53,6 +64,9 @@ struct Worker<'a, F> {
 
 impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
     fn entry(&mut self, source: &Entry, destination: Option<&Path>, depth: usize) -> bool {
+        if self.plan.completed.contains(&source.path) {
+            return true;
+        }
         let mut result = EntryResult {
             source: source.path.clone(),
             destination: destination.map(Path::to_owned),
@@ -288,6 +302,7 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
         guards: &[Parents; 2],
     ) -> Result<Entry> {
         self.stage_payload(source, destination, stage, result)?;
+        stage.seal()?;
         (self.notify)(Event::Progress {
             source: source.path.clone(),
             destination: destination.into(),
@@ -299,7 +314,7 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
         safety::revalidate(source, true)?;
         safety::destination_matches(destination, previous)?;
         stage.commit(destination, previous.is_some())?;
-        let committed = crate::fs::inspect(destination);
+        let committed = stage.committed(destination)?;
         (self.notify)(Event::Progress {
             source: source.path.clone(),
             destination: destination.into(),

@@ -31,6 +31,7 @@ pub(super) fn copy(
 
 fn opened(source: &Entry) -> Result<File> {
     let file = staging::open_source(&source.path)?;
+    safety::opened_object(source, &file)?;
     safety::revalidate(source, true)?;
     let metadata = file.metadata()?;
     if metadata.len() != source.size.unwrap_or(u64::MAX)

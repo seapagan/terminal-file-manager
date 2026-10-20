@@ -19,6 +19,11 @@ pub(super) struct OwnedStage {
 }
 
 impl OwnedStage {
+    pub fn seal(&mut self) -> Result<()> {
+        safety::owned_object(&self.entry)?;
+        self.entry = crate::fs::inspect(&self.path);
+        Ok(())
+    }
     pub fn finish(self, transfer: Result<Entry>) -> Result<Entry> {
         let recovery = self.root.path.clone();
         if transfer
@@ -79,7 +84,7 @@ impl OwnedStage {
     pub fn validate(&self) -> Result<()> {
         self.parents.validate()?;
         safety::revalidate(&self.root, false)?;
-        safety::revalidate(&self.entry, false)
+        safety::revalidate(&self.entry, true)
     }
     pub fn commit(&mut self, destination: &Path, replace: bool) -> Result<()> {
         self.validate()?;
@@ -94,7 +99,7 @@ impl OwnedStage {
             rename_new(&self.path, destination)
         };
         if let Err(error) = renamed {
-            if safety::revalidate(&self.entry, false).is_ok() {
+            if safety::owned_object(&self.entry).is_ok() {
                 return Err(error.into());
             }
             return Err(safety::Failure {
@@ -110,12 +115,52 @@ impl OwnedStage {
         self.parents.validate()?;
         safety::revalidate(&self.root, false)?;
         if safety::existing(&self.path)?.is_some() {
-            safety::revalidate(&self.entry, false)?;
+            safety::owned_object(&self.entry)?;
             remove_leaf(&self.path)?;
         }
         fs::remove_dir(&self.root.path)?;
         Ok(())
     }
+
+    pub fn committed(&self, destination: &Path) -> Result<Entry> {
+        let mut expected = self.entry.clone();
+        expected.path = destination.to_owned();
+        safety::owned_object(&expected)?;
+        #[cfg(windows)]
+        restore_readonly(&mut expected)?;
+        safety::revalidate(&expected, true)?;
+        Ok(crate::fs::inspect(destination))
+    }
+}
+
+#[cfg(windows)]
+fn restore_readonly(expected: &mut Entry) -> Result<()> {
+    use std::os::windows::fs::OpenOptionsExt;
+    let readonly = u32::from_str_radix(expected.attributes.trim_start_matches("0x"), 16)
+        .map_err(io::Error::other)?
+        & 1
+        != 0;
+    let file = OpenOptions::new()
+        .access_mode(0x0000_0180)
+        .custom_flags(0x0020_0000)
+        .open(&expected.path)?;
+    safety::opened_object(expected, &file)?;
+    let mut permissions = file.metadata()?.permissions();
+    permissions.set_readonly(readonly);
+    file.set_permissions(permissions)?;
+    let after = crate::fs::inspect(&expected.path);
+    let old = u32::from_str_radix(expected.attributes.trim_start_matches("0x"), 16)
+        .map_err(io::Error::other)?;
+    let new = u32::from_str_radix(after.attributes.trim_start_matches("0x"), 16)
+        .map_err(io::Error::other)?;
+    // tempfile persistence normalizes Archive/Temporary/Normal on our stage.
+    if (old ^ new) & !0x1a0 != 0 {
+        return Err(safety::changed(
+            "Committed attributes differ from owned stage",
+        ));
+    }
+    expected.attributes = after.attributes;
+    Ok(())
 }
 
 pub(super) fn open_source(path: &Path) -> io::Result<File> {
@@ -174,5 +219,24 @@ fn create_link(source: &Entry, destination: &Path) -> io::Result<()> {
         } else {
             std::os::windows::fs::symlink_file(target, destination)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn committed_identity_is_the_owned_stage_not_a_fresh_unrelated_destination() {
+        let root = tempfile::tempdir().unwrap();
+        let destination = root.path().join("final");
+        let mut stage = OwnedStage::create(&destination, None).unwrap();
+        stage.seal().unwrap();
+        stage.commit(&destination, false).unwrap();
+        fs::rename(&destination, root.path().join("committed-original")).unwrap();
+        fs::write(&destination, "external").unwrap();
+        assert!(stage.committed(&destination).is_err());
+        assert_eq!(fs::read(&destination).unwrap(), b"external");
+        stage.cleanup().unwrap();
     }
 }

@@ -15,7 +15,7 @@ Cursor, scroll, marks, filter and back/forward history are session-only;
 preferences persist lazily.
 
 `app` owns pure transitions and request generations; `input` maps keyboard and
-mouse to the same read-only actions. `ui` renders cached data through Ratatui,
+mouse to the same application actions. `ui` renders cached data through Ratatui,
 using width-based geometry shared with hit testing. `colored_text` owns colour
 capability/downgrade policy; a Labeldeck-derived adapter maps its public resolved
 colours into semantic Ratatui styles. No backend calls occur in input or draw.
@@ -81,8 +81,13 @@ These checks do not isolate files from external writers or detect every
 same-size/time change. Checksums describe the verified read, not an atomic
 source snapshot. Crash durability remains filesystem-dependent.
 
-The browser still disables mutation controls while queue and dialog integration
-is in progress. This engine checkpoint does not establish M2 acceptance.
+The browser submits pure operation intents to a bounded coordinator, with at
+most two mutation threads. Progress is coalesced; conflicts and terminal records
+remain reliable. The terminal restores before queue teardown waits on writers.
+Destructive previews run on workers and need separate confirmation. Jobs retain
+partial outcomes and retry lineage; unknown outcomes quarantine claims and block
+retry/exit. Q freezes the navigation snapshot before waiting for acknowledgement.
+Reconciliation and final native acceptance remain in progress.
 
 Future milestones preserve native local byte/UTF-16 path identities separately
 from display text. Remote POSIX paths remain exact bytes on every client OS;
@@ -125,5 +130,5 @@ comparison must remain bounded and cancellable; incomplete or failed scans never
 prove equality or authorize deletion. Optional capabilities expose unavailable
 reasons without preventing unrelated basic browsing.
 
-M2–M8 implement the remaining contracts. M1 provides local read-only browsing;
-user-file operations and SSH sessions are not implemented.
+M2 implements local operations on the M1 browsing foundation. M3–M8 add the
+remaining application contracts, including SSH sessions.

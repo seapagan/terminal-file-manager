@@ -10,12 +10,13 @@ struct Claim {
     path: PathBuf,
     object: Option<(u64, u64)>,
     write: bool,
+    unknown_aliases: bool,
 }
 
 /// One process-wide coordinator for all local mutation kinds, with two active jobs.
 #[derive(Default)]
 pub struct Coordinator {
-    claims: BTreeMap<u64, Vec<Claim>>,
+    claims: BTreeMap<u64, (Vec<Claim>, bool)>,
 }
 
 impl Coordinator {
@@ -27,19 +28,19 @@ impl Coordinator {
         if self.claims.contains_key(&job) {
             return Err(invalid("Job already holds claims"));
         }
-        if self.claims.len() >= 2 {
+        if self.active() >= 2 {
             return Ok(false);
         }
         let claims = footprint(plan)?;
         if self
             .claims
             .values()
-            .flatten()
+            .flat_map(|(claims, _)| claims)
             .any(|held| claims.iter().any(|next| conflicts(held, next)))
         {
             return Ok(false);
         }
-        self.claims.insert(job, claims);
+        self.claims.insert(job, (claims, true));
         Ok(true)
     }
 
@@ -48,9 +49,16 @@ impl Coordinator {
         self.claims.remove(&job);
     }
 
-    /// Jobs holding claims, including unresolved outcomes.
+    /// Active workers; quarantined claims retain conflicts without consuming a slot.
     pub fn active(&self) -> usize {
-        self.claims.len()
+        self.claims.values().filter(|(_, active)| *active).count()
+    }
+
+    /// An acknowledged stopped worker releases its slot while unresolved claims remain held.
+    pub fn quarantine(&mut self, job: u64) {
+        if let Some((_, active)) = self.claims.get_mut(&job) {
+            *active = false;
+        }
     }
 }
 
@@ -65,22 +73,36 @@ fn footprint(plan: &Plan) -> io::Result<Vec<Claim>> {
             path: namespace(&entry.path)?,
             object: identity.object,
             write: plan.operation != Operation::Copy,
+            unknown_aliases: unknown_aliases(entry),
         });
+        if let Some(destination) = plan.target(entry) {
+            claims.push(destination_claim(&destination)?);
+        }
     }
-    if let Some(destination) = &plan.destination {
-        let path = if matches!(plan.operation, Operation::Copy | Operation::Move) {
-            std::fs::canonicalize(destination)?
-        } else {
-            namespace(destination)?
-        };
-        claims.push(Claim {
-            path,
-            object: None,
-            write: true,
-        });
+    if plan.operands.is_empty()
+        && let Some(destination) = &plan.destination
+    {
+        claims.push(destination_claim(destination)?);
     }
     claims.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(claims)
+}
+
+fn destination_claim(path: &Path) -> io::Result<Claim> {
+    let entry = match std::fs::symlink_metadata(path) {
+        Ok(_) => Some(crate::fs::inspect(path)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error),
+    };
+    Ok(Claim {
+        path: namespace(path)?,
+        object: entry
+            .as_ref()
+            .and_then(|entry| entry.identity.as_ref())
+            .and_then(|id| id.object),
+        write: true,
+        unknown_aliases: entry.as_ref().is_some_and(unknown_aliases),
+    })
 }
 
 pub(super) fn namespace(path: &Path) -> io::Result<PathBuf> {
@@ -98,6 +120,10 @@ fn conflicts(a: &Claim, b: &Claim) -> bool {
     if !a.write && !b.write {
         return false;
     }
+    // Descendant hard-link equivalence is unknown without a full namespace scan.
+    if (a.unknown_aliases && b.object.is_some()) || (b.unknown_aliases && a.object.is_some()) {
+        return true;
+    }
     if a.object.is_some() && a.object == b.object {
         return true;
     }
@@ -109,6 +135,13 @@ fn conflicts(a: &Claim, b: &Claim) -> bool {
     {
         a.path.starts_with(&b.path) || b.path.starts_with(&a.path)
     }
+}
+
+fn unknown_aliases(entry: &crate::fs::Entry) -> bool {
+    entry.may_recurse()
+        && std::fs::read_dir(&entry.path)
+            .map(|mut children| children.next().is_some())
+            .unwrap_or(true)
 }
 
 #[cfg(windows)]

@@ -39,6 +39,7 @@ impl SelectionCounts {
 
 /// One independent session-only pane.
 pub struct Pane {
+    pub directory: Option<Entry>,
     pub path: PathBuf,
     pub entries: Vec<Entry>,
     pub visible: Vec<usize>,
@@ -82,6 +83,7 @@ impl Pane {
 
     pub(super) fn new(path: PathBuf) -> Self {
         Self {
+            directory: None,
             path,
             entries: Vec::new(),
             visible: Vec::new(),
@@ -115,6 +117,7 @@ impl Pane {
     }
 
     pub(super) fn install(&mut self, snapshot: Snapshot) {
+        self.directory = snapshot.directory.map(|entry| *entry);
         self.reset_range();
         let navigating = self.path != snapshot.path;
         if navigating {

@@ -3,9 +3,9 @@
 ## Current status and evidence
 
 M0's engineering foundation is complete at the accepted checkpoints below. The
-application now implements the M1 local read-only browser described below.
+application includes the M1 local browser and the M2 implementation in progress below.
 The maintainer merged M1 in [PR #2](https://github.com/seapagan/terminal-file-manager/pull/2)
-on 18 October 2026. M2 is the next milestone; M2–M8 cover the remaining
+on 18 October 2026. M2 is in progress; M2–M8 cover the remaining
 application and final release. Genuine direct SSH-to-SSH transfer
 remains post-v1 work.
 
@@ -148,21 +148,22 @@ establish ConPTY or representative-terminal behaviour. Those contracts remain
 in [architecture](architecture.md) and the M1/M2/M3/M7 acceptance below. Retain
 Lizard 1.23.0; a parser upgrade needs its separate compatibility gate.
 
-## M2 baseline: upcoming, not implemented
+## M2: implementation in progress
 
-M2 will add local operation planning, shared locks and a two-job scheduler,
-copy/move/create/rename/attributes, recursive merge/conflicts, owned staging,
-verification/commit, restricted native Trash, explicit permanent deletion,
-cancellation/retry/progress/history and safe quit. Preserve the three-layer
-mutation safety and restricted Linux same-filesystem Trash contracts described
-in [architecture](architecture.md). No M2 mutations exist yet.
+The browser now exposes frozen copy/move plans, a two-worker queue, recursive
+merge and conflicts, verified staging, create/rename/attributes, native Trash,
+counted permanent-delete confirmation, retained job results and safe exit.
+Local regressions include real executable/PTY creation, copy, conflict replacement,
+and permanent-delete cancellation/confirmation. Linux Trash tests use an owned
+XDG data root and reject cross-filesystem fallback. Windows/macOS native Trash
+and Read-only behavior still require hosted execution for this implementation.
 
-The agreed first future implementation slice consolidates the existing
-`src/color.rs`, `Theme` and `Role` semantic style boundary while retaining M1
-visuals, monochrome cues and VTE accommodations. That extraction is planned only.
-Selectable palettes, OSC 11/background detection and theme configuration await
-separate work after M2. This baseline task changes documentation only; the
-maintainer must authorise the next implementation slice separately.
+M2 is not accepted yet. Reconciliation, the remaining safety/interaction audit,
+completed-tree full gates and native hosted outcomes remain outstanding. Preserve
+the three-layer mutation contract in [architecture](architecture.md).
+
+The existing Theme/Role boundary supplies all operation styles. Selectable
+palettes, OSC 11/background detection and theme configuration remain later work.
 
 ## M0-B: local foundation
 
@@ -293,7 +294,7 @@ do not establish execution on those older systems. No public release exists yet.
 | Milestone | Required behaviour and proof |
 | --- | --- |
 | M1 (merged) | Local panes, raw identity, natural sorting, selection/filters, key protocol and terminal lifecycle; Unix PTY and Windows ConPTY, resize and restored state |
-| M2 (upcoming) | Shared operation planner/conflicts, two-job queue, staging/commit/source-removal and restricted Trash; race/fault/cancel/uncertainty/source-preservation tests |
+| M2 (in progress) | Shared operation planner/conflicts, two-job queue, staging/commit/source-removal and restricted Trash; race/fault/cancel/uncertainty/source-preservation tests |
 | M3 | Embedded byte-preserving SFTP; trust/auth/config, opaque handles, short writes/acknowledged close, bounded pooling/teardown and native clients with real isolated server fixtures |
 | M4 | Local/SSH transfer and explicit labelled client relay; validation, honest sent-request uncertainty, safe retry/removal; no genuine direct route |
 | M5 | Navigation/history/bookmarks, optional zoxide/fzf/clipboard/shell integration; missing capabilities, exact payloads, isolation, no implicit shell configuration changes |

@@ -3,6 +3,32 @@ use terminal_file_manager::operations::{
     Decision, Event, Operation, Options, Outcome, Plan, Stage, execute,
 };
 
+#[cfg(windows)]
+#[test]
+fn native_readonly_survives_new_destination_commit_and_can_be_edited() {
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("source");
+    let target = root.path().join("target");
+    fs::create_dir(&target).unwrap();
+    fs::write(&source, "readonly bytes").unwrap();
+    let mut permissions = fs::metadata(&source).unwrap().permissions();
+    permissions.set_readonly(true);
+    fs::set_permissions(&source, permissions).unwrap();
+    let plan = Plan::paths(Operation::Copy, vec![source.clone()], Some(target.clone())).unwrap();
+    let record = execute(&plan, Options { checksum: true }, &false.into(), |_| {
+        Decision::Skip
+    });
+    assert_eq!(record.completed_files(), 1, "{record:?}");
+    let copied = target.join("source");
+    assert!(fs::metadata(&copied).unwrap().permissions().readonly());
+    for path in [source, copied] {
+        let plan = Plan::paths(Operation::ReadOnly(false), vec![path.clone()], None).unwrap();
+        let record = execute(&plan, Options::default(), &false.into(), |_| Decision::Skip);
+        assert_eq!(record.completed_files(), 1, "{record:?}");
+        assert!(!fs::metadata(path).unwrap().permissions().readonly());
+    }
+}
+
 #[cfg(unix)]
 #[test]
 fn native_mode_mtime_and_non_utf8_names_survive_verified_copy() {
