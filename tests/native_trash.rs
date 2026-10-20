@@ -18,6 +18,8 @@ fn native_trash_preserves_selected_tree_and_reports_actual_recursive_counts() {
         "owned native fixture",
     )
     .unwrap();
+    // Relaunches this test with an isolated fixture, without a security decision.
+    // nosemgrep: rust.lang.security.current-exe.current-exe
     let output = Command::new(std::env::current_exe().unwrap())
         .args(["--ignored", "--exact", "trash_child", "--nocapture"])
         .env("TFM_NATIVE_TRASH_ROOT", root.path())

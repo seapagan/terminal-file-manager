@@ -47,8 +47,15 @@ impl OwnedStage {
     }
 
     pub fn seal(&mut self) -> Result<()> {
-        safety::owned_object(&self.entry)?;
-        self.entry = crate::fs::inspect(&self.path);
+        let current = crate::fs::inspect(&self.path);
+        if let Some(file) = &self.file {
+            // APFS can adjust birth time when we preserve an older mtime; the held handle pins identity.
+            safety::opened_object(&self.entry, file)?;
+            safety::opened_object(&current, file)?;
+        } else {
+            safety::owned_object(&self.entry)?;
+        }
+        self.entry = current;
         Ok(())
     }
     pub fn finish(self, transfer: Result<Entry>) -> Result<Entry> {
@@ -274,6 +281,16 @@ mod tests {
             "before={before:?}; after={after:?}; result={result:?}"
         );
         stage.cleanup().unwrap();
+    }
+
+    #[test]
+    fn sealing_never_adopts_an_unrelated_replacement() {
+        let root = tempfile::tempdir().unwrap();
+        let mut stage = OwnedStage::create(&root.path().join("final"), None).unwrap();
+        fs::rename(&stage.path, root.path().join("owned-original")).unwrap();
+        fs::write(&stage.path, "external replacement").unwrap();
+        assert!(stage.seal().is_err());
+        assert_eq!(fs::read(&stage.path).unwrap(), b"external replacement");
     }
 
     #[test]
