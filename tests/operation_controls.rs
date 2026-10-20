@@ -199,6 +199,25 @@ fn an_unknown_outcome_blocks_retry_and_safe_exit_without_freezing_the_manager() 
     assert!(job.plan.retry(job.record.as_ref().unwrap()).is_err());
 }
 
+#[test]
+fn a_native_trash_safety_incident_blocks_retry_exit_and_reconciliation() {
+    let (_, mut controller) = controller();
+    running(&mut controller);
+    let geometry = ui::geometry(&controller.app, Rect::new(0, 0, 120, 30));
+    controller.dispatch(Action::Quit, &geometry);
+    key(&mut controller, KeyCode::Char('c'));
+    finish(&mut controller, Outcome::SafetyIncident);
+    assert!(!controller.quit);
+    let job = &controller.app.operations.history[0];
+    let record = job.record.as_ref().unwrap();
+    assert!(record.unresolved());
+    assert!(job.plan.retry(record).is_err());
+    let reconciled =
+        terminal_file_manager::operations::reconcile(&job.plan, record.clone(), &false.into());
+    assert!(reconciled.unresolved());
+    assert_eq!(reconciled.entries[0].outcome, Outcome::SafetyIncident);
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 fn editing_an_incoming_name_keeps_an_unedited_non_utf8_target_exact() {

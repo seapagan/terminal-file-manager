@@ -564,21 +564,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "junkyard"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ebff58ccf7bcdf78e5b7fb654da823b092cc3144578e7c2770db01885f188b4"
-dependencies = [
- "indoc",
- "objc2-foundation",
- "rustix",
- "thiserror 2.0.21",
- "time",
- "windows",
- "windows-core",
-]
-
-[[package]]
 name = "kasuari"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1218,8 +1203,9 @@ dependencies = [
  "colored_text",
  "crossterm",
  "ignore",
- "junkyard",
  "nix 0.31.3",
+ "objc2",
+ "objc2-foundation",
  "portable-pty",
  "ratatui",
  "serde",
@@ -1230,6 +1216,8 @@ dependencies = [
  "toml",
  "vsort",
  "winapi-util",
+ "windows",
+ "windows-core",
  "windows-sys",
 ]
 

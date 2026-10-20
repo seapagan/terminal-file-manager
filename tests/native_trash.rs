@@ -53,11 +53,25 @@ fn trash_child() {
         (evidence.validated_files, evidence.validated_directories),
         (1, 2)
     );
-    let receipt = record.entries.last().unwrap().destination.as_ref().unwrap();
-    assert_eq!(
-        fs::read(receipt.join("nested/file")).unwrap(),
-        b"owned native fixture"
-    );
+    #[cfg(not(windows))]
+    {
+        let receipt = record.entries.last().unwrap().destination.as_ref().unwrap();
+        assert_eq!(
+            fs::read(receipt.join("nested/file")).unwrap(),
+            b"owned native fixture"
+        );
+    }
+    #[cfg(windows)]
+    {
+        assert!(record.entries[0].destination.is_none());
+        assert!(matches!(
+            &evidence.receipt,
+            terminal_file_manager::operations::trash::Receipt::Windows {
+                parsing_name: Some(_),
+                ..
+            }
+        ));
+    }
     println!("NATIVE_TRASH_EXERCISED");
     #[cfg(target_os = "linux")]
     trash_metadata_claim(&root);

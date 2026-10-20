@@ -138,6 +138,16 @@ pub(crate) fn summary(job: &Job) -> String {
     let Some(record) = &job.record else {
         return format!("Job {} {:?}: {:?}", job.id, job.plan.operation, job.state);
     };
+    if record
+        .entries
+        .iter()
+        .any(|entry| entry.outcome == Outcome::SafetyIncident)
+    {
+        return format!(
+            "Job {}: CRITICAL SAFETY INCIDENT: Windows reported permanent deletion during Trash; stop and report",
+            job.id
+        );
+    }
     let completed = completed(job, record);
     let counts = |outcome| {
         record

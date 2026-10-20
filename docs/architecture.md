@@ -127,7 +127,18 @@ retain platform-specific recovery references. One top-level acknowledgement does
 not fabricate descendant operations: recursive inventory is labelled as validated
 before the move. Unknown results retain locks; a native permanent-deletion report
 during F8 is a critical safety incident. Permanent deletion needs separate explicit
-confirmation. Native macOS/Windows execution requires its own proof.
+confirmation.
+
+macOS calls Foundation's native Trash method with lossless filesystem URLs and
+keeps successful recycling separate from its optional resulting URL. Windows
+uses a dedicated STA, one frozen Shell item and a non-agile progress sink. It
+requests recycling/undo, checks per-item acknowledgements and abort state, and
+extracts an opaque recovery reference while the returned Shell item is live.
+Optional metadata failure does not erase a recycle acknowledgement. No auto-Yes
+flag authorizes permanent deletion; unexpected native Shell behaviour remains a
+residual risk. A successful delete callback with no recycled item is a critical
+incident, never Trash success. Native recoverability tests use owned fixtures and
+supported Shell moves; Linux cross-builds do not establish this native proof.
 
 V1 transfers include local/embedded-SFTP paths and explicitly approved, labelled
 client relay. Genuine server-to-server transfer is post-v1. A relay is never

@@ -1,3 +1,9 @@
+#[cfg(any(windows, test))]
+mod acknowledgement;
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(windows)]
+mod windows;
 use crate::fs::Entry;
 #[cfg(target_os = "linux")]
 use std::io;
@@ -20,8 +26,22 @@ pub struct LinuxReceipt {
 #[derive(Clone, Debug)]
 pub enum Receipt {
     Linux(LinuxReceipt),
-    Mac { path: Option<PathBuf> },
-    Windows { parsing_name: Option<Vec<u16>> },
+    Mac {
+        path: Option<PathBuf>,
+    },
+    Windows {
+        parsing_name: Option<Vec<u16>>,
+        metadata: ShellMetadata,
+    },
+}
+
+/// Optional owned properties read from the live recycled Shell item.
+#[derive(Clone, Debug, Default)]
+pub struct ShellMetadata {
+    pub display_name: Option<Vec<u16>>,
+    pub deleted_from: Option<Vec<u16>>,
+    /// Native Windows FILETIME ticks; absent when the Shell property is unavailable.
+    pub deletion_time: Option<u64>,
 }
 
 impl Receipt {
@@ -51,31 +71,13 @@ pub(super) fn put(
             .put_checked(entry, cancel)
             .map(Receipt::Linux)
     }
-    #[cfg(any(target_os = "macos", windows))]
+    #[cfg(target_os = "macos")]
     {
-        crate::fs::check_cancelled(cancel)?;
-        let item = junkyard::discard(&entry.path).map_err(|error| {
-            let outcome = if super::safety::revalidate(entry, true).is_ok() {
-                super::Outcome::Failed
-            } else {
-                super::Outcome::OutcomeUnknown
-            };
-            super::safety::Failure {
-                outcome,
-                detail: format!("Native Trash error; no automatic retry: {error}"),
-            }
-        })?;
-        #[cfg(target_os = "macos")]
-        return Ok(Receipt::Mac {
-            path: Some(item.id().into()),
-        });
-        #[cfg(windows)]
-        {
-            use std::os::windows::ffi::OsStrExt;
-            Ok(Receipt::Windows {
-                parsing_name: Some(std::ffi::OsStr::new(item.id()).encode_wide().collect()),
-            })
-        }
+        macos::put(entry, cancel)
+    }
+    #[cfg(windows)]
+    {
+        windows::put(entry, cancel)
     }
 }
 

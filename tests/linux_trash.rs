@@ -89,8 +89,11 @@ fn real_separate_volume_preserves_payload_and_relative_recovery_metadata() {
     );
     let source = source_root.path().join("owned-file");
     fs::write(&source, "recoverable volume fixture").unwrap();
-    let entry = terminal_file_manager::fs::inspect(&source);
-    let receipt = LinuxTrash::new(data.path().into()).put(&entry).unwrap();
+    let alias = data.path().join("alias");
+    symlink(source_root.path(), &alias).unwrap();
+    let entry = terminal_file_manager::fs::inspect(&alias.join("owned-file"));
+    let trash = LinuxTrash::new(data.path().into());
+    let receipt = trash.put(&entry).unwrap();
     assert!(!source.exists());
     assert_eq!(
         fs::read(&receipt.path).unwrap(),
@@ -108,4 +111,19 @@ fn real_separate_volume_preserves_payload_and_relative_recovery_metadata() {
     );
     fs::rename(&receipt.path, &source).unwrap();
     fs::remove_file(receipt.info).unwrap();
+    let link_receipt = trash
+        .put(&terminal_file_manager::fs::inspect(&alias))
+        .unwrap();
+    assert!(
+        link_receipt
+            .path
+            .starts_with(data.path().join("Trash/files"))
+    );
+    assert_eq!(fs::read(&source).unwrap(), b"recoverable volume fixture");
+    assert_eq!(
+        fs::read_link(&link_receipt.path).unwrap(),
+        source_root.path()
+    );
+    fs::rename(link_receipt.path, &alias).unwrap();
+    fs::remove_file(link_receipt.info).unwrap();
 }
