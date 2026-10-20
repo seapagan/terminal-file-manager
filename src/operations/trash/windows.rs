@@ -133,7 +133,8 @@ fn preflight(entry: &Entry) -> Result<(Parents, IShellItem)> {
     if entry.kind == EntryKind::ReparsePoint {
         return Err(io::Error::other("Unsupported reparse object; native Trash refused").into());
     }
-    let path = crate::operations::locks::namespace(&entry.path)?;
+    // Canonicalization can add a Shell-incompatible verbatim prefix; keep the approved spelling.
+    let path = std::path::absolute(&entry.path)?;
     Ok((parents, shell_item(&path)?))
 }
 
@@ -144,6 +145,7 @@ fn preflight(entry: &Entry) -> Result<(Parents, IShellItem)> {
 fn configured(flags: windows::Win32::UI::Shell::FILEOPERATION_FLAGS) -> io::Result<IFileOperation> {
     // SAFETY: caller holds a live Apartment on this STA; the returned owned
     // interface is dropped before apartment teardown. Flags never auto-answer Yes.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     unsafe {
         let operation: IFileOperation =
             CoCreateInstance(&FileOperation, None, CLSCTX_INPROC_SERVER)
@@ -215,6 +217,7 @@ fn shell_item(path: &Path) -> io::Result<IShellItem> {
 fn display_name(item: &IShellItem, kind: windows::Win32::UI::Shell::SIGDN) -> Option<Vec<u16>> {
     // SAFETY: item is a live borrowed callback reference on its owning STA.
     // GetDisplayName returns CoTaskMem storage; copy before freeing it exactly once.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     unsafe {
         let name = item.GetDisplayName(kind).ok()?;
         if name.is_null() {

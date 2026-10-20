@@ -35,6 +35,7 @@ fn deleted_from(item: &IShellItem2) -> Option<Vec<u16>> {
 fn deletion_time(item: &IShellItem2) -> Option<u64> {
     // SAFETY: static canonical name and stack property key live for these
     // synchronous STA calls; FILETIME is returned by value with no borrowed data.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     unsafe {
         let key = property_key(w!("System.Recycle.DateDeleted"))?;
         let time = item.GetFileTime(&key).ok()?;
@@ -52,6 +53,7 @@ fn owned_string(value: PWSTR) -> Option<Vec<u16>> {
     }
     // SAFETY: successful GetString returned NUL-terminated CoTaskMem storage;
     // copy the native UTF-16 before freeing exactly this allocation once.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     unsafe {
         let owned = value.as_wide().to_vec();
         CoTaskMemFree(Some(value.0.cast()));
