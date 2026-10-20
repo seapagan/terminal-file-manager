@@ -159,11 +159,32 @@ and permanent-delete cancellation/confirmation. Linux Trash tests use an owned
 XDG data root, sticky/private per-volume layouts and an owned file on a separate
 real filesystem; no cross-device copy/delete fallback is allowed. Windows/macOS Trash
 uses direct Foundation/Shell adapters with hosted-only owned recovery fixtures.
-The callback outcome matrix runs locally; actual macOS/Windows recycling and
-Read-only behaviour still require hosted execution for this implementation.
+The callback outcome matrix covers missing, contradictory and interrupted
+acknowledgements, optional metadata and critical permanent-deletion incidents.
 
-M2 is not accepted yet. Completed-tree full gates and native hosted outcomes
-remain outstanding. Reconciliation tests cover retained sources, committed
+### Native Trash checkpoint, 20 October 2026
+
+At `e0b6184`, [Rust CI](https://github.com/seapagan/terminal-file-manager/actions/runs/39483201039)
+passed **Linux 362 / macOS 350 / Windows 338**, plus combined coverage and exact
+MSRV. Each host reported two child-entry skips exercised by parent terminal tests.
+Native tests recovered owned Linux per-volume payloads, macOS collision-renamed
+files and symlinks, and Windows files, recursive trees, symlinks and junctions.
+Windows tests used supported Shell moves from opaque recovery references and
+verified target preservation. The selected-path parsing regression passed.
+[Policy](https://github.com/seapagan/terminal-file-manager/actions/runs/39483200952),
+[Source Package](https://github.com/seapagan/terminal-file-manager/actions/runs/39483201136),
+[GitHub Actions Security](https://github.com/seapagan/terminal-file-manager/actions/runs/39483201032)
+and [Advisory Quality](https://github.com/seapagan/terminal-file-manager/actions/runs/39483201041)
+also passed. The unchanged clean-tree local full gate passed, including Linux
+xwin check/Clippy/build; xwin remains cross-build evidence.
+
+Codacy cleared the native unsafe-audit findings after approved line-scoped
+dispositions. Its existing Lizard false positive in `tests/operation_controls.rs`
+remains reported; no threshold or project policy changed.
+
+M2 is not accepted yet. This checkpoint covers the native Trash correction;
+it does not establish live UNC/SMB recycling, minimum-OS compatibility or every
+mount topology. Reconciliation tests cover retained sources, committed
 destinations, owned staging and unresolved evidence without repeating removals.
 Preserve the three-layer mutation contract in [architecture](architecture.md).
 
