@@ -2,10 +2,13 @@
 mod execute;
 mod locks;
 mod model;
+mod mounts;
 mod mutations;
 mod preview;
+mod recovery;
 pub(crate) use model::summary;
 pub use model::{Dialog, Intent, Job, JobState, Notice, OperationDialog, PendingConflict, State};
+pub use recovery::{Recovery, reconcile};
 mod queue;
 pub use preview::Preview;
 pub use queue::{Queue, Update};

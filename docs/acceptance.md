@@ -152,15 +152,17 @@ Lizard 1.23.0; a parser upgrade needs its separate compatibility gate.
 
 The browser now exposes frozen copy/move plans, a two-worker queue, recursive
 merge and conflicts, verified staging, create/rename/attributes, native Trash,
-counted permanent-delete confirmation, retained job results and safe exit.
+counted permanent-delete confirmation, retained job results, reconciliation and
+safe exit.
 Local regressions include real executable/PTY creation, copy, conflict replacement,
 and permanent-delete cancellation/confirmation. Linux Trash tests use an owned
 XDG data root and reject cross-filesystem fallback. Windows/macOS native Trash
 and Read-only behavior still require hosted execution for this implementation.
 
-M2 is not accepted yet. Reconciliation, the remaining safety/interaction audit,
-completed-tree full gates and native hosted outcomes remain outstanding. Preserve
-the three-layer mutation contract in [architecture](architecture.md).
+M2 is not accepted yet. Completed-tree full gates and native hosted outcomes
+remain outstanding. Reconciliation tests cover retained sources, committed
+destinations, owned staging and unresolved evidence without repeating removals.
+Preserve the three-layer mutation contract in [architecture](architecture.md).
 
 The existing Theme/Role boundary supplies all operation styles. Selectable
 palettes, OSC 11/background detection and theme configuration remain later work.

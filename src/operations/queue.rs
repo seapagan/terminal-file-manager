@@ -15,7 +15,7 @@ use std::{
 pub enum Update {
     Preview {
         id: u64,
-        plan: Plan,
+        plan: Box<Plan>,
     },
     Started {
         id: u64,
@@ -41,11 +41,36 @@ struct Submission {
     options: Options,
     cancel: Arc<AtomicBool>,
     preview: bool,
+    reconciliation: Option<Record>,
+}
+
+impl Submission {
+    fn failed(&self, outcome: Outcome, detail: &str) -> Record {
+        let Some(mut record) = self.reconciliation.clone() else {
+            return unsuccessful(&self.plan, outcome, detail);
+        };
+        for entry in &mut record.entries {
+            if entry.outcome == Outcome::OutcomeUnknown {
+                entry.detail = format!("{}; {detail}", entry.detail);
+            }
+        }
+        record
+    }
 }
 
 struct Running {
     handle: JoinHandle<()>,
     progress: Arc<Mutex<Option<Event>>>,
+}
+
+enum Message {
+    Update(Update),
+    Claim {
+        id: u64,
+        root: Box<crate::fs::Entry>,
+        payload: Box<crate::fs::Entry>,
+        accepted: mpsc::SyncSender<bool>,
+    },
 }
 
 /// Bounded local scheduler. Drop cancels and joins actual writers before returning.
@@ -97,6 +122,31 @@ impl Queue {
         self.submit_kind(plan, Options::default(), true)
     }
 
+    /// Reinspect a stopped unknown job under the same retained claims and identity.
+    ///
+    /// # Errors
+    /// Refuses active jobs, resolved records, a full queue or an unavailable coordinator.
+    pub fn reconcile(&mut self, id: u64, plan: Plan, record: Record) -> io::Result<()> {
+        if self.tokens.contains_key(&id) || !record.unresolved() || self.tokens.len() >= 64 {
+            return Err(io::Error::other(
+                "Only a stopped unknown job can be reconciled",
+            ));
+        }
+        let cancel = Arc::new(AtomicBool::new(false));
+        self.sender
+            .try_send(Submission {
+                id,
+                plan,
+                options: Options::default(),
+                cancel: cancel.clone(),
+                preview: false,
+                reconciliation: Some(record),
+            })
+            .map_err(|_| io::Error::other("Operation queue unavailable"))?;
+        self.tokens.insert(id, cancel);
+        Ok(())
+    }
+
     fn submit_kind(&mut self, plan: Plan, options: Options, preview: bool) -> io::Result<u64> {
         if self.tokens.len() >= 64 {
             return Err(io::Error::other("Operation queue full (64 jobs)"));
@@ -113,6 +163,7 @@ impl Queue {
                 options,
                 cancel: cancel.clone(),
                 preview,
+                reconciliation: None,
             })
             .map_err(|_| io::Error::other("Operation queue unavailable"))?;
         self.tokens.insert(id, cancel);
@@ -170,9 +221,8 @@ fn schedule(
     let mut active = BTreeMap::<u64, Running>::new();
     let mut coordinator = Coordinator::default();
     loop {
-        while let Ok(update) = events.try_recv() {
-            acknowledge(&update, &mut active, &mut coordinator);
-            let _ = updates.send(update);
+        while let Ok(message) = events.try_recv() {
+            receive(message, &mut active, &mut coordinator, &updates);
         }
         for (id, worker) in &active {
             if let Ok(mut progress) = worker.progress.lock()
@@ -203,6 +253,28 @@ fn schedule(
     }
 }
 
+fn receive(
+    message: Message,
+    active: &mut BTreeMap<u64, Running>,
+    coordinator: &mut Coordinator,
+    updates: &mpsc::SyncSender<Update>,
+) {
+    match message {
+        Message::Update(update) => {
+            acknowledge(&update, active, coordinator);
+            let _ = updates.send(update);
+        }
+        Message::Claim {
+            id,
+            root,
+            payload,
+            accepted,
+        } => {
+            let _ = accepted.send(coordinator.own_stage(id, &root, &payload).unwrap_or(false));
+        }
+    }
+}
+
 fn acknowledge(
     update: &Update,
     active: &mut BTreeMap<u64, Running>,
@@ -227,7 +299,7 @@ fn pump(
     pending: &mut VecDeque<Submission>,
     active: &mut BTreeMap<u64, Running>,
     coordinator: &mut Coordinator,
-    events: &mpsc::SyncSender<Update>,
+    events: &mpsc::SyncSender<Message>,
     updates: &mpsc::SyncSender<Update>,
     stopping: bool,
 ) {
@@ -241,21 +313,25 @@ fn pump(
         if job.cancel.load(Ordering::Relaxed) {
             let _ = updates.send(Update::Finished {
                 id: job.id,
-                record: unsuccessful(
-                    &job.plan,
+                record: job.failed(
                     Outcome::Cancelled,
                     "Queued job cancelled; no mutations submitted",
                 ),
             });
             continue;
         }
-        match coordinator.acquire(job.id, &job.plan) {
+        let acquired = if job.reconciliation.is_some() {
+            coordinator.resume(job.id)
+        } else {
+            coordinator.acquire(job.id, &job.plan)
+        };
+        match acquired {
             Ok(true) => start(job, active, coordinator, events, updates),
             Ok(false) => pending.push_back(job),
             Err(error) => {
                 let _ = updates.send(Update::Finished {
                     id: job.id,
-                    record: unsuccessful(&job.plan, Outcome::Failed, &error.to_string()),
+                    record: job.failed(Outcome::Failed, &error.to_string()),
                 });
             }
         }
@@ -266,20 +342,18 @@ fn start(
     job: Submission,
     active: &mut BTreeMap<u64, Running>,
     coordinator: &mut Coordinator,
-    events: &mpsc::SyncSender<Update>,
+    events: &mpsc::SyncSender<Message>,
     updates: &mpsc::SyncSender<Update>,
 ) {
     let progress = Arc::new(Mutex::new(None));
     let progress_writer = progress.clone();
     let events = events.clone();
     let id = job.id;
-    let failed = unsuccessful(
-        &job.plan,
+    let failed = job.failed(
         Outcome::OutcomeUnknown,
         "Mutation worker panicked; source/final/stage outcomes require reconciliation",
     );
-    let not_started = unsuccessful(
-        &job.plan,
+    let not_started = job.failed(
         Outcome::Failed,
         "Worker could not start; no mutation submitted",
     );
@@ -290,7 +364,7 @@ fn start(
                 run(job, &events, &progress_writer)
             }))
             .unwrap_or(Update::Finished { id, record: failed });
-            let _ = events.send(update);
+            let _ = events.send(Message::Update(update));
         });
     match spawn {
         Ok(handle) => {
@@ -298,7 +372,11 @@ fn start(
             let _ = updates.send(Update::Started { id });
         }
         Err(error) => {
-            coordinator.release(id);
+            if not_started.unresolved() {
+                coordinator.quarantine(id);
+            } else {
+                coordinator.release(id);
+            }
             let mut record = not_started;
             for entry in &mut record.entries {
                 entry.detail = format!("{}: {error}", entry.detail);
@@ -310,9 +388,15 @@ fn start(
 
 fn run(
     mut job: Submission,
-    events: &mpsc::SyncSender<Update>,
+    events: &mpsc::SyncSender<Message>,
     progress: &Mutex<Option<Event>>,
 ) -> Update {
+    if let Some(record) = job.reconciliation.take() {
+        return Update::Finished {
+            id: job.id,
+            record: super::reconcile(&job.plan, record, &job.cancel),
+        };
+    }
     if let Err(error) = job.plan.refresh_retry() {
         return Update::Finished {
             id: job.id,
@@ -323,6 +407,7 @@ fn run(
         return prepare(job);
     }
     let record = super::execute(&job.plan, job.options, &job.cancel, |event| match event {
+        Event::OwnedStage { root, payload } => claim(job.id, root, payload, events, &job.cancel),
         Event::Conflict { .. } => conflict(job.id, event, events, &job.cancel),
         Event::Progress { .. } => {
             *progress.lock().expect("owned progress") = Some(event);
@@ -335,11 +420,14 @@ fn run(
 fn conflict(
     id: u64,
     event: Event,
-    events: &mpsc::SyncSender<Update>,
+    events: &mpsc::SyncSender<Message>,
     cancel: &AtomicBool,
 ) -> Decision {
     let (reply, response) = mpsc::sync_channel(1);
-    if events.send(Update::Conflict { id, event, reply }).is_err() {
+    if events
+        .send(Message::Update(Update::Conflict { id, event, reply }))
+        .is_err()
+    {
         return Decision::Cancel;
     }
     loop {
@@ -354,12 +442,44 @@ fn conflict(
     }
 }
 
+fn claim(
+    id: u64,
+    root: Box<crate::fs::Entry>,
+    payload: Box<crate::fs::Entry>,
+    events: &mpsc::SyncSender<Message>,
+    cancel: &AtomicBool,
+) -> Decision {
+    let (accepted, response) = mpsc::sync_channel(1);
+    if events
+        .send(Message::Claim {
+            id,
+            root,
+            payload,
+            accepted,
+        })
+        .is_err()
+    {
+        return Decision::Cancel;
+    }
+    loop {
+        if cancel.load(Ordering::Relaxed) {
+            return Decision::Cancel;
+        }
+        match response.recv_timeout(Duration::from_millis(25)) {
+            Ok(true) => return Decision::Skip,
+            Ok(false) | Err(mpsc::RecvTimeoutError::Disconnected) => return Decision::Cancel,
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+        }
+    }
+}
+
 pub(super) fn unsuccessful(plan: &Plan, outcome: Outcome, detail: &str) -> Record {
     let mut record = Record {
         entries: plan
             .operands
             .iter()
             .map(|source| EntryResult {
+                recovery: None,
                 source: source.path.clone(),
                 destination: plan.destination.clone(),
                 kind: source.kind,
@@ -373,6 +493,7 @@ pub(super) fn unsuccessful(plan: &Plan, outcome: Outcome, detail: &str) -> Recor
     };
     if record.entries.is_empty() {
         record.entries.push(EntryResult {
+            recovery: None,
             source: plan.destination.clone().unwrap_or_default(),
             destination: plan.destination.clone(),
             kind: crate::fs::EntryKind::Directory,
@@ -398,7 +519,7 @@ fn prepare(mut job: Submission) -> Update {
             job.plan.preview = Some(preview);
             Update::Preview {
                 id: job.id,
-                plan: job.plan,
+                plan: Box::new(job.plan),
             }
         }
         Err(error) => Update::Finished {
@@ -407,3 +528,6 @@ fn prepare(mut job: Submission) -> Update {
         },
     }
 }
+
+#[cfg(test)]
+mod tests;

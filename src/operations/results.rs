@@ -30,6 +30,10 @@ pub enum Decision {
 /// Worker events contain native identities; rendering must sanitize display text.
 #[derive(Clone, Debug)]
 pub enum Event {
+    OwnedStage {
+        root: Box<Entry>,
+        payload: Box<Entry>,
+    },
     Progress {
         source: PathBuf,
         destination: PathBuf,
@@ -58,6 +62,7 @@ pub enum Outcome {
 /// One actual recursive entry outcome; partial directories are never completed.
 #[derive(Clone, Debug)]
 pub struct EntryResult {
+    pub recovery: Option<Box<super::Recovery>>,
     pub source: PathBuf,
     pub destination: Option<PathBuf>,
     pub kind: EntryKind,

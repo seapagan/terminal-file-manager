@@ -24,6 +24,7 @@ impl Preview {
 
     pub(super) fn capture(plan: &Plan, cancel: &AtomicBool) -> Result<Self> {
         plan.validate_directories()?;
+        let mounts = super::mounts::Mounts::capture(plan.operation)?;
         let mut preview = Self {
             files: 0,
             directories: 0,
@@ -35,7 +36,7 @@ impl Preview {
             crate::fs::check_cancelled(cancel)?;
             safety::revalidate(source, true)?;
             preview.parents.push(Parents::capture(&source.path)?);
-            preview.scan(source, cancel, 0)?;
+            preview.scan(source, cancel, 0, &mounts)?;
         }
         for parent in &preview.parents {
             parent.validate()?;
@@ -43,13 +44,20 @@ impl Preview {
         Ok(preview)
     }
 
-    fn scan(&mut self, source: &Entry, cancel: &AtomicBool, depth: usize) -> Result<()> {
+    fn scan(
+        &mut self,
+        source: &Entry,
+        cancel: &AtomicBool,
+        depth: usize,
+        mounts: &super::mounts::Mounts,
+    ) -> Result<()> {
         crate::fs::check_cancelled(cancel)?;
+        mounts.reject(source)?;
         if depth > 128 || source.identity.is_none() {
             return Err(io::Error::other("Incomplete recursive preview; deletion disabled").into());
         }
         if source.kind == EntryKind::Directory {
-            self.scan_directory(source, cancel, depth)?;
+            self.scan_directory(source, cancel, depth, mounts)?;
         } else {
             self.add_file(source)?;
         }
@@ -57,14 +65,25 @@ impl Preview {
         Ok(())
     }
 
-    fn scan_directory(&mut self, source: &Entry, cancel: &AtomicBool, depth: usize) -> Result<()> {
+    fn scan_directory(
+        &mut self,
+        source: &Entry,
+        cancel: &AtomicBool,
+        depth: usize,
+        mounts: &super::mounts::Mounts,
+    ) -> Result<()> {
         self.directories = self
             .directories
             .checked_add(1)
             .ok_or_else(|| io::Error::other("Directory count overflow"))?;
         let children: io::Result<Vec<_>> = fs::read_dir(&source.path)?.collect();
         for child in children? {
-            self.scan(&crate::fs::inspect(&child.path()), cancel, depth + 1)?;
+            self.scan(
+                &crate::fs::inspect(&child.path()),
+                cancel,
+                depth + 1,
+                mounts,
+            )?;
         }
         Ok(())
     }

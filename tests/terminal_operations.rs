@@ -59,9 +59,15 @@ fn copy_and_move_replace_are_accessible_from_the_real_dual_pane_manager() {
     fs::create_dir(&left).unwrap();
     fs::create_dir(&right).unwrap();
     fs::write(left.join("payload"), "incoming").unwrap();
+    fs::write(left.join("zzz-left-ready"), "left sentinel").unwrap();
+    fs::write(right.join("aaa-right-ready"), "right sentinel").unwrap();
     drive(
         command(root.path(), &left, Some(&right)),
-        &[("payload", "\x1b[15~"), ("1 file copied", "q")],
+        &[
+            ("zzz-left-ready", "\t"),
+            ("aaa-right-ready", "\x1b[Z\x1b[15~"),
+            ("1 file copied", "q"),
+        ],
         false,
     );
     assert_eq!(fs::read(right.join("payload")).unwrap(), b"incoming");
@@ -69,7 +75,8 @@ fn copy_and_move_replace_are_accessible_from_the_real_dual_pane_manager() {
     drive(
         command(root.path(), &left, Some(&right)),
         &[
-            ("payload", "\x1b[17~"),
+            ("zzz-left-ready", "\t"),
+            ("aaa-right-ready", "\x1b[Z\x1b[17~"),
             ("Destination conflict", "r"),
             ("1 file moved", "q"),
         ],

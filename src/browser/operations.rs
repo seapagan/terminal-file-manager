@@ -35,6 +35,7 @@ pub(super) fn submit(controller: &mut Controller, queue: &mut Queue) {
                 Ok(())
             }
             Intent::Retry(id) => retry(controller, queue, id),
+            Intent::Reconcile(id) => reconcile(controller, queue, id),
             Intent::SubmitRetry(plan, options, parent) => queue
                 .submit(plan.clone(), options)
                 .map(|id| controller.register_operation(id, plan, options, Some(parent))),
@@ -43,6 +44,28 @@ pub(super) fn submit(controller: &mut Controller, queue: &mut Queue) {
             controller.app.status = error.to_string();
         }
     }
+}
+
+fn reconcile(controller: &mut Controller, queue: &mut Queue, id: u64) -> std::io::Result<()> {
+    let job = controller
+        .app
+        .operations
+        .history
+        .iter_mut()
+        .find(|job| job.id == id)
+        .ok_or_else(|| std::io::Error::other("Unknown job"))?;
+    let record = job
+        .record
+        .as_ref()
+        .filter(|record| record.unresolved())
+        .ok_or_else(|| {
+            std::io::Error::other("Only an acknowledged unknown job needs reconciliation")
+        })?;
+    queue.reconcile(id, job.plan.clone(), record.clone())?;
+    job.state = crate::operations::JobState::Queued;
+    job.progress = None;
+    controller.app.status = format!("Job {id}: checking retained identities and owned staging");
+    Ok(())
 }
 
 fn retry(controller: &mut Controller, queue: &mut Queue, id: u64) -> std::io::Result<()> {

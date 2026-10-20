@@ -106,12 +106,13 @@ F2 in a transfer dialog enables SHA-256 verification.
 
 Conflicts default to Skip. Choose Replace, Keep both or Newer, and use All to
 repeat a choice within that job and type pair. Directories merge. In Jobs,
-`C` requests cancellation and `R` retries incomplete work from scratch.
+`C` requests cancellation, `R` retries incomplete work from scratch, and `X`
+rechecks unknown outcomes without repeating source removal.
 Completed entries stay excluded from retries.
 
 Trash can fail where the native facility cannot preserve the selected object.
-Linux Trash requires the same filesystem. Permanent deletion requires its own
-confirmation and never serves as a fallback. On quit, choose Return, Wait, or
+Linux Trash requires the source and home Trash to share a filesystem. Permanent
+deletion requires its own confirmation and never serves as a fallback. On quit, choose Return, Wait, or
 Cancel safely; `tfm` waits for workers and cleanup. An unknown outcome blocks
 retry and safe exit until reconciliation.
 

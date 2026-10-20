@@ -25,6 +25,7 @@ impl Controller {
             record: None,
             progress: None,
             started: self.app.now,
+            finished: None,
             retry_of,
         });
         self.app.operations.cursor = self.app.operations.history.len() - 1;
@@ -38,22 +39,13 @@ impl Controller {
                 if let Some(Dialog::Operation(dialog)) = &mut self.app.operations.dialog
                     && dialog.preview_id == Some(id)
                 {
-                    dialog.plan = plan;
+                    dialog.plan = *plan;
                     dialog.ready = true;
                     self.app.status = "Preview ready; review exact counts before confirming".into();
                 }
             }
             Update::Started { id } => {
-                if let Some(job) = self
-                    .app
-                    .operations
-                    .history
-                    .iter_mut()
-                    .find(|job| job.id == id)
-                {
-                    job.state = JobState::Running;
-                    job.started = self.app.now;
-                }
+                self.start_operation(id);
             }
             Update::Progress { id, event } => {
                 if let Some(job) = self
@@ -82,6 +74,21 @@ impl Controller {
         Vec::new()
     }
 
+    fn start_operation(&mut self, id: u64) {
+        if let Some(job) = self
+            .app
+            .operations
+            .history
+            .iter_mut()
+            .find(|job| job.id == id)
+        {
+            job.state = JobState::Running;
+            if job.record.is_none() {
+                job.started = self.app.now;
+            }
+        }
+    }
+
     fn finish_operation(&mut self, id: u64, record: crate::operations::Record) -> Vec<Request> {
         if let Some(Dialog::Operation(dialog)) = &mut self.app.operations.dialog
             && dialog.preview_id == Some(id)
@@ -104,7 +111,7 @@ impl Controller {
             .iter_mut()
             .find(|job| job.id == id)
         {
-            job.finish(record);
+            job.finish(record, self.app.now);
             self.app.status = crate::operations::summary(job);
             let warning = job.state != JobState::Completed;
             self.app
@@ -193,6 +200,11 @@ fn history_key(controller: &mut Controller, key: KeyCode) {
                     Intent::Cancel(job.id)
                 };
                 state.outbox.push(intent);
+            }
+        }
+        KeyCode::Char('x' | 'X') => {
+            if let Some(job) = state.history.get(state.cursor) {
+                state.outbox.push(Intent::Reconcile(job.id));
             }
         }
         KeyCode::Enter => state.show_history = false,

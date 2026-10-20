@@ -19,6 +19,33 @@ pub(super) struct OwnedStage {
 }
 
 impl OwnedStage {
+    pub fn claim_event(&self) -> super::Event {
+        super::Event::OwnedStage {
+            root: Box::new(self.root.clone()),
+            payload: Box::new(self.entry.clone()),
+        }
+    }
+
+    pub fn recovery(
+        &self,
+        source: &Entry,
+        destination: &Path,
+        previous: Option<&Entry>,
+        guards: &[Parents; 2],
+    ) -> super::Recovery {
+        super::Recovery {
+            source: source.clone(),
+            destination: destination.to_owned(),
+            previous: previous.cloned(),
+            committed: None,
+            staging: Some(super::recovery::Staging {
+                root: self.root.clone(),
+                payload: self.entry.clone(),
+            }),
+            guards: guards.clone(),
+        }
+    }
+
     pub fn seal(&mut self) -> Result<()> {
         safety::owned_object(&self.entry)?;
         self.entry = crate::fs::inspect(&self.path);

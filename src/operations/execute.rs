@@ -24,7 +24,12 @@ pub fn execute(
     if !matches!(plan.operation, Operation::Copy | Operation::Move) {
         return super::mutations::execute(plan, cancel, &mut notify);
     }
+    let mounts = match super::mounts::Mounts::capture(plan.operation) {
+        Ok(mounts) => mounts,
+        Err(error) => return super::queue::unsuccessful(plan, Outcome::Failed, &error.to_string()),
+    };
     let mut worker = Worker {
+        mounts,
         plan,
         options,
         cancel,
@@ -32,28 +37,12 @@ pub fn execute(
         record: Record::default(),
         policies: Vec::new(),
     };
-    for entry in &plan.operands {
-        if plan.completed.contains(&entry.path) {
-            continue;
-        }
-        let refreshed;
-        let entry =
-            if plan.retrying && entry.may_recurse() && safety::revalidate(entry, false).is_ok() {
-                refreshed = crate::fs::inspect(&entry.path);
-                &refreshed
-            } else {
-                entry
-            };
-        let destination = plan.target(entry);
-        worker.entry(entry, destination.as_deref(), 0);
-        if worker.record.unresolved() {
-            break;
-        }
-    }
+    worker.run();
     worker.record
 }
 
 struct Worker<'a, F> {
+    mounts: super::mounts::Mounts,
     plan: &'a Plan,
     options: Options,
     cancel: &'a AtomicBool,
@@ -63,11 +52,35 @@ struct Worker<'a, F> {
 }
 
 impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
+    fn run(&mut self) {
+        for entry in &self.plan.operands {
+            if self.plan.completed.contains(&entry.path) {
+                continue;
+            }
+            let refreshed;
+            let entry = if self.plan.retrying
+                && entry.may_recurse()
+                && safety::revalidate(entry, false).is_ok()
+            {
+                refreshed = crate::fs::inspect(&entry.path);
+                &refreshed
+            } else {
+                entry
+            };
+            let destination = self.plan.target(entry);
+            self.entry(entry, destination.as_deref(), 0);
+            if self.record.unresolved() {
+                break;
+            }
+        }
+    }
+
     fn entry(&mut self, source: &Entry, destination: Option<&Path>, depth: usize) -> bool {
         if self.plan.completed.contains(&source.path) {
             return true;
         }
         let mut result = EntryResult {
+            recovery: None,
             source: source.path.clone(),
             destination: destination.map(Path::to_owned),
             kind: source.kind,
@@ -80,6 +93,9 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
         if let Err(error) = self.perform(source, destination, depth, &mut result) {
             result.outcome = error.outcome;
             result.detail = error.detail;
+        }
+        if result.outcome != Outcome::OutcomeUnknown {
+            result.recovery = None;
         }
         let complete = result.outcome == Outcome::Completed;
         self.record.entries.push(result);
@@ -95,14 +111,10 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
     ) -> Result<()> {
         self.check_cancel()?;
         prepare_source(source, depth)?;
+        self.mounts.reject(source)?;
         let destination =
             destination.ok_or_else(|| super::plan::invalid("Destination required"))?;
         safety::reject_overlap(source, destination)?;
-        if !matches!(self.plan.operation, Operation::Copy | Operation::Move) {
-            return Err(
-                super::plan::invalid("This executor accepts copy and move transfers").into(),
-            );
-        }
         let Some((destination, previous)) = self.resolve(source, destination)? else {
             result.outcome = Outcome::Skipped;
             return Ok(());
@@ -193,12 +205,16 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
             result.created_directory = true;
         }
         let target = crate::fs::inspect(destination);
-        let complete = self.children(source, &target, depth, [&source_parents, &target_parents])?;
+        let guards = [source_parents, target_parents];
+        result.recovery = Some(Box::new(super::Recovery::directory(
+            source, &target, &guards,
+        )));
+        let complete = self.children(source, &target, depth, [&guards[0], &guards[1]])?;
         if !complete {
             result.outcome = Outcome::CopiedSourceRetained;
             return Ok(());
         }
-        self.finish_directory(source, &target, [&source_parents, &target_parents])
+        self.finish_directory(source, &target, [&guards[0], &guards[1]])
     }
 
     fn children(
@@ -277,6 +293,9 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
             (source.kind == EntryKind::Link).then_some(source),
         )?;
         let transfer = self.staged(source, destination, previous, &mut stage, result, &guards);
+        let mut evidence = stage.recovery(source, destination, previous, &guards);
+        evidence.committed = transfer.as_ref().ok().cloned();
+        result.recovery = Some(Box::new(evidence));
         let committed = stage.finish(transfer)?;
         if self.plan.operation == Operation::Move {
             let removal = self.remove_source(source, &committed, &guards);
@@ -301,14 +320,7 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
         result: &mut EntryResult,
         guards: &[Parents; 2],
     ) -> Result<Entry> {
-        self.stage_payload(source, destination, stage, result)?;
-        stage.seal()?;
-        (self.notify)(Event::Progress {
-            source: source.path.clone(),
-            destination: destination.into(),
-            stage: Stage::Verified,
-            bytes: result.bytes,
-        });
+        self.verify_stage(source, destination, stage, result)?;
         self.check_cancel()?;
         validate_guards(guards)?;
         safety::revalidate(source, true)?;
@@ -332,6 +344,35 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
             });
         }
         Ok(committed)
+    }
+
+    fn verify_stage(
+        &mut self,
+        source: &Entry,
+        destination: &Path,
+        stage: &mut staging::OwnedStage,
+        result: &mut EntryResult,
+    ) -> Result<()> {
+        self.claim_stage(stage)?;
+        self.stage_payload(source, destination, stage, result)?;
+        stage.seal()?;
+        (self.notify)(Event::Progress {
+            source: source.path.clone(),
+            destination: destination.into(),
+            stage: Stage::Verified,
+            bytes: result.bytes,
+        });
+        Ok(())
+    }
+
+    fn claim_stage(&mut self, stage: &staging::OwnedStage) -> Result<()> {
+        if matches!((self.notify)(stage.claim_event()), Decision::Cancel) {
+            self.check_cancel()?;
+            return Err(safety::changed(
+                "Private staging claim refused; source retained",
+            ));
+        }
+        Ok(())
     }
 
     fn stage_payload(

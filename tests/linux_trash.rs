@@ -1,7 +1,7 @@
 #![cfg(target_os = "linux")]
 use std::{
     fs,
-    os::unix::fs::{PermissionsExt, symlink},
+    os::unix::fs::{MetadataExt, PermissionsExt, symlink},
 };
 use terminal_file_manager::operations::trash::LinuxTrash;
 
@@ -55,10 +55,34 @@ fn unsafe_permissions_and_cross_device_targets_fail_without_fallback() {
     );
     assert_eq!(fs::read(&source).unwrap(), b"preserved");
     let separate = tempfile::tempdir_in("/dev/shm").unwrap();
+    assert_ne!(
+        root.path().metadata().unwrap().dev(),
+        separate.path().metadata().unwrap().dev()
+    );
+    let error = LinuxTrash::new(separate.path().into())
+        .put(&terminal_file_manager::fs::inspect(&source))
+        .unwrap_err();
     assert!(
-        LinuxTrash::new(separate.path().into())
-            .put(&terminal_file_manager::fs::inspect(&source))
-            .is_err()
+        error
+            .to_string()
+            .contains("Cross-filesystem Trash unsupported")
     );
     assert_eq!(fs::read(source).unwrap(), b"preserved");
+}
+
+#[test]
+fn symlinked_parent_on_the_trash_filesystem_is_supported() {
+    let root = tempfile::tempdir().unwrap();
+    let parent = root.path().join("parent");
+    let alias = root.path().join("alias");
+    fs::create_dir(&parent).unwrap();
+    fs::write(parent.join("source"), "preserved").unwrap();
+    symlink(&parent, &alias).unwrap();
+    let source = alias.join("source");
+    let receipt = LinuxTrash::new(root.path().join("data"))
+        .put(&terminal_file_manager::fs::inspect(&source))
+        .unwrap();
+    assert_eq!(fs::read(receipt.path).unwrap(), b"preserved");
+    assert!(!source.exists());
+    assert!(alias.is_symlink());
 }

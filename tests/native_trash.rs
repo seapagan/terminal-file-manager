@@ -51,4 +51,24 @@ fn trash_child() {
         b"owned native fixture"
     );
     println!("NATIVE_TRASH_EXERCISED");
+    #[cfg(target_os = "linux")]
+    trash_metadata_claim(&root);
+}
+
+#[cfg(target_os = "linux")]
+fn trash_metadata_claim(root: &std::path::Path) {
+    let source = root.join("queued-source");
+    fs::write(&source, "preserved").unwrap();
+    let metadata = fs::read_dir(root.join("data/Trash/info"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let trash = Plan::paths(Operation::Trash, vec![source], None).unwrap();
+    let deletion = Plan::paths(Operation::Delete, vec![metadata.clone()], None).unwrap();
+    let mut coordinator = terminal_file_manager::operations::Coordinator::default();
+    assert!(coordinator.acquire(1, &trash).unwrap());
+    assert!(!coordinator.acquire(2, &deletion).unwrap());
+    assert!(metadata.is_file());
 }

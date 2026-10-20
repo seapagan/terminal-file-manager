@@ -11,23 +11,19 @@ pub(super) fn execute(
     cancel: &AtomicBool,
     notify: &mut impl FnMut(Event) -> Decision,
 ) -> Record {
+    if matches!(plan.operation, Operation::Trash | Operation::Delete) && plan.preview.is_none() {
+        let mut approved = plan.clone();
+        match super::Preview::capture(plan, cancel) {
+            Ok(preview) => approved.preview = Some(preview),
+            Err(error) => return super::queue::unsuccessful(plan, error.outcome, &error.detail),
+        }
+        return execute(&approved, cancel, notify);
+    }
     let mut record = Record::default();
     if let Some(preview) = &plan.preview
         && let Err(error) = preview.validate(plan, cancel)
     {
-        for source in &plan.operands {
-            record.entries.push(EntryResult {
-                source: source.path.clone(),
-                destination: plan.destination.clone(),
-                kind: source.kind,
-                outcome: error.outcome,
-                bytes: 0,
-                checksum_verified: false,
-                created_directory: false,
-                detail: error.detail.clone(),
-            });
-        }
-        return record;
+        return super::queue::unsuccessful(plan, error.outcome, &error.detail);
     }
     if plan.operation == Operation::Mkdir {
         if let Some(destination) = &plan.destination {
@@ -54,6 +50,7 @@ fn apply(
     depth: usize,
 ) -> bool {
     let mut result = EntryResult {
+        recovery: None,
         source: source.path.clone(),
         destination: plan.destination.clone(),
         kind: source.kind,
@@ -302,6 +299,7 @@ fn recycle(source: &Entry, result: &mut EntryResult, record: &mut Record) -> Res
             .strip_prefix(&receipt.path)
             .map_err(io::Error::other)?;
         record.entries.push(EntryResult {
+            recovery: None,
             source: source.path.join(relative),
             destination: Some(child.path.clone()),
             kind: child.kind,

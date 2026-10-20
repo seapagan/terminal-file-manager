@@ -121,3 +121,61 @@ fn replacement_destination_aliases_are_locked_as_objects() {
     assert_eq!(coordinator.active(), 0);
     assert!(!coordinator.acquire(2, &delete).unwrap());
 }
+#[test]
+fn a_transfer_claim_also_protects_its_private_staging_namespace() {
+    use terminal_file_manager::operations::{Coordinator, Operation, Plan};
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(root.path().join("source"), "source").unwrap();
+    let destination = root.path().join("target");
+    std::fs::create_dir_all(destination.join(".tfm-stage-owned")).unwrap();
+    let stage = destination.join(".tfm-stage-owned/payload");
+    std::fs::write(&stage, "owned staging").unwrap();
+    let copy = Plan::paths(
+        Operation::Copy,
+        vec![root.path().join("source")],
+        Some(destination),
+    )
+    .unwrap();
+    let deletion = Plan::paths(Operation::Delete, vec![stage], None).unwrap();
+    let mut coordinator = Coordinator::default();
+    assert!(coordinator.acquire(1, &copy).unwrap());
+    assert!(!coordinator.acquire(2, &deletion).unwrap());
+    coordinator.quarantine(1);
+    assert!(!coordinator.acquire(2, &deletion).unwrap());
+}
+#[test]
+fn an_owned_stage_claim_blocks_a_hard_link_alias_outside_its_private_directory() {
+    use terminal_file_manager::operations::{Coordinator, Operation, Plan};
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(root.path().join("source"), "source").unwrap();
+    let destination = root.path().join("target");
+    let directory = destination.join(".tfm-stage-owned");
+    std::fs::create_dir_all(&directory).unwrap();
+    let payload = directory.join("payload");
+    std::fs::write(&payload, "owned staging").unwrap();
+    let alias = root.path().join("alias");
+    std::fs::hard_link(&payload, &alias).unwrap();
+    let copy = Plan::paths(
+        Operation::Copy,
+        vec![root.path().join("source")],
+        Some(destination),
+    )
+    .unwrap();
+    let attributes = Plan::paths(Operation::ReadOnly(true), vec![alias], None).unwrap();
+    let mut coordinator = Coordinator::default();
+    assert!(coordinator.acquire(1, &copy).unwrap());
+    assert!(
+        coordinator
+            .own_stage(
+                1,
+                &terminal_file_manager::fs::inspect(&directory),
+                &terminal_file_manager::fs::inspect(&payload)
+            )
+            .unwrap()
+    );
+    assert!(!coordinator.acquire(2, &attributes).unwrap());
+    coordinator.quarantine(1);
+    assert!(!coordinator.acquire(2, &attributes).unwrap());
+    coordinator.release(1);
+    assert!(coordinator.acquire(2, &attributes).unwrap());
+}

@@ -87,7 +87,9 @@ remain reliable. The terminal restores before queue teardown waits on writers.
 Destructive previews run on workers and need separate confirmation. Jobs retain
 partial outcomes and retry lineage; unknown outcomes quarantine claims and block
 retry/exit. Q freezes the navigation snapshot before waiting for acknowledgement.
-Reconciliation and final native acceptance remain in progress.
+Reconciliation runs under the original quarantined claims. It checks retained
+identities and cleans only proven owned staging; missing evidence keeps the job
+unknown. It never repeats source removal. Native acceptance remains outstanding.
 
 Future milestones preserve native local byte/UTF-16 path identities separately
 from display text. Remote POSIX paths remain exact bytes on every client OS;

@@ -60,21 +60,76 @@ impl Coordinator {
             *active = false;
         }
     }
+
+    pub(super) fn resume(&mut self, job: u64) -> io::Result<bool> {
+        if self.active() >= 2 {
+            return Ok(false);
+        }
+        let (_, active) = self
+            .claims
+            .get_mut(&job)
+            .ok_or_else(|| invalid("Reconciliation has no retained claims"))?;
+        if *active {
+            return Err(invalid("Job is still active"));
+        }
+        *active = true;
+        Ok(true)
+    }
+
+    /// Claim newly allocated private objects before payload writes, including native aliases.
+    ///
+    /// # Errors
+    /// Refuses changed ownership evidence or a job without its original claims.
+    pub fn own_stage(
+        &mut self,
+        job: u64,
+        root: &crate::fs::Entry,
+        payload: &crate::fs::Entry,
+    ) -> io::Result<bool> {
+        super::safety::revalidate(root, false).map_err(|error| io::Error::other(error.detail))?;
+        super::safety::revalidate(payload, true).map_err(|error| io::Error::other(error.detail))?;
+        let mut additions = vec![
+            source_claim(root, Operation::Delete)?,
+            source_claim(payload, Operation::Delete)?,
+        ];
+        for claim in &mut additions {
+            claim.unknown_aliases = false;
+        }
+        if self
+            .claims
+            .iter()
+            .filter(|(id, _)| **id != job)
+            .flat_map(|(_, (claims, _))| claims)
+            .any(|held| additions.iter().any(|next| conflicts(held, next)))
+        {
+            return Ok(false);
+        }
+        let (claims, _) = self
+            .claims
+            .get_mut(&job)
+            .ok_or_else(|| invalid("Stage has no owning job"))?;
+        claims.extend(additions);
+        Ok(true)
+    }
 }
 
 fn footprint(plan: &Plan) -> io::Result<Vec<Claim>> {
     let mut claims = Vec::new();
+    #[cfg(target_os = "linux")]
+    if plan.operation == Operation::Trash {
+        claims.push(trash_claim()?);
+    }
+    if let Some(staging_namespace) = staging_claim(plan)? {
+        claims.push(staging_namespace);
+    }
+    operand_claims(plan, &mut claims)?;
+    claims.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(claims)
+}
+
+fn operand_claims(plan: &Plan, claims: &mut Vec<Claim>) -> io::Result<()> {
     for entry in &plan.operands {
-        let identity = entry
-            .identity
-            .as_ref()
-            .ok_or_else(|| invalid("Missing source identity"))?;
-        claims.push(Claim {
-            path: namespace(&entry.path)?,
-            object: identity.object,
-            write: plan.operation != Operation::Copy,
-            unknown_aliases: unknown_aliases(entry),
-        });
+        claims.push(source_claim(entry, plan.operation)?);
         if let Some(destination) = plan.target(entry) {
             claims.push(destination_claim(&destination)?);
         }
@@ -84,8 +139,72 @@ fn footprint(plan: &Plan) -> io::Result<Vec<Claim>> {
     {
         claims.push(destination_claim(destination)?);
     }
-    claims.sort_by(|a, b| a.path.cmp(&b.path));
-    Ok(claims)
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn trash_claim() -> io::Result<Claim> {
+    let root = super::trash::data_root()?.join("Trash");
+    Ok(Claim {
+        path: future_namespace(&root)?,
+        object: crate::fs::inspect(&root)
+            .identity
+            .and_then(|identity| identity.object),
+        write: true,
+        unknown_aliases: false,
+    })
+}
+
+#[cfg(target_os = "linux")]
+fn future_namespace(path: &Path) -> io::Result<PathBuf> {
+    let mut ancestor = std::path::absolute(path)?;
+    let mut missing = Vec::new();
+    loop {
+        match std::fs::canonicalize(&ancestor) {
+            Ok(mut resolved) => {
+                for name in missing.into_iter().rev() {
+                    resolved.push(name);
+                }
+                return Ok(resolved);
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                missing.push(
+                    ancestor
+                        .file_name()
+                        .ok_or_else(|| invalid("Trash namespace unavailable"))?
+                        .to_owned(),
+                );
+                ancestor.pop();
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+fn source_claim(entry: &crate::fs::Entry, operation: Operation) -> io::Result<Claim> {
+    let identity = entry
+        .identity
+        .as_ref()
+        .ok_or_else(|| invalid("Missing source identity"))?;
+    Ok(Claim {
+        path: namespace(&entry.path)?,
+        object: identity.object,
+        write: operation != Operation::Copy,
+        unknown_aliases: unknown_aliases(entry),
+    })
+}
+
+fn staging_claim(plan: &Plan) -> io::Result<Option<Claim>> {
+    if !matches!(plan.operation, Operation::Copy | Operation::Move) {
+        return Ok(None);
+    }
+    let Some(directory) = &plan.destination else {
+        return Ok(None);
+    };
+    let mut claim = destination_claim(directory)?;
+    // Only private staging names are mutated here, not arbitrary existing descendants.
+    claim.unknown_aliases = false;
+    Ok(Some(claim))
 }
 
 fn destination_claim(path: &Path) -> io::Result<Claim> {

@@ -7,6 +7,7 @@ pub enum Intent {
     Preview(Plan),
     Cancel(u64),
     Retry(u64),
+    Reconcile(u64),
     SubmitRetry(Plan, Options, u64),
 }
 
@@ -49,6 +50,7 @@ pub struct Job {
     pub record: Option<Record>,
     pub progress: Option<Event>,
     pub started: SystemTime,
+    pub finished: Option<SystemTime>,
     pub retry_of: Option<u64>,
 }
 
@@ -56,7 +58,8 @@ impl Job {
     pub fn active(&self) -> bool {
         matches!(self.state, JobState::Queued | JobState::Running)
     }
-    pub fn finish(&mut self, record: Record) {
+    pub fn finish(&mut self, record: Record, now: SystemTime) {
+        self.finished.get_or_insert(now);
         self.state = if record.unresolved() {
             JobState::Unknown
         } else if record

@@ -39,11 +39,18 @@ impl LinuxTrash {
     fn put_checked(&self, entry: &Entry) -> safety::Result<Receipt> {
         let source_guard = Parents::capture(&entry.path)?;
         safety::revalidate(entry, true)?;
+        validate_scope(entry)?;
         let (files, info) = self.prepare(entry)?;
         let (destination, info_path) = reserve(entry, &files, &info)?;
         let info_entry = crate::fs::inspect(&info_path);
         let target_guard = Parents::capture(&destination)?;
-        let result = commit(entry, &destination, [&source_guard, &target_guard]);
+        let info_guard = Parents::capture(&info_path)?;
+        let result = commit(
+            entry,
+            &destination,
+            &info_entry,
+            [&source_guard, &target_guard, &info_guard],
+        );
         if let Err(error) = result {
             cleanup_info(entry, &destination, &info_entry);
             return Err(error);
@@ -73,6 +80,16 @@ impl LinuxTrash {
         safety::reject_overlap(source, &files.join("reservation"))?;
         Ok((files, info))
     }
+}
+
+fn validate_scope(entry: &Entry) -> safety::Result<()> {
+    let plan = crate::operations::Plan::paths(
+        crate::operations::Operation::Trash,
+        vec![entry.path.clone()],
+        None,
+    )?;
+    crate::operations::Preview::capture(&plan, &false.into())?;
+    Ok(())
 }
 
 fn validate_data(data: &Path, source: &Entry) -> io::Result<()> {
@@ -143,10 +160,16 @@ fn write_info(file: &mut fs::File, path: &Path) -> io::Result<()> {
     file.sync_all()
 }
 
-fn commit(source: &Entry, destination: &Path, guards: [&Parents; 2]) -> safety::Result<()> {
+fn commit(
+    source: &Entry,
+    destination: &Path,
+    info: &Entry,
+    guards: [&Parents; 3],
+) -> safety::Result<()> {
     for guard in guards {
         guard.validate()?;
     }
+    safety::revalidate(info, true)?;
     safety::revalidate(source, true)?;
     staging::rename_new(&source.path, destination)?;
     let moved = crate::fs::inspect(destination);
@@ -173,5 +196,39 @@ fn cleanup_info(source: &Entry, destination: &Path, info: &Entry) {
         && safety::revalidate(info, true).is_ok()
     {
         let _ = fs::remove_file(&info.path);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn changed_trash_metadata_blocks_source_rename() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source");
+        let destination = root.path().join("recycled");
+        let info = root.path().join("item.trashinfo");
+        fs::write(&source, "source preserved").unwrap();
+        fs::write(&info, "approved metadata").unwrap();
+        let source_entry = crate::fs::inspect(&source);
+        let info_entry = crate::fs::inspect(&info);
+        let source_guard = Parents::capture(&source).unwrap();
+        let target_guard = Parents::capture(&destination).unwrap();
+        let info_guard = Parents::capture(&info).unwrap();
+        fs::rename(&info, root.path().join("old-info")).unwrap();
+        fs::write(&info, "external replacement").unwrap();
+        assert!(
+            commit(
+                &source_entry,
+                &destination,
+                &info_entry,
+                [&source_guard, &target_guard, &info_guard]
+            )
+            .is_err()
+        );
+        assert_eq!(fs::read(source).unwrap(), b"source preserved");
+        assert_eq!(fs::read(info).unwrap(), b"external replacement");
+        assert!(!destination.exists());
     }
 }

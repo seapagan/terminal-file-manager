@@ -117,6 +117,7 @@ fn outcome(
     let source = controller.app.panes[0].entries[0].clone();
     terminal_file_manager::operations::Record {
         entries: vec![terminal_file_manager::operations::EntryResult {
+            recovery: None,
             source: source.path,
             destination: None,
             kind: source.kind,
@@ -251,6 +252,21 @@ fn finish(controller: &mut Controller, value: Outcome) {
 }
 
 #[test]
+fn jobs_reconciliation_submits_the_original_unknown_job_identity() {
+    let (_, mut controller) = controller();
+    running(&mut controller);
+    finish(&mut controller, Outcome::OutcomeUnknown);
+    controller.app.operations.show_history = true;
+    key(&mut controller, KeyCode::Char('x'));
+    assert!(matches!(
+        controller.app.operations.outbox.last(),
+        Some(Intent::Reconcile(1))
+    ));
+    assert_eq!(controller.app.operations.history.len(), 1);
+    assert!(!controller.quit);
+}
+
+#[test]
 fn conflict_arrow_choice_and_scroll_use_the_visible_operation_geometry() {
     let (_, mut controller) = controller();
     let source = controller.app.panes[0].entries[0].clone();
@@ -276,4 +292,32 @@ fn conflict_arrow_choice_and_scroll_use_the_visible_operation_geometry() {
         response.try_recv().unwrap(),
         terminal_file_manager::operations::Decision::Replace
     ));
+}
+
+#[test]
+fn completed_job_elapsed_time_stops_at_worker_acknowledgement() {
+    let (_, mut controller) = controller();
+    running(&mut controller);
+    controller.app.now += Duration::from_secs(7);
+    finish(&mut controller, Outcome::Completed);
+    controller.app.now += Duration::from_secs(100);
+    controller.app.operations.show_history = true;
+    let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
+    terminal
+        .draw(|frame| {
+            ui::render(
+                frame,
+                &controller.app,
+                &Theme::new(colored_text::ColorLevel::NoColor),
+            );
+        })
+        .unwrap();
+    let text: String = terminal
+        .backend()
+        .buffer()
+        .content
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect();
+    assert!(text.contains("elapsed ~7s"), "{text}");
 }

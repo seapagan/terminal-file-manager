@@ -80,6 +80,7 @@ fn buttons(app: &App) -> Vec<(&'static str, KeyCode)> {
             ],
         },
         None if app.operations.show_history => vec![
+            ("X Reconcile", KeyCode::Char('x')),
             ("R Retry incomplete", KeyCode::Char('r')),
             ("C Cancel job", KeyCode::Char('c')),
             ("Esc Close", KeyCode::Esc),
@@ -320,7 +321,7 @@ fn identity_lines(label: &str, entry: &crate::fs::Entry) -> Vec<String> {
 }
 
 fn history(app: &App) -> Vec<String> {
-    let mut lines = vec!["Up/Down selects; Enter resolves a pending conflict; R retries incomplete entries from scratch; C cancels".into()];
+    let mut lines = vec!["Up/Down selects; Enter resolves a pending conflict; R retries incomplete; C cancels; X reconciles unknown outcomes without repeating source removal".into()];
     for (index, job) in app.operations.history.iter().enumerate() {
         lines.push(format!(
             "{} Job {} {:?} {:?}",
@@ -345,7 +346,8 @@ fn job_lines(app: &App, job: &crate::operations::Job) -> Vec<String> {
     lines.push(format!(
         "Route: Local → local; retry of {:?}; elapsed ~{}s",
         job.retry_of,
-        app.now
+        job.finished
+            .unwrap_or(app.now)
             .duration_since(job.started)
             .unwrap_or_default()
             .as_secs()
@@ -374,6 +376,13 @@ fn job_lines(app: &App, job: &crate::operations::Job) -> Vec<String> {
                 entry.destination,
                 entry.detail
             ));
+            if let Some(path) = entry
+                .recovery
+                .as_ref()
+                .and_then(|evidence| evidence.staging_path())
+            {
+                lines.push(format!("Owned staging checkpoint: {}", path.display()));
+            }
         }
     }
     lines
