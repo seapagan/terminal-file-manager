@@ -59,9 +59,10 @@ impl Apartment {
     fn initialize() -> io::Result<Self> {
         // SAFETY: this dedicated new thread has no existing COM apartment. Its
         // non-Send interface values are released before Apartment's balanced teardown.
+        // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
         unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) }
             .ok()
-            .map_err(native_error)?;
+            .map_err(|error| native_error("Initialize Trash STA", error))?;
         Ok(Self)
     }
 }
@@ -74,6 +75,7 @@ impl Drop for Apartment {
     fn drop(&mut self) {
         // SAFETY: construction succeeded on this same scoped thread; all COM
         // values were created after this guard and have already been released.
+        // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
         unsafe { CoUninitialize() };
     }
 }
@@ -95,6 +97,7 @@ fn recycle_sta(entry: &Entry, cancel: &AtomicBool) -> Result<Receipt> {
     // SAFETY: all interfaces, UTF-16 buffers and callback state live on this STA
     // through PerformOperations. The callback is explicitly non-agile; no COM
     // object or borrowed pointer crosses the scoped thread boundary.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     unsafe {
         // SILENT hides progress only; no auto-Yes flag is set. WANTNUKEWARNING
         // is a warning, not proof that Windows can never delete permanently.
@@ -107,7 +110,9 @@ fn recycle_sta(entry: &Entry, cancel: &AtomicBool) -> Result<Receipt> {
                 | FOF_NOERRORUI
                 | FOFX_EARLYFAILURE,
         )?;
-        operation.DeleteItem(&item, &sink).map_err(native_error)?;
+        operation
+            .DeleteItem(&item, &sink)
+            .map_err(|error| native_error("Queue selected Shell item", error))?;
         parents.validate()?;
         safety::revalidate(entry, true)?;
         crate::fs::check_cancelled(cancel)?;
@@ -141,8 +146,11 @@ fn configured(flags: windows::Win32::UI::Shell::FILEOPERATION_FLAGS) -> io::Resu
     // interface is dropped before apartment teardown. Flags never auto-answer Yes.
     unsafe {
         let operation: IFileOperation =
-            CoCreateInstance(&FileOperation, None, CLSCTX_INPROC_SERVER).map_err(native_error)?;
-        operation.SetOperationFlags(flags).map_err(native_error)?;
+            CoCreateInstance(&FileOperation, None, CLSCTX_INPROC_SERVER)
+                .map_err(|error| native_error("Create Shell operation", error))?;
+        operation
+            .SetOperationFlags(flags)
+            .map_err(|error| native_error("Set Shell operation flags", error))?;
         Ok(operation)
     }
 }
@@ -174,8 +182,8 @@ fn finish(
     })
 }
 
-fn native_error(error: windows_core::Error) -> io::Error {
-    io::Error::other(error.to_string())
+fn native_error(stage: &str, error: windows_core::Error) -> io::Error {
+    io::Error::other(format!("{stage}: {error}"))
 }
 
 fn wide(path: &Path) -> io::Result<Vec<u16>> {
@@ -195,7 +203,9 @@ fn shell_item(path: &Path) -> io::Result<IShellItem> {
     let wide = wide(path)?;
     // SAFETY: the buffer is native UTF-16, NUL-terminated and live throughout
     // this synchronous call. Shell returns an owned reference in the current STA.
-    unsafe { SHCreateItemFromParsingName(PCWSTR(wide.as_ptr()), None) }.map_err(native_error)
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
+    unsafe { SHCreateItemFromParsingName(PCWSTR(wide.as_ptr()), None) }
+        .map_err(|error| native_error("Create Shell item from native path", error))
 }
 
 #[allow(

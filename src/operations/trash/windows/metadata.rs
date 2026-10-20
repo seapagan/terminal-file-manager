@@ -21,6 +21,7 @@ pub(super) fn extract(item: &IShellItem) -> ShellMetadata {
 fn deleted_from(item: &IShellItem2) -> Option<Vec<u16>> {
     // SAFETY: canonical property name is static NUL-terminated UTF-16; item is
     // live on this STA. The returned COM allocation is copied and freed below.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     unsafe {
         let key = property_key(w!("System.Recycle.DeletedFrom"))?;
         owned_string(item.GetString(&key).ok()?)
@@ -66,6 +67,7 @@ fn property_key(name: PCWSTR) -> Option<windows::Win32::Foundation::PROPERTYKEY>
     let mut key = windows::Win32::Foundation::PROPERTYKEY::default();
     // SAFETY: callers pass static NUL-terminated property names; key is live,
     // initialized writable SDK storage and is read only after API success.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     unsafe { PSGetPropertyKeyFromName(name, &mut key) }.ok()?;
     Some(key)
 }

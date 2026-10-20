@@ -104,8 +104,8 @@ impl IFileOperationProgressSink_Impl for interface::Sink_Impl {
     ) -> windows_core::Result<()> {
         let recycled = psinewlycreated.as_ref();
         let acknowledgement = Acknowledgement {
+            status: hrdelete.0,
             error: hrdelete.ok().err().map(|error| error.to_string()),
-            succeeded: hrdelete.is_ok(),
             recycled: recycled.is_some(),
             parsing_name: recycled
                 .and_then(|item| display_name(item, SIGDN_DESKTOPABSOLUTEPARSING)),

@@ -84,6 +84,7 @@ fn file_url(path: &Path, directory: bool) -> io::Result<Retained<NSURL>> {
         .ok_or_else(|| io::Error::other("Missing native path"))?;
     // SAFETY: bytes is a live NUL-terminated native filesystem representation
     // throughout the synchronous call; NSURL owns its result, with no final-link resolution.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     Ok(unsafe {
         NSURL::fileURLWithFileSystemRepresentation_isDirectory_relativeToURL(
             pointer, directory, None,
@@ -101,6 +102,7 @@ fn filesystem_path(url: &NSURL) -> Option<PathBuf> {
     }
     // SAFETY: Foundation returns a NUL-terminated filesystem representation whose
     // storage remains owned by the borrowed live NSURL; bytes are copied before return.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     let bytes = unsafe { CStr::from_ptr(url.fileSystemRepresentation().as_ptr()) }
         .to_bytes()
         .to_vec();

@@ -96,6 +96,36 @@ fn stale_source_and_pre_submission_cancellation_never_enter_the_shell_queue() {
     assert_eq!(fs::read(source).unwrap(), b"replacement");
 }
 
+#[test]
+fn native_shell_parsing_compares_frozen_and_canonical_namespace_paths() {
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("source");
+    fs::write(&source, "retained diagnostic fixture").unwrap();
+    let entry = crate::fs::inspect(&source);
+    std::thread::scope(|scope| {
+        scope
+            .spawn(|| {
+                let _apartment = Apartment::initialize().unwrap();
+                let direct = shell_item(&source)
+                    .map(|_| "created".to_owned())
+                    .unwrap_or_else(|error| error.to_string());
+                let namespace = crate::operations::locks::namespace(&source).unwrap();
+                let canonical = shell_item(&namespace)
+                    .map(|_| "created".to_owned())
+                    .unwrap_or_else(|error| error.to_string());
+                assert!(
+                    preflight(&entry).is_ok(),
+                    "Shell parsing direct={} ({direct}); namespace={} ({canonical})",
+                    source.display(),
+                    namespace.display()
+                );
+            })
+            .join()
+            .unwrap()
+    });
+    assert_eq!(fs::read(source).unwrap(), b"retained diagnostic fixture");
+}
+
 fn restore(receipt: &Receipt, destination: &Path) {
     let Receipt::Windows {
         parsing_name: Some(name),
@@ -126,6 +156,7 @@ fn restore_sta(source: &Path, destination: &Path) -> io::Result<()> {
     assert!(fs::symlink_metadata(destination).is_err());
     // SAFETY: interfaces and UTF-16 buffer remain live in this dedicated STA;
     // only the positively identified owned test receipt is moved to its empty name.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     unsafe {
         let operation =
             configured(FOF_NO_CONNECTED_ELEMENTS | FOF_SILENT | FOF_NOERRORUI | FOFX_EARLYFAILURE)?;
@@ -136,11 +167,14 @@ fn restore_sta(source: &Path, destination: &Path) -> io::Result<()> {
                 PCWSTR(name.as_ptr()),
                 None::<&IFileOperationProgressSink>,
             )
-            .map_err(native_error)?;
+            .map_err(|error| native_error("Restore owned fixture", error))?;
         let performed = operation.PerformOperations();
         let aborted = operation.GetAnyOperationsAborted();
-        performed.map_err(native_error)?;
-        if aborted.map_err(native_error)?.as_bool() {
+        performed.map_err(|error| native_error("Restore owned fixture", error))?;
+        if aborted
+            .map_err(|error| native_error("Restore owned fixture", error))?
+            .as_bool()
+        {
             return Err(io::Error::other("Owned Shell restore aborted"));
         }
     }
