@@ -198,7 +198,7 @@ fn an_unknown_outcome_blocks_retry_and_safe_exit_without_freezing_the_manager() 
     assert!(job.plan.retry(job.record.as_ref().unwrap()).is_err());
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 #[test]
 fn editing_an_incoming_name_keeps_an_unedited_non_utf8_target_exact() {
     use std::{ffi::OsString, os::unix::ffi::OsStringExt};

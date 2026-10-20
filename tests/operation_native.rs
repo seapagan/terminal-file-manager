@@ -31,7 +31,7 @@ fn native_readonly_survives_new_destination_commit_and_can_be_edited() {
 
 #[cfg(unix)]
 #[test]
-fn native_mode_mtime_and_non_utf8_names_survive_verified_copy() {
+fn native_mode_mtime_and_supported_names_survive_verified_copy() {
     use std::{
         ffi::OsString,
         os::unix::{ffi::OsStringExt, fs::PermissionsExt},
@@ -39,9 +39,12 @@ fn native_mode_mtime_and_non_utf8_names_survive_verified_copy() {
     let root = tempfile::tempdir().unwrap();
     let destination = root.path().join("destination");
     fs::create_dir(&destination).unwrap();
-    let source = root
-        .path()
-        .join(OsString::from_vec(b"raw-\xff\nfile".to_vec()));
+    let name = if cfg!(target_os = "linux") {
+        OsString::from_vec(b"raw-\xff\nfile".to_vec())
+    } else {
+        OsString::from("native-λ\nfile")
+    };
+    let source = root.path().join(name);
     fs::write(&source, "bytes").unwrap();
     fs::set_permissions(&source, fs::Permissions::from_mode(0o640)).unwrap();
     let before = fs::metadata(&source).unwrap();
@@ -54,7 +57,7 @@ fn native_mode_mtime_and_non_utf8_names_survive_verified_copy() {
     let record = execute(&plan, Options { checksum: true }, &false.into(), |_| {
         Decision::Skip
     });
-    assert_eq!(record.completed_files(), 1);
+    assert_eq!(record.completed_files(), 1, "{:?}", record.entries);
     let after = fs::metadata(destination.join(source.file_name().unwrap())).unwrap();
     assert_eq!(after.permissions().mode() & 0o777, 0o640);
     assert_eq!(after.modified().unwrap(), before.modified().unwrap());

@@ -49,8 +49,13 @@ fn copy_verifies_staged_bytes_and_never_clobbers_without_a_conflict_decision() {
             Decision::Replace
         },
     );
+    assert_eq!(
+        record.entries[0].outcome,
+        Outcome::Completed,
+        "{:?}",
+        record.entries
+    );
     assert_eq!(fs::read(destination).unwrap(), b"new bytes");
-    assert_eq!(record.entries[0].outcome, Outcome::Completed);
     assert!(record.entries[0].checksum_verified);
     assert_eq!(record.bytes(), 9);
 }

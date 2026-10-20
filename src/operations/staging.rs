@@ -254,6 +254,29 @@ mod tests {
     use super::*;
 
     #[test]
+    fn preserving_an_older_mtime_keeps_the_owned_stage_valid() {
+        let root = tempfile::tempdir().unwrap();
+        let mut stage = OwnedStage::create(&root.path().join("final"), None).unwrap();
+        let before = stage.entry.identity.clone();
+        stage
+            .file
+            .as_ref()
+            .unwrap()
+            .set_times(
+                fs::FileTimes::new()
+                    .set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_secs(1000)),
+            )
+            .unwrap();
+        let after = crate::fs::inspect(&stage.path).identity;
+        let result = stage.seal();
+        assert!(
+            result.is_ok(),
+            "before={before:?}; after={after:?}; result={result:?}"
+        );
+        stage.cleanup().unwrap();
+    }
+
+    #[test]
     fn committed_identity_is_the_owned_stage_not_a_fresh_unrelated_destination() {
         let root = tempfile::tempdir().unwrap();
         let destination = root.path().join("final");
