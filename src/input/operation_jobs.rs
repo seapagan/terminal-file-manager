@@ -195,15 +195,23 @@ fn history_key(controller: &mut Controller, key: KeyCode) {
         KeyCode::Char('r' | 'R' | 'c' | 'C') => {
             if let Some(job) = state.history.get(state.cursor) {
                 let intent = if matches!(key, KeyCode::Char('r' | 'R')) {
+                    if !job.can_retry() {
+                        return;
+                    }
                     Intent::Retry(job.id)
                 } else {
+                    if !job.active() {
+                        return;
+                    }
                     Intent::Cancel(job.id)
                 };
                 state.outbox.push(intent);
             }
         }
         KeyCode::Char('x' | 'X') => {
-            if let Some(job) = state.history.get(state.cursor) {
+            if let Some(job) = state.history.get(state.cursor)
+                && job.can_reconcile()
+            {
                 state.outbox.push(Intent::Reconcile(job.id));
             }
         }

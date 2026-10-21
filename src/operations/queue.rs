@@ -127,7 +127,7 @@ impl Queue {
     /// # Errors
     /// Refuses active jobs, resolved records, a full queue or an unavailable coordinator.
     pub fn reconcile(&mut self, id: u64, plan: Plan, record: Record) -> io::Result<()> {
-        if self.tokens.contains_key(&id) || !record.unresolved() || self.tokens.len() >= 64 {
+        if self.tokens.contains_key(&id) || !record.reconcilable() || self.tokens.len() >= 64 {
             return Err(io::Error::other(
                 "Only a stopped unknown job can be reconciled",
             ));

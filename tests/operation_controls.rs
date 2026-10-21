@@ -272,16 +272,14 @@ fn finish(controller: &mut Controller, value: Outcome) {
 }
 
 #[test]
-fn jobs_reconciliation_submits_the_original_unknown_job_identity() {
+fn jobs_without_ownership_evidence_do_not_offer_a_reconciliation_attempt() {
     let (_, mut controller) = controller();
     running(&mut controller);
     finish(&mut controller, Outcome::OutcomeUnknown);
     controller.app.operations.show_history = true;
     key(&mut controller, KeyCode::Char('x'));
-    assert!(matches!(
-        controller.app.operations.outbox.last(),
-        Some(Intent::Reconcile(1))
-    ));
+    assert!(controller.app.operations.outbox.is_empty());
+    assert!(!controller.app.operations.history[0].can_reconcile());
     assert_eq!(controller.app.operations.history.len(), 1);
     assert!(!controller.quit);
 }

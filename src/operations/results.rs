@@ -109,6 +109,20 @@ impl Record {
             .filter(|e| e.created_directory && e.outcome == Outcome::Completed)
             .count()
     }
+    /// A critical incident is irreversible and never offered as reconciliation.
+    pub fn incident(&self) -> bool {
+        self.entries
+            .iter()
+            .any(|entry| entry.outcome == Outcome::SafetyIncident)
+    }
+    /// Retained ownership evidence is required for an unknown-outcome inspection.
+    pub fn reconcilable(&self) -> bool {
+        !self.incident()
+            && self
+                .entries
+                .iter()
+                .any(|entry| entry.outcome == Outcome::OutcomeUnknown && entry.recovery.is_some())
+    }
     /// Unresolved outcomes retain locks and block automatic retry and safe exit.
     pub fn unresolved(&self) -> bool {
         self.entries

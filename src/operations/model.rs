@@ -37,6 +37,9 @@ pub enum JobState {
     Queued,
     Running,
     Completed,
+    Skipped,
+    Failed,
+    Critical,
     Partial,
     Cancelled,
     Unknown,
@@ -58,28 +61,55 @@ impl Job {
     pub fn active(&self) -> bool {
         matches!(self.state, JobState::Queued | JobState::Running)
     }
+    /// Retry remains an explicit fresh attempt; the plan revalidates its frozen identities.
+    pub fn can_retry(&self) -> bool {
+        !self.active()
+            && self
+                .record
+                .as_ref()
+                .is_some_and(|record| self.plan.retry(record).is_ok())
+    }
+    /// Only unknown entries with retained ownership evidence can be reconciled.
+    pub fn can_reconcile(&self) -> bool {
+        !self.active() && self.record.as_ref().is_some_and(Record::reconcilable)
+    }
     pub fn finish(&mut self, record: Record, now: SystemTime) {
         self.finished.get_or_insert(now);
-        self.state = if record.unresolved() {
-            JobState::Unknown
-        } else if record
-            .entries
-            .iter()
-            .any(|entry| entry.outcome == Outcome::Cancelled)
-        {
-            JobState::Cancelled
-        } else if record.entries.iter().any(|entry| {
-            matches!(
-                entry.outcome,
-                Outcome::Failed | Outcome::Changed | Outcome::CopiedSourceRetained
-            )
-        }) {
-            JobState::Partial
-        } else {
-            JobState::Completed
-        };
+        self.state = finished_state(&record);
         self.record = Some(record);
     }
+}
+
+fn finished_state(record: &Record) -> JobState {
+    let has = |outcome| record.entries.iter().any(|entry| entry.outcome == outcome);
+    for (outcome, state) in [
+        (Outcome::SafetyIncident, JobState::Critical),
+        (Outcome::OutcomeUnknown, JobState::Unknown),
+        (Outcome::Cancelled, JobState::Cancelled),
+    ] {
+        if has(outcome) {
+            return state;
+        }
+    }
+    if has(Outcome::CopiedSourceRetained) {
+        return JobState::Partial;
+    }
+    let completed = has(Outcome::Completed);
+    if has(Outcome::Failed) || has(Outcome::Changed) {
+        return if completed {
+            JobState::Partial
+        } else {
+            JobState::Failed
+        };
+    }
+    if has(Outcome::Skipped) || record.entries.is_empty() {
+        return if completed {
+            JobState::Partial
+        } else {
+            JobState::Skipped
+        };
+    }
+    JobState::Completed
 }
 
 pub struct PendingConflict {
@@ -118,7 +148,7 @@ impl State {
     pub fn unresolved(&self) -> bool {
         self.history
             .iter()
-            .any(|job| job.state == JobState::Unknown)
+            .any(|job| matches!(job.state, JobState::Unknown | JobState::Critical))
     }
     pub fn notify(&mut self, text: String, now: SystemTime, warning: bool) {
         self.notices

@@ -54,6 +54,11 @@ fn reconcile(controller: &mut Controller, queue: &mut Queue, id: u64) -> std::io
         .iter_mut()
         .find(|job| job.id == id)
         .ok_or_else(|| std::io::Error::other("Unknown job"))?;
+    if !job.can_reconcile() {
+        return Err(std::io::Error::other(
+            "No reconcilable unknown outcome with retained evidence",
+        ));
+    }
     let record = job
         .record
         .as_ref()
@@ -74,8 +79,8 @@ fn retry(controller: &mut Controller, queue: &mut Queue, id: u64) -> std::io::Re
         .operations
         .history
         .iter()
-        .find(|job| job.id == id)
-        .ok_or_else(|| std::io::Error::other("Unknown job"))?;
+        .find(|job| job.id == id && job.can_retry())
+        .ok_or_else(|| std::io::Error::other("No authorised incomplete attempt to retry"))?;
     let record = job.record.as_ref().ok_or_else(|| {
         std::io::Error::other("Job still active; wait for acknowledgement before retry")
     })?;

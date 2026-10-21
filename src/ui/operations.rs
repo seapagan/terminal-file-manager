@@ -79,12 +79,22 @@ fn buttons(app: &App) -> Vec<(&'static str, KeyCode)> {
                 ("F2 SHA-256", KeyCode::F(2)),
             ],
         },
-        None if app.operations.show_history => vec![
-            ("X Reconcile", KeyCode::Char('x')),
-            ("R Retry incomplete", KeyCode::Char('r')),
-            ("C Cancel job", KeyCode::Char('c')),
-            ("Esc Close", KeyCode::Esc),
-        ],
+        None if app.operations.show_history => {
+            let mut buttons = Vec::new();
+            if let Some(job) = app.operations.history.get(app.operations.cursor) {
+                if job.can_reconcile() {
+                    buttons.push(("X Reconcile", KeyCode::Char('x')));
+                }
+                if job.can_retry() {
+                    buttons.push(("R Retry incomplete", KeyCode::Char('r')));
+                }
+                if job.active() {
+                    buttons.push(("C Cancel job", KeyCode::Char('c')));
+                }
+            }
+            buttons.push(("Esc Close", KeyCode::Esc));
+            buttons
+        }
         None if !app.operations.conflicts.is_empty() => vec![
             ("S Skip", KeyCode::Char('s')),
             ("R Replace", KeyCode::Char('r')),
