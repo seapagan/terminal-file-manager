@@ -39,7 +39,7 @@ fn mkdir_runs_from_the_real_dialog_and_restores_the_terminal() {
         command(root.path(), root.path(), None),
         &[
             ("sentinel", "\x1b[18~"),
-            ("Local operation", "created-directory\r"),
+            ("Create directory", "created-directory\r"),
             ("1 directory created", "q"),
         ],
         true,
@@ -92,7 +92,7 @@ fn permanent_delete_requires_separate_confirmation_and_enter_cancels() {
     fs::write(root.path().join("selected"), "owned").unwrap();
     drive(
         command(root.path(), root.path(), None),
-        &[("selected", "\x1bd"), ("Preview: 1 files", "\rq")],
+        &[("selected", "\x1bd"), ("Preview: 1 file", "\rq")],
         false,
     );
     assert_eq!(fs::read(root.path().join("selected")).unwrap(), b"owned");
@@ -100,7 +100,7 @@ fn permanent_delete_requires_separate_confirmation_and_enter_cancels() {
         command(root.path(), root.path(), None),
         &[
             ("selected", "\x1bd"),
-            ("Preview: 1 files", "D"),
+            ("Preview: 1 file", "D"),
             ("1 file permanently deleted", "q"),
         ],
         false,

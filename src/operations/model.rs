@@ -14,6 +14,7 @@ pub enum Intent {
 pub enum Dialog {
     Operation(Box<OperationDialog>),
     Exit { save: bool },
+    IncidentExit { save: bool, typed: String },
 }
 
 pub struct OperationDialog {
@@ -30,6 +31,7 @@ pub struct OperationDialog {
     pub preview_id: Option<u64>,
     pub track_scope: bool,
     pub retry_of: Option<u64>,
+    pub error: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -120,10 +122,17 @@ pub struct PendingConflict {
     pub choice: usize,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NoticeSeverity {
+    Success,
+    Warning,
+    Error,
+}
+
 pub struct Notice {
     pub text: String,
     pub expires: SystemTime,
-    pub warning: bool,
+    pub severity: NoticeSeverity,
 }
 
 /// Session-only operation state. Toast expiry never removes the job's result evidence.
@@ -139,6 +148,7 @@ pub struct State {
     pub waiting_exit: Option<bool>,
     pub notices: VecDeque<Notice>,
     pub exit_snapshot: Option<crate::session::NavigationSession>,
+    pub last_error: Option<String>,
 }
 
 impl State {
@@ -150,15 +160,38 @@ impl State {
             .iter()
             .any(|job| matches!(job.state, JobState::Unknown | JobState::Critical))
     }
-    pub fn notify(&mut self, text: String, now: SystemTime, warning: bool) {
+    /// Irreversible native incidents retain their records until actual exit.
+    pub fn incidents(&self) -> bool {
+        self.history
+            .iter()
+            .any(|job| job.record.as_ref().is_some_and(Record::incident))
+    }
+    /// Ordinary uncertainty never receives the incident acknowledgement bypass.
+    pub fn unknown(&self) -> bool {
+        self.history
+            .iter()
+            .filter_map(|job| job.record.as_ref())
+            .any(|record| {
+                record
+                    .entries
+                    .iter()
+                    .any(|entry| entry.outcome == Outcome::OutcomeUnknown)
+            })
+    }
+    /// A rejected request has no worker job; preserve its evidence in the existing Jobs view.
+    pub fn fail(&mut self, detail: String, now: SystemTime) {
+        self.last_error = Some(detail);
+        self.notify("Operation not started".into(), now, NoticeSeverity::Error);
+    }
+    pub fn notify(&mut self, text: String, now: SystemTime, severity: NoticeSeverity) {
         self.notices
             .retain(|notice| notice.text != text && notice.expires > now);
         self.notices.push_back(Notice {
             text,
             expires: now + std::time::Duration::from_secs(5),
-            warning,
+            severity,
         });
-        while self.notices.len() > 3 {
+        while self.notices.len() > 2 {
             self.notices.pop_front();
         }
     }
@@ -166,7 +199,15 @@ impl State {
 
 pub(crate) fn summary(job: &Job) -> String {
     let Some(record) = &job.record else {
-        return format!("Job {} {:?}: {:?}", job.id, job.plan.operation, job.state);
+        return format!(
+            "Job {}: {}",
+            job.id,
+            if job.state == JobState::Queued {
+                "queued"
+            } else {
+                "running"
+            }
+        );
     };
     if record
         .entries
@@ -179,26 +220,25 @@ pub(crate) fn summary(job: &Job) -> String {
         );
     }
     let completed = completed(job, record);
-    let counts = |outcome| {
-        record
+    let mut summary = format!("Job {}: {completed}", job.id);
+    for (outcome, label) in [
+        (Outcome::Skipped, "skipped"),
+        (Outcome::Failed, "failed"),
+        (Outcome::Changed, "changed"),
+        (Outcome::Cancelled, "cancelled"),
+        (Outcome::CopiedSourceRetained, "source retained"),
+        (Outcome::OutcomeUnknown, "unknown"),
+    ] {
+        let count = record
             .entries
             .iter()
             .filter(|entry| entry.outcome == outcome)
-            .count()
-    };
-    let failed = record
-        .entries
-        .iter()
-        .filter(|entry| matches!(entry.outcome, Outcome::Failed | Outcome::Changed))
-        .count();
-    format!(
-        "Job {}: {completed}; {} skipped, {failed} failed, {} cancelled, {} source retained, {} unknown",
-        job.id,
-        counts(Outcome::Skipped),
-        counts(Outcome::Cancelled),
-        counts(Outcome::CopiedSourceRetained),
-        counts(Outcome::OutcomeUnknown) + counts(Outcome::SafetyIncident)
-    )
+            .count();
+        if count > 0 {
+            summary.push_str(&format!("; {count} {label}"));
+        }
+    }
+    summary
 }
 
 fn completed(job: &Job, record: &Record) -> String {

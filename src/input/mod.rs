@@ -7,6 +7,7 @@ mod divider;
 mod help;
 mod metadata;
 mod operation_dialog;
+mod operation_exit;
 mod operation_jobs;
 mod operations;
 mod profiles;

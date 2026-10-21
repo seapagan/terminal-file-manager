@@ -191,6 +191,83 @@ Preserve the three-layer mutation contract in [architecture](architecture.md).
 The existing Theme/Role boundary supplies all operation styles. Selectable
 palettes, OSC 11/background detection and theme configuration remain later work.
 
+### M2 remediation working checkpoint, 21 October 2026
+
+Signed checkpoint `0807ae2` separates skipped, failed and critical jobs and guards
+contextual retry/reconciliation/cancellation. Its unchanged clean-tree
+`RUSTUP_TOOLCHAIN=1.95.0 cargo make verify` passed, including mandatory Linux xwin.
+The following incident-exit, operation-UX and assurance changes remain local;
+their final clean gate, hosted native execution and combined coverage are pending.
+
+Local controller tests cover deliberate incident acknowledgement after worker
+drain, accidental keys/paste, ordinary unknown outcomes, retained diagnostics,
+Q versus q, and replacement of an earlier exit intent. The existing terminal
+child fixture exercises acknowledgement and cleanup without provoking OS data
+loss. TestBackend/input cases cover content sizing, narrow/tiny terminals,
+resize, four colour capabilities, sanitized Unicode paths, mouse hit regions,
+contextual controls, error evidence and notice expiry. The local suite passed
+396 tests with two owned child-entry skips before an additional RED regression
+confirmed that Jobs opened the first conflict instead of the selected job's
+conflict. The maintainer approved the routing repair; the selected job now opens
+its own conflict without submitting either pending decision. Final verification
+of this checkpoint remains pending.
+
+Assurance additions exercise the real browser/Queue retry and reconciliation
+bridge, frozen-source replacement refusal, destructive retry previews,
+newer-only replacement, recursive move cleanup, cancellation after commit and
+owned-stage failure/quarantine. Cross-compilation supplies no foreign-native
+runtime proof.
+
+### Coverage investigation baseline, 21 October 2026
+
+Downloaded native LLVM JSON/LCOV and combined artifacts from
+[`976cd2b` Rust CI](https://github.com/seapagan/terminal-file-manager/actions/runs/39484254984)
+and comparable
+[`main` at `10a2682` Rust CI](https://github.com/seapagan/terminal-file-manager/actions/runs/39133765767).
+The published source records give:
+
+| Measurement | `main` | M2 baseline |
+| --- | ---: | ---: |
+| Combined lines | 5,045/5,202 (96.981930%) | 8,803/9,655 (91.175557%) |
+| Combined functions | 529/552 (95.833333%) | 915/1,033 (88.576960%) |
+| Production-only line projection | 4,538/4,692 (96.717818%) | 8,010/8,853 (90.477804%) |
+| Existing production modules | 4,538/4,692 (96.717818%) | 4,588/4,741 (96.772833%) |
+| New M2 production modules | Not applicable | 3,422/4,112 (83.219844%) |
+
+The production projection omits explicit inline test modules for analysis only;
+collection, uploads and exclusions remain unchanged. The published line delta
+is **−5.806373 percentage points**, matching Codacy's −5.806 result against its
+−1.0 target. Codacy's **84.72% diff coverage** uses 3,864/4,561 changed coverable
+lines. The denominators explain the different percentages; the regression comes
+from added M2 runtime code, while coverage of existing modules remains stable.
+Native LLVM summaries include overlapping function views; the combined LCOV
+uses unique source lines and source-function locations. Neither supplies branch
+coverage.
+
+Baseline production-path triage uses each platform's native report. Values below
+are covered/found lines; cfg-only modules are absent on other hosts.
+
+| Module/path group | Linux | macOS | Windows | Assurance priority |
+| --- | ---: | ---: | ---: | --- |
+| Browser operation bridge | 28/100 | 28/100 | 28/100 | Retry linkage, frozen identities and retained-claim reconciliation |
+| Operation input/dialog/jobs | 525/707 | 510/707 | 520/707 | Confirmation, disabled conflicts, cancellation and exit routing |
+| Execute/transfer | 454/486 | 454/486 | 449/486 | Newer replacement, completed-directory removal and post-commit cancellation |
+| Queue/recovery | 437/515 | 438/515 | 440/515 | Same-job reconciliation, ownership and source retention |
+| Staging | 136/153 | 136/153 | 148/183 | No-clobber failure, quarantine and native link branches |
+| Linux Trash | 191/228 | cfg | cfg | Safe refusal and owned metadata cleanup |
+| macOS Trash | cfg | 58/65 | cfg | Native failure and optional receipt evidence |
+| Windows Trash/metadata | cfg | cfg | 121/149 | Native error and retained-source paths |
+| Windows COM sink | cfg | cfg | 27/125 | Identity refusal; most unhit methods are required no-op callbacks |
+| Operations UI | 275/303 | 275/303 | 275/303 | New modal/action/expiry/error branches require fresh evidence |
+
+Required COM interface callbacks, cfg-gated platform code and inline-test
+artifacts are separate from missing safety tests. Calling no-op callbacks merely
+to raise coverage would add little assurance. Meaningful remediation tests target
+the integration and mutation boundaries above. Final native reports and Codacy
+variation must be compared with this baseline; no waiver or threshold change
+follows from the investigation. Preserve the established Lizard 1.23 parser
+anomalies rather than changing valid source to fit the scanner.
+
 ## M0-B: local foundation
 
 - Exact package/bin/licence metadata and lockfile; help/version/error CLI smoke

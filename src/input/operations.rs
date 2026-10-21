@@ -27,7 +27,11 @@ pub(super) fn action(controller: &mut Controller, action: Action, geometry: &Geo
         _ => return false,
     };
     if let Err(error) = open(controller, action, operation, geometry) {
-        controller.app.status = error.to_string();
+        controller
+            .app
+            .operations
+            .fail(error.to_string(), controller.app.now);
+        controller.app.status = "Operation not started — F9 details".into();
     }
     true
 }
@@ -62,6 +66,7 @@ fn open(
 }
 
 fn open_dialog(controller: &mut Controller, plan: Plan, native_target: std::path::PathBuf) {
+    controller.app.operations.scroll = 0;
     let pane = controller.app.active;
     let base = controller.app.panes[pane].path.clone();
     let text = initial_text(&plan, &native_target);
@@ -89,6 +94,7 @@ fn open_dialog(controller: &mut Controller, plan: Plan, native_target: std::path
         preview_id: None,
         track_scope: true,
         retry_of: None,
+        error: None,
     })));
 }
 
@@ -216,16 +222,21 @@ fn scroll(controller: &mut Controller, event: &Event, geometry: &Geometry) -> bo
     }
     let limit = usize::from(geometry.operation_scroll_limit);
     state.scroll = state.scroll.min(limit);
-    if let Event::Key(key) = event {
-        let delta = match key.code {
+    let delta = match event {
+        Event::Key(key) => match key.code {
             KeyCode::PageUp => -8,
             KeyCode::PageDown => 8,
             _ => return false,
-        };
-        state.scroll = state.scroll.saturating_add_signed(delta).min(limit);
-        return true;
-    }
-    false
+        },
+        Event::Mouse(mouse) => match mouse.kind {
+            MouseEventKind::ScrollUp => -3,
+            MouseEventKind::ScrollDown => 3,
+            _ => return false,
+        },
+        _ => return false,
+    };
+    state.scroll = state.scroll.saturating_add_signed(delta).min(limit);
+    true
 }
 
 fn interrupt(event: &Event) -> bool {
@@ -253,44 +264,45 @@ fn modal_click(controller: &mut Controller, event: &Event, geometry: &Geometry) 
             .iter()
             .find(|control| control.area.contains((mouse.column, mouse.row).into()))
         {
-            return handle(
-                controller,
-                &Event::Key(crossterm::event::KeyEvent::new(
-                    control.key,
-                    KeyModifiers::NONE,
-                )),
-                geometry,
-            );
+            return activate_control(controller, control.target, geometry);
         }
         return true;
     }
     false
 }
 
-pub(super) fn exit(controller: &mut Controller, save: bool) {
-    controller.app.operations.exit_snapshot =
-        save.then(|| crate::session::NavigationSession::capture(&controller.app));
-    if controller.app.operations.active() || controller.app.operations.unresolved() {
-        controller.app.operations.dialog = Some(Dialog::Exit { save });
-    } else {
-        controller.save_session = save;
-        controller.quit = true;
+pub(super) fn activate_control(
+    controller: &mut Controller,
+    target: crate::ui::OperationTarget,
+    geometry: &Geometry,
+) -> bool {
+    match target {
+        crate::ui::OperationTarget::Key(key) => handle(
+            controller,
+            &Event::Key(crossterm::event::KeyEvent::new(key, KeyModifiers::NONE)),
+            geometry,
+        ),
+        crate::ui::OperationTarget::Job(index) => {
+            let state = &mut controller.app.operations;
+            if state.dialog.is_none() && state.show_history && index < state.history.len() {
+                state.cursor = index;
+                state.scroll = 0;
+            }
+            true
+        }
+        crate::ui::OperationTarget::Field(index) => {
+            if let Some(Dialog::Operation(dialog)) = &mut controller.app.operations.dialog {
+                dialog.field = index.min(1);
+            }
+            true
+        }
     }
 }
 
+pub(super) fn exit(controller: &mut Controller, save: bool) {
+    super::operation_exit::request(controller, save);
+}
+
 pub(crate) fn check_exit(controller: &mut Controller) {
-    let Some(save) = controller.app.operations.waiting_exit else {
-        return;
-    };
-    if controller.app.operations.active() {
-        return;
-    }
-    controller.app.operations.waiting_exit = None;
-    if controller.app.operations.unresolved() {
-        controller.app.operations.exit_snapshot = None;
-        controller.app.status = "Outcome unknown; exit blocked pending reconciliation".into();
-    } else {
-        controller.save_session = save;
-        controller.quit = true;
-    }
+    super::operation_exit::check(controller);
 }

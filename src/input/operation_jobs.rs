@@ -41,6 +41,7 @@ impl Controller {
                 {
                     dialog.plan = *plan;
                     dialog.ready = true;
+                    dialog.error = None;
                     self.app.status = "Preview ready; review exact counts before confirming".into();
                 }
             }
@@ -94,10 +95,12 @@ impl Controller {
             && dialog.preview_id == Some(id)
         {
             dialog.ready = false;
-            self.app.status = record
+            let detail = record
                 .entries
                 .first()
                 .map_or_else(|| "Preview cancelled".into(), |entry| entry.detail.clone());
+            dialog.error = Some(detail);
+            self.app.status = "Preview unavailable; confirmation disabled".into();
             return Vec::new();
         }
         self.app
@@ -113,10 +116,19 @@ impl Controller {
         {
             job.finish(record, self.app.now);
             self.app.status = crate::operations::summary(job);
-            let warning = job.state != JobState::Completed;
-            self.app
-                .operations
-                .notify(self.app.status.clone(), self.app.now, warning);
+            let severity = match job.state {
+                JobState::Completed => crate::operations::NoticeSeverity::Success,
+                JobState::Failed | JobState::Unknown | JobState::Critical => {
+                    crate::operations::NoticeSeverity::Error
+                }
+                _ => crate::operations::NoticeSeverity::Warning,
+            };
+            let incident = job.state == JobState::Critical;
+            if !incident {
+                self.app
+                    .operations
+                    .notify(self.app.status.clone(), self.app.now, severity);
+            }
             super::operations::check_exit(self);
             return refresh(self);
         }
@@ -149,14 +161,7 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
             .iter()
             .find(|control| control.area.contains((mouse.column, mouse.row).into()))
         {
-            return handle(
-                controller,
-                &Event::Key(crossterm::event::KeyEvent::new(
-                    control.key,
-                    crossterm::event::KeyModifiers::NONE,
-                )),
-                geometry,
-            );
+            return super::operations::activate_control(controller, control.target, geometry);
         }
         return true;
     }
@@ -215,9 +220,23 @@ fn history_key(controller: &mut Controller, key: KeyCode) {
                 state.outbox.push(Intent::Reconcile(job.id));
             }
         }
-        KeyCode::Enter => state.show_history = false,
+        KeyCode::Enter => open_conflict(state),
         _ => {}
     }
+}
+
+fn open_conflict(state: &mut crate::operations::State) {
+    if let Some(job) = state.history.get(state.cursor)
+        && let Some(index) = state
+            .conflicts
+            .iter()
+            .position(|conflict| conflict.id == job.id)
+        && let Some(conflict) = state.conflicts.remove(index)
+    {
+        state.conflicts.push_front(conflict);
+    }
+    state.show_history = false;
+    state.scroll = 0;
 }
 
 fn conflict_key(controller: &mut Controller, key: KeyCode) {

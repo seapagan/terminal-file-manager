@@ -5,6 +5,9 @@ use crate::{
 };
 use std::time::Duration;
 
+#[cfg(test)]
+mod tests;
+
 pub(super) fn collect(controller: &mut Controller, queue: &mut Queue, pool: &mut Pool) -> bool {
     let mut changed = false;
     for _ in 0..12 {
@@ -41,7 +44,11 @@ pub(super) fn submit(controller: &mut Controller, queue: &mut Queue) {
                 .map(|id| controller.register_operation(id, plan, options, Some(parent))),
         };
         if let Err(error) = result {
-            controller.app.status = error.to_string();
+            controller
+                .app
+                .operations
+                .fail(error.to_string(), controller.app.now);
+            controller.app.status = "Operation not started — F9 details".into();
         }
     }
 }
@@ -97,6 +104,7 @@ fn retry(controller: &mut Controller, queue: &mut Queue, id: u64) -> std::io::Re
             .unwrap_or(&plan.operands[0].path)
             .to_owned();
         controller.app.operations.show_history = false;
+        controller.app.operations.scroll = 0;
         controller.app.operations.dialog = Some(Dialog::Operation(Box::new(
             crate::operations::OperationDialog {
                 plan,
@@ -112,6 +120,7 @@ fn retry(controller: &mut Controller, queue: &mut Queue, id: u64) -> std::io::Re
                 preview_id: Some(preview_id),
                 track_scope: false,
                 retry_of: Some(id),
+                error: None,
             },
         )));
         return Ok(());

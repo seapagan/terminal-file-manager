@@ -97,7 +97,7 @@ fn two_explicit_locations_and_configured_dual_startup_run_in_a_real_terminal() {
 #[test]
 fn terminal_restores_after_returned_error_and_unwind() {
     let root = tempfile::tempdir().unwrap();
-    let mut modes = vec!["error", "panic"];
+    let mut modes = vec!["error", "panic", "incident"];
     if cfg!(windows) {
         modes.push("keys");
     }
@@ -132,16 +132,82 @@ fn terminal_child() {
             if mode == "panic" {
                 panic!("owned terminal unwind test");
             }
+            if mode == "incident" {
+                incident_exit_probe();
+                return Ok(());
+            }
             Err(std::io::Error::other("owned terminal error test"))
         })
     });
     if mode == "panic" {
         assert!(result.is_err());
+    } else if mode == "incident" {
+        assert!(result.unwrap().is_ok());
     } else {
         assert!(result.unwrap().is_err());
     }
     assert!(!crossterm::terminal::is_raw_mode_enabled().unwrap());
     println!("RESTORATION-CHECK-PASSED");
+}
+
+// A controlled worker record exercises exit/cleanup without provoking real data loss.
+fn incident_controller() -> (tempfile::TempDir, terminal_file_manager::input::Controller) {
+    use terminal_file_manager::{
+        app::App,
+        input::{Bindings, Controller},
+        operations::{Operation, Outcome, Plan, Update},
+    };
+    let root = tempfile::tempdir().unwrap();
+    let plan = Plan::mkdir(root.path().join("owned-directory"));
+    let mut record = terminal_file_manager::operations::execute(
+        &plan,
+        Default::default(),
+        &false.into(),
+        |_| terminal_file_manager::operations::Decision::Skip,
+    );
+    record.entries[0].outcome = Outcome::SafetyIncident;
+    let mut plan = plan;
+    plan.operation = Operation::Trash;
+    let app = App::new(root.path().to_owned());
+    let mut controller = Controller::new(
+        app,
+        Bindings::new(&Default::default()).unwrap(),
+        Default::default(),
+    );
+    controller.register_operation(1, plan, Default::default(), None);
+    controller.complete_operation(Update::Finished { id: 1, record });
+    (root, controller)
+}
+
+fn incident_exit_probe() {
+    let (_root, mut controller) = incident_controller();
+    let geometry = terminal_file_manager::ui::geometry(
+        &controller.app,
+        ratatui::layout::Rect::new(0, 0, 100, 30),
+    );
+    controller.dispatch(terminal_file_manager::input::Action::Quit, &geometry);
+    for code in "ACKNOWLEDGE"
+        .chars()
+        .map(crossterm::event::KeyCode::Char)
+        .chain([crossterm::event::KeyCode::F(10)])
+    {
+        controller.handle(
+            crossterm::event::Event::Key(crossterm::event::KeyEvent::new(
+                code,
+                crossterm::event::KeyModifiers::NONE,
+            )),
+            &geometry,
+            std::time::Duration::ZERO,
+        );
+    }
+    assert!(controller.quit);
+    assert!(
+        controller.app.operations.history[0]
+            .record
+            .as_ref()
+            .unwrap()
+            .incident()
+    );
 }
 
 // ConPTY requests Win32 input mode, not Kitty CSI-u. Keep the unsupported probes.

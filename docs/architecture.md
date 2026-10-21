@@ -85,11 +85,37 @@ The browser submits pure operation intents to a bounded coordinator, with at
 most two mutation threads. Progress is coalesced; conflicts and terminal records
 remain reliable. The terminal restores before queue teardown waits on writers.
 Destructive previews run on workers and need separate confirmation. Jobs retain
-partial outcomes and retry lineage; unknown outcomes quarantine claims and block
-retry/exit. Q freezes the navigation snapshot before waiting for acknowledgement.
+skipped, failed, partial, cancelled, unknown and critical outcomes separately.
+An all-skipped or empty result does not count as completed work. Retry and
+reconciliation controls share guards with the browser bridge and queue;
+reconciliation requires an unknown entry with retained ownership evidence.
+Unknown outcomes quarantine claims and block retry/exit. Q freezes the navigation
+snapshot before waiting for acknowledgement; a new exit request abandons the
+earlier waiting intent.
 Reconciliation runs under the original quarantined claims. It checks retained
 identities and cleans only proven owned staging; missing evidence keeps the job
-unknown. It never repeats source removal. Native acceptance remains outstanding.
+unknown. It never repeats source removal.
+
+An observed native permanent deletion during Trash remains a critical incident,
+with its record and claims intact. After all mutation workers acknowledge
+completion or cancellation, a separate exit dialog accepts manually typed
+`ACKNOWLEDGE` followed by F10. Enter/Esc stay in the manager; paste and key
+release/repeat events cannot confirm. An ordinary unknown outcome blocks this
+path, including when it accompanies an incident. Acknowledgement does not
+reconcile an incident, retry a mutation or write a recovery file. Terminal
+restoration precedes navigation-session persistence. Job diagnostics remain
+session-local.
+
+Operation dialogs size to wrapped content within terminal bounds. The renderer
+and input controller share exact button, field and job-row rectangles. Jobs use
+a bounded selection viewport and a separate details scroll position; completed
+execution duration freezes at acknowledgement. Display sanitization preserves
+the model's native paths. The existing Notice queue holds at most two five-second
+success/warning/error notices without taking focus. Rendering uses the existing
+status row and semantic Theme roles; a non-expiring incident warning takes
+precedence. Jobs retain request failures and worker evidence after notices
+expire. These operation surfaces do not implement the later generic status
+framework.
 
 Future milestones preserve native local byte/UTF-16 path identities separately
 from display text. Remote POSIX paths remain exact bytes on every client OS;

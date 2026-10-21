@@ -8,7 +8,7 @@ mod listing;
 mod measure;
 mod metadata;
 mod operations;
-pub use operations::OperationControl;
+pub use operations::{OperationControl, OperationTarget};
 mod path_title;
 pub use metadata::MetadataControl;
 mod policy;

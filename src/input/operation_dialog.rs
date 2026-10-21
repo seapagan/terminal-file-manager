@@ -8,7 +8,10 @@ use std::{
 
 pub(super) fn handle(controller: &mut Controller, dialog: Dialog, event: &Event) -> Option<Dialog> {
     match dialog {
-        Dialog::Exit { save } => exit_key(controller, save, event),
+        Dialog::Exit { save } => super::operation_exit::choices(controller, save, event),
+        Dialog::IncidentExit { save, typed } => {
+            super::operation_exit::incident(controller, save, typed, event)
+        }
         Dialog::Operation(mut dialog) => {
             let keep = match event {
                 Event::Key(key) if key.kind == KeyEventKind::Press => {
@@ -22,43 +25,6 @@ pub(super) fn handle(controller: &mut Controller, dialog: Dialog, event: &Event)
             };
             keep.then_some(Dialog::Operation(dialog))
         }
-    }
-}
-
-fn exit_key(controller: &mut Controller, save: bool, event: &Event) -> Option<Dialog> {
-    let Event::Key(key) = event else {
-        return Some(Dialog::Exit { save });
-    };
-    if key.kind != KeyEventKind::Press {
-        return Some(Dialog::Exit { save });
-    }
-    match key.code {
-        KeyCode::Esc | KeyCode::Enter | KeyCode::Char('r' | 'R') => {
-            controller.app.operations.waiting_exit = None;
-            controller.app.operations.exit_snapshot = None;
-            None
-        }
-        KeyCode::Char('w' | 'W' | 'c' | 'C') => {
-            if matches!(key.code, KeyCode::Char('c' | 'C')) {
-                let ids: Vec<_> = controller
-                    .app
-                    .operations
-                    .history
-                    .iter()
-                    .filter(|job| job.active())
-                    .map(|job| job.id)
-                    .collect();
-                controller
-                    .app
-                    .operations
-                    .outbox
-                    .extend(ids.into_iter().map(Intent::Cancel));
-            }
-            controller.app.operations.waiting_exit = Some(save);
-            super::operations::check_exit(controller);
-            None
-        }
-        _ => Some(Dialog::Exit { save }),
     }
 }
 
@@ -157,7 +123,8 @@ fn submit(controller: &mut Controller, dialog: &mut OperationDialog) -> bool {
         }
         Ok(false) => true,
         Err(error) => {
-            controller.app.status = error.to_string();
+            dialog.error = Some(error.to_string());
+            controller.app.status = "Operation not started; review the dialog details".into();
             true
         }
     }
@@ -288,6 +255,7 @@ fn append(controller: &mut Controller, dialog: &mut OperationDialog, text: &str)
         controller.app.status = "Input too long; pasted input rejected".into();
         return;
     }
+    dialog.error = None;
     field(dialog).push_str(text);
     dialog.edited |= dialog.field == 0;
 }

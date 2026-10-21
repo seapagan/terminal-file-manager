@@ -261,6 +261,38 @@ mod tests {
     use super::*;
 
     #[test]
+    fn failed_no_clobber_commit_keeps_existing_data_and_cleans_only_its_owned_stage() {
+        let root = tempfile::tempdir().unwrap();
+        let destination = root.path().join("final");
+        fs::write(&destination, "existing").unwrap();
+        let mut stage = OwnedStage::create(&destination, None).unwrap();
+        fs::write(&stage.path, "incoming").unwrap();
+        stage.seal().unwrap();
+        assert!(stage.commit(&destination, false).is_err());
+        assert_eq!(fs::read(&stage.path).unwrap(), b"incoming");
+        assert_eq!(fs::read(&destination).unwrap(), b"existing");
+        let directory = stage.root.path.clone();
+        stage.cleanup().unwrap();
+        assert!(!directory.exists());
+        assert_eq!(fs::read(destination).unwrap(), b"existing");
+    }
+
+    #[test]
+    fn unknown_transfer_never_cleans_an_owned_stage_as_if_completion_were_known() {
+        let root = tempfile::tempdir().unwrap();
+        let destination = root.path().join("final");
+        let stage = OwnedStage::create(&destination, None).unwrap();
+        let payload = stage.path.clone();
+        let result = stage.finish(Err(safety::Failure {
+            outcome: Outcome::OutcomeUnknown,
+            detail: "controlled lost acknowledgement".into(),
+        }));
+        assert_eq!(result.unwrap_err().outcome, Outcome::OutcomeUnknown);
+        assert!(payload.exists());
+        assert!(!destination.exists());
+    }
+
+    #[test]
     fn preserving_an_older_mtime_keeps_the_owned_stage_valid() {
         let root = tempfile::tempdir().unwrap();
         let mut stage = OwnedStage::create(&root.path().join("final"), None).unwrap();

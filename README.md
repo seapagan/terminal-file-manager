@@ -106,9 +106,11 @@ F2 in a transfer dialog enables SHA-256 verification.
 
 Conflicts default to Skip. Choose Replace, Keep both or Newer, and use All to
 repeat a choice within that job and type pair. Directories merge. In Jobs,
+select a job with Up/Down or the mouse. Available controls depend on its state:
 `C` requests cancellation, `R` retries incomplete work from scratch, and `X`
-rechecks unknown outcomes without repeating source removal.
-Completed entries stay excluded from retries.
+rechecks an unknown outcome with retained evidence. Completed entries stay
+excluded from retries. PgUp/PgDown or the mouse wheel scroll details; results
+and error evidence remain in Jobs after success, warning and error notices expire.
 
 Trash can fail where the native facility cannot preserve the selected object.
 Linux uses home Trash or a validated Trash on the source volume; it never copies
@@ -116,6 +118,13 @@ and deletes across filesystems to emulate Trash. Permanent
 deletion requires its own confirmation and never serves as a fallback. On quit, choose Return, Wait, or
 Cancel safely; `tfm` waits for workers and cleanup. An unknown outcome blocks
 retry and safe exit until reconciliation.
+
+If the OS reports permanent deletion during a Trash request, TFM retains a
+critical incident in Jobs. This is irreversible; acknowledgement cannot restore
+the data. After all workers stop, quitting offers a separate acknowledgement:
+type `ACKNOWLEDGE`, then press F10. Enter or Esc keeps TFM open. Ordinary unknown
+outcomes cannot use this exit path. Job diagnostics exist only for the current
+session; `Q` saves navigation, not job history.
 
 Hidden entries are excluded by default. Use `h` or the View menu to change
 between **Hidden: Hide** and **Hidden: Show**. A small `h` beside an entry's type
