@@ -191,32 +191,44 @@ Preserve the three-layer mutation contract in [architecture](architecture.md).
 The existing Theme/Role boundary supplies all operation styles. Selectable
 palettes, OSC 11/background detection and theme configuration remain later work.
 
-### M2 remediation working checkpoint, 21 October 2026
+### M2 remediation source checkpoint, 21 October 2026
 
 Signed checkpoint `0807ae2` separates skipped, failed and critical jobs and guards
 contextual retry/reconciliation/cancellation. Its unchanged clean-tree
 `RUSTUP_TOOLCHAIN=1.95.0 cargo make verify` passed, including mandatory Linux xwin.
-The following incident-exit, operation-UX and assurance changes remain local;
-their final clean gate, hosted native execution and combined coverage are pending.
+Signed checkpoints `4983449` and `5417253` add incident exit, operation UX and
+behavioural assurance. Each passed an immediate unchanged clean-tree full gate
+after its signed commit, including mandatory Linux xwin check/Clippy/build.
 
-Local controller tests cover deliberate incident acknowledgement after worker
+Controller tests cover deliberate incident acknowledgement after worker
 drain, accidental keys/paste, ordinary unknown outcomes, retained diagnostics,
 Q versus q, and replacement of an earlier exit intent. The existing terminal
 child fixture exercises acknowledgement and cleanup without provoking OS data
 loss. TestBackend/input cases cover content sizing, narrow/tiny terminals,
 resize, four colour capabilities, sanitized Unicode paths, mouse hit regions,
-contextual controls, error evidence and notice expiry. The local suite passed
-396 tests with two owned child-entry skips before an additional RED regression
-confirmed that Jobs opened the first conflict instead of the selected job's
-conflict. The maintainer approved the routing repair; the selected job now opens
-its own conflict without submitting either pending decision. Final verification
-of this checkpoint remains pending.
+contextual controls, error evidence and notice expiry. Jobs opens the selected
+job's conflict without submitting either pending decision; its regression first
+reproduced the wrong-job routing. The source checkpoint's clean local suite
+passed 401 tests, with two owned child-entry skips.
 
 Assurance additions exercise the real browser/Queue retry and reconciliation
 bridge, frozen-source replacement refusal, destructive retry previews,
 newer-only replacement, recursive move cleanup, cancellation after commit and
-owned-stage failure/quarantine. Cross-compilation supplies no foreign-native
-runtime proof.
+owned-stage failure/quarantine. Input regressions also cover empty/NUL/traversal
+rename refusal, invalid attributes, bounded paste, outcome counts/severity and
+critical records that cannot become expiring completion notices.
+
+At `5417253`, [Rust CI](https://github.com/seapagan/terminal-file-manager/actions/runs/39650670119)
+passed **Linux 401 / macOS 389 / Windows 377**, exact MSRV, source quality and
+combined coverage. Each host reported two intentional child-entry skips;
+parent PTY/ConPTY tests execute those owned children and check terminal cleanup.
+Native Trash recovery fixtures passed on their respective hosts.
+[Policy](https://github.com/seapagan/terminal-file-manager/actions/runs/39650670086),
+[Source Package](https://github.com/seapagan/terminal-file-manager/actions/runs/39650669962),
+[GitHub Actions Security](https://github.com/seapagan/terminal-file-manager/actions/runs/39650669873)
+and [Advisory Quality](https://github.com/seapagan/terminal-file-manager/actions/runs/39650669959)
+also passed. Linux xwin supplies separate cross-build evidence. Infrastructure
+files did not change, so this assignment did not run `verify-infra`.
 
 ### Coverage investigation baseline, 21 October 2026
 
@@ -234,8 +246,10 @@ The published source records give:
 | Existing production modules | 4,538/4,692 (96.717818%) | 4,588/4,741 (96.772833%) |
 | New M2 production modules | Not applicable | 3,422/4,112 (83.219844%) |
 
-The production projection omits explicit inline test modules for analysis only;
-collection, uploads and exclusions remain unchanged. The published line delta
+The production projection omits explicit test-only modules for analysis only,
+following inline and external Rust module declarations transitively. It retains
+any module with a production route and test hooks outside those modules.
+Collection, uploads and exclusions remain unchanged. The published line delta
 is **−5.806373 percentage points**, matching Codacy's −5.806 result against its
 −1.0 target. Codacy's **84.72% diff coverage** uses 3,864/4,561 changed coverable
 lines. The denominators explain the different percentages; the regression comes
@@ -267,6 +281,62 @@ the integration and mutation boundaries above. Final native reports and Codacy
 variation must be compared with this baseline; no waiver or threshold change
 follows from the investigation. Preserve the established Lizard 1.23 parser
 anomalies rather than changing valid source to fit the scanner.
+
+### Remediation coverage and remaining disposition, 21 October 2026
+
+The three native JSON/LCOV pairs at `5417253` regenerate the uploaded combined
+LCOV byte for byte through the existing merger. No collection, exclusion,
+threshold or reporting changes accompany these results.
+
+| Measurement | M2 baseline `976cd2b` | Remediated source `5417253` |
+| --- | ---: | ---: |
+| Combined lines | 8,803/9,655 (91.175557%) | 9,618/10,339 (93.026405%) |
+| Combined functions | 915/1,033 (88.576960%) | 993/1,098 (90.437158%) |
+| Production-only lines | 8,010/8,853 (90.477804%) | 8,797/9,509 (92.512357%) |
+| Production-only functions | 851/967 (88.004137%) | 927/1,030 (90.000000%) |
+| Codacy diff lines | 3,864/4,561 (84.72%) | 4,679/5,245 (89.21%) |
+| Codacy variation versus main | −5.806373 pp | −3.955525 pp |
+
+Published line coverage improves 1.850848 percentage points; the like-for-like
+production projection improves 2.034553 points. Production uncovered lines fall
+from 843 to 712 despite 656 additional coverable lines. The four final input and
+result tests add 46 covered production lines without changing the denominator.
+Codacy's rounded −3.956-point variation agrees with the published comparison to
+main. Its **−1.0-point variation target remains unmet**. Diff coverage has no
+defined gate. Green Actions workflows do not constitute Codacy or M2 acceptance.
+
+Final production-path triage distinguishes native availability from coverage:
+
+| Module | Combined | Linux | macOS | Windows |
+| --- | ---: | ---: | ---: | ---: |
+| Browser operation bridge | 99/111 | 99/111 | 99/111 | 99/111 |
+| Operation dialog input | 161/197 | 156/197 | 146/197 | 149/197 |
+| Exit input | 91/95 | 91/95 | 91/95 | 91/95 |
+| Execute | 387/408 | 387/408 | 387/408 | 382/408 |
+| Queue | 349/381 | 347/381 | 349/381 | 348/381 |
+| Recovery | 119/134 | 119/134 | 119/134 | 119/134 |
+| Staging | 170/186 | 145/153 | 145/153 | 157/183 |
+| Operation UI, including submodules | 707/788 | 705/788 | 705/788 | 705/788 |
+
+Native Trash counts remain as in the baseline table. Of the Windows COM sink's
+98 unhit lines, 96 implement required no-op callbacks; two cover pre-delete
+identity refusal. Remaining safety gaps include exceptional native Trash
+submission/cleanup failures, lost stage ownership, transfer mismatch refusals,
+and successful Queue reconciliation with genuinely retained quarantined claims.
+The real bridge tests cover same-job submission and fail-closed missing claims;
+existing direct recovery tests cover restored owned cleanup. Destructive retry
+tests prove fresh preview and default cancellation, without exercising an
+affirmative retry submission. These are assurance limits, not demonstrated
+defects or permission to weaken guards. UI detail/error branches remain partly
+uncovered. Neither the native nor merged reports provide branch coverage.
+
+Strict Rust maintainability passes. Lizard 1.23 still merges adjacent valid Rust
+tests: existing `operation_controls.rs:145` reports 141 NLOC, and new
+`operation_incidents.rs:115` reports 113 although that function ends at line 140.
+The prior `permissions::file_type` 55/50 parser anomaly remains unchanged.
+No suppression, scanner change or authenticated issue dismissal occurred.
+The residual coverage variation and new parser finding require separate narrow
+maintainer dispositions. M2 acceptance remains pending.
 
 ## M0-B: local foundation
 
