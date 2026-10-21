@@ -220,9 +220,10 @@ critical records that cannot become expiring completion notices.
 
 At `5417253`, [Rust CI](https://github.com/seapagan/terminal-file-manager/actions/runs/39650670119)
 passed **Linux 401 / macOS 389 / Windows 377**, exact MSRV, source quality and
-combined coverage. Each host reported two intentional child-entry skips;
-parent PTY/ConPTY tests execute those owned children and check terminal cleanup.
-Native Trash recovery fixtures passed on their respective hosts.
+combined coverage. Each host reported two intentional child-entry skips: the
+terminal lifecycle child runs through its PTY/ConPTY parent, and the native
+Trash isolation child runs through its native parent. Those parent tests passed,
+including terminal cleanup and platform-specific owned Trash recovery.
 [Policy](https://github.com/seapagan/terminal-file-manager/actions/runs/39650670086),
 [Source Package](https://github.com/seapagan/terminal-file-manager/actions/runs/39650669962),
 [GitHub Actions Security](https://github.com/seapagan/terminal-file-manager/actions/runs/39650669873)
