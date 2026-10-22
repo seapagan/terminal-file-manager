@@ -339,6 +339,66 @@ No suppression, scanner change or authenticated issue dismissal occurred.
 The residual coverage variation and new parser finding require separate narrow
 maintainer dispositions. M2 acceptance remains pending.
 
+### M2 final safety-assurance source checkpoint, 22 October 2026
+
+This round adds five tests without changing production behavior, dependencies,
+QC gates, suppressions or coverage collection. The previous checkpoints and
+coverage figures above retain their original attribution.
+
+| Test location | Exercised safety guarantee | Platforms |
+| --- | --- | --- |
+| `src/operations/queue/tests.rs`, `queue_owned_reconciliation_releases_quarantine_only_after_owned_cleanup` | A Queue-issued move acquires real coordinator stage claims, retains unknown cleanup evidence after payload replacement, refuses conflicting work through an unsuccessful same-job reconciliation, then cleans the restored owned payload and releases the blocked job. Source bytes and foreign content survive; reconciliation never copies or removes the source again. | Portable filesystem fixture |
+| `src/browser/operations/tests.rs`, three destructive retry cases | F9/Retry opens a fresh recursive preview; early D submits nothing. A later D submits a distinct child attempt that removes only the unfinished file/tree, preserves a new occupant at the completed path, and reports exact completed counts and a success notice. Replaced roots fail preview; replaced descendants fail final execution. Enter cancels the failed-preview dialog. | Portable filesystem fixtures |
+| `tests/operation_assurance.rs`, `transfer_verification_failures_preserve_move_source_and_previous_destination` | Staged size/checksum mismatch and a changed opened source prevent verification, commit and move-source removal. The previous destination survives and owned staging disappears. | Portable filesystem fixtures |
+
+**A: successful queue-owned reconciliation is covered under controlled scheduler
+driving.** The test constructs Queue's channels and uses its public submission,
+update and reconciliation methods, production `pump`/`receive`, actual workers
+and the same Coordinator throughout. It pauses the acknowledged stage claim
+before replying to the worker. No unrelated recovery record or ownership claim
+is fabricated. This test does not run the background `schedule` loop, progress
+forwarding or shutdown; existing Queue integration tests exercise those paths
+without this fault. It therefore does not establish the entire background-loop
+recovery scenario end to end.
+
+**B: affirmative destructive retry submission is covered through the controller
+and real background Queue.** The initial partial deletion comes from direct
+execution with a synchronous cancellation callback and enters history as its
+actual record. Retry, fresh count, separate D approval, worker acknowledgement,
+job linkage and notices use the production controller/Queue path. The original
+partial attempt does not pass through the background Queue. Existing Delete and
+Trash retry tests retain safe default cancellation. This round deliberately
+submits permanent deletion only against disposable fixtures; it does not add an
+affirmative native Trash retry or infer native recycling proof from deletion.
+
+**C: bounded transfer failures are covered.** No new exceptional macOS Foundation
+or Windows Shell failure is induced: those native APIs lack a deterministic
+failure seam for a controlled post-submission/cleanup error, and provoking
+ambiguous recycling or OS permanent loss would exceed this round's safety
+boundary. Existing native recovery/refusal tests remain required. The test does
+not cover every source read/close error or crash durability; process-local
+identity checks retain the documented external-writer race limits.
+
+The completed working-tree native Linux suite passes **406 tests**, with the
+two existing child-entry skips. The sandbox run failed existing Trash fixtures;
+the identical elevated retry passed. Strict Rust maintainability passes. The
+precommit full gate and exact-MSRV task reach only Cargo's expected dirty-package
+boundary; interim `cargo package --locked --allow-dirty` and its list check pass.
+Audit, deny, workflow security, native paired coverage, ShellCheck and compulsory
+Linux xwin check/Clippy/build pass separately. Clean signed-tree full verification,
+foreign-native results and regenerated combined/production/diff coverage remain
+pending delivery below. No infrastructure changed; `verify-infra` is not run.
+
+Lizard 1.23.0 reports a new parser merge at
+`src/browser/operations/tests.rs:341`: `open_delete_retry` reports **128 NLOC**
+although its body ends at line 360; the scanner includes the three following
+separate tests. Strict Clippy accepts each function. The established
+`permissions::file_type` 55/50, `operation_controls.rs:145` 141/50 and
+`operation_incidents.rs:115` 113/50 findings remain. No cosmetic restructuring,
+suppression, detector change or issue dismissal follows. Maintainer disposition
+of each scanner finding, residual Codacy variation and final M2 acceptance
+remains pending; behavioral assurance does not waive coverage policy.
+
 ## M0-B: local foundation
 
 - Exact package/bin/licence metadata and lockfile; help/version/error CLI smoke

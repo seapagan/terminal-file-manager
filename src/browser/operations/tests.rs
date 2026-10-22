@@ -302,3 +302,167 @@ fn terminal_or_active_jobs_cannot_bypass_retry_and_reconciliation_guards() {
     );
     assert!(!root.path().join("target/source").exists());
 }
+
+fn partial_delete(controller: &mut Controller, queue: &mut Queue, root: &Path) {
+    let pending = root.join("pending");
+    fs::create_dir(&pending).unwrap();
+    fs::write(pending.join("child"), "unfinished bytes").unwrap();
+    let plan = Plan::paths(
+        Operation::Delete,
+        vec![root.join("source"), pending.clone()],
+        None,
+    )
+    .unwrap();
+    let plan = preview(queue, plan);
+    let cancel = std::sync::atomic::AtomicBool::new(false);
+    let record = crate::operations::execute(&plan, Options::default(), &cancel, |event| {
+        if let Event::Progress {
+            source,
+            stage: Stage::Removing,
+            ..
+        } = event
+            && source.starts_with(&pending)
+        {
+            cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+        Decision::Skip
+    });
+    assert_eq!(record.completed_files(), 1);
+    assert!(!root.join("source").exists());
+    assert_eq!(
+        fs::read(pending.join("child")).unwrap(),
+        b"unfinished bytes"
+    );
+    install(controller, plan, record);
+    assert!(controller.app.operations.history[0].can_retry());
+    fs::write(root.join("source"), "new occupant of completed path").unwrap();
+}
+
+fn open_delete_retry(controller: &mut Controller, queue: &mut Queue) -> u64 {
+    key(controller, KeyCode::F(9));
+    key(controller, KeyCode::Char('r'));
+    assert!(matches!(
+        controller.app.operations.outbox.as_slice(),
+        [Intent::Retry(100)]
+    ));
+    submit(controller, queue);
+    let Some(Dialog::Operation(dialog)) = &controller.app.operations.dialog else {
+        panic!("retry must open a separate confirmation");
+    };
+    assert!(!dialog.ready);
+    assert!(dialog.plan.preview.is_none());
+    assert_eq!(dialog.retry_of, Some(100));
+    let id = dialog.preview_id.unwrap();
+    key(controller, KeyCode::Char('D'));
+    assert!(controller.app.operations.outbox.is_empty());
+    assert_eq!(acknowledge(controller, queue, Decision::Skip), id);
+    id
+}
+
+#[test]
+fn affirmative_delete_retry_counts_then_removes_only_unfinished_operands() {
+    let (root, mut controller, mut queue, _) = fixture();
+    partial_delete(&mut controller, &mut queue, root.path());
+    let preview_id = open_delete_retry(&mut controller, &mut queue);
+    let Some(Dialog::Operation(dialog)) = &controller.app.operations.dialog else {
+        panic!("preview must await deliberate approval");
+    };
+    assert!(dialog.ready);
+    let counts = dialog.plan.preview.as_ref().unwrap();
+    assert_eq!((counts.files, counts.directories, counts.bytes), (1, 1, 16));
+    assert_eq!(controller.app.operations.history.len(), 1);
+    assert_eq!(
+        fs::read(root.path().join("pending/child")).unwrap(),
+        b"unfinished bytes"
+    );
+    key(&mut controller, KeyCode::Char('D'));
+    assert!(matches!(
+        controller.app.operations.outbox.as_slice(),
+        [Intent::SubmitRetry(_, _, 100)]
+    ));
+    submit(&mut controller, &mut queue);
+    let child_id = acknowledge(&mut controller, &mut queue, Decision::Skip);
+    assert_ne!(child_id, preview_id);
+    let child = controller.app.operations.history.last().unwrap();
+    assert_eq!(child.retry_of, Some(100));
+    assert_eq!(child.state, JobState::Completed);
+    let record = child.record.as_ref().unwrap();
+    assert_eq!(
+        (record.completed_files(), record.completed_directories()),
+        (1, 1)
+    );
+    assert!(
+        record
+            .entries
+            .iter()
+            .all(|entry| entry.source.starts_with(root.path().join("pending")))
+    );
+    assert!(!root.path().join("pending").exists());
+    assert_eq!(
+        fs::read(root.path().join("source")).unwrap(),
+        b"new occupant of completed path"
+    );
+    let notice = controller.app.operations.notices.back().unwrap();
+    assert_eq!(notice.severity, crate::operations::NoticeSeverity::Success);
+    assert_eq!(
+        notice.text,
+        format!("Job {child_id}: 1 file permanently deleted, 1 directory permanently deleted")
+    );
+}
+
+#[test]
+fn approved_delete_retry_refuses_a_descendant_replaced_after_its_fresh_preview() {
+    let (root, mut controller, mut queue, _) = fixture();
+    partial_delete(&mut controller, &mut queue, root.path());
+    open_delete_retry(&mut controller, &mut queue);
+    let child = root.path().join("pending/child");
+    fs::rename(&child, root.path().join("held-original")).unwrap();
+    fs::write(&child, "foreign replacement").unwrap();
+    key(&mut controller, KeyCode::Char('D'));
+    submit(&mut controller, &mut queue);
+    acknowledge(&mut controller, &mut queue, Decision::Skip);
+    let job = controller.app.operations.history.last().unwrap();
+    assert_eq!(job.retry_of, Some(100));
+    assert_eq!(job.state, JobState::Failed);
+    let record = job.record.as_ref().unwrap();
+    assert_eq!(record.completed_files(), 0);
+    assert_eq!(record.entries[0].outcome, Outcome::Changed);
+    assert_eq!(fs::read(child).unwrap(), b"foreign replacement");
+    assert_eq!(
+        fs::read(root.path().join("held-original")).unwrap(),
+        b"unfinished bytes"
+    );
+    assert_eq!(
+        fs::read(root.path().join("source")).unwrap(),
+        b"new occupant of completed path"
+    );
+}
+
+#[test]
+fn delete_retry_cannot_preview_or_authorize_a_replaced_original_root() {
+    let (root, mut controller, mut queue, _) = fixture();
+    partial_delete(&mut controller, &mut queue, root.path());
+    fs::rename(root.path().join("pending"), root.path().join("held-root")).unwrap();
+    fs::create_dir(root.path().join("pending")).unwrap();
+    fs::write(root.path().join("pending/foreign"), "preserve").unwrap();
+    open_delete_retry(&mut controller, &mut queue);
+    let Some(Dialog::Operation(dialog)) = &controller.app.operations.dialog else {
+        panic!("failed preview retains its disabled confirmation");
+    };
+    assert!(!dialog.ready);
+    assert!(dialog.error.is_some());
+    key(&mut controller, KeyCode::Char('D'));
+    submit(&mut controller, &mut queue);
+    assert_eq!(controller.app.operations.history.len(), 1);
+    key(&mut controller, KeyCode::Enter);
+    submit(&mut controller, &mut queue);
+    assert!(controller.app.operations.dialog.is_none());
+    assert_eq!(
+        fs::read(root.path().join("pending/foreign")).unwrap(),
+        b"preserve"
+    );
+    assert_eq!(
+        fs::read(root.path().join("held-root/child")).unwrap(),
+        b"unfinished bytes"
+    );
+}

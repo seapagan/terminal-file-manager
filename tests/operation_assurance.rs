@@ -110,3 +110,68 @@ fn cancellation_after_commit_keeps_the_verified_destination_and_move_source() {
     assert_eq!(fs::read(source).unwrap(), b"verified");
     assert_eq!(fs::read(target.join("source")).unwrap(), b"verified");
 }
+
+#[test]
+fn transfer_verification_failures_preserve_move_source_and_previous_destination() {
+    for (fault, expected_detail, source_bytes) in [
+        ("size", "Staged destination size mismatch", "original"),
+        ("checksum", "SHA-256 verification failed", "original"),
+        ("source", "Source", "changed source"),
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source");
+        let target = root.path().join("target");
+        fs::create_dir(&target).unwrap();
+        fs::write(&source, "original").unwrap();
+        fs::write(target.join("source"), "previous").unwrap();
+        let plan =
+            Plan::paths(Operation::Move, vec![source.clone()], Some(target.clone())).unwrap();
+        let mut payload = None;
+        let mut finalized = false;
+        let record = execute(&plan, Options { checksum: true }, &false.into(), |event| {
+            match event {
+                Event::OwnedStage { payload: entry, .. } => payload = Some(entry.path),
+                Event::Progress {
+                    stage: Stage::Reading,
+                    ..
+                } => {
+                    corrupt_transfer(fault, payload.as_ref().unwrap(), &source);
+                }
+                Event::Progress {
+                    stage: Stage::Verified | Stage::Committed | Stage::Removing,
+                    ..
+                } => finalized = true,
+                _ => {}
+            }
+            Decision::Replace
+        });
+        assert!(!finalized, "{fault}: {record:?}");
+        assert_eq!(record.completed_files(), 0);
+        let entry = &record.entries[0];
+        assert_eq!(entry.outcome, Outcome::Changed, "{fault}: {record:?}");
+        assert!(
+            entry.detail.contains(expected_detail),
+            "{fault}: {record:?}"
+        );
+        assert!(!entry.checksum_verified);
+        assert!(entry.recovery.is_none());
+        assert_eq!(fs::read(&source).unwrap(), source_bytes.as_bytes());
+        assert_eq!(fs::read(target.join("source")).unwrap(), b"previous");
+        assert_eq!(fs::read_dir(&target).unwrap().count(), 1);
+        assert!(!payload.unwrap().parent().unwrap().exists());
+    }
+}
+
+fn corrupt_transfer(fault: &str, payload: &std::path::Path, source: &std::path::Path) {
+    match fault {
+        "size" => fs::OpenOptions::new()
+            .write(true)
+            .open(payload)
+            .unwrap()
+            .set_len(0)
+            .unwrap(),
+        "checksum" => fs::write(payload, "tampered").unwrap(),
+        "source" => fs::write(source, "changed source").unwrap(),
+        _ => unreachable!(),
+    }
+}
