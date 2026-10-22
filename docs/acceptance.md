@@ -413,6 +413,76 @@ expected failure/cleanup assertions remain intact. Pre-seal failure combined
 with APFS birth-time adjustment remains a recovery limitation; this round does
 not broaden identity adoption or change production recovery semantics.
 
+#### Corrected native and coverage proof, 22 October 2026
+
+Signed source checkpoint `3280286c5f830ff8c51dc8916b43559c9659687c` passed
+[Rust CI](https://github.com/seapagan/terminal-file-manager/actions/runs/39826650209),
+including native **Linux 406 / macOS 394 / Windows 382**, exact declared
+**Rust 1.95.0**, source quality and combined coverage. All five added tests ran
+on each host, including the corrected APFS cases. Each host retained two
+intentional ignored entry points: `terminal_child`, exercised by the PTY/ConPTY
+lifecycle parent, and `trash_child`, exercised by the native Trash isolation
+parent. Those parents passed; the native logs contain no NOT RUN fallback.
+[Policy](https://github.com/seapagan/terminal-file-manager/actions/runs/39826650186),
+[Source Package](https://github.com/seapagan/terminal-file-manager/actions/runs/39826650227),
+[GitHub Actions Security](https://github.com/seapagan/terminal-file-manager/actions/runs/39826650239)
+and [Advisory Quality](https://github.com/seapagan/terminal-file-manager/actions/runs/39826650333)
+passed. The earlier `d575636` run failed its two macOS cases and skipped combined
+coverage; these corrected results supersede that incomplete assurance run.
+
+Immediate unchanged clean-tree
+`RUSTUP_TOOLCHAIN=1.95.0 cargo make verify` passed at both signed checkpoints:
+`d575636` in 35.16 seconds and `3280286` in 37.95 seconds. The latter includes
+406 native Linux tests, exact MSRV, clean package checks, audits, source/workflow
+security, paired coverage, ShellCheck and mandatory xwin check/Clippy/build.
+Xwin remains compilation evidence; the Windows runtime proof comes from its
+native job. Infrastructure, collection and reporting policy did not change;
+`verify-infra` and distribution rehearsals were not run.
+
+The three native JSON/LCOV pairs regenerate the uploaded combined LCOV and
+summary exactly (LCOV SHA-256
+`7c67c817ac7d502616e4759e5abf9e4558c57feef60f6c81e6cedfdad73ee90e`).
+The same module-graph projection used above removes only explicit test-only
+modules for analysis. Raw collection and Codacy uploads retain their existing
+source set. Values below count unique source lines/functions in normalized
+LCOV, rather than overlapping native LLVM summary views; no branch data exists.
+
+| Measurement | Comparable `main` `10a2682` | Previous delivery `3d13c13` | Assurance source `3280286` |
+| --- | ---: | ---: | ---: |
+| Combined lines | 5,045/5,202 (96.981930%) | 9,617/10,339 (93.016733%) | 9,657/10,339 (93.403617%) |
+| Combined functions | 529/552 (95.833333%) | 993/1,098 (90.437158%) | 998/1,098 (90.892532%) |
+| Production-only lines | 4,538/4,692 (96.717818%) | 8,796/9,509 (92.501840%) | 8,836/9,509 (92.922494%) |
+| Production-only functions | 489/512 (95.507813%) | 927/1,030 (90.000000%) | 932/1,030 (90.485437%) |
+| Codacy diff lines | Not applicable | 4,678/5,245 (89.19%) | 4,718/5,245 (89.95%) |
+| Exact published variation versus `main` | Not applicable | −3.965197 pp | −3.578313 pp |
+
+| Native unique LCOV lines | Previous delivery | Assurance source |
+| --- | ---: | ---: |
+| Linux | 9,151/9,736 (93.991372%) | 9,189/9,736 (94.381676%) |
+| macOS | 8,832/9,378 (94.177863%) | 8,871/9,378 (94.593730%) |
+| Windows | 8,908/9,624 (92.560266%) | 8,961/9,624 (93.110973%) |
+
+The combined report observes **40 additional covered production lines and five
+functions**, with unchanged denominators. Production uncovered lines fall from
+713 to 673. This measurement remains distinct from the specific guarantees and
+limits above; scheduler/progress timing can vary individual native hits.
+[Codacy PR #3](https://app.codacy.com/gh/seapagan/terminal-file-manager/pull-requests/3)
+reports **−3.578 pp variation**, **89.95% diff coverage**, and a failed
+**−1.0 pp variation target** at this exact source head. Green Actions do not
+resolve that failure.
+
+Codacy also reports three open Lizard PR findings: existing
+`c8915940aa1c966dc9ec9281d5741f71` (controls 141/50),
+`ab49192d7f4876ca903bcff9061fe1cc` (incidents 113/50), and new
+`70e4c4e09ad13a4bc3a72275d2ea7324` (retry helper/parser merge 128/50).
+The local `permissions::file_type` 55/50 anomaly remains the fourth local
+advisory. These issue-specific parser explanations do not dismiss findings or
+change thresholds. Strict Rust maintainability passes. The maintainer still
+must decide scanner dispositions, residual coverage variation and final M2
+acceptance. The controlled scheduler scope, original-attempt retry scope,
+pre-seal APFS recovery limitation and deferred exceptional native failures
+remain as stated above.
+
 ## M0-B: local foundation
 
 - Exact package/bin/licence metadata and lockfile; help/version/error CLI smoke
