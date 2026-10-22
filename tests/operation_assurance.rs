@@ -1,5 +1,6 @@
 use std::{
     fs,
+    io::Write,
     sync::atomic::{AtomicBool, Ordering},
     time::{Duration, SystemTime},
 };
@@ -122,7 +123,7 @@ fn transfer_verification_failures_preserve_move_source_and_previous_destination(
         let source = root.path().join("source");
         let target = root.path().join("target");
         fs::create_dir(&target).unwrap();
-        fs::write(&source, "original").unwrap();
+        future_dated_source(&source);
         fs::write(target.join("source"), "previous").unwrap();
         let plan =
             Plan::paths(Operation::Move, vec![source.clone()], Some(target.clone())).unwrap();
@@ -174,4 +175,12 @@ fn corrupt_transfer(fault: &str, payload: &std::path::Path, source: &std::path::
         "source" => fs::write(source, "changed source").unwrap(),
         _ => unreachable!(),
     }
+}
+
+fn future_dated_source(source: &std::path::Path) {
+    let mut file = fs::File::create(source).unwrap();
+    file.write_all(b"original").unwrap();
+    // Keep APFS birth time stable even when verification fails before stage sealing.
+    file.set_modified(SystemTime::UNIX_EPOCH + Duration::from_secs(2_000_000_000))
+        .unwrap();
 }

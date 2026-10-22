@@ -399,6 +399,20 @@ suppression, detector change or issue dismissal follows. Maintainer disposition
 of each scanner finding, residual Codacy variation and final M2 acceptance
 remains pending; behavioral assurance does not waive coverage policy.
 
+#### Native fixture correction, 22 October 2026
+
+The first hosted assurance run at `d575636` passed Linux but failed two new
+macOS cases before producing combined coverage. APFS moved the stage's creation
+time backward while the worker preserved the source mtime. These faults occur
+before `OwnedStage::seal` can refresh evidence through its held handle; cleanup
+and later reconciliation retained OutcomeUnknown under the original identity.
+The worker retained uncertainty before authorizing source removal. The corrected
+fixtures set a fixed future source mtime so they isolate payload replacement and transfer
+mismatch without an additional APFS birth-time transition. Ownership checks and
+expected failure/cleanup assertions remain intact. Pre-seal failure combined
+with APFS birth-time adjustment remains a recovery limitation; this round does
+not broaden identity adoption or change production recovery semantics.
+
 ## M0-B: local foundation
 
 - Exact package/bin/licence metadata and lockfile; help/version/error CLI smoke

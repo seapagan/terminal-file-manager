@@ -159,6 +159,12 @@ fn recovery_fixture() -> (tempfile::TempDir, Plan) {
     let source = root.path().join("source");
     let target = root.path().join("target");
     std::fs::write(&source, "original bytes").unwrap();
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&source)
+        .unwrap()
+        .set_modified(std::time::UNIX_EPOCH + Duration::from_secs(2_000_000_000))
+        .unwrap();
     std::fs::create_dir(&target).unwrap();
     let plan = Plan::paths(
         super::super::Operation::Move,
@@ -213,7 +219,7 @@ fn queue_owned_reconciliation_releases_quarantine_only_after_owned_cleanup() {
     driver.queue.reconcile(id, plan, record).unwrap();
     driver.pump();
     let resolved = driver.finish(id);
-    assert_eq!(resolved.entries[0].outcome, Outcome::Failed);
+    assert_eq!(resolved.entries[0].outcome, Outcome::Failed, "{resolved:?}");
     assert!(!resolved.unresolved());
     assert!(!payload.parent().unwrap().exists());
     assert!(!target.join("source").exists());
