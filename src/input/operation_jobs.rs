@@ -151,9 +151,10 @@ fn refresh(controller: &mut Controller) -> Vec<Request> {
 }
 
 pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geometry) -> bool {
+    let owns_input =
+        controller.app.operations.show_history || !controller.app.operations.conflicts.is_empty();
     if let Event::Mouse(mouse) = event
-        && (controller.app.operations.show_history
-            || !controller.app.operations.conflicts.is_empty())
+        && owns_input
         && mouse.kind == MouseEventKind::Down(MouseButton::Left)
     {
         if let Some(control) = geometry
@@ -166,11 +167,10 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
         return true;
     }
     let Event::Key(key) = event else {
-        return controller.app.operations.show_history
-            || !controller.app.operations.conflicts.is_empty();
+        return owns_input;
     };
     if key.kind != KeyEventKind::Press {
-        return false;
+        return owns_input;
     }
     if controller.app.operations.show_history {
         history_key(controller, key.code);

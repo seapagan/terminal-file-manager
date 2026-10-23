@@ -272,6 +272,79 @@ fn finish(controller: &mut Controller, value: Outcome) {
 }
 
 #[test]
+fn operation_surfaces_consume_navigation_repeats_without_moving_the_pane() {
+    for history in [false, true] {
+        for waiting in [false, true] {
+            let (_, mut controller) = controller();
+            let (reply, response) = std::sync::mpsc::sync_channel(1);
+            controller.complete_operation(Update::Conflict {
+                id: 1,
+                event: terminal_file_manager::operations::Event::Conflict {
+                    source: Box::new(controller.app.panes[0].entries[0].clone()),
+                    destination: Box::new(controller.app.panes[0].entries[1].clone()),
+                    newer_available: true,
+                },
+                reply,
+            });
+            controller.app.operations.show_history = history;
+            if history {
+                controller.app.operations.conflicts.clear();
+            }
+            controller.app.operations.waiting_exit = waiting.then_some(false);
+            assert_modal_navigation(&mut controller);
+            assert_eq!(
+                response.try_recv().unwrap_err(),
+                if history {
+                    std::sync::mpsc::TryRecvError::Disconnected
+                } else {
+                    std::sync::mpsc::TryRecvError::Empty
+                }
+            );
+        }
+    }
+}
+
+fn assert_modal_navigation(controller: &mut Controller) {
+    use crossterm::event::KeyEventKind;
+    for code in [
+        KeyCode::Char('j'),
+        KeyCode::Down,
+        KeyCode::Char('k'),
+        KeyCode::Up,
+    ] {
+        let index = usize::from(matches!(code, KeyCode::Up | KeyCode::Char('k')));
+        controller.app.panes[0].cursor = Some(controller.app.panes[0].entries[index].path.clone());
+        let before = controller.app.panes[0].cursor.clone();
+        for kind in [KeyEventKind::Repeat, KeyEventKind::Release] {
+            let geometry = ui::geometry(&controller.app, Rect::new(0, 0, 120, 30));
+            controller.handle(
+                Event::Key(KeyEvent::new_with_kind(code, KeyModifiers::NONE, kind)),
+                &geometry,
+                Duration::ZERO,
+            );
+            assert_eq!(controller.app.panes[0].cursor, before, "{code:?} {kind:?}");
+        }
+    }
+}
+
+#[test]
+fn nonmodal_navigation_still_accepts_key_repeat() {
+    let (_, mut controller) = controller();
+    let before = controller.app.panes[0].cursor.clone();
+    let geometry = ui::geometry(&controller.app, Rect::new(0, 0, 120, 30));
+    controller.handle(
+        Event::Key(KeyEvent::new_with_kind(
+            KeyCode::Down,
+            KeyModifiers::NONE,
+            crossterm::event::KeyEventKind::Repeat,
+        )),
+        &geometry,
+        Duration::ZERO,
+    );
+    assert_ne!(controller.app.panes[0].cursor, before);
+}
+
+#[test]
 fn jobs_without_ownership_evidence_do_not_offer_a_reconciliation_attempt() {
     let (_, mut controller) = controller();
     running(&mut controller);
