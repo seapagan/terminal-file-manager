@@ -189,6 +189,10 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
         return true;
     }
     if controller.app.diagnostics {
+        if controller.app.operations.waiting_exit.is_some() {
+            waiting(controller, event, geometry);
+            return true;
+        }
         return false;
     }
     if scroll(controller, event, geometry) {
@@ -213,7 +217,10 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
 }
 
 fn waiting(controller: &mut Controller, event: &Event, geometry: &Geometry) {
-    if !editing_surface(controller) && super::operation_jobs::handle(controller, event, geometry) {
+    if !controller.app.diagnostics
+        && !editing_surface(controller)
+        && super::operation_jobs::handle(controller, event, geometry)
+    {
         return;
     }
     if matches!(event, Event::Key(key) if key.code == KeyCode::Esc && key.kind == KeyEventKind::Press)
@@ -264,7 +271,8 @@ fn editing_surface(controller: &Controller) -> bool {
 
 fn modal_click(controller: &mut Controller, event: &Event, geometry: &Geometry) -> bool {
     if let Event::Mouse(mouse) = event
-        && controller.app.operations.dialog.is_some()
+        && (controller.app.operations.dialog.is_some()
+            || controller.app.operations.waiting_exit.is_some())
         && mouse.kind == MouseEventKind::Down(MouseButton::Left)
     {
         if let Some(control) = geometry

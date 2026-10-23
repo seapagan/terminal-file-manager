@@ -174,3 +174,51 @@ fn completed_directories_copy_source_modes_but_merges_preserve_existing_modes() 
         }
     }
 }
+
+#[test]
+fn retry_treats_retained_private_directories_as_existing_merge_targets() {
+    for operation in [Operation::Copy, Operation::Move] {
+        let root = fixture();
+        fs::set_permissions(
+            root.path().join("source"),
+            fs::Permissions::from_mode(0o750),
+        )
+        .unwrap();
+        let plan = plan(root.path(), operation);
+        let cancel = AtomicBool::new(false);
+        let interrupted = execute(&plan, Options::default(), &cancel, |event| {
+            if matches!(
+                event,
+                Event::Progress {
+                    stage: Stage::Committed,
+                    ..
+                }
+            ) {
+                cancel.store(true, Ordering::Relaxed);
+            }
+            Decision::Skip
+        });
+        assert_eq!(mode(&root.path().join("target/source")), 0o700);
+        let retry = plan.retry(&interrupted).unwrap();
+        let completed = execute(&retry, Options { checksum: true }, &false.into(), |_| {
+            Decision::Replace
+        });
+        assert!(
+            completed
+                .entries
+                .iter()
+                .all(|entry| entry.outcome == Outcome::Completed),
+            "{completed:?}"
+        );
+        assert_eq!(mode(&root.path().join("target/source")), 0o700);
+        assert_eq!(mode(&root.path().join("target/source/nested")), 0o700);
+        assert_eq!(
+            fs::read(root.path().join("target/source/nested/secret")).unwrap(),
+            b"private bytes"
+        );
+        assert_eq!(
+            root.path().join("source").exists(),
+            operation == Operation::Copy
+        );
+    }
+}

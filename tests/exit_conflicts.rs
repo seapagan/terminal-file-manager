@@ -338,3 +338,62 @@ fn safely_cancelled_worker_ignores_a_stale_conflict_choice_and_exits_only_after_
     );
     assert_eq!(fs::read(root.path().join("source")).unwrap(), b"incoming");
 }
+
+#[test]
+fn diagnostics_cannot_bypass_pending_exit_or_steal_hidden_conflict_input() {
+    let (_, mut controller, plan) = fixture();
+    controller.app.dual = true;
+    controller.register_operation(1, plan.clone(), Options::default(), None);
+    wait(&mut controller, true, false);
+    let response = conflict(&mut controller, 1, &plan);
+    key(&mut controller, KeyCode::F(12));
+    assert!(controller.app.diagnostics);
+    for code in [
+        KeyCode::Tab,
+        KeyCode::Down,
+        KeyCode::F(5),
+        KeyCode::Char('r'),
+    ] {
+        key(&mut controller, code);
+    }
+    assert_eq!(controller.app.active, 0);
+    assert!(controller.app.operations.dialog.is_none());
+    assert!(controller.app.operations.outbox.is_empty());
+    assert!(matches!(
+        response.try_recv(),
+        Err(mpsc::TryRecvError::Empty)
+    ));
+    key(&mut controller, KeyCode::Esc);
+    assert!(controller.app.operations.waiting_exit.is_none());
+    assert!(controller.app.operations.exit_snapshot.is_none());
+    assert!(controller.app.diagnostics);
+    assert!(!controller.quit);
+}
+
+#[test]
+fn pending_exit_return_button_abandons_snapshot_without_cancelling_the_job() {
+    let (_, mut controller, plan) = fixture();
+    controller.register_operation(1, plan, Options::default(), None);
+    wait(&mut controller, true, false);
+    let geometry = ui::geometry(&controller.app, Rect::new(0, 0, 120, 30));
+    let area = geometry
+        .operation_controls
+        .iter()
+        .find(|control| control.target == OperationTarget::Key(KeyCode::Esc))
+        .unwrap()
+        .area;
+    event(
+        &mut controller,
+        Event::Mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: area.x,
+            row: area.y,
+            modifiers: KeyModifiers::NONE,
+        }),
+    );
+    assert!(controller.app.operations.waiting_exit.is_none());
+    assert!(controller.app.operations.exit_snapshot.is_none());
+    assert!(controller.app.operations.outbox.is_empty());
+    assert!(controller.app.operations.active());
+    assert!(!controller.quit);
+}
