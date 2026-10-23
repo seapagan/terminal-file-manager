@@ -91,7 +91,7 @@ fn perform(
     let parents = Parents::capture(&source.path)?;
     safety::revalidate(source, true)?;
     match plan.operation {
-        Operation::Rename => rename(source, plan, result),
+        Operation::Rename => rename(source, plan, result, notify, cancel, &parents),
         Operation::Permissions(mode) => attributes(source, Some(mode), None, &parents),
         Operation::ReadOnly(value) => attributes(source, None, Some(value), &parents),
         Operation::Delete => delete(source, plan, cancel, notify, record, depth, &parents),
@@ -113,7 +113,14 @@ fn mkdir(plan: &Plan, result: &mut EntryResult) -> Result<()> {
     Ok(())
 }
 
-fn rename(source: &Entry, plan: &Plan, result: &mut EntryResult) -> Result<()> {
+fn rename(
+    source: &Entry,
+    plan: &Plan,
+    result: &mut EntryResult,
+    notify: &mut impl FnMut(Event) -> Decision,
+    cancel: &AtomicBool,
+    source_parents: &Parents,
+) -> Result<()> {
     let destination = rename_destination(plan)?;
     safety::reject_overlap(source, destination)?;
     if safety::existing(destination)?.is_some() {
@@ -122,12 +129,46 @@ fn rename(source: &Entry, plan: &Plan, result: &mut EntryResult) -> Result<()> {
         return Ok(());
     }
     let parents = Parents::capture(destination)?;
+    (notify)(Event::Progress {
+        source: source.path.clone(),
+        destination: destination.into(),
+        stage: Stage::Verified,
+        bytes: 0,
+    });
+    crate::fs::check_cancelled(cancel)?;
+    source_parents.validate()?;
     parents.validate()?;
     safety::revalidate(source, true)?;
-    #[cfg(unix)]
-    staging::rename_new(&source.path, destination)?;
-    #[cfg(windows)]
-    fs::rename(&source.path, destination)?;
+    commit_rename(source, destination, result)
+}
+
+fn commit_rename(
+    source: &Entry,
+    destination: &std::path::Path,
+    result: &mut EntryResult,
+) -> Result<()> {
+    if let Err(error) = staging::rename_new(&source.path, destination) {
+        if safety::revalidate(source, true).is_err() {
+            return Err(safety::Failure {
+                outcome: Outcome::OutcomeUnknown,
+                detail: format!(
+                    "Rename unacknowledged; selected object requires reconciliation: {error}"
+                ),
+            });
+        }
+        if error.kind() == io::ErrorKind::AlreadyExists {
+            result.outcome = Outcome::Skipped;
+            result.detail = "Rename destination appeared; source retained".into();
+            return Ok(());
+        }
+        return Err(error.into());
+    }
+    let mut moved = source.clone();
+    moved.path = destination.into();
+    safety::revalidate(&moved, true).map_err(|error| safety::Failure {
+        outcome: Outcome::OutcomeUnknown,
+        detail: format!("Renamed object identity unverified: {}", error.detail),
+    })?;
     Ok(())
 }
 

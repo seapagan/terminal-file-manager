@@ -10,6 +10,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+mod rename;
+pub(super) use rename::rename_new;
+
 pub(super) struct OwnedStage {
     pub path: PathBuf,
     pub file: Option<File>,
@@ -160,41 +163,9 @@ impl OwnedStage {
         let mut expected = self.entry.clone();
         expected.path = destination.to_owned();
         safety::owned_object(&expected)?;
-        #[cfg(windows)]
-        restore_readonly(&mut expected)?;
         safety::revalidate(&expected, true)?;
         Ok(crate::fs::inspect(destination))
     }
-}
-
-#[cfg(windows)]
-fn restore_readonly(expected: &mut Entry) -> Result<()> {
-    use std::os::windows::fs::OpenOptionsExt;
-    let readonly = u32::from_str_radix(expected.attributes.trim_start_matches("0x"), 16)
-        .map_err(io::Error::other)?
-        & 1
-        != 0;
-    let file = OpenOptions::new()
-        .access_mode(0x0000_0180)
-        .custom_flags(0x0020_0000)
-        .open(&expected.path)?;
-    safety::opened_object(expected, &file)?;
-    let mut permissions = file.metadata()?.permissions();
-    permissions.set_readonly(readonly);
-    file.set_permissions(permissions)?;
-    let after = crate::fs::inspect(&expected.path);
-    let old = u32::from_str_radix(expected.attributes.trim_start_matches("0x"), 16)
-        .map_err(io::Error::other)?;
-    let new = u32::from_str_radix(after.attributes.trim_start_matches("0x"), 16)
-        .map_err(io::Error::other)?;
-    // tempfile persistence normalizes Archive/Temporary/Normal on our stage.
-    if (old ^ new) & !0x1a0 != 0 {
-        return Err(safety::changed(
-            "Committed attributes differ from owned stage",
-        ));
-    }
-    expected.attributes = after.attributes;
-    Ok(())
 }
 
 pub(super) fn open_source(path: &Path) -> io::Result<File> {
@@ -215,13 +186,6 @@ pub(super) fn open_source(path: &Path) -> io::Result<File> {
         return Err(invalid("Source is no longer a regular file"));
     }
     Ok(file)
-}
-
-pub(super) fn rename_new(source: &Path, destination: &Path) -> io::Result<()> {
-    let mut path = tempfile::TempPath::try_from_path(source)?;
-    path.disable_cleanup(true);
-    path.persist_noclobber(destination)
-        .map_err(|error| error.error)
 }
 
 pub(super) fn remove_leaf(path: &Path) -> io::Result<()> {
