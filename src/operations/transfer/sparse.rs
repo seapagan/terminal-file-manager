@@ -106,7 +106,12 @@ fn allocated(file: &File) -> io::Result<u64> {
 use windows::allocated;
 
 pub(super) fn verify(source_allocation: u64, size: u64, target: &File) -> io::Result<()> {
-    if source_allocation < size / 2 && allocated(target)? >= size / 2 {
+    if source_allocation >= size {
+        return Ok(());
+    }
+    let target_allocation = allocated(target)?;
+    if target_allocation >= size || (source_allocation < size / 2 && target_allocation >= size / 2)
+    {
         return Err(io::Error::new(
             io::ErrorKind::Unsupported,
             "Destination allocation expanded; sparse/compressed fidelity unsupported on this filesystem; transfer refused",
@@ -119,6 +124,25 @@ pub(super) fn verify(source_allocation: u64, size: u64, target: &File) -> io::Re
 mod tests {
     use super::*;
     use std::io::Read;
+
+    #[test]
+    fn full_materialization_is_refused_even_when_the_source_is_mostly_allocated() {
+        let mut output = tempfile::tempfile().unwrap();
+        let bytes = vec![1; 64 * 1024];
+        output.write_all(&bytes).unwrap();
+        output.sync_all().unwrap();
+        let size = output.metadata().unwrap().len();
+        assert!(allocated(&output).unwrap() >= size);
+        assert_eq!(
+            verify(size * 3 / 4, size, &output).unwrap_err().kind(),
+            io::ErrorKind::Unsupported
+        );
+        verify(size, size, &output).unwrap();
+        output.seek(SeekFrom::Start(0)).unwrap();
+        let mut actual = Vec::new();
+        output.read_to_end(&mut actual).unwrap();
+        assert_eq!(actual, bytes);
+    }
 
     fn native_allocation(expected: &[u8]) -> u64 {
         let mut file = tempfile::tempfile().unwrap();
