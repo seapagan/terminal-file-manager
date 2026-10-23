@@ -1050,3 +1050,40 @@ remote finding disposition has been applied. This checkpoint does not declare
 Codacy green or waive the static gate. Crash recovery remains the explicit
 [pre-v1 reliability TODO](../TODO.md#pre-v1-reliability). PR #3 stays draft and
 unmerged pending the maintainer's decision.
+
+### Final sparse-allocation refusal correction
+
+Source `51fe5f6ceac86188b4e172291950c9386bbea1a1` also refuses full destination
+materialisation when the source uses more than half its logical size. The
+earlier substantial-expansion check alone accepted a 75%-allocated source
+becoming fully dense. A native dense-target regression reproduced that `Ok`
+result before the correction, then required `Unsupported`, unchanged target
+bytes and continued acceptance of an ordinary dense source. The guard runs
+before stage commit and source removal; it adds no native API or dependency.
+
+Its immediate unchanged clean `RUSTUP_TOOLCHAIN=1.95.0 cargo make verify` passed
+in **46.74 s**, including **453 Linux tests**, two established child-entry skips
+and mandatory xwin check, Clippy and build. The evidence-only `19bed4f` preceding
+it passed its clean gate in **45.28 s**. Earlier checkpoint bytes remain intact.
+
+[Rust CI 40023012170](https://github.com/seapagan/terminal-file-manager/actions/runs/40023012170)
+passed with actual native
+[Linux 453](https://github.com/seapagan/terminal-file-manager/actions/runs/40023012170/job/120652082331),
+[macOS 433](https://github.com/seapagan/terminal-file-manager/actions/runs/40023012170/job/120652081889)
+and [Windows 412](https://github.com/seapagan/terminal-file-manager/actions/runs/40023012170/job/120652082357)
+tests passed, two established child-entry skips each. The new refusal regression
+ran on all three hosts. Exact MSRV, source quality and
+[combined coverage](https://github.com/seapagan/terminal-file-manager/actions/runs/40023012170/job/120653747493)
+passed. [Policy](https://github.com/seapagan/terminal-file-manager/actions/runs/40023012103),
+[Source Package](https://github.com/seapagan/terminal-file-manager/actions/runs/40023012173),
+[GitHub Actions Security](https://github.com/seapagan/terminal-file-manager/actions/runs/40023012136)
+and [Advisory Quality](https://github.com/seapagan/terminal-file-manager/actions/runs/40023012327)
+also passed.
+
+Codacy at this exact source reports **91.28% diff coverage (5,432/5,951)** and
+**−3.110 pp variation** under the existing accepted M2 decrease. The same three
+generic unsafe-use alerts still block static analysis. Approval for the five
+audited call-site scanner comments remains pending; no suppression or remote
+disposition has changed. Only this append-only evidence follows the tested
+runtime source. Final pushed-head checks belong in the ignored ledger and
+maintainer handoff; PR #3 remains draft and unmerged.
