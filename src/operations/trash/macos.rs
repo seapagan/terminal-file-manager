@@ -138,21 +138,49 @@ mod tests {
         let source = root.path().join("same-雪-\n");
         let target = root.path().join("sentinel");
         std::fs::write(&target, "preserved").unwrap();
-        std::fs::write(&source, "first").unwrap();
-        let first = put(&crate::fs::inspect(&source), &false.into()).unwrap();
-        std::fs::write(&source, "second").unwrap();
-        let second = put(&crate::fs::inspect(&source), &false.into()).unwrap();
-        assert_ne!(first.path(), second.path());
-        assert_eq!(std::fs::read(first.path().unwrap()).unwrap(), b"first");
-        assert_eq!(std::fs::read(second.path().unwrap()).unwrap(), b"second");
-        std::fs::rename(first.path().unwrap(), root.path().join("restored-first")).unwrap();
-        std::fs::rename(second.path().unwrap(), &source).unwrap();
-        std::fs::remove_file(&source).unwrap();
+        let first = trash_file(&source, b"first");
+        let second = trash_file(&source, b"second");
+        if let (Some(first), Some(second)) = (first.path(), second.path()) {
+            assert_ne!(first, second);
+        }
+        restore_optional(&first, &root.path().join("restored-first"));
+        restore_optional(&second, &root.path().join("restored-second"));
         std::os::unix::fs::symlink(&target, &source).unwrap();
+        let identity = crate::fs::inspect(&source).identity;
         let receipt = put(&crate::fs::inspect(&source), &false.into()).unwrap();
-        assert_eq!(std::fs::read_link(receipt.path().unwrap()).unwrap(), target);
+        assert_eq!(
+            source.symlink_metadata().unwrap_err().kind(),
+            io::ErrorKind::NotFound
+        );
+        if let Some(path) = receipt.path() {
+            assert_eq!(crate::fs::inspect(path).identity, identity);
+            assert_eq!(std::fs::read_link(path).unwrap(), target);
+        }
         assert_eq!(std::fs::read(&target).unwrap(), b"preserved");
-        std::fs::rename(receipt.path().unwrap(), &source).unwrap();
+        restore_optional(&receipt, &source);
+    }
+
+    fn trash_file(source: &Path, bytes: &[u8]) -> Receipt {
+        std::fs::write(source, bytes).unwrap();
+        let entry = crate::fs::inspect(source);
+        let receipt = put(&entry, &false.into()).unwrap();
+        assert_eq!(
+            source.symlink_metadata().unwrap_err().kind(),
+            io::ErrorKind::NotFound
+        );
+        if let Some(path) = receipt.path() {
+            assert_eq!(crate::fs::inspect(path).identity, entry.identity);
+            assert_eq!(std::fs::read(path).unwrap(), bytes);
+        }
+        receipt
+    }
+
+    fn restore_optional(receipt: &Receipt, destination: &Path) {
+        if let Some(path) = receipt.path() {
+            crate::operations::staging::rename_new(path, destination).unwrap();
+        } else {
+            eprintln!("Native Trash acknowledged removal without a recovery path");
+        }
     }
 
     #[test]

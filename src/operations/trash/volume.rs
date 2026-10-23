@@ -96,8 +96,8 @@ mod tests {
     #[test]
     fn unrelated_same_device_mounts_do_not_disable_volume_trash() {
         let root = tempfile::tempdir().unwrap();
-        let top = root.path().join("volume");
-        let unrelated = root.path().join("volume-alias");
+        let top = root.path().join("volume-alias");
+        let unrelated = root.path().join("volume");
         fs::create_dir(&top).unwrap();
         fs::create_dir(&unrelated).unwrap();
         let source = top.join("source");
