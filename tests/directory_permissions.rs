@@ -222,3 +222,39 @@ fn retry_treats_retained_private_directories_as_existing_merge_targets() {
         );
     }
 }
+
+#[test]
+fn source_directory_replacement_cannot_broaden_copied_private_permissions() {
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("source");
+    let target = root.path().join("target");
+    fs::create_dir(&source).unwrap();
+    fs::set_permissions(&source, fs::Permissions::from_mode(0o700)).unwrap();
+    fs::write(source.join("secret"), "private bytes").unwrap();
+    fs::set_permissions(source.join("secret"), fs::Permissions::from_mode(0o644)).unwrap();
+    fs::create_dir(&target).unwrap();
+    let plan = plan(root.path(), Operation::Copy);
+    let held = root.path().join("held-source");
+    let record = execute(&plan, Options::default(), &false.into(), |event| {
+        if matches!(
+            event,
+            Event::Progress {
+                stage: Stage::Committed,
+                ..
+            }
+        ) {
+            fs::rename(&source, &held).unwrap();
+            fs::create_dir(&source).unwrap();
+            fs::set_permissions(&source, fs::Permissions::from_mode(0o777)).unwrap();
+        }
+        Decision::Skip
+    });
+    assert_eq!(mode(&target.join("source")), 0o700, "{record:?}");
+    assert_eq!(record.entries.last().unwrap().outcome, Outcome::Changed);
+    assert_eq!(
+        fs::read(target.join("source/secret")).unwrap(),
+        b"private bytes"
+    );
+    assert_eq!(fs::read(held.join("secret")).unwrap(), b"private bytes");
+    assert_eq!(mode(&source), 0o777);
+}

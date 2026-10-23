@@ -260,7 +260,7 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
         self.check_cancel()?;
         guards[1].validate()?;
         safety::revalidate(target, false)?;
-        finish_permissions(source, target, created)?;
+        finish_permissions(source, target, created, guards[0])?;
         if self.plan.operation == Operation::Move {
             self.check_cancel()?;
             guards[0].validate()?;
@@ -454,12 +454,26 @@ fn create_directory(path: &Path) -> std::io::Result<()> {
     fs::create_dir(path)
 }
 
-fn finish_permissions(source: &Entry, target: &Entry, created: bool) -> std::io::Result<()> {
+fn finish_permissions(
+    source: &Entry,
+    target: &Entry,
+    created: bool,
+    source_parents: &Parents,
+) -> Result<()> {
     if created {
-        fs::set_permissions(
-            &target.path,
-            fs::symlink_metadata(&source.path)?.permissions(),
-        )?;
+        source_parents.validate()?;
+        safety::revalidate(source, false)?;
+        #[cfg(unix)]
+        let permissions =
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::Permissions::from_mode(source.mode.ok_or_else(|| {
+                    super::plan::invalid("Source directory permissions unavailable")
+                })?)
+            };
+        #[cfg(not(unix))]
+        let permissions = fs::symlink_metadata(&source.path)?.permissions();
+        fs::set_permissions(&target.path, permissions)?;
     }
     Ok(())
 }

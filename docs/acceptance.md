@@ -623,3 +623,189 @@ do not establish execution on those older systems. No public release exists yet.
 No future seam constitutes a passing feature test. Restricted Trash remains
 required; true direct transfer is a post-v1 TODO. Resume, synchronization,
 editing and other deferrals are listed in [TODO](../TODO.md).
+
+
+## M2 review-fix checkpoint — 23 October 2026
+
+Starting local, remote and draft PR #3 heads agreed at
+`358324c429c778ffcfa01cbb74243bc0353497fd`. Review-fix source is
+`fc084dad21b44a6601b0ac9f7a08cd248f3179fb`, followed by the final source-identity
+guard in the commit containing this checkpoint. A and C pass local
+regressions. B passes on Linux but remains blocked on native macOS; this
+checkpoint does not grant M2 acceptance. Older checkpoints above remain dated
+records, including their original coverage measurements and scanner status.
+
+### A: private transfer directories and existing merges
+
+The original deterministic reproducer copied a `0700` directory with a `0644`
+child. At `Stage::Committed`, both new ancestors had mode `0775`; cancellation
+and a failed child retained that exposure. An existing `0711` merge target also
+changed to source mode `0750`. Four new tests failed before the correction.
+
+Unix transfer creation now supplies mode `0700` to `DirBuilder` at mkdir,
+before copying children. The worker checks cancellation before directory
+finalisation and applies source permissions only to newly created, completed
+directories. Existing merge targets keep their modes. Windows retains native
+directory creation and final attributes for new targets. The recursive executor
+shares this policy across Copy and Move, including Linux cross-filesystem Move.
+
+`tests/directory_permissions.rs` checks real destination modes and bytes:
+
+- `cancelled_recursive_copy_and_move_keep_new_ancestors_private` inspects nested
+  ancestors at the committed-child callback and after cancellation.
+- `cancelled_cross_filesystem_directory_move_keeps_new_ancestors_private` uses
+  owned `/dev/shm` storage and proves different native device IDs on Linux.
+- `failed_child_keeps_new_directories_private_and_copied_bytes_intact` uses an
+  unsupported Unix socket child and verifies retained private directories.
+- `completed_directories_copy_source_modes_but_merges_preserve_existing_modes`
+  checks complete Copy/Move modes, bytes, source retention/removal and merges.
+- `retry_treats_retained_private_directories_as_existing_merge_targets` proves
+  the safe retry limitation: a retained `0700` target stays `0700` even when the
+  source mode is `0750`. Current cancellation records do not retain destination
+  ownership sufficient to authorize changing an existing target's permissions.
+- `source_directory_replacement_cannot_broaden_copied_private_permissions`
+  replaces the source at the last committed child. Its RED run exposed a
+  `0777` destination and a false completed-directory result. The final guard
+  validates source parent/object identity before chmod and uses frozen Unix
+  mode bits, leaving copied bytes under `0700` and reporting the source change.
+
+These Unix tests use owned fixtures, callback boundaries and native metadata;
+none changes process umask or relies on sleep. Pre-existing permissive merge
+parents remain permissive. Completed descendants retain their successful result;
+cancelled/incomplete ancestors remain private with existing partial/unknown
+classifications. The filesystem race and external-writer limits above remain.
+
+### B: Linux owner chmod and the macOS approval gate
+
+The native RED test exercised owned file `0000 → 0600` and directory
+`0000 → 0700`; both returned `Failed` with mode `0000`. Linux now opens an
+`O_PATH | O_NOFOLLOW` descriptor, validates its native identity and the parent
+namespace, then chmods the held descriptor through `/proc/self/fd`. This pins
+the inode without requesting content access. Missing/inaccessible procfs fails
+visibly; there is no original-path fallback. Windows retains its attribute
+access mask, reparse flags and descriptor-based Read-only editing. No dependency,
+unsafe boundary or suppression was added.
+
+Regression names:
+
+- `owned_unreadable_file_and_directory_modes_can_be_restored_without_read_access`
+  checks resulting modes, device/inode identity and retained file/child bytes
+  without root privileges.
+- `chmod_refuses_a_replaced_regular_file_and_preserves_both_objects` and existing
+  `mode_changes_use_frozen_identity_and_reject_replacement_links` check frozen
+  selection and unrelated bytes/modes.
+- `chmod_denied_parent_search_preserves_the_selected_object` checks denied
+  namespace access using an owned parent and restores fixture access.
+- `attribute_descriptor_never_retargets_a_replacement_name_or_link` replaces the
+  selected name after opening; the held descriptor affects only its original
+  inode, and selection revalidation rejects the replacement.
+- Windows `native_readonly_survives_new_destination_commit_and_can_be_edited`
+  remains unchanged and passed on the actual Windows runner.
+
+**macOS B remains unresolved.** `O_EVTONLY | O_NOFOLLOW` passes ordinary readable
+attribute cases but cannot open the owned `0000` fixtures on macOS 15. The two
+new unreadable/descriptor tests remain failing; their assertions were not
+weakened or skipped. Apple XNU's `vn_authorize_open_existing` retains content
+read authorization, and its alternative process policy requires a private
+entitlement. A public `fchmodat(..., AT_SYMLINK_NOFOLLOW)` fallback could retain
+parent and no-follow checks but cannot atomically reject a regular-file
+replacement. The assignment requires explicit maintainer approval before that
+identity-assurance deviation. That decision is pending; no fallback or private
+entitlement was introduced.
+
+### C: conflict controls during safe exit
+
+The original RED sequence selected Wait then exit and installed a pending
+conflict. Keyboard, mouse and Esc replies left the channel empty; a real queued
+worker could not finish. The corrected wait branch routes visible conflict and
+Jobs controls through the existing handler while blocking ordinary actions and
+new retry/reconciliation attempts. Worker acknowledgement, q/Q intent, frozen
+session snapshots and unknown/incident exit protections retain their guards.
+
+Esc now cancels the visible conflict while retaining the pending exit; in Jobs
+it closes Jobs first. With neither surface active, Esc or its rendered Return
+button abandons the exit and discards the snapshot. Under diagnostics, ordinary
+actions stay blocked and hidden conflicts receive no input; Esc abandons exit.
+A separate pair of failing-first regressions demonstrated the previous
+diagnostics bypass and inert Return mouse button before their correction.
+
+`tests/exit_conflicts.rs` covers these observable paths:
+
+- `waiting_exit_routes_conflict_choices_once_and_keeps_q_or_q_save_intent_until_ack`
+  checks Skip/Replace/Keep both/default Enter/cancel, q/Q, Wait/Cancel safely,
+  Press versus Repeat/Release, immediate single channel delivery and real bytes.
+- `waiting_exit_mouse_conflict_hit_regions_reply_without_allowing_pane_actions`
+  checks exact hit/non-hit regions and blocked pane/mutation/exit keys.
+- `conflict_escape_cancels_that_job_then_a_second_escape_abandons_pending_exit`
+  distinguishes conflict cancellation from discarding exit intent.
+- `multiple_conflicts_keep_exit_pending_until_both_jobs_acknowledge` checks
+  intended reply channels, Jobs access, blocked retry and both acknowledgements.
+- `queued_worker_conflict_after_waiting_save_exit_requires_finished_acknowledgement`
+  uses the actual background Queue, controller and completed destination bytes.
+- `safely_cancelled_worker_ignores_a_stale_conflict_choice_and_exits_only_after_ack`
+  proves real queue cancellation preserves source and old destination bytes.
+- `diagnostics_cannot_bypass_pending_exit_or_steal_hidden_conflict_input` and
+  `pending_exit_return_button_abandons_snapshot_without_cancelling_the_job`
+  cover the two additional demonstrated boundary paths.
+
+The direct channel assertions detect swallowed replies immediately. Ten-second
+Queue receives serve only as failure guards around actual lifecycle updates;
+no sleep controls the test sequence. Existing unknown/critical, destructive
+confirmation, Trash, recovery/quarantine and terminal restoration tests remain.
+
+### Local and hosted evidence
+
+All scoped commits are GPG-signed with Signed-off-by trailers. Local unchanged
+`RUSTUP_TOOLCHAIN=1.95.0 cargo make verify` passed on clean commits `b818316`
+(37.90 s), `382ea10` (37.66 s), `394dc8e` (37.23 s) and `fc084da` (36.83 s).
+The final source ran **423 Linux tests, 423 passed, two intentional child-entry
+skips**, plus doctests, exact MSRV, package verification, coverage, security and
+mandatory xwin check/Clippy/build. The initial A commit `622a0fe` exposed a
+Windows-only unused-mut error in its immediate full gate; signed follow-up
+`b818316` corrected it and passed. Dirty-package checks were interim only,
+followed by unchanged clean gates. Sandbox SSH/test restrictions received
+elevated retries; the product failures above were not attributed to sandboxing.
+
+Four existing local Lizard parser advisories remain (permissions 55/50, controls
+141/50, incidents 113/50, retry helper 128/50); no new finding or suppression
+remains. Infrastructure is unchanged, so verify-infra was not run. No release
+rehearsal, minimum-OS, live UNC/SMB or additional filesystem certification is
+claimed.
+
+At source `382ea10`, [Rust CI](https://github.com/seapagan/terminal-file-manager/actions/runs/39991564469)
+ran actual Linux **414 passed**, Windows **382 passed**, and macOS **399 passed,
+two B tests failed** out of 401. Each host reports two intentional ignored entry
+points: `terminal_child` and `trash_child`, exercised through their parent
+terminal-restoration and native-Trash tests. The Windows Read-only regression
+and Linux A/B regressions executed successfully. macOS A tests passed; its two
+B failures block foreign-native completion and the combined coverage job.
+[Policy](https://github.com/seapagan/terminal-file-manager/actions/runs/39991564408),
+[Source Package](https://github.com/seapagan/terminal-file-manager/actions/runs/39991564360),
+[GitHub Actions Security](https://github.com/seapagan/terminal-file-manager/actions/runs/39991564280)
+and [Advisory Quality](https://github.com/seapagan/terminal-file-manager/actions/runs/39991564298)
+passed at that source. Final review-source native observation follows below.
+
+[Codacy PR #3](https://app.codacy.com/gh/seapagan/terminal-file-manager/pull-requests/3)
+Static Code Analysis succeeded at `382ea10` with zero check annotations. No new
+combined coverage variation exists for that source because macOS failed and
+combined coverage skipped. The maintainer has accepted the documented earlier
+M2 coverage decrease without changing the configured −1.0 pp target, and marked
+the three existing Codacy Lizard parser findings false positive. Those decisions
+supersede the outstanding-disposition wording in older dated checkpoints, not
+their historical measurements. No threshold, metrics collection, scanner
+disposition or security/dependency policy was changed here.
+
+At hosted review source `fc084da`, [Rust CI](https://github.com/seapagan/terminal-file-manager/actions/runs/39993060079)
+ran Linux **423 passed**, Windows **390 passed**, and macOS **408 passed, two B
+tests failed** out of 410. All eight C regressions and all applicable A
+regressions executed successfully on each native host; the Linux-only
+cross-filesystem case did not run on macOS/Windows. The two child-entry skips
+per host retain the parent-test rationale above. Exact MSRV and source quality
+passed; combined coverage skipped. [Policy](https://github.com/seapagan/terminal-file-manager/actions/runs/39993060091),
+[Source Package](https://github.com/seapagan/terminal-file-manager/actions/runs/39993060086),
+[GitHub Actions Security](https://github.com/seapagan/terminal-file-manager/actions/runs/39993060078)
+and [Advisory Quality](https://github.com/seapagan/terminal-file-manager/actions/runs/39993060146)
+passed. Codacy static analysis succeeded with zero check annotations; no new
+combined variation was published. The final source-identity guard has an
+additional local RED/GREEN regression (**424 Linux tests passed**); native and
+clean-gate evidence for that follow-up must be recorded separately.

@@ -73,6 +73,25 @@ default to Skip; apply-to-all stays within one job and type pair. Keep both uses
 native no-clobber commit. Unsupported atomic type replacements require Keep both
 or Skip. Partial moves retain skipped children and their parent directories.
 
+New Unix transfer directories request mode `0700` at creation, before receiving children.
+Only a newly created, fully populated directory receives the source's final
+permissions, after fresh source-parent and object checks. Unix final modes come
+from the frozen source snapshot. Cancellation and incomplete children retain private ancestors.
+Merges preserve existing directory permissions, including permissive parents;
+they do not promise to make those parents private. A retry treats directories
+retained from an earlier attempt as existing merge targets and preserves their
+private mode. Restoring their source modes would require retained destination
+ownership evidence beyond the current retry record.
+
+Linux permission edits pin the selected object with `O_PATH | O_NOFOLLOW` and
+change its mode through the held descriptor's `/proc/self/fd` reference. They
+require accessible procfs, but no content-read permission. Parent/namespace and
+selected-object checks precede chmod; a replacement name cannot retarget the
+held descriptor. Windows retains its native attribute handle. macOS still
+rejects unreadable objects: native tests show that `O_EVTONLY` requires read
+permission on the tested host. A macOS pathname fallback would weaken the
+selected-inode guarantee and remains subject to maintainer approval.
+
 Workers check parent identity and namespace around reads, commit and source
 removal. A move removes each source only after destination commit and fresh
 source/destination checks. Cancellation waits for owned cleanup; uncertain
@@ -92,6 +111,13 @@ reconciliation requires an unknown entry with retained ownership evidence.
 Unknown outcomes quarantine claims and block retry/exit. Q freezes the navigation
 snapshot before waiting for acknowledgement; a new exit request abandons the
 earlier waiting intent.
+While an exit waits, visible conflict and Jobs controls remain usable; ordinary
+pane actions, retries and reconciliation stay blocked, including under
+diagnostics. Esc cancels a visible conflict, closes Jobs, or abandons a pending
+exit when neither surface is active. Abandoning exit discards its frozen session
+snapshot. Diagnostics hides conflicts without taking their input; Esc there
+abandons the pending exit. Keyboard and rendered mouse controls share these
+rules. A conflict reply alone does not acknowledge worker completion.
 Reconciliation runs under the original quarantined claims. It checks retained
 identities and cleans only proven owned staging; missing evidence keeps the job
 unknown. It never repeats source removal.
