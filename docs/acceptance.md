@@ -624,7 +624,6 @@ No future seam constitutes a passing feature test. Restricted Trash remains
 required; true direct transfer is a post-v1 TODO. Resume, synchronization,
 editing and other deferrals are listed in [TODO](../TODO.md).
 
-
 ## M2 review-fix checkpoint — 23 October 2026
 
 Starting local, remote and draft PR #3 heads agreed at
@@ -833,3 +832,51 @@ Linux unreadable-handle case and uses a readable `0400` macOS fixture to prove
 that normal supported attribute edits cannot retarget a replacement. No new
 ignore, lint suppression or dependency exception was added. Native results for
 this approved policy follow below.
+
+### Final approved-source native evidence — 23 October 2026
+
+Immutable source `b7d6cecaf753b5b2d30dba9ff0e674876ebbcdb3` includes the final
+source-directory identity guard and the maintainer-approved macOS capability
+limit. Its unchanged clean local
+`RUSTUP_TOOLCHAIN=1.95.0 cargo make verify` passed in **36.90 s**, including
+424 Linux tests, exact MSRV, package/security/coverage and mandatory Windows
+xwin check, Clippy and build. The preceding source guard `85d54f1` passed its
+clean full gate in **36.12 s**. These are Linux full gates, separate from the
+actual native runs below.
+
+[Rust CI 39995625473](https://github.com/seapagan/terminal-file-manager/actions/runs/39995625473)
+completed successfully, including exact MSRV, source quality and
+[combined coverage](https://github.com/seapagan/terminal-file-manager/actions/runs/39995625473/job/120561240808).
+
+| Actual native job | Tests passed | Intentional child-entry skips | Exercised contracts |
+| --- | ---: | ---: | --- |
+| [Linux / ubuntu-24.04](https://github.com/seapagan/terminal-file-manager/actions/runs/39995625473/job/120558490282) | 424 | 2 | A modes/bytes/source replacement/retry and distinct-device Move; B unreadable restoration and pinned identity; all eight C regressions |
+| [macOS / macos-15](https://github.com/seapagan/terminal-file-manager/actions/runs/39995625473/job/120558490550) | 411 | 2 | A Unix modes/source identity/retry; B approved unchanged-mode/identity rejection and readable descriptor safety; all eight C regressions |
+| [Windows / windows-2025](https://github.com/seapagan/terminal-file-manager/actions/runs/39995625473/job/120558490512) | 390 | 2 | Native Read-only editing, shared transfer/Trash safeguards and all eight C regressions |
+
+The two skipped child entry points retain the parent-execution rationale above;
+actual native Trash and terminal-restoration parents passed on all three hosts.
+No new skip or unsupported-host substitution supplied these results.
+[Policy](https://github.com/seapagan/terminal-file-manager/actions/runs/39995625561),
+[Source Package](https://github.com/seapagan/terminal-file-manager/actions/runs/39995625551),
+[GitHub Actions Security](https://github.com/seapagan/terminal-file-manager/actions/runs/39995625514)
+and [Advisory Quality](https://github.com/seapagan/terminal-file-manager/actions/runs/39995625456)
+also passed. Cache restoration emitted nonfatal `ENOENT` annotations for
+generated `target/package/.../tests/target` and `tests/trybuild` paths; the
+subsequent native and coverage steps passed. No cache/workflow change was made.
+
+Codacy at this exact source reports **90.52% diff coverage (4,823/5,328)** and
+**−3.305 pp variation** against the unchanged **−1.0 pp** target. The coverage
+variation remains `action_required`, under the maintainer's accepted M2
+decrease; this work did not adjust collection or targets. Static analysis
+reported one genuinely new issue, `markdownlint_MD012`
+`fea36b203143b34ffe63cf808d40b6ad`: an extra blank line added before this new
+checkpoint. The final evidence change removes only that added blank line.
+Earlier checkpoint text and measurements remain unchanged. Post-push analysis
+must confirm resolution; no manual issue dismissal or suppression was used.
+The three previously accepted Codacy Lizard false positives remain untouched.
+
+Only documentation changes follow this tested source. The ignored append-only
+ledger records signed commits, each immediate clean-gate outcome and final-head
+checks. PR #3 remains draft and unmerged; M2 acceptance and merge remain the
+maintainer's decision.
