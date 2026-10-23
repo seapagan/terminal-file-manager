@@ -445,13 +445,13 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
 }
 
 fn create_directory(path: &Path) -> std::io::Result<()> {
-    let mut builder = fs::DirBuilder::new();
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
-        builder.mode(0o700);
+        fs::DirBuilder::new().mode(0o700).create(path)
     }
-    builder.create(path)
+    #[cfg(not(unix))]
+    fs::create_dir(path)
 }
 
 fn finish_permissions(source: &Entry, target: &Entry, created: bool) -> std::io::Result<()> {
