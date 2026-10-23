@@ -1,4 +1,13 @@
-# Post-v1 TODO
+# TODO
+
+## Pre-v1 compatibility
+
+Enable permission changes for unreadable owned files and directories on macOS
+before v1 without weakening object-identity or no-follow safety guarantees.
+The current implementation deliberately fails closed. Never introduce an unsafe
+pathname fallback.
+
+## Post-v1 TODO
 
 These items are deferred contracts, without dormant implementations. Each needs
 separate approved scope and review; none removes a v1 acceptance obligation.
