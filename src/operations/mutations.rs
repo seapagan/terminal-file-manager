@@ -92,8 +92,8 @@ fn perform(
     safety::revalidate(source, true)?;
     match plan.operation {
         Operation::Rename => rename(source, plan, result),
-        Operation::Permissions(mode) => attributes(source, Some(mode), None),
-        Operation::ReadOnly(value) => attributes(source, None, Some(value)),
+        Operation::Permissions(mode) => attributes(source, Some(mode), None, &parents),
+        Operation::ReadOnly(value) => attributes(source, None, Some(value), &parents),
         Operation::Delete => delete(source, plan, cancel, notify, record, depth, &parents),
         Operation::Trash => recycle(source, plan, cancel, result),
         _ => Err(io::Error::other("Unsupported mutation kind").into()),
@@ -142,7 +142,12 @@ fn rename_destination(plan: &Plan) -> io::Result<&std::path::Path> {
         .ok_or_else(|| io::Error::other("New name required"))
 }
 
-fn attributes(source: &Entry, mode: Option<u32>, readonly: Option<bool>) -> Result<()> {
+fn attributes(
+    source: &Entry,
+    mode: Option<u32>,
+    readonly: Option<bool>,
+    parents: &Parents,
+) -> Result<()> {
     if !matches!(source.kind, EntryKind::File | EntryKind::Directory) {
         return Err(
             io::Error::other("Attribute changes do not follow links/reparse points").into(),
@@ -152,8 +157,9 @@ fn attributes(source: &Entry, mode: Option<u32>, readonly: Option<bool>) -> Resu
     safety::opened_object(source, &file)?;
     let mut permissions = file.metadata()?.permissions();
     apply_permissions(&mut permissions, mode, readonly)?;
+    parents.validate()?;
     safety::revalidate(source, true)?;
-    file.set_permissions(permissions)?;
+    set_attributes(&file, permissions)?;
     Ok(())
 }
 
@@ -187,7 +193,12 @@ fn open_attributes(source: &Entry) -> io::Result<fs::File> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(nix::libc::O_NOFOLLOW | nix::libc::O_NONBLOCK);
+        let flags = nix::libc::O_NOFOLLOW | nix::libc::O_NONBLOCK;
+        #[cfg(target_os = "linux")]
+        let flags = flags | nix::libc::O_PATH;
+        #[cfg(target_os = "macos")]
+        let flags = flags | nix::libc::O_EVTONLY;
+        options.custom_flags(flags);
     }
     #[cfg(windows)]
     {
@@ -195,6 +206,55 @@ fn open_attributes(source: &Entry) -> io::Result<fs::File> {
         options.custom_flags(0x0220_0000).access_mode(0x0000_0180);
     }
     options.open(&source.path)
+}
+
+fn set_attributes(file: &fs::File, permissions: fs::Permissions) -> io::Result<()> {
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::fd::AsRawFd;
+        // O_PATH pins the object without read access; procfs resolves the held fd, not its old name.
+        fs::set_permissions(format!("/proc/self/fd/{}", file.as_raw_fd()), permissions)
+    }
+    #[cfg(not(target_os = "linux"))]
+    file.set_permissions(permissions)
+}
+
+#[cfg(all(test, unix))]
+mod attribute_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn attribute_descriptor_never_retargets_a_replacement_name_or_link() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("selected");
+        fs::write(&path, "selected bytes").unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
+        let selected = crate::fs::inspect(&path);
+        let file = open_attributes(&selected).unwrap();
+        safety::opened_object(&selected, &file).unwrap();
+        let retained = root.path().join("retained");
+        fs::rename(&path, &retained).unwrap();
+        let outside = root.path().join("outside");
+        fs::write(&outside, "sentinel").unwrap();
+        fs::set_permissions(&outside, fs::Permissions::from_mode(0o640)).unwrap();
+        std::os::unix::fs::symlink(&outside, &path).unwrap();
+        if let Ok(replacement) = open_attributes(&selected) {
+            assert!(safety::opened_object(&selected, &replacement).is_err());
+        }
+        assert!(safety::revalidate(&selected, true).is_err());
+        set_attributes(&file, fs::Permissions::from_mode(0o600)).unwrap();
+        assert_eq!(
+            fs::metadata(&retained).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert_eq!(
+            fs::metadata(&outside).unwrap().permissions().mode() & 0o777,
+            0o640
+        );
+        assert_eq!(fs::read(retained).unwrap(), b"selected bytes");
+        assert_eq!(fs::read(outside).unwrap(), b"sentinel");
+    }
 }
 
 fn delete(
