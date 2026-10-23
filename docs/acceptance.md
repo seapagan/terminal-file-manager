@@ -983,3 +983,70 @@ No suppression or threshold changed. Infrastructure and distribution tooling
 are unchanged; `verify-infra` and release rehearsal were not required or run.
 Hosted native results, all five workflows and Codacy for this correction source
 must be recorded after push. PR #3 remains draft and unmerged.
+
+### Correction-source native evidence and remaining static gate
+
+Immutable source `65d048472e2fd73c8152d4c2c25eb21374bb76f5` passed its unchanged
+clean local `RUSTUP_TOOLCHAIN=1.95.0 cargo make verify` in **46.71 s**:
+452 Linux tests, two existing child-entry skips, exact MSRV, package/security/
+coverage checks and mandatory xwin check, Clippy and build. The intermediate
+fixture-layout commit `32fc7e8` passed its clean gate in **40.35 s**.
+
+[Rust CI 40021352935](https://github.com/seapagan/terminal-file-manager/actions/runs/40021352935)
+passed, including exact MSRV, source quality and
+[combined native coverage](https://github.com/seapagan/terminal-file-manager/actions/runs/40021352935/job/120648939910).
+
+| Native host | Passed | Exercised correction contracts |
+| --- | ---: | --- |
+| [Linux / ubuntu-24.04](https://github.com/seapagan/terminal-file-manager/actions/runs/40021352935/job/120646421375) | 452 | Actual second-device Move/Rename refusal, directory finalisation/recovery, native exclusive rename and directory Trash, owned cleanup, raw-byte Rename, sparse allocation/bytes and atime |
+| [macOS / macos-15](https://github.com/seapagan/terminal-file-manager/actions/runs/40021352935/job/120646421486) | 432 | Directory finalisation/recovery, native exclusive file/directory/link rename, optional Trash receipt, APFS sparse Copy/Move and atime; approved unreadable-object chmod rejection remains intact |
+| [Windows / windows-2025](https://github.com/seapagan/terminal-file-manager/actions/runs/40021352935/job/120646421249) | 411 | Native no-clobber races and old-overwrite control, NTFS sparse Copy/Move/cancellation/allocation, directory recovery, typed Trash failure classification and native recycling, Unicode Rename and atime |
+
+Each host retained the two established child-entry skips; passing parent tests
+ran native Trash and terminal restoration. No new skip supplied this proof.
+[Policy](https://github.com/seapagan/terminal-file-manager/actions/runs/40021352908),
+[Source Package](https://github.com/seapagan/terminal-file-manager/actions/runs/40021352934),
+[GitHub Actions Security](https://github.com/seapagan/terminal-file-manager/actions/runs/40021352960)
+and [Advisory Quality](https://github.com/seapagan/terminal-file-manager/actions/runs/40021353007)
+also passed. Source quality retains the same four Lizard advisories. Cache
+restoration still emits nonfatal `ENOENT` annotations for generated packaged
+`tests/target` and `tests/trybuild` paths; subsequent jobs succeed.
+
+The first correction push exposed a package-content failure: the new nested
+`tests/common` helpers built but violated the existing root-test-only inventory.
+The correction moves them to `tests/volume_fixture.rs` and
+`tests/trash_fixture.rs`, following the existing fixture layout, and removes the
+added manifest include. The unchanged package analyser/enforcer passes locally
+and in the linked workflow. No package policy or workflow changed.
+
+Initial APFS tests also exposed a fixture assumption: the operating system
+allocated all **8,388,608 bytes** of the 8 MiB source before TFM ran, and all
+**1,048,576 bytes** of the small short-write output. Mount diagnostics confirmed
+APFS. The final Copy/Move fixture uses native seek/write to create **64 MiB** and
+requires source allocation below one quarter of logical size before execution.
+It then requires destination allocation below the same bound, SHA-256, complete
+bytes and correct source retention/removal. The 511-byte short-write test
+compares allocation against an independent native write/seek/length fixture on
+the same filesystem and still checks every byte and trailing length. Both
+tests ran and passed on macOS. These results establish preservation of proven
+sparse sources; they do not promise sparse storage for small files that APFS
+itself allocates densely. No broad APFS fidelity deferral or platform skip was
+introduced.
+
+[Codacy PR #3](https://app.codacy.com/gh/seapagan/terminal-file-manager/pull-requests/3)
+at this exact source reports **91.18% diff coverage (5,409/5,932)** and
+**−3.156 pp variation** against the unchanged **−1.0 pp** target. The variation
+remains under the maintainer's accepted M2 decrease. Combined collection and
+configured thresholds remain unchanged.
+
+**The static-analysis gate remains blocked by three new generic unsafe-use
+alerts** (`rust.lang.security.unsafe-usage.unsafe-usage`): Linux rename,
+Windows rename and Windows sparse control. They point to the native boundaries
+whose function-scoped unsafe allowances the maintainer approved. The audit
+checks live borrowed handles, initialized/sized buffers, lossless native paths,
+synchronous lifetimes and exclusive/no-fallback flags. Separate approval for
+five call-site scanner comments remains pending; no scanner suppression or
+remote finding disposition has been applied. This checkpoint does not declare
+Codacy green or waive the static gate. Crash recovery remains the explicit
+[pre-v1 reliability TODO](../TODO.md#pre-v1-reliability). PR #3 stays draft and
+unmerged pending the maintainer's decision.
