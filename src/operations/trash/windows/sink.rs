@@ -90,7 +90,7 @@ impl IFileOperationProgressSink_Impl for interface::Sink_Impl {
             .validate()
             .and_then(|()| safety::revalidate(&self.entry, true));
         if let Err(error) = checked {
-            self.observed.borrow_mut().refused = Some(error.detail);
+            self.observed.borrow_mut().refused = Some(error);
             return Err(Error::from_hresult(HRESULT(0x80004004_u32 as i32)));
         }
         Ok(())

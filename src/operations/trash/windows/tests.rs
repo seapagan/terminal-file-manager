@@ -1,6 +1,65 @@
 use super::*;
 use std::{fs, path::PathBuf};
 
+#[test]
+fn callback_refusal_preserves_known_failure_classification_only_with_retained_identity() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("selected");
+    fs::write(&path, "preserved").unwrap();
+    let entry = crate::fs::inspect(&path);
+    for outcome in [Outcome::Failed, Outcome::Changed, Outcome::Cancelled] {
+        let observed = Observed {
+            callbacks: Vec::new(),
+            refused: Some(Failure {
+                outcome,
+                detail: "known pre-delete failure".into(),
+            }),
+        };
+        let error = finish(&entry, &observed, Ok(()), Ok(true)).unwrap_err();
+        assert_eq!(error.outcome, outcome);
+        assert_eq!(error.detail, "known pre-delete failure");
+    }
+    fs::rename(&path, root.path().join("retained-original")).unwrap();
+    fs::write(&path, "foreign replacement").unwrap();
+    let observed = Observed {
+        callbacks: Vec::new(),
+        refused: Some(Failure {
+            outcome: Outcome::Failed,
+            detail: "known pre-delete failure".into(),
+        }),
+    };
+    assert_eq!(
+        finish(&entry, &observed, Ok(()), Ok(true))
+            .unwrap_err()
+            .outcome,
+        Outcome::OutcomeUnknown
+    );
+    assert_eq!(fs::read(path).unwrap(), b"foreign replacement");
+}
+
+#[test]
+fn a_refusal_never_masks_a_native_permanent_deletion_acknowledgement() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("selected");
+    fs::write(&path, "owned fixture").unwrap();
+    let observed = Observed {
+        callbacks: vec![Acknowledgement {
+            status: 0,
+            recycled: false,
+            metadata: Default::default(),
+            error: None,
+            parsing_name: None,
+        }],
+        refused: Some(Failure {
+            outcome: Outcome::Failed,
+            detail: "known refusal".into(),
+        }),
+    };
+    let error = finish(&crate::fs::inspect(&path), &observed, Ok(()), Ok(false)).unwrap_err();
+    assert_eq!(error.outcome, Outcome::SafetyIncident);
+    assert_eq!(fs::read(path).unwrap(), b"owned fixture");
+}
+
 fn fixture() -> Option<tempfile::TempDir> {
     if std::env::var("RUNNER_ENVIRONMENT").as_deref() != Ok("github-hosted") {
         eprintln!("NOT RUN: real Windows Trash requires an ephemeral hosted identity");

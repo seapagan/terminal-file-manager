@@ -44,23 +44,20 @@ fn trash_child() {
         std::env::var_os("TFM_NATIVE_TRASH_ROOT").expect("owned fixture required"),
     );
     let plan = Plan::paths(Operation::Trash, vec![root.join("selected")], None).unwrap();
+    #[cfg(not(windows))]
+    let selected_identity = plan.operands[0].identity.as_ref().unwrap().object;
     let record = execute(&plan, Options::default(), &false.into(), |_| Decision::Skip);
     assert_eq!(record.completed_files(), 0, "{:?}", record.entries);
     assert_eq!(record.completed_directories(), 1, "{:?}", record.entries);
     assert_eq!(record.entries.len(), 1, "one native top-level operation");
+    assert!(!root.join("selected").exists());
     let evidence = record.entries[0].trash.as_ref().unwrap();
     assert_eq!(
         (evidence.validated_files, evidence.validated_directories),
         (1, 2)
     );
     #[cfg(not(windows))]
-    {
-        let receipt = record.entries.last().unwrap().destination.as_ref().unwrap();
-        assert_eq!(
-            fs::read(receipt.join("nested/file")).unwrap(),
-            b"owned native fixture"
-        );
-    }
+    verify_recovery(&record.entries[0], selected_identity);
     #[cfg(windows)]
     {
         assert!(record.entries[0].destination.is_none());
@@ -75,6 +72,31 @@ fn trash_child() {
     println!("NATIVE_TRASH_EXERCISED");
     #[cfg(target_os = "linux")]
     trash_metadata_claim(&root);
+}
+
+#[cfg(not(windows))]
+fn verify_recovery(
+    entry: &terminal_file_manager::operations::EntryResult,
+    selected_identity: Option<(u64, u64)>,
+) {
+    if let Some(receipt) = entry.destination.as_ref() {
+        assert_eq!(
+            terminal_file_manager::fs::inspect(receipt)
+                .identity
+                .unwrap()
+                .object,
+            selected_identity
+        );
+        assert_eq!(
+            fs::read(receipt.join("nested/file")).unwrap(),
+            b"owned native fixture"
+        );
+    } else {
+        assert!(matches!(
+            entry.trash.as_ref().unwrap().receipt,
+            terminal_file_manager::operations::trash::Receipt::Mac { path: None }
+        ));
+    }
 }
 
 #[cfg(target_os = "linux")]

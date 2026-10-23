@@ -1,4 +1,6 @@
 use std::{fs, sync::atomic::AtomicBool};
+#[cfg(target_os = "linux")]
+mod common;
 use terminal_file_manager::operations::{
     Decision, Event, Operation, Options, Outcome, Plan, Stage, execute,
 };
@@ -68,7 +70,9 @@ fn native_mode_mtime_and_supported_names_survive_verified_copy() {
 fn cross_filesystem_move_verifies_commits_and_removes_only_the_source() {
     use std::os::unix::fs::MetadataExt;
     let root = tempfile::tempdir().unwrap();
-    let destination = tempfile::tempdir_in("/dev/shm").unwrap();
+    let Some(destination) = common::second_filesystem(root.path()) else {
+        return;
+    };
     assert_ne!(
         fs::metadata(root.path()).unwrap().dev(),
         fs::metadata(destination.path()).unwrap().dev()
@@ -90,6 +94,46 @@ fn cross_filesystem_move_verifies_commits_and_removes_only_the_source() {
         fs::read(destination.path().join("source")).unwrap(),
         b"cross filesystem payload"
     );
+    assert_ne!(
+        common::volume_root(root.path()),
+        common::volume_root(destination.path())
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn exclusive_rename_refuses_cross_device_files_and_directories_without_a_fallback() {
+    let root = tempfile::tempdir().unwrap();
+    let Some(target) = common::second_filesystem(root.path()) else {
+        return;
+    };
+    for directory in [false, true] {
+        let source = root
+            .path()
+            .join(if directory { "directory" } else { "file" });
+        let destination = target.path().join(source.file_name().unwrap());
+        let payload = if directory {
+            fs::create_dir(&source).unwrap();
+            source.join("payload")
+        } else {
+            source.clone()
+        };
+        fs::write(&payload, "retained bytes").unwrap();
+        let plan = Plan::paths(
+            Operation::Rename,
+            vec![source.clone()],
+            Some(destination.clone()),
+        )
+        .unwrap();
+        let record = execute(&plan, Options::default(), &false.into(), |_| Decision::Skip);
+        assert_eq!(record.entries[0].outcome, Outcome::Failed, "{record:?}");
+        assert_eq!(
+            terminal_file_manager::fs::inspect(&source).identity,
+            plan.operands[0].identity
+        );
+        assert_eq!(fs::read(payload).unwrap(), b"retained bytes");
+        assert!(!destination.exists());
+    }
 }
 
 #[test]

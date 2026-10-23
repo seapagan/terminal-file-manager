@@ -11,6 +11,8 @@ use std::{
     sync::atomic::AtomicBool,
 };
 
+mod sparse;
+
 pub(super) fn copy(
     source: &Entry,
     destination: &mut File,
@@ -20,13 +22,45 @@ pub(super) fn copy(
 ) -> Result<u64> {
     let mut input = opened(source)?;
     let metadata = input.metadata()?;
-    let (bytes, digest) = payload(&mut input, destination, options.checksum, cancel, progress)?;
+    let allocation = sparse::prepare(&input, destination, &metadata)?;
+    let (bytes, digest) =
+        file_payload(&mut input, destination, options.checksum, cancel, progress)?;
     safety::revalidate(source, true)?;
     metadata_verification(destination, &metadata, bytes)?;
+    finish_metadata(destination, &metadata, digest, cancel)?;
+    sparse::verify(allocation, metadata.len(), destination)?;
+    Ok(bytes)
+}
+
+fn file_payload(
+    input: &mut File,
+    destination: &mut File,
+    checksum: bool,
+    cancel: &AtomicBool,
+    progress: &mut impl FnMut(u64),
+) -> Result<(u64, Option<[u8; 32]>)> {
+    let mut output = sparse::Writer::new(destination);
+    let copied = payload(input, &mut output, checksum, cancel, progress)?;
+    output.finish(copied.0)?;
+    Ok(copied)
+}
+
+fn finish_metadata(
+    destination: &mut File,
+    metadata: &Metadata,
+    digest: Option<[u8; 32]>,
+    cancel: &AtomicBool,
+) -> Result<()> {
     if let Some(digest) = digest {
         checksum_verification(destination, digest, cancel)?;
     }
-    Ok(bytes)
+    destination.set_times(
+        fs::FileTimes::new()
+            .set_modified(metadata.modified()?)
+            .set_accessed(metadata.accessed()?),
+    )?;
+    destination.sync_all()?;
+    Ok(())
 }
 
 fn opened(source: &Entry) -> Result<File> {
@@ -75,9 +109,7 @@ fn metadata_verification(destination: &mut File, source: &Metadata, bytes: u64) 
         return Err(safety::changed("Source byte count changed during read"));
     }
     destination.set_permissions(source.permissions())?;
-    destination.set_times(fs::FileTimes::new().set_modified(source.modified()?))?;
     destination.flush()?;
-    destination.sync_all()?;
     if destination.metadata()?.len() != bytes {
         return Err(safety::changed("Staged destination size mismatch"));
     }

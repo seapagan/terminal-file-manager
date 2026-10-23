@@ -90,10 +90,25 @@ fn cancelling_at_a_conflict_stops_subsequent_operands() {
     let record = execute(&plan, Options::default(), &false.into(), |_| {
         Decision::Cancel
     });
+    assert_eq!(
+        record.entries.len(),
+        1,
+        "later operands must not be dispatched"
+    );
+    assert_eq!(record.entries[0].source, root.path().join("a"));
+    assert_eq!(
+        record.entries[0].destination,
+        Some(root.path().join("target/a"))
+    );
+    assert_eq!(record.entries[0].bytes, 0);
+    assert!(record.entries[0].recovery.is_none());
     assert!(root.path().join("a").exists());
     assert!(root.path().join("b").exists());
     assert!(!root.path().join("target/b").exists());
     assert_eq!(record.entries[0].outcome, Outcome::Cancelled);
+    assert_eq!(fs::read(root.path().join("a")).unwrap(), b"incoming");
+    assert_eq!(fs::read(root.path().join("b")).unwrap(), b"incoming");
+    assert_eq!(fs::read(root.path().join("target/a")).unwrap(), b"previous");
 }
 
 #[test]

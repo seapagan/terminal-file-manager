@@ -38,7 +38,7 @@ fn an_all_skipped_conflict_job_never_claims_completion() {
     assert_eq!(record.entries[0].outcome, Outcome::Skipped);
     assert_eq!(record.completed_files(), 0);
     job.finish(record, job.started + Duration::from_secs(2));
-    assert_eq!(format!("{:?}", job.state), "Skipped");
+    assert_eq!(job.state, JobState::Skipped);
     assert_eq!(
         fs::read(root.path().join("target/source")).unwrap(),
         b"existing"
@@ -49,16 +49,19 @@ fn an_all_skipped_conflict_job_never_claims_completion() {
 fn job_outcome_precedence_keeps_partial_unknown_and_critical_distinct() {
     use Outcome::*;
     let cases = [
-        (vec![], "Skipped"),
-        (vec![Completed], "Completed"),
-        (vec![Completed, Skipped], "Partial"),
-        (vec![Changed], "Failed"),
-        (vec![Failed], "Failed"),
-        (vec![CopiedSourceRetained], "Partial"),
-        (vec![Completed, Failed], "Partial"),
-        (vec![Cancelled, Failed], "Cancelled"),
-        (vec![OutcomeUnknown, Cancelled], "Unknown"),
-        (vec![SafetyIncident, OutcomeUnknown, Completed], "Critical"),
+        (vec![], JobState::Skipped),
+        (vec![Completed], JobState::Completed),
+        (vec![Completed, Skipped], JobState::Partial),
+        (vec![Changed], JobState::Failed),
+        (vec![Failed], JobState::Failed),
+        (vec![CopiedSourceRetained], JobState::Partial),
+        (vec![Completed, Failed], JobState::Partial),
+        (vec![Cancelled, Failed], JobState::Cancelled),
+        (vec![OutcomeUnknown, Cancelled], JobState::Unknown),
+        (
+            vec![SafetyIncident, OutcomeUnknown, Completed],
+            JobState::Critical,
+        ),
     ];
     let (_, mut job, record) = fixture();
     for (outcomes, expected) in cases {
@@ -71,7 +74,7 @@ fn job_outcome_precedence_keeps_partial_unknown_and_critical_distinct() {
             })
             .collect();
         job.finish(Record { entries }, job.started + Duration::from_secs(4));
-        assert_eq!(format!("{:?}", job.state), expected);
+        assert_eq!(job.state, expected);
     }
 }
 

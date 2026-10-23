@@ -43,11 +43,12 @@ fn different_volume(source: &Entry) -> io::Result<bool> {
         .parent()
         .ok_or_else(|| io::Error::other("Root mutation refused"))?;
     let device = fs::metadata(parent)?.dev();
-    Ok(source
+    let object = source
         .identity
         .as_ref()
         .and_then(|identity| identity.object)
-        .is_none_or(|object| object.0 != device))
+        .ok_or_else(|| io::Error::other("Source device identity unavailable; mutation refused"))?;
+    Ok(object.0 != device)
 }
 
 #[cfg(windows)]
@@ -117,6 +118,27 @@ pub(super) fn decode_path(field: &[u8]) -> io::Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn missing_device_identity_is_an_explicit_failure_not_a_mount_mismatch() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source");
+        fs::write(&source, "preserved").unwrap();
+        let mut entry = crate::fs::inspect(&source);
+        entry.identity.as_mut().unwrap().object = None;
+        let mounts = Mounts {
+            enabled: true,
+            roots: BTreeSet::new(),
+        };
+        let error = mounts.reject(&entry).unwrap_err();
+        assert_eq!(error.outcome, super::super::Outcome::Failed);
+        assert_eq!(
+            error.detail,
+            "Source device identity unavailable; mutation refused"
+        );
+        assert_eq!(fs::read(source).unwrap(), b"preserved");
+    }
 
     #[cfg(target_os = "linux")]
     #[test]

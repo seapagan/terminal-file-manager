@@ -89,6 +89,7 @@ impl OwnedStage {
     }
 
     pub fn create(destination: &Path, link: Option<&Entry>) -> Result<Self> {
+        let parents = Parents::capture(destination)?;
         let parent = destination
             .parent()
             .ok_or_else(|| invalid("Destination lacks parent"))?;
@@ -99,20 +100,22 @@ impl OwnedStage {
         let root = crate::fs::inspect(&root);
         let path = root.path.join("payload");
         let file = if let Some(source) = link {
-            create_link(source, &path)?;
-            None
+            create_link(source, &path).map(|()| None)
         } else {
-            Some(
-                OpenOptions::new()
-                    .write(true)
-                    .read(true)
-                    .create_new(true)
-                    .open(&path)?,
-            )
+            OpenOptions::new()
+                .write(true)
+                .read(true)
+                .create_new(true)
+                .open(&path)
+                .map(Some)
+        };
+        let file = match file {
+            Ok(file) => file,
+            Err(error) => return Err(construction_failure(&root, &parents, error)),
         };
         Ok(Self {
             entry: crate::fs::inspect(&path),
-            parents: Parents::capture(&path)?,
+            parents,
             path,
             file,
             root,
@@ -166,6 +169,24 @@ impl OwnedStage {
         safety::revalidate(&expected, true)?;
         Ok(crate::fs::inspect(destination))
     }
+}
+
+fn construction_failure(root: &Entry, parents: &Parents, error: io::Error) -> safety::Failure {
+    let cleanup = parents
+        .validate()
+        .and_then(|()| safety::revalidate(root, false))
+        .and_then(|()| fs::remove_dir(&root.path).map_err(Into::into));
+    if let Err(cleanup) = cleanup {
+        return safety::Failure {
+            outcome: Outcome::OutcomeUnknown,
+            detail: format!(
+                "Stage construction failed: {error}; cleanup unverified at {}: {}",
+                root.path.display(),
+                cleanup.detail
+            ),
+        };
+    }
+    error.into()
 }
 
 pub(super) fn open_source(path: &Path) -> io::Result<File> {
@@ -223,6 +244,48 @@ fn create_link(source: &Entry, destination: &Path) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn failed_payload_creation_removes_only_the_new_empty_stage() {
+        use std::os::unix::ffi::OsStringExt;
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source");
+        fs::write(&source, "original bytes").unwrap();
+        let mut link = crate::fs::inspect(&source);
+        link.link_target = Some(std::ffi::OsString::from_vec(b"invalid\0target".to_vec()).into());
+        assert!(OwnedStage::create(&root.path().join("target"), Some(&link)).is_err());
+        assert_eq!(
+            fs::read_dir(root.path()).unwrap().count(),
+            1,
+            "empty stage leaked"
+        );
+        assert_eq!(fs::read(source).unwrap(), b"original bytes");
+    }
+
+    #[test]
+    fn construction_cleanup_preserves_foreign_content_and_replacement_directories() {
+        for replacement in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let path = root.path().join("stage");
+            fs::create_dir(&path).unwrap();
+            let owned = crate::fs::inspect(&path);
+            let parents = Parents::capture(&path).unwrap();
+            if replacement {
+                fs::rename(&path, root.path().join("retained-owned")).unwrap();
+                fs::create_dir(&path).unwrap();
+            }
+            fs::write(path.join("unrelated"), "preserved").unwrap();
+            let error = construction_failure(
+                &owned,
+                &parents,
+                io::Error::other("injected creation failure"),
+            );
+            assert_eq!(error.outcome, Outcome::OutcomeUnknown);
+            assert_eq!(fs::read(path.join("unrelated")).unwrap(), b"preserved");
+            assert!(path.is_dir());
+        }
+    }
 
     #[test]
     fn failed_no_clobber_commit_keeps_existing_data_and_cleans_only_its_owned_stage() {

@@ -71,7 +71,7 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
             };
             let destination = self.plan.target(entry);
             self.entry(entry, destination.as_deref(), 0);
-            if self.record.unresolved() {
+            if self.record.unresolved() || self.cancel.load(Ordering::Relaxed) {
                 break;
             }
         }

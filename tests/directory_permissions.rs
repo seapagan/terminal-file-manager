@@ -9,6 +9,8 @@ use std::{
 use terminal_file_manager::operations::{
     Decision, Event, Operation, Options, Outcome, Plan, Stage, execute,
 };
+#[cfg(target_os = "linux")]
+mod common;
 
 fn mode(path: &Path) -> u32 {
     fs::metadata(path).unwrap().permissions().mode() & 0o7777
@@ -93,12 +95,18 @@ fn cancelled_recursive_copy_and_move_keep_new_ancestors_private() {
 fn cancelled_cross_filesystem_directory_move_keeps_new_ancestors_private() {
     use std::os::unix::fs::MetadataExt;
     let root = fixture();
-    let target = tempfile::tempdir_in("/dev/shm").unwrap();
+    let Some(target) = common::second_filesystem(root.path()) else {
+        return;
+    };
     assert_ne!(
         fs::metadata(root.path()).unwrap().dev(),
         fs::metadata(target.path()).unwrap().dev()
     );
     cancelled_copy(root.path(), target.path(), Operation::Move);
+    assert_ne!(
+        common::volume_root(root.path()),
+        common::volume_root(target.path())
+    );
 }
 
 #[test]

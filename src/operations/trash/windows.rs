@@ -34,7 +34,7 @@ mod tests;
 #[derive(Default)]
 struct Observed {
     callbacks: Vec<Acknowledgement>,
-    refused: Option<String>,
+    refused: Option<Failure>,
 }
 
 pub(super) fn put(entry: &Entry, cancel: &AtomicBool) -> Result<Receipt> {
@@ -168,7 +168,10 @@ fn finish(
         && retained
         && let Some(reason) = &observed.refused
     {
-        return Err(safety::changed(reason));
+        return Err(Failure {
+            outcome: reason.outcome,
+            detail: reason.detail.clone(),
+        });
     }
     acknowledgement::classify(
         performed.is_ok(),
