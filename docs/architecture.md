@@ -87,10 +87,12 @@ Linux permission edits pin the selected object with `O_PATH | O_NOFOLLOW` and
 change its mode through the held descriptor's `/proc/self/fd` reference. They
 require accessible procfs, but no content-read permission. Parent/namespace and
 selected-object checks precede chmod; a replacement name cannot retarget the
-held descriptor. Windows retains its native attribute handle. macOS still
-rejects unreadable objects: native tests show that `O_EVTONLY` requires read
-permission on the tested host. A macOS pathname fallback would weaken the
-selected-inode guarantee and remains subject to maintainer approval.
+held descriptor. Windows retains its native attribute handle. macOS keeps its
+no-follow read handle and rejects unreadable objects, as the maintainer approved
+on 23 October 2026. Native tests showed that `O_EVTONLY` could not remove the
+read requirement. A pathname fallback would weaken the selected-inode guarantee
+and is not permitted. Native regressions check unchanged modes/identity on
+rejection and descriptor safety for readable macOS objects.
 
 Workers check parent identity and namespace around reads, commit and source
 removal. A move removes each source only after destination commit and fresh

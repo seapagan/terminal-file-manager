@@ -2,8 +2,7 @@ use std::fs;
 use terminal_file_manager::operations::{Decision, Operation, Options, Outcome, Plan, execute};
 
 #[cfg(unix)]
-#[test]
-fn owned_unreadable_file_and_directory_modes_can_be_restored_without_read_access() {
+fn unreadable_attribute_results() -> Vec<(Outcome, u32, u32)> {
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
     assert!(
         !nix::unistd::geteuid().is_root(),
@@ -32,7 +31,26 @@ fn owned_unreadable_file_and_directory_modes_can_be_restored_without_read_access
     }
     assert_eq!(fs::read(file).unwrap(), b"retained bytes");
     assert_eq!(fs::read(directory.join("child")).unwrap(), b"child bytes");
+    results
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn owned_unreadable_file_and_directory_modes_can_be_restored_without_read_access() {
+    let results = unreadable_attribute_results();
     assert!(results.iter().all(|(outcome, actual, expected)| *outcome == Outcome::Completed && actual == expected), "{results:?}");
+}
+
+#[cfg(all(unix, not(target_os = "linux")))]
+#[test]
+fn unreadable_unix_attribute_edits_fail_closed_when_identity_cannot_be_pinned() {
+    let results = unreadable_attribute_results();
+    assert!(
+        results
+            .iter()
+            .all(|(outcome, actual, _)| *outcome == Outcome::Failed && *actual == 0),
+        "{results:?}"
+    );
 }
 
 #[cfg(unix)]

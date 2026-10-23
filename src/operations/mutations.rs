@@ -196,8 +196,6 @@ fn open_attributes(source: &Entry) -> io::Result<fs::File> {
         let flags = nix::libc::O_NOFOLLOW | nix::libc::O_NONBLOCK;
         #[cfg(target_os = "linux")]
         let flags = flags | nix::libc::O_PATH;
-        #[cfg(target_os = "macos")]
-        let flags = flags | nix::libc::O_EVTONLY;
         options.custom_flags(flags);
     }
     #[cfg(windows)]
@@ -229,7 +227,12 @@ mod attribute_tests {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("selected");
         fs::write(&path, "selected bytes").unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
+        let mode = if cfg!(target_os = "linux") {
+            0o000
+        } else {
+            0o400
+        };
+        fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
         let selected = crate::fs::inspect(&path);
         let file = open_attributes(&selected).unwrap();
         safety::opened_object(&selected, &file).unwrap();

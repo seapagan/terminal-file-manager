@@ -809,3 +809,27 @@ passed. Codacy static analysis succeeded with zero check annotations; no new
 combined variation was published. The final source-identity guard has an
 additional local RED/GREEN regression (**424 Linux tests passed**); native and
 clean-gate evidence for that follow-up must be recorded separately.
+
+### 23 October follow-up: approved macOS capability limit
+
+The maintainer chose **“Keep macOS safely blocked; do not weaken identity.”**
+This decision supersedes the pending-approval language in the checkpoint above.
+Unreadable macOS files/directories remain unsupported for permission edits;
+they fail visibly without changing mode or native identity. TFM does not use a
+pathname fallback, private entitlement or weaker selected-object assurance.
+The ineffective `O_EVTONLY` addition was removed; readable macOS objects keep
+the existing no-follow read handle and descriptor-based chmod.
+
+Linux's
+`owned_unreadable_file_and_directory_modes_can_be_restored_without_read_access`
+retains its successful `0000 → 0600` / `0000 → 0700` assertions. The separate
+macOS regression
+`unreadable_unix_attribute_edits_fail_closed_when_identity_cannot_be_pinned`
+requires `Failed` results, unchanged native identity and mode `0000`, and
+retained file/child bytes before fixture cleanup. This is the approved macOS
+capability contract, not a skipped restoration claim.
+`attribute_descriptor_never_retargets_a_replacement_name_or_link` keeps the
+Linux unreadable-handle case and uses a readable `0400` macOS fixture to prove
+that normal supported attribute edits cannot retarget a replacement. No new
+ignore, lint suppression or dependency exception was added. Native results for
+this approved policy follow below.
