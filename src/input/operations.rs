@@ -203,16 +203,24 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
         return true;
     }
     if controller.app.operations.waiting_exit.is_some() {
-        if matches!(event, Event::Key(key) if key.code == KeyCode::Esc) {
-            controller.app.operations.waiting_exit = None;
-            controller.app.operations.exit_snapshot = None;
-        }
+        waiting(controller, event, geometry);
         return true;
     }
     if editing_surface(controller) {
         return false;
     }
     super::operation_jobs::handle(controller, event, geometry)
+}
+
+fn waiting(controller: &mut Controller, event: &Event, geometry: &Geometry) {
+    if !editing_surface(controller) && super::operation_jobs::handle(controller, event, geometry) {
+        return;
+    }
+    if matches!(event, Event::Key(key) if key.code == KeyCode::Esc && key.kind == KeyEventKind::Press)
+    {
+        controller.app.operations.waiting_exit = None;
+        controller.app.operations.exit_snapshot = None;
+    }
 }
 
 fn scroll(controller: &mut Controller, event: &Event, geometry: &Geometry) -> bool {

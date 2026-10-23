@@ -77,10 +77,10 @@ fn operation(dialog: &crate::operations::OperationDialog, narrow: bool) -> Vec<B
 fn history(app: &App, narrow: bool) -> Vec<Button> {
     let mut buttons = Vec::new();
     if let Some(job) = app.operations.history.get(app.operations.cursor) {
-        if job.can_reconcile() {
+        if app.operations.waiting_exit.is_none() && job.can_reconcile() {
             buttons.push(("X Reconcile", KeyCode::Char('x')));
         }
-        if job.can_retry() {
+        if app.operations.waiting_exit.is_none() && job.can_retry() {
             buttons.push((
                 if narrow {
                     "R Retry"

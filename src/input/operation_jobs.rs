@@ -185,6 +185,9 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
 
 fn history_key(controller: &mut Controller, key: KeyCode) {
     let state = &mut controller.app.operations;
+    if state.waiting_exit.is_some() && matches!(key, KeyCode::Char('r' | 'R' | 'x' | 'X')) {
+        return;
+    }
     match key {
         KeyCode::Esc | KeyCode::F(9) => state.show_history = false,
         KeyCode::Up | KeyCode::Char('k') => {
