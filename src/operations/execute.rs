@@ -202,7 +202,7 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
         let target_parents = Parents::capture(destination)?;
         safety::destination_matches(destination, previous)?;
         if previous.is_none() {
-            fs::create_dir(destination)?;
+            create_directory(destination)?;
             result.created_directory = true;
         }
         let target = crate::fs::inspect(destination);
@@ -215,7 +215,12 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
             result.outcome = Outcome::CopiedSourceRetained;
             return Ok(());
         }
-        self.finish_directory(source, &target, [&guards[0], &guards[1]])
+        self.finish_directory(
+            source,
+            &target,
+            [&guards[0], &guards[1]],
+            result.created_directory,
+        )
     }
 
     fn children(
@@ -250,13 +255,12 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
         source: &Entry,
         target: &Entry,
         guards: [&Parents; 2],
+        created: bool,
     ) -> Result<()> {
+        self.check_cancel()?;
         guards[1].validate()?;
         safety::revalidate(target, false)?;
-        fs::set_permissions(
-            &target.path,
-            fs::symlink_metadata(&source.path)?.permissions(),
-        )?;
+        finish_permissions(source, target, created)?;
         if self.plan.operation == Operation::Move {
             self.check_cancel()?;
             guards[0].validate()?;
@@ -438,6 +442,26 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
             Ok(())
         }
     }
+}
+
+fn create_directory(path: &Path) -> std::io::Result<()> {
+    let mut builder = fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(path)
+}
+
+fn finish_permissions(source: &Entry, target: &Entry, created: bool) -> std::io::Result<()> {
+    if created {
+        fs::set_permissions(
+            &target.path,
+            fs::symlink_metadata(&source.path)?.permissions(),
+        )?;
+    }
+    Ok(())
 }
 
 fn keep_both(path: &Path) -> Result<PathBuf> {
