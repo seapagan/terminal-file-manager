@@ -181,8 +181,7 @@ fn apply_fields(dialog: &mut OperationDialog) -> io::Result<()> {
             dialog.plan.set_destination(typed_path(dialog)?);
         }
         Operation::Rename => {
-            validate_name(&dialog.text)?;
-            dialog.plan.set_destination(dialog.base.join(&dialog.text));
+            dialog.plan.set_destination(rename_target(dialog)?);
         }
         Operation::Permissions(_) => {
             let mode = u32::from_str_radix(dialog.text.trim().trim_start_matches("0o"), 8)
@@ -204,6 +203,16 @@ fn apply_fields(dialog: &mut OperationDialog) -> io::Result<()> {
         _ => {}
     }
     Ok(())
+}
+
+fn rename_target(dialog: &OperationDialog) -> io::Result<PathBuf> {
+    if !dialog.edited && dialog.plan.operands[0].name.to_str().is_none() {
+        return Err(io::Error::other(
+            "Native name is display only; Ctrl+A and enter a replacement filename",
+        ));
+    }
+    validate_name(&dialog.text)?;
+    Ok(dialog.base.join(&dialog.text))
 }
 
 fn target(dialog: &OperationDialog) -> io::Result<PathBuf> {

@@ -376,7 +376,7 @@ fn conflict_arrow_choice_and_scroll_use_the_visible_operation_geometry() {
         key(&mut controller, KeyCode::PageDown);
     }
     let geometry = ui::geometry(&controller.app, Rect::new(0, 0, 120, 30));
-    assert!(controller.app.operations.scroll <= usize::from(geometry.operation_scroll_limit));
+    assert!(controller.app.operations.scroll <= geometry.operation_scroll_limit);
     key(&mut controller, KeyCode::Down);
     key(&mut controller, KeyCode::Enter);
     assert!(matches!(

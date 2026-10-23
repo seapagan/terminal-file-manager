@@ -7,11 +7,13 @@ pub(super) struct Layout {
     pub body: Rect,
     pub list: Rect,
     pub buttons: Vec<OperationControl>,
+    pub rows: Vec<content::Row>,
 }
 
 impl Layout {
     pub fn new(app: &App, terminal: Rect) -> Self {
-        let width = desired_width(app).min(
+        let rows = content::rows(app);
+        let width = desired_width(app, &rows).min(
             terminal
                 .width
                 .saturating_sub(u16::from(terminal.width > 4) * 2),
@@ -20,9 +22,9 @@ impl Layout {
         let inner = width.saturating_sub(padding * 2);
         let buttons = pack(app, inner);
         let button_rows = buttons.last().map_or(0, |button| button.area.y + 1);
-        let rows = content::wrapped(app, inner).len().min(u16::MAX as usize) as u16;
+        let rows = content::wrapped(rows, inner);
         let list_rows = list_rows(app, terminal.height);
-        let height = (rows
+        let height = ((rows.len().min(u16::MAX as usize) as u16)
             .saturating_add(list_rows)
             .saturating_add(button_rows)
             .saturating_add(4))
@@ -51,12 +53,12 @@ impl Layout {
             inner,
             button_top.saturating_sub(content_top).saturating_sub(1),
         );
-        let buttons = position(buttons, list, button_top, outer);
         Self {
             outer,
             body,
             list,
-            buttons,
+            buttons: position(buttons, list, button_top, outer),
+            rows,
         }
     }
 
@@ -65,16 +67,15 @@ impl Layout {
     }
 }
 
-fn desired_width(app: &App) -> u16 {
-    let longest = content::rows(app)
-        .iter()
-        .map(|row| Line::raw(super::super::clean(&row.text)).width())
-        .max()
-        .unwrap_or(0);
-    (longest
-        .max(Line::raw(content::title(app)).width())
-        .saturating_add(4))
-    .clamp(38, 88) as u16
+fn desired_width(app: &App, rows: &[content::Row]) -> u16 {
+    let mut longest = Line::raw(content::title(app)).width();
+    for row in rows {
+        longest = longest.max(Line::raw(super::super::clean(&row.text)).width());
+        if longest >= 84 {
+            return 88;
+        }
+    }
+    longest.saturating_add(4).clamp(38, 88) as u16
 }
 
 fn pack(app: &App, width: u16) -> Vec<OperationControl> {

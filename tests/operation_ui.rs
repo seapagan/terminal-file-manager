@@ -335,7 +335,7 @@ fn mouse_and_keyboard_select_jobs_while_detail_scroll_stays_bounded() {
         &geometry,
         Duration::ZERO,
     );
-    assert!(controller.app.operations.scroll <= usize::from(geometry.operation_scroll_limit));
+    assert!(controller.app.operations.scroll <= geometry.operation_scroll_limit);
     assert!(controller.app.operations.outbox.is_empty());
 }
 

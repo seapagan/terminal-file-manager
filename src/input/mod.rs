@@ -16,7 +16,7 @@ pub(crate) mod view;
 pub use bindings::{Bindings, chord};
 pub use controller::Controller;
 
-/// Only read-only M1 actions execute; later actions explain their unavailability.
+/// Browser and local-operation actions share dispatch; later milestones explain unavailability.
 #[derive(
     Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize,
 )]

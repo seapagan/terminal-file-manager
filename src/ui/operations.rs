@@ -41,14 +41,14 @@ pub(super) fn visible(app: &App) -> bool {
             || app.operations.waiting_exit.is_some())
 }
 
-pub(super) fn controls(app: &App, terminal: Rect) -> Vec<OperationControl> {
+pub(super) fn geometry(app: &App, terminal: Rect) -> (Vec<OperationControl>, usize) {
     if !visible(app) {
-        return Vec::new();
+        return (Vec::new(), 0);
     }
     let layout = Layout::new(app, terminal);
     let mut controls = layout.buttons.clone();
     controls.extend(jobs::controls(app, layout.list));
-    let rows = content::wrapped(app, layout.body.width);
+    let rows = &layout.rows;
     let scroll = app.operations.scroll.min(layout.limit(rows.len()));
     for (offset, row) in rows
         .iter()
@@ -71,21 +71,11 @@ pub(super) fn controls(app: &App, terminal: Rect) -> Vec<OperationControl> {
             });
         }
     }
-    controls
+    (controls, layout.limit(rows.len()))
 }
 
-pub(super) fn scroll_limit(app: &App, terminal: Rect) -> u16 {
-    if !visible(app) {
-        return 0;
-    }
-    let layout = Layout::new(app, terminal);
-    layout
-        .limit(content::wrapped(app, layout.body.width).len())
-        .min(u16::MAX as usize) as u16
-}
-
-pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, controls: &[OperationControl]) {
-    notices(frame, app, theme);
+pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, geometry: &super::Geometry) {
+    notices(frame, app, theme, geometry.status);
     if !visible(app) {
         return;
     }
@@ -100,14 +90,17 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, controls: &[Op
         layout.outer,
     );
     jobs::render(frame, app, theme, layout.list);
-    let rows = content::wrapped(app, layout.body.width);
+    let rows = &layout.rows;
     let scroll = app.operations.scroll.min(layout.limit(rows.len()));
-    let text: Vec<_> = rows
+    let text: Vec<_> = layout
+        .rows
         .into_iter()
+        .skip(scroll)
+        .take(usize::from(layout.body.height))
         .map(|row| Line::styled(row.text, theme.style(row.role)))
         .collect();
-    frame.render_widget(Paragraph::new(text).scroll((scroll as u16, 0)), layout.body);
-    for control in controls {
+    frame.render_widget(Paragraph::new(text), layout.body);
+    for control in &geometry.operation_controls {
         if matches!(control.target, OperationTarget::Key(_)) {
             frame.render_widget(
                 Paragraph::new(format!("[{}]", control.label)).style(theme.style(Role::Key)),
@@ -117,7 +110,7 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, controls: &[Op
     }
 }
 
-fn notices(frame: &mut Frame, app: &App, theme: &Theme) {
+fn notices(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
     if app.diagnostics
         || app.help
         || app.popup
@@ -126,7 +119,6 @@ fn notices(frame: &mut Frame, app: &App, theme: &Theme) {
     {
         return;
     }
-    let area = super::geometry(app, frame.area()).status;
     let notice = if app.operations.incidents() {
         Some((
             "CRITICAL · F9 details: OS reported permanent deletion during F8 Trash".to_owned(),

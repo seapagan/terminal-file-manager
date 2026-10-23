@@ -27,18 +27,18 @@ use ratatui::{Frame, layout::Rect, widgets::Paragraph};
 
 /// Escape terminal controls and bidi formatting in every untrusted display string.
 pub fn clean(text: &str) -> String {
-    text.chars()
-        .flat_map(|c| {
-            if c.is_control()
-                || matches!(c, '\u{200e}' | '\u{200f}' | '\u{61c}' | '\u{2028}' | '\u{2029}'
+    let mut output = String::with_capacity(text.len());
+    for c in text.chars() {
+        if c.is_control()
+            || matches!(c, '\u{200e}' | '\u{200f}' | '\u{61c}' | '\u{2028}' | '\u{2029}'
                     | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
-            {
-                c.escape_default().collect::<Vec<_>>()
-            } else {
-                vec![c]
-            }
-        })
-        .collect()
+        {
+            output.extend(c.escape_default());
+        } else {
+            output.push(c);
+        }
+    }
+    output
 }
 
 /// Draw a frame using the same geometry used by mouse hit testing.
@@ -76,7 +76,7 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     if let Some(lines) = diagnostics {
         diagnostics::render(frame, app, theme, &mut geometry, lines);
     }
-    operations::render(frame, app, theme, &geometry.operation_controls);
+    operations::render(frame, app, theme, &geometry);
     geometry
 }
 
@@ -89,4 +89,14 @@ pub(super) fn centered(area: Rect, width: u16, height: u16) -> Rect {
         width,
         height,
     )
+}
+
+#[cfg(test)]
+mod clean_tests {
+    #[test]
+    fn terminal_controls_and_direction_overrides_are_escaped_without_changing_text() {
+        assert_eq!(super::clean("a\u{1b}[31m\n"), "a\\u{1b}[31m\\n");
+        assert_eq!(super::clean("\u{202e}x\u{2069}"), "\\u{202e}x\\u{2069}");
+        assert_eq!(super::clean("normal λ界👩"), "normal λ界👩");
+    }
 }

@@ -176,7 +176,10 @@ fn validate_single(plan: &Plan) -> std::io::Result<()> {
 fn initial_text(plan: &Plan, target: &std::path::Path) -> String {
     match plan.operation {
         Operation::Mkdir => String::new(),
-        Operation::Rename => plan.operands[0].name.to_str().unwrap_or("").into(),
+        Operation::Rename => plan.operands[0]
+            .name
+            .to_str()
+            .map_or_else(|| format!("{:?}", plan.operands[0].name), str::to_owned),
         Operation::Permissions(_) => format!("{:04o}", plan.operands[0].mode.unwrap_or(0) & 0o7777),
         Operation::ReadOnly(_) => "true".into(),
         _ => target.to_str().unwrap_or("").into(),
@@ -235,10 +238,11 @@ fn scroll(controller: &mut Controller, event: &Event, geometry: &Geometry) -> bo
     if state.dialog.is_none() && !state.show_history && state.conflicts.is_empty() {
         return false;
     }
-    let limit = usize::from(geometry.operation_scroll_limit);
+    let limit = geometry.operation_scroll_limit;
     state.scroll = state.scroll.min(limit);
     let delta = match event {
         Event::Key(key) => match key.code {
+            KeyCode::PageUp | KeyCode::PageDown if key.kind != KeyEventKind::Press => return true,
             KeyCode::PageUp => -8,
             KeyCode::PageDown => 8,
             _ => return false,

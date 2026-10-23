@@ -497,9 +497,6 @@ fn unavailable(action: Action) -> Option<&'static str> {
         Action::Viewer | Action::Editor => {
             Some("Viewer/editor unavailable until M6; files are never launched")
         }
-        Action::Copy | Action::Move | Action::Mkdir | Action::Trash | Action::Delete => {
-            Some("File mutations unavailable until M2 — M1 is read-only")
-        }
         Action::Path | Action::Zoxide | Action::OppositeZoxide | Action::ExitDirectory => {
             Some("Navigation integration/shell handoff unavailable until M5")
         }

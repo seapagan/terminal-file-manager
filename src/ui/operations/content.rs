@@ -65,9 +65,8 @@ pub(super) fn operation(operation: Operation) -> &'static str {
     }
 }
 
-pub(super) fn wrapped(app: &App, width: u16) -> Vec<Row> {
-    rows(app)
-        .into_iter()
+pub(super) fn wrapped(rows: Vec<Row>, width: u16) -> Vec<Row> {
+    rows.into_iter()
         .flat_map(|row| {
             super::super::text::wrap_value(&super::super::clean(&row.text), usize::from(width))
                 .into_iter()
@@ -158,6 +157,7 @@ fn dialog_rows(dialog: &OperationDialog) -> Vec<Row> {
     if matches!(dialog.plan.operation, Operation::Delete | Operation::Trash) {
         rows.extend(destructive(dialog));
     } else {
+        rows.extend(rename_notice(dialog));
         rows.push(Row::field(
             field_label(dialog.plan.operation),
             &dialog.text,
@@ -186,6 +186,18 @@ fn dialog_rows(dialog: &OperationDialog) -> Vec<Row> {
             kind(source.kind),
             super::super::listing::size(source.size)
         )));
+    }
+    rows
+}
+
+fn rename_notice(dialog: &OperationDialog) -> Vec<Row> {
+    let mut rows = Vec::new();
+    if dialog.plan.operation == Operation::Rename && dialog.plan.operands[0].name.to_str().is_none()
+    {
+        rows.push(Row::styled(
+            "Original name is escaped for display. Ctrl+A and type a replacement; Esc cancels.",
+            Role::Warning,
+        ));
     }
     rows
 }
