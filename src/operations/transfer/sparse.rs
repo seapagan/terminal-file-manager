@@ -120,6 +120,19 @@ mod tests {
     use super::*;
     use std::io::Read;
 
+    fn native_allocation(expected: &[u8]) -> u64 {
+        let mut file = tempfile::tempfile().unwrap();
+        #[cfg(windows)]
+        windows::mark_sparse(&file).unwrap();
+        file.write_all(&expected[..1024]).unwrap();
+        file.seek(SeekFrom::Start(512 * 1024)).unwrap();
+        file.write_all(&expected[512 * 1024..512 * 1024 + 512])
+            .unwrap();
+        file.set_len(expected.len() as u64).unwrap();
+        file.sync_all().unwrap();
+        allocated(&file).unwrap()
+    }
+
     #[test]
     fn unaligned_short_writes_preserve_zero_runs_trailing_length_and_all_bytes() {
         let mut output = tempfile::tempfile().unwrap();
@@ -135,9 +148,10 @@ mod tests {
         writer.finish(expected.len() as u64).unwrap();
         output.sync_all().unwrap();
         let allocation = allocated(&output).unwrap();
+        let native = native_allocation(&expected);
         assert!(
-            allocation < expected.len() as u64 / 2,
-            "{allocation} allocated of {} logical bytes; temp directory {:?}",
+            allocation <= native,
+            "{allocation} allocated versus {native} native of {} logical bytes; temp directory {:?}",
             expected.len(),
             std::env::temp_dir()
         );

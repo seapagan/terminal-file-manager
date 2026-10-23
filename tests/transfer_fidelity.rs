@@ -68,9 +68,8 @@ fn large_sparse_copy_and_move_keep_holes_and_verify_all_logical_bytes() {
         let source = root.path().join("sparse");
         fs::create_dir(root.path().join("target")).unwrap();
         let mut file = fs::File::create(&source).unwrap();
-        file.set_len(8 * 1024 * 1024).unwrap();
         file.write_all(b"head").unwrap();
-        file.seek(SeekFrom::End(-4)).unwrap();
+        file.seek(SeekFrom::Start(64 * 1024 * 1024 - 4)).unwrap();
         file.write_all(b"tail").unwrap();
         file.sync_all().unwrap();
         let before = file.metadata().unwrap();
