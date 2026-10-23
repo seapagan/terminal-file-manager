@@ -80,7 +80,7 @@ impl Recovery {
         }
         let destination = self.destination_evidence()?;
         if self.staging.is_none() {
-            return self.directory_outcome(&destination);
+            return self.directory_outcome();
         }
         if safety::revalidate(&destination, true).is_ok() {
             let outcome = self.committed_outcome(operation)?;
@@ -94,13 +94,20 @@ impl Recovery {
         self.retained_outcome()
     }
 
-    fn directory_outcome(&self, destination: &Entry) -> Result<(Outcome, &'static str)> {
-        safety::revalidate(&self.source, false)?;
-        safety::revalidate(destination, false)?;
+    fn directory_outcome(&self) -> Result<(Outcome, &'static str)> {
+        self.validate_directory()?;
         Ok((
             Outcome::CopiedSourceRetained,
             "Reconciled child outcomes; source directory retained; retry from scratch",
         ))
+    }
+
+    pub(super) fn validate_directory(&self) -> Result<()> {
+        for guard in &self.guards {
+            guard.validate()?;
+        }
+        safety::revalidate(&self.source, false)?;
+        safety::revalidate(&self.destination_evidence()?, false)
     }
 
     fn retained_outcome(&self) -> Result<(Outcome, &'static str)> {

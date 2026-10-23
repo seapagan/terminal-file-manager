@@ -29,6 +29,7 @@ pub struct Plan {
     pub(super) retrying: bool,
     pub(super) source_directories: Vec<DirectoryGuard>,
     pub(super) destination_directory: Option<Box<DirectoryGuard>>,
+    retained_directories: Vec<super::Recovery>,
 }
 
 impl Plan {
@@ -44,6 +45,7 @@ impl Plan {
             retrying: false,
             source_directories: Vec::new(),
             destination_directory: None,
+            retained_directories: Vec::new(),
         }
     }
     /// Capture the visible working set without filesystem I/O.
@@ -117,6 +119,7 @@ impl Plan {
             retrying: false,
             source_directories: Vec::new(),
             destination_directory: None,
+            retained_directories: Vec::new(),
         })
     }
 
@@ -141,6 +144,16 @@ impl Plan {
         let mut retry = self.clone();
         retry.preview = None;
         retry.retrying = true;
+        retry.retained_directories = record
+            .entries
+            .iter()
+            .filter_map(|entry| {
+                (entry.kind == crate::fs::EntryKind::Directory
+                    && entry.outcome == super::Outcome::CopiedSourceRetained)
+                    .then(|| entry.recovery.as_deref().cloned())
+                    .flatten()
+            })
+            .collect();
         retry.completed.extend(
             record
                 .entries
@@ -207,6 +220,20 @@ impl Plan {
     }
 
     pub(super) fn validate_directories(&self) -> super::safety::Result<()> {
+        for evidence in &self.retained_directories {
+            evidence.validate_directory()?;
+        }
+        self.validate_incoming_name()?;
+        for guard in &self.source_directories {
+            guard.validate()?;
+        }
+        if let Some(guard) = &self.destination_directory {
+            guard.validate()?;
+        }
+        Ok(())
+    }
+
+    fn validate_incoming_name(&self) -> super::safety::Result<()> {
         if let Some(name) = &self.incoming_name {
             let mut parts = std::path::Path::new(name).components();
             if self.operands.len() != 1
@@ -215,12 +242,6 @@ impl Plan {
             {
                 return Err(invalid("Incoming name must be one filename for one operand").into());
             }
-        }
-        for guard in &self.source_directories {
-            guard.validate()?;
-        }
-        if let Some(guard) = &self.destination_directory {
-            guard.validate()?;
         }
         Ok(())
     }

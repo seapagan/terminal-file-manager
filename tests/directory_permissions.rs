@@ -250,7 +250,12 @@ fn source_directory_replacement_cannot_broaden_copied_private_permissions() {
         Decision::Skip
     });
     assert_eq!(mode(&target.join("source")), 0o700, "{record:?}");
-    assert_eq!(record.entries.last().unwrap().outcome, Outcome::Changed);
+    assert_eq!(
+        record.entries.last().unwrap().outcome,
+        Outcome::OutcomeUnknown
+    );
+    assert!(record.reconcilable());
+    assert!(plan.retry(&record).is_err());
     assert_eq!(
         fs::read(target.join("source/secret")).unwrap(),
         b"private bytes"

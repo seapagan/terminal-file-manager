@@ -187,7 +187,7 @@ fn apply_permissions(
     Ok(())
 }
 
-fn open_attributes(source: &Entry) -> io::Result<fs::File> {
+pub(super) fn open_attributes(source: &Entry) -> io::Result<fs::File> {
     let mut options = fs::OpenOptions::new();
     options.read(true);
     #[cfg(unix)]
@@ -206,7 +206,7 @@ fn open_attributes(source: &Entry) -> io::Result<fs::File> {
     options.open(&source.path)
 }
 
-fn set_attributes(file: &fs::File, permissions: fs::Permissions) -> io::Result<()> {
+pub(super) fn set_attributes(file: &fs::File, permissions: fs::Permissions) -> io::Result<()> {
     #[cfg(target_os = "linux")]
     {
         use std::os::fd::AsRawFd;

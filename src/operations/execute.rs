@@ -41,6 +41,8 @@ pub fn execute(
     worker.record
 }
 
+mod directory;
+
 struct Worker<'a, F> {
     mounts: super::mounts::Mounts,
     plan: &'a Plan,
@@ -92,10 +94,14 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
             detail: String::new(),
         };
         if let Err(error) = self.perform(source, destination, depth, &mut result) {
+            let error = directory::failure(&result, error, self.record.unresolved());
             result.outcome = error.outcome;
             result.detail = error.detail;
         }
-        if result.outcome != Outcome::OutcomeUnknown {
+        if !matches!(
+            result.outcome,
+            Outcome::OutcomeUnknown | Outcome::CopiedSourceRetained
+        ) {
             result.recovery = None;
         }
         let complete = result.outcome == Outcome::Completed;
@@ -182,92 +188,6 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
         } else {
             decision
         }
-    }
-
-    fn directory(
-        &mut self,
-        source: &Entry,
-        destination: &Path,
-        previous: Option<&Entry>,
-        depth: usize,
-        result: &mut EntryResult,
-    ) -> Result<()> {
-        if previous.is_some_and(|entry| !entry.may_recurse()) {
-            return Err(super::plan::invalid(
-                "Atomic file/directory replacement unsupported; choose Keep both or Skip",
-            )
-            .into());
-        }
-        let source_parents = Parents::capture(&source.path)?;
-        let target_parents = Parents::capture(destination)?;
-        safety::destination_matches(destination, previous)?;
-        if previous.is_none() {
-            create_directory(destination)?;
-            result.created_directory = true;
-        }
-        let target = crate::fs::inspect(destination);
-        let guards = [source_parents, target_parents];
-        result.recovery = Some(Box::new(super::Recovery::directory(
-            source, &target, &guards,
-        )));
-        let complete = self.children(source, &target, depth, [&guards[0], &guards[1]])?;
-        if !complete {
-            result.outcome = Outcome::CopiedSourceRetained;
-            return Ok(());
-        }
-        self.finish_directory(
-            source,
-            &target,
-            [&guards[0], &guards[1]],
-            result.created_directory,
-        )
-    }
-
-    fn children(
-        &mut self,
-        source: &Entry,
-        target: &Entry,
-        depth: usize,
-        guards: [&Parents; 2],
-    ) -> Result<bool> {
-        let mut complete = true;
-        let entries: std::io::Result<Vec<_>> = fs::read_dir(&source.path)?.collect();
-        for item in entries? {
-            self.check_cancel()?;
-            guards[0].validate()?;
-            safety::revalidate(source, false)?;
-            guards[1].validate()?;
-            safety::revalidate(target, false)?;
-            let entry = crate::fs::inspect(&item.path());
-            complete &= self.entry(&entry, Some(&target.path.join(&entry.name)), depth + 1);
-            if self.record.unresolved() {
-                return Err(Failure {
-                    outcome: Outcome::OutcomeUnknown,
-                    detail: "Child outcome unresolved".into(),
-                });
-            }
-        }
-        Ok(complete)
-    }
-
-    fn finish_directory(
-        &mut self,
-        source: &Entry,
-        target: &Entry,
-        guards: [&Parents; 2],
-        created: bool,
-    ) -> Result<()> {
-        self.check_cancel()?;
-        guards[1].validate()?;
-        safety::revalidate(target, false)?;
-        finish_permissions(source, target, created, guards[0])?;
-        if self.plan.operation == Operation::Move {
-            self.check_cancel()?;
-            guards[0].validate()?;
-            safety::revalidate(source, false)?;
-            fs::remove_dir(&source.path)?;
-        }
-        Ok(())
     }
 
     fn leaf(
@@ -442,40 +362,6 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
             Ok(())
         }
     }
-}
-
-fn create_directory(path: &Path) -> std::io::Result<()> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::DirBuilderExt;
-        fs::DirBuilder::new().mode(0o700).create(path)
-    }
-    #[cfg(not(unix))]
-    fs::create_dir(path)
-}
-
-fn finish_permissions(
-    source: &Entry,
-    target: &Entry,
-    created: bool,
-    source_parents: &Parents,
-) -> Result<()> {
-    if created {
-        source_parents.validate()?;
-        safety::revalidate(source, false)?;
-        #[cfg(unix)]
-        let permissions =
-            {
-                use std::os::unix::fs::PermissionsExt;
-                fs::Permissions::from_mode(source.mode.ok_or_else(|| {
-                    super::plan::invalid("Source directory permissions unavailable")
-                })?)
-            };
-        #[cfg(not(unix))]
-        let permissions = fs::symlink_metadata(&source.path)?.permissions();
-        fs::set_permissions(&target.path, permissions)?;
-    }
-    Ok(())
 }
 
 fn keep_both(path: &Path) -> Result<PathBuf> {
