@@ -880,3 +880,106 @@ Only documentation changes follow this tested source. The ignored append-only
 ledger records signed commits, each immediate clean-gate outcome and final-head
 checks. PR #3 remains draft and unmerged; M2 acceptance and merge remain the
 maintainer's decision.
+
+## M2 DeepSeek correction round — 23 October 2026
+
+The maintainer authorized remediation of the 16-reviewer summary on draft PR #3,
+starting from verified clean head `96a2f53fa16dd8a80a35acc2271f49b6a5eca5a3`.
+This checkpoint appends correction evidence; earlier measurements remain intact.
+The approved macOS unreadable-object chmod limitation and accepted M2 coverage
+variation remain unchanged. No dependency version, QC gate or coverage target
+changed.
+
+### Correctness and native filesystem contracts
+
+| Review item | Correction and regression evidence |
+| --- | --- |
+| A: modal key repeats | Real controller routing covers Jobs and conflict-only surfaces, `j`/`k`/Up/Down Repeat and Release, with and without pending exit. The RED case moved the pane cursor. Nonmodal repeats still navigate; existing conflict keyboard/mouse and Esc tests pass. Paging repeats also stay consumed. |
+| B: directory finalisation | Deterministic permission-finalisation, removal, cancellation and identity-replacement cases assert child bytes/outcomes, parent state, recovery and retry/reconciliation. Proven retained sources report partial results; replaced identities remain unknown and refuse retry. Worker-side directory evidence validation precedes retry mutations. Copy cancellation retains both sources and destinations. |
+| C: Linux mount aliases | Resolution exercises `reject_aliases` with same-device unrelated aliases, a textual but noncomponent prefix, physical symlinked parents, source ancestors, subtree binds and ambiguous stacks. Unrelated aliases work; relevant ambiguity still fails closed. |
+| D/E: exclusive rename | Linux/macOS use native exclusive rename; Windows uses `MoveFileExW(0)`. File/directory destination races preserve independent destination bytes and identity. Normal file/directory/selected-link moves and distinct-device Rename refusal have regressions. No hard-link/unlink fallback remains. Windows also has an owned counterfactual fixture demonstrating the old overwrite. |
+| Stage construction | A malformed link target reproduced an empty-stage leak. Ordinary construction failure now removes only its revalidated empty owned root; foreign content and replacement fixtures remain intact. |
+| Transfer fidelity | An 8 MiB fixture reproduced dense expansion. Coalesced zero-region writes preserve large holes, interleaved pages and trailing length; tests compare complete bytes, logical size and allocated blocks. Optional SHA-256 and the existing injected-truncation regression remain effective. A 511-byte write fixture covers unaligned writes. |
+| Destination atime | Copy/Move, with checksum on/off, restore pre-read source atime after verification. Whole-second native comparisons accommodate timestamp resolution; mtime and payload assertions remain exact. |
+| Missing device identity | An exact-diagnostic regression distinguishes unavailable identity (`Failed`, mutation refused) from an actual device mismatch. |
+| Windows Trash callback | Typed callback failures retain their original outcome. Native-only tests preserve validation/native `Failed` classification while giving ambiguous results and critical permanent-deletion acknowledgements precedence. |
+| Rename presentation | Unix native-byte names display escaped text and require a deliberate replacement; the selected native operand stays separate. Native-byte rename and valid Unicode replacements have regressions. Stale M1 read-only action messages and input documentation were removed. |
+
+The maintainer approved the narrow native rename unsafe boundaries and two
+Windows sparse handle boundaries, plus the existing `windows-sys`
+`Win32_System_IO` feature. No new dependency or pathname-only chmod fallback was
+introduced. Native syscall/filesystem errors remain visible and fail closed;
+no synthetic unsupported-primitive fallback can report success.
+
+Sparse handling preserves the tested allocation behaviour, not identical extent
+maps, compression or arbitrary filesystem capabilities. A substantially sparse
+or compressed source whose destination expands to at least half its logical
+size fails before commit/source removal. Windows requires the native sparse
+control for a sparse source; unsupported controls fail. Source atime may change
+because TFM reads content. Only destination atime restoration is promised when
+the filesystem supports the metadata operations. Local sparse fixtures ran on
+Linux tmpfs; actual APFS/NTFS execution remains pending below.
+
+### Jobs accessibility and measured cost
+
+`tests/operation_ui_stress.rs` constructs 2,500 results with 40 long path
+components at 120×40 cells. It exercises PageUp/PageDown, consumes Repeat and
+Release, checks a detail limit above 65,535 rows and renders the final marker.
+Existing scrolling already supplies navigation; additional pagination was not
+needed. The old `u16` offset did prevent access to the last result.
+
+Optimized native fixture measurements, using the same release dependency
+fingerprints and `/usr/bin/time -v`, were:
+
+| Measurement | Before | After |
+| --- | ---: | ---: |
+| Geometry | 1.299 s | 26.60 ms |
+| Bottom redraw | 3.235 s | 40.29 ms |
+| Fixture total | 7.770 s | 108.66 ms |
+| Peak resident memory | 32,356 KiB | 20,408 KiB |
+| Final result accessible | No | Yes |
+
+These are single-fixture observations, not percentile or unlimited-history
+claims. Shared wrapped layouts, capped width scanning and visible-row rendering
+resolve the reproduced cost without a shared-modal rewrite or history
+virtualisation. Unicode/wide/combining/control/bidi cell assertions still pass.
+
+### Test rigor and remaining recovery work
+
+Conflict cancellation now proves exactly one operand record and no later
+mutation, with both source payloads and the previous destination retained.
+Linux cross-volume tests discover and verify a writable different device;
+hosted Linux refuses to silently skip that assurance. Linux Trash fixtures
+restore only their frozen owned receipts, unlink only their metadata and remove
+only newly created, identity-checked empty store directories. Regression cases
+preserve pre-existing stores, foreign contents, replaced/dangling directories
+and racing restore targets. macOS native tests accept an absent optional
+recovery URL and verify identity/content/link targets whenever a URL exists.
+Job outcome tables compare `JobState` values directly.
+
+Crash/panic orphan discovery remains deferred under
+[Pre-v1 reliability](../TODO.md#pre-v1-reliability). Payload sync and in-memory
+ownership/recovery evidence do not establish safe ownership after restart.
+There is no startup sweep. The TODO requires durable ownership and quarantine,
+termination-boundary/replaced-identity tests and proof that cleanup preserves
+the only payload and unrelated user files. No speculative fidelity or UI TODO
+substitutes for the implemented fixes above.
+
+### Local verification checkpoint
+
+Signed source commits `5db135d`, `ab0213b`, `0e0940d`, `6ccdd4a`, `e11a710` and
+`28b2d34` each passed an immediate unchanged clean
+`RUSTUP_TOOLCHAIN=1.95.0 cargo make verify`. The last gate passed in **39.20 s**,
+with **452 Linux tests passed**, two intentional child-entry skips, exact MSRV,
+package/security/coverage checks and mandatory Windows MSVC xwin check, Clippy
+and build. Xwin is compilation/lint proof, not Windows runtime proof.
+The approved dirty-package/interim-package/sign/clean-gate sequence supplied
+each source commit; no partial gate is labelled a clean full pass.
+
+Four existing Lizard advisories remain: `open_delete_retry`, `file_type`,
+`cancel_then_exit_waits_for_acknowledgement_and_return_abandons_exit_intent` and
+`active_workers_must_acknowledge_stop_before_incident_exit_is_available`.
+No suppression or threshold changed. Infrastructure and distribution tooling
+are unchanged; `verify-infra` and release rehearsal were not required or run.
+Hosted native results, all five workflows and Codacy for this correction source
+must be recorded after push. PR #3 remains draft and unmerged.

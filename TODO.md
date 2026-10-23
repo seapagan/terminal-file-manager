@@ -7,6 +7,19 @@ before v1 without weakening object-identity or no-follow safety guarantees.
 The current implementation deliberately fails closed. Never introduce an unsafe
 pathname fallback.
 
+## Pre-v1 reliability
+
+Define durable ownership, discovery, quarantine and reconciliation for orphan
+`.tfm-stage-*` artifacts after a crash or panic. Current payload sync and
+session-local recovery records do not establish ownership after restart.
+Do not sweep stages by filename or erase uncertain payloads.
+
+Before shipping, exercise process termination before and after stage commit and
+source removal, missing records and replaced identities. Discovery must preserve
+the only remaining payload, quarantine uncertainty, avoid deleting user files
+and require validated evidence before cleanup or any new mutation. See the
+[M2 correction checkpoint](docs/acceptance.md#m2-deepseek-correction-round--23-october-2026).
+
 ## Post-v1 TODO
 
 These items are deferred contracts, without dormant implementations. Each needs

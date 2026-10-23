@@ -73,6 +73,20 @@ default to Skip; apply-to-all stays within one job and type pair. Keep both uses
 native no-clobber commit. Unsupported atomic type replacements require Keep both
 or Skip. Partial moves retain skipped children and their parent directories.
 
+Rename and no-clobber stage/Trash commits use Linux `renameat2(RENAME_NOREPLACE)`,
+macOS `renamex_np(RENAME_EXCL)` or Windows `MoveFileExW` with zero flags.
+An unavailable native primitive refuses the operation; there is no
+hard-link/unlink or cross-volume copy/delete fallback.
+
+Regular-file transfers coalesce zero sectors into destination holes while
+verifying logical bytes and optional SHA-256. Windows marks only the held owned
+stage sparse when the source has the sparse attribute. Allocation validation
+refuses substantial expansion of a sparse/compressed source before commit.
+This preserves tested sparse space behaviour without promising identical extent
+maps or compression. Destination access and modification times come from held
+source metadata captured before content reads; timestamps are applied after
+checksum reads. Metadata/allocation failures preserve the source.
+
 New Unix transfer directories request mode `0700` at creation, before receiving children.
 Only a newly created, fully populated directory receives the source's final
 permissions, after fresh source-parent and object checks. Unix final modes come
@@ -80,8 +94,13 @@ from the frozen source snapshot. Cancellation and incomplete children retain pri
 Merges preserve existing directory permissions, including permissive parents;
 they do not promise to make those parents private. A retry treats directories
 retained from an earlier attempt as existing merge targets and preserves their
-private mode. Restoring their source modes would require retained destination
-ownership evidence beyond the current retry record.
+private mode. Directory finalisation uses the existing no-follow attribute
+descriptor. Incomplete parents retain source/destination/parent evidence and
+completed child records. Validated retained sources produce partial outcomes;
+uncertain identities stay unknown and quarantined. A retry carries directory
+evidence into worker-side validation before any new mutation; retaining evidence
+alone does not authorize retry. Reconciliation rechecks ownership without
+repeating source removal.
 
 Linux permission edits pin the selected object with `O_PATH | O_NOFOLLOW` and
 change its mode through the held descriptor's `/proc/self/fd` reference. They
@@ -138,7 +157,13 @@ Operation dialogs size to wrapped content within terminal bounds. The renderer
 and input controller share exact button, field and job-row rectangles. Jobs use
 a bounded selection viewport and a separate details scroll position; completed
 execution duration freezes at acknowledgement. Display sanitization preserves
-the model's native paths. The existing Notice queue holds at most two five-second
+the model's native paths. Detail offsets use full-size row indices and rendering
+passes only visible rows to the terminal widget. Geometry and rendering reuse
+the same wrapped layout for each draw. Non-Press events stay inside active
+operation surfaces, including paging while safe exit waits. Non-Unicode Rename
+shows escaped native text and requires an explicit replacement edit; display
+text never substitutes for the selected operand. The existing Notice queue holds
+at most two five-second
 success/warning/error notices without taking focus. Rendering uses the existing
 status row and semantic Theme roles; a non-expiring incident warning takes
 precedence. Jobs retain request failures and worker evidence after notices
@@ -174,7 +199,8 @@ outcomes for reconciliation; retries never invent safe completion.
 
 Linux Trash uses a checked same-filesystem rename into home Trash or Freedesktop
 per-volume storage. Per-volume discovery resolves the physical source parent,
-refuses ambiguous/bind mount topology, and validates sticky shared or private
+refuses ambiguous stacks and source-ancestor/subtree bind topology, and validates
+sticky shared or private
 user storage before reserving matching payload/metadata names. It never follows
 the selected final link or uses cross-device copy/delete. Native Trash results
 retain platform-specific recovery references. One top-level acknowledgement does
@@ -182,6 +208,12 @@ not fabricate descendant operations: recursive inventory is labelled as validate
 before the move. Unknown results retain locks; a native permanent-deletion report
 during F8 is a critical safety incident. Permanent deletion needs separate explicit
 confirmation.
+
+Stage construction cleans only a newly owned, revalidated empty directory on
+ordinary failure. Foreign content or uncertain ownership preserves the artifact
+and reports uncertainty. Crash recovery has no durable ownership catalogue or
+startup sweep; the pre-v1 reliability item in [TODO](../TODO.md#pre-v1-reliability)
+defines that remaining contract.
 
 macOS calls Foundation's native Trash method with lossless filesystem URLs and
 keeps successful recycling separate from its optional resulting URL. Windows
