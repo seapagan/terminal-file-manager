@@ -10,6 +10,7 @@ use terminal_file_manager::operations::{
     Decision, Event, Operation, Options, Outcome, Plan, Stage, execute,
 };
 #[cfg(target_os = "linux")]
+#[path = "volume_fixture.rs"]
 mod common;
 
 fn mode(path: &Path) -> u32 {

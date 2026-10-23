@@ -74,10 +74,7 @@ fn large_sparse_copy_and_move_keep_holes_and_verify_all_logical_bytes() {
         file.write_all(b"tail").unwrap();
         file.sync_all().unwrap();
         let before = file.metadata().unwrap();
-        assert!(
-            before.blocks() * 512 < before.len() / 4,
-            "fixture filesystem must support sparse files"
-        );
+        require_sparse_fixture(&source, &before);
         drop(file);
         let expected = fs::read(&source).unwrap();
         let plan = Plan::paths(
@@ -103,6 +100,25 @@ fn large_sparse_copy_and_move_keep_holes_and_verify_all_logical_bytes() {
         assert_eq!(fs::read(target).unwrap(), expected);
         assert_eq!(source.exists(), operation == Operation::Copy);
     }
+}
+
+#[cfg(unix)]
+fn require_sparse_fixture(source: &std::path::Path, before: &fs::Metadata) {
+    use std::os::unix::fs::MetadataExt;
+    #[cfg(target_os = "macos")]
+    if before.blocks() * 512 >= before.len() / 4 {
+        eprintln!(
+            "Sparse fixture filesystem: {:?}",
+            std::process::Command::new("/sbin/mount").output().unwrap()
+        );
+    }
+    assert!(
+        before.blocks() * 512 < before.len() / 4,
+        "fixture {} must support sparse files: {} allocated of {} logical bytes",
+        source.display(),
+        before.blocks() * 512,
+        before.len()
+    );
 }
 
 #[cfg(unix)]

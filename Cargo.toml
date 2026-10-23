@@ -16,7 +16,6 @@ include = [
   "THIRD_PARTY_NOTICES.md",
   "src/**",
   "tests/*.rs",
-  "tests/common/*.rs",
 ]
 
 [package.metadata.binstall]

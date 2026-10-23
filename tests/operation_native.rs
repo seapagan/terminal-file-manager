@@ -1,5 +1,6 @@
 use std::{fs, sync::atomic::AtomicBool};
 #[cfg(target_os = "linux")]
+#[path = "volume_fixture.rs"]
 mod common;
 use terminal_file_manager::operations::{
     Decision, Event, Operation, Options, Outcome, Plan, Stage, execute,

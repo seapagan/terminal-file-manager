@@ -134,7 +134,13 @@ mod tests {
         }
         writer.finish(expected.len() as u64).unwrap();
         output.sync_all().unwrap();
-        assert!(allocated(&output).unwrap() < expected.len() as u64 / 2);
+        let allocation = allocated(&output).unwrap();
+        assert!(
+            allocation < expected.len() as u64 / 2,
+            "{allocation} allocated of {} logical bytes; temp directory {:?}",
+            expected.len(),
+            std::env::temp_dir()
+        );
         output.seek(SeekFrom::Start(0)).unwrap();
         let mut actual = Vec::new();
         output.read_to_end(&mut actual).unwrap();

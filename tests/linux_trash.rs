@@ -1,6 +1,7 @@
 #![cfg(target_os = "linux")]
+#[path = "volume_fixture.rs"]
 mod common;
-#[path = "common/trash.rs"]
+#[path = "trash_fixture.rs"]
 mod fixtures;
 use fixtures::{OwnedStore, ReceiptFixture};
 use std::{
