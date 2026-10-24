@@ -3,7 +3,11 @@ use super::{
     safety::{self, Parents, Result},
 };
 use crate::fs::{Entry, EntryKind};
-use std::{collections::HashMap, fs, io, sync::atomic::AtomicBool};
+use std::{
+    collections::{HashMap, HashSet},
+    fs, io,
+    sync::atomic::AtomicBool,
+};
 
 /// A deletion preview is a counted no-follow snapshot, not approval to mutate.
 #[derive(Clone, Debug)]
@@ -16,7 +20,38 @@ pub struct Preview {
 }
 
 impl Preview {
+    pub(super) fn claim_objects(&self, root: &Entry) -> io::Result<HashSet<(u64, u64)>> {
+        safety::revalidate(root, false).map_err(|error| io::Error::other(error.detail))?;
+        if !self
+            .entries
+            .get(&root.path)
+            .is_some_and(|entry| same_entry(entry, root))
+        {
+            return Err(io::Error::other(
+                "Claim differs from immutable approved root",
+            ));
+        }
+        self.entries
+            .values()
+            .filter(|entry| entry.path.starts_with(&root.path))
+            .map(|entry| {
+                entry
+                    .identity
+                    .as_ref()
+                    .and_then(|id| id.object)
+                    .ok_or_else(|| io::Error::other("Approved native alias identity unavailable"))
+            })
+            .collect()
+    }
+
     pub(super) fn inventory(&self, root: &std::path::Path) -> (u64, u64) {
+        if self
+            .entries
+            .get(root)
+            .is_some_and(|entry| !entry.may_recurse())
+        {
+            return (1, 0);
+        }
         self.entries
             .values()
             .filter(|entry| entry.path.starts_with(root))
@@ -127,11 +162,7 @@ impl Preview {
             let Some(after) = fresh.entries.get(path) else {
                 return Err(safety::changed("Recursive selection changed"));
             };
-            if before.identity != after.identity
-                || before.kind != after.kind
-                || before.attributes != after.attributes
-                || before.link_target != after.link_target
-            {
+            if !same_entry(before, after) {
                 return Err(safety::changed(
                     "Recursive object changed after preview; fresh review required",
                 ));
@@ -139,4 +170,83 @@ impl Preview {
         }
         Ok(())
     }
+
+    #[cfg(target_os = "linux")]
+    pub(super) fn validate_root(&self, root: &Entry, cancel: &AtomicBool) -> Result<()> {
+        for parent in &self.parents {
+            parent.validate()?;
+        }
+        let mounts = super::mounts::Mounts::capture(super::Operation::Trash)?;
+        let count = self.validate_entry(&crate::fs::inspect(&root.path), cancel, &mounts, 0)?;
+        let expected = if root.may_recurse() {
+            self.entries
+                .keys()
+                .filter(|path| path.starts_with(&root.path))
+                .count()
+        } else {
+            1
+        };
+        if count != expected {
+            return Err(safety::changed(
+                "Recursive scope membership changed after preview",
+            ));
+        }
+        Ok(())
+    }
+
+    #[cfg(target_os = "linux")]
+    fn validate_entry(
+        &self,
+        fresh: &Entry,
+        cancel: &AtomicBool,
+        mounts: &super::mounts::Mounts,
+        depth: usize,
+    ) -> Result<usize> {
+        crate::fs::check_cancelled(cancel)?;
+        mounts.reject(fresh)?;
+        let before = self
+            .entries
+            .get(&fresh.path)
+            .ok_or_else(|| safety::changed("Unapproved descendant after preview"))?;
+        if depth > 128 || !same_entry(before, fresh) {
+            return Err(safety::changed(
+                "Recursive object changed after preview; fresh review required",
+            ));
+        }
+        let mut count = 1;
+        if fresh.may_recurse() {
+            count += self.validate_children(fresh, cancel, mounts, depth)?;
+            safety::revalidate(fresh, true)?;
+        }
+        Ok(count)
+    }
+
+    #[cfg(target_os = "linux")]
+    fn validate_children(
+        &self,
+        root: &Entry,
+        cancel: &AtomicBool,
+        mounts: &super::mounts::Mounts,
+        depth: usize,
+    ) -> Result<usize> {
+        let mut count = 0;
+        for child in fs::read_dir(&root.path)? {
+            count += self.validate_entry(
+                &crate::fs::inspect(&child?.path()),
+                cancel,
+                mounts,
+                depth + 1,
+            )?;
+        }
+        Ok(count)
+    }
+}
+
+fn same_entry(before: &Entry, after: &Entry) -> bool {
+    let ownership = |entry: &Entry| entry.owner.as_ref().map(|owner| (owner.uid, owner.gid));
+    before.identity == after.identity
+        && before.kind == after.kind
+        && before.attributes == after.attributes
+        && before.link_target == after.link_target
+        && ownership(before) == ownership(after)
 }

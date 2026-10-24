@@ -53,6 +53,49 @@ fn replace_field(controller: &mut Controller, text: &str) {
 }
 
 #[test]
+fn late_preview_results_cannot_approve_a_reopened_destructive_dialog() {
+    use terminal_file_manager::operations::Intent;
+    for (action, confirm) in [(Action::Delete, 'D'), (Action::Trash, 't')] {
+        let (root, mut controller) = fixture();
+        open(&mut controller, action);
+        let old = match controller.app.operations.dialog.as_mut().unwrap() {
+            Dialog::Operation(dialog) => {
+                dialog.preview_id = Some(43);
+                dialog.ready = true;
+                dialog.plan.clone()
+            }
+            _ => panic!("destructive dialog"),
+        };
+        controller.app.operations.outbox.clear();
+        key(&mut controller, KeyCode::Esc, KeyModifiers::NONE);
+        open(&mut controller, action);
+        controller.complete_operation(Update::Preview {
+            id: 43,
+            plan: Box::new(old),
+        });
+        controller.complete_operation(Update::Finished {
+            id: 43,
+            record: Record::default(),
+        });
+        let dialog = match controller.app.operations.dialog.as_ref().unwrap() {
+            Dialog::Operation(dialog) => dialog,
+            _ => panic!("reopened destructive dialog"),
+        };
+        assert!(!dialog.ready);
+        assert_eq!(dialog.preview_id, None);
+        key(&mut controller, KeyCode::Char(confirm), KeyModifiers::NONE);
+        assert!(matches!(
+            controller.app.operations.outbox.as_slice(),
+            [Intent::Cancel(43), Intent::Preview(_)]
+        ));
+        assert_eq!(
+            fs::read(root.path().join("left/source")).unwrap(),
+            b"preserved"
+        );
+    }
+}
+
+#[test]
 fn rename_rejects_empty_nul_and_parent_traversal_without_queueing_or_retargeting() {
     for text in ["", "../escape", "bad\0name"] {
         let (root, mut controller) = fixture();

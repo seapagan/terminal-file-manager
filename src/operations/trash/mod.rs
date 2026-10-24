@@ -64,11 +64,14 @@ impl Receipt {
 pub(super) fn put(
     entry: &Entry,
     cancel: &std::sync::atomic::AtomicBool,
+    approval: &super::Preview,
 ) -> super::safety::Result<Receipt> {
+    #[cfg(not(target_os = "linux"))]
+    let _ = approval;
     #[cfg(target_os = "linux")]
     {
         LinuxTrash::new(data_root()?)
-            .put_checked(entry, cancel)
+            .put_checked(entry, cancel, Some(approval))
             .map(Receipt::Linux)
     }
     #[cfg(target_os = "macos")]

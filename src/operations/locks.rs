@@ -91,13 +91,7 @@ impl Coordinator {
     ) -> io::Result<bool> {
         super::safety::revalidate(root, false).map_err(|error| io::Error::other(error.detail))?;
         super::safety::revalidate(payload, true).map_err(|error| io::Error::other(error.detail))?;
-        let mut additions = vec![
-            source_claim(root, Operation::Delete)?,
-            source_claim(payload, Operation::Delete)?,
-        ];
-        for claim in &mut additions {
-            claim.unknown_aliases = false;
-        }
+        let additions = vec![stage_claim(root)?, stage_claim(payload)?];
         if self
             .claims
             .iter()
@@ -114,6 +108,15 @@ impl Coordinator {
         claims.extend(additions);
         Ok(true)
     }
+}
+
+fn stage_claim(entry: &crate::fs::Entry) -> io::Result<Claim> {
+    let mut claim = source_claim(entry, Operation::Delete, None)?;
+    claim
+        .object
+        .ok_or_else(|| invalid("Private stage native identity unavailable"))?;
+    claim.unknown_aliases = false;
+    Ok(claim)
 }
 
 fn footprint(plan: &Plan) -> io::Result<Vec<Claim>> {
@@ -136,7 +139,7 @@ fn footprint(plan: &Plan) -> io::Result<Vec<Claim>> {
 
 fn operand_claims(plan: &Plan, claims: &mut Vec<Claim>) -> io::Result<()> {
     for entry in &plan.operands {
-        claims.push(source_claim(entry, plan.operation)?);
+        claims.push(source_claim(entry, plan.operation, plan.preview.as_ref())?);
         if let Some(destination) = plan.target(entry) {
             claims.push(destination_claim(&destination, true)?);
         }
@@ -188,12 +191,22 @@ fn future_namespace(path: &Path) -> io::Result<PathBuf> {
     }
 }
 
-fn source_claim(entry: &crate::fs::Entry, operation: Operation) -> io::Result<Claim> {
+fn source_claim(
+    entry: &crate::fs::Entry,
+    operation: Operation,
+    preview: Option<&super::Preview>,
+) -> io::Result<Claim> {
     let identity = entry
         .identity
         .as_ref()
         .ok_or_else(|| invalid("Missing source identity"))?;
-    let objects = aliases::capture(entry);
+    // Destructive workers refuse descendants outside this immutable approval before mutation.
+    let objects = match preview.filter(|_| {
+        entry.may_recurse() && matches!(operation, Operation::Delete | Operation::Trash)
+    }) {
+        Some(preview) => preview.claim_objects(entry),
+        None => aliases::capture(entry),
+    };
     Ok(Claim {
         path: namespace(&entry.path)?,
         object: identity.object,
@@ -210,10 +223,8 @@ fn staging_claim(plan: &Plan) -> io::Result<Option<Claim>> {
     let Some(directory) = &plan.destination else {
         return Ok(None);
     };
-    let mut claim = destination_claim(directory, false)?;
     // Only private staging names are mutated here, not arbitrary existing descendants.
-    claim.unknown_aliases = false;
-    Ok(Some(claim))
+    destination_claim(directory, false).map(Some)
 }
 
 fn destination_claim(path: &Path, recursive: bool) -> io::Result<Claim> {
@@ -227,14 +238,15 @@ fn destination_claim(path: &Path, recursive: bool) -> io::Result<Claim> {
         .filter(|_| recursive)
         .map(aliases::capture)
         .transpose();
+    let path = namespace(path)?;
+    // An absent target belongs to its native parent, including through bind/junction aliases.
+    let owner = entry.unwrap_or_else(|| crate::fs::inspect(path.parent().unwrap_or(&path)));
+    let object = owner.identity.and_then(|id| id.object);
     Ok(Claim {
-        path: namespace(path)?,
-        object: entry
-            .as_ref()
-            .and_then(|entry| entry.identity.as_ref())
-            .and_then(|id| id.object),
+        path,
+        object,
         write: true,
-        unknown_aliases: objects.is_err(),
+        unknown_aliases: objects.is_err() || object.is_none(),
         objects: objects.unwrap_or_default().unwrap_or_default(),
     })
 }
@@ -289,5 +301,22 @@ fn windows_overlap(a: &Path, b: &Path) -> bool {
         (Some(a), Some(b)) => a.starts_with(&b) || b.starts_with(&a),
         // Unknown native case equivalence conservatively serializes the namespace.
         _ => true,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_future_destination_conflicts_with_its_native_parent_through_an_opaque_alias() {
+        let root = tempfile::tempdir().unwrap();
+        let parent = crate::fs::inspect(root.path());
+        let source = source_claim(&parent, Operation::Delete, None).unwrap();
+        let mut target = destination_claim(&root.path().join("new"), true).unwrap();
+        // Bind aliases can preserve native identity without sharing a lexical prefix.
+        target.path = PathBuf::from("opaque-native-alias/new");
+        assert!(conflicts(&source, &target));
+        assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
     }
 }

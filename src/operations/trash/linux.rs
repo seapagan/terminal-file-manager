@@ -32,7 +32,7 @@ impl LinuxTrash {
     /// # Errors
     /// Rejects unsafe ownership/permissions, cross-device paths, changed identity or uncertain rename.
     pub fn put(&self, entry: &Entry) -> io::Result<Receipt> {
-        self.put_checked(entry, &false.into())
+        self.put_checked(entry, &false.into(), None)
             .map_err(|failure| io::Error::other(failure.detail))
     }
 
@@ -40,17 +40,18 @@ impl LinuxTrash {
         &self,
         entry: &Entry,
         cancel: &std::sync::atomic::AtomicBool,
+        approval: Option<&crate::operations::Preview>,
     ) -> safety::Result<Receipt> {
+        crate::fs::check_cancelled(cancel)?;
         let source_guard = Parents::capture(&entry.path)?;
         safety::revalidate(entry, true)?;
-        validate_scope(entry, cancel)?;
         let mounts = fs::read("/proc/self/mountinfo")?;
         let physical = crate::operations::locks::namespace(&entry.path)?;
         let (files, info, original) = self.prepare(entry, &physical)?;
         let (destination, info_path) = reserve(&original, &files, &info)?;
-        if let Err(error) = crate::fs::check_cancelled(cancel) {
+        if let Err(error) = validate_scope(entry, cancel, approval) {
             cleanup_info(entry, &destination, &crate::fs::inspect(&info_path));
-            return Err(error.into());
+            return Err(error);
         }
         finish(entry, destination, info_path, source_guard, &mounts)
     }
@@ -174,13 +175,22 @@ fn valid_shared(path: &Path, device: u64) -> bool {
     })
 }
 
-fn validate_scope(entry: &Entry, cancel: &std::sync::atomic::AtomicBool) -> safety::Result<()> {
-    let plan = crate::operations::Plan::paths(
-        crate::operations::Operation::Trash,
-        vec![entry.path.clone()],
-        None,
-    )?;
-    crate::operations::Preview::capture(&plan, cancel)?;
+fn validate_scope(
+    entry: &Entry,
+    cancel: &std::sync::atomic::AtomicBool,
+    approval: Option<&crate::operations::Preview>,
+) -> safety::Result<()> {
+    if let Some(approval) = approval {
+        approval.validate_root(entry, cancel)?;
+    } else {
+        let plan = crate::operations::Plan::paths(
+            crate::operations::Operation::Trash,
+            vec![entry.path.clone()],
+            None,
+        )?;
+        crate::operations::Preview::capture(&plan, cancel)?;
+    }
+    crate::fs::check_cancelled(cancel)?;
     Ok(())
 }
 
@@ -293,6 +303,35 @@ fn cleanup_info(source: &Entry, destination: &Path, info: &Entry) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recursive_trash_scope_cost_uses_real_native_inventory_and_validation() {
+        use crate::operations::{Operation, Plan, Preview};
+        use std::time::Instant;
+        let root = tempfile::tempdir().unwrap();
+        let selected = root.path().join("selected");
+        fs::create_dir(&selected).unwrap();
+        for index in 0..5000 {
+            fs::write(selected.join(index.to_string()), "retained").unwrap();
+        }
+        let plan = Plan::paths(Operation::Trash, vec![selected.clone()], None).unwrap();
+        let start = Instant::now();
+        let preview = Preview::capture(&plan, &false.into()).unwrap();
+        let capture = start.elapsed();
+        let start = Instant::now();
+        preview.validate(&plan, &false.into()).unwrap();
+        let validate = start.elapsed();
+        let start = Instant::now();
+        validate_scope(&plan.operands[0], &false.into(), Some(&preview)).unwrap();
+        let final_root = start.elapsed();
+        eprintln!(
+            "TRASH_SCOPE_COST: 5000 files, capture {capture:?}, removed approval scan {validate:?}, final root validation {final_root:?}, current two-walk total {:?}",
+            capture + final_root
+        );
+        assert_eq!((preview.files, preview.directories), (5000, 1));
+        assert_eq!(fs::read_dir(&selected).unwrap().count(), 5000);
+        assert_eq!(fs::read(selected.join("0")).unwrap(), b"retained");
+    }
 
     #[test]
     fn volume_storage_prefers_sticky_shared_and_falls_back_from_unsafe_components() {

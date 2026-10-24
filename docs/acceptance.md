@@ -1147,3 +1147,28 @@ Exclusive rename maps ENOSYS, ENOTSUP and EOPNOTSUPP as unsupported mechanisms.
 EINVAL retains its native error and errno because invalid ancestry and paths
 can produce it. An actual descendant-rename regression reproduced the earlier
 misclassification. No error enables an overwrite or copy/delete fallback.
+
+Linux Trash now shares its immutable approval with the native adapter. Each
+root receives a complete, cancellable, no-follow membership and metadata check
+immediately before native submission. This replaces the separate whole-job
+recapture and the per-root construction of another Preview map; direct
+`LinuxTrash::put` callers retain a full fresh recursive guard. Distinct approved
+roots can finish independently when another root changes. Native mount-table
+evidence starts before preparation and covers the final walk and rename.
+
+A deterministic native fixture reproduced successful recycling of a nested file
+changed after confirmation validation. The corrected path refuses late writes,
+replacement objects, new descendants and substituted directory symlinks, and
+acknowledges cancellation without recycling. It preserves original/replacement
+bytes and identities, the outside sentinel and existing Trash contents; owned
+reservation metadata is cleaned up. Destructive claim acquisition reuses only
+the immutable approved identities; execution still validates current scope.
+Future destination names also claim their native parent identity, protecting
+opaque bind/junction aliases, and private staging requires native identity.
+
+For 5,000 owned files, the measured capture/approval/final-scope validation
+subtotal was 203.41 ms before. The revised confirmation-plus-final-validation
+subtotal was 134.90 ms; the removed scan measured 69.21 ms in the revised
+fixture. These figures exclude coordinator acquisition, native recycling and
+fixture creation; the final filesystem walk remains mandatory. No watcher,
+shared modal framework, dependency or additional security exception was added.

@@ -20,9 +20,7 @@ pub(super) fn execute(
         return execute(&approved, cancel, notify);
     }
     let mut record = Record::default();
-    if let Some(preview) = &plan.preview
-        && let Err(error) = preview.validate(plan, cancel)
-    {
+    if let Err(error) = validate_preview(plan, cancel) {
         return super::queue::unsuccessful(plan, error.outcome, &error.detail);
     }
     if plan.operation == Operation::Mkdir {
@@ -39,6 +37,17 @@ pub(super) fn execute(
         }
     }
     record
+}
+
+fn validate_preview(plan: &Plan, cancel: &AtomicBool) -> Result<()> {
+    // Linux Trash validates each immutable approved root immediately before native rename.
+    if cfg!(target_os = "linux") && plan.operation == Operation::Trash {
+        return Ok(());
+    }
+    if let Some(preview) = &plan.preview {
+        preview.validate(plan, cancel)?;
+    }
+    Ok(())
 }
 
 fn apply(
@@ -95,7 +104,7 @@ fn perform(
         Operation::Permissions(mode) => attributes(source, Some(mode), None, &parents),
         Operation::ReadOnly(value) => attributes(source, None, Some(value), &parents),
         Operation::Delete => delete(source, plan, cancel, notify, record, depth, &parents),
-        Operation::Trash => recycle(source, plan, cancel, result),
+        Operation::Trash => recycle(source, plan, cancel, result, notify),
         _ => Err(io::Error::other("Unsupported mutation kind").into()),
     }
 }
@@ -396,14 +405,21 @@ fn recycle(
     plan: &Plan,
     cancel: &AtomicBool,
     result: &mut EntryResult,
+    notify: &mut impl FnMut(Event) -> Decision,
 ) -> Result<()> {
-    let (files, directories) = plan
+    let approval = plan
         .preview
         .as_ref()
-        .ok_or_else(|| io::Error::other("Validated Trash inventory required"))?
-        .inventory(&source.path);
+        .ok_or_else(|| io::Error::other("Validated Trash inventory required"))?;
+    let (files, directories) = approval.inventory(&source.path);
     crate::fs::check_cancelled(cancel)?;
-    let receipt = super::trash::put(source, cancel)?;
+    (notify)(Event::Progress {
+        source: source.path.clone(),
+        destination: source.path.clone(),
+        stage: Stage::Removing,
+        bytes: 0,
+    });
+    let receipt = super::trash::put(source, cancel, approval)?;
     result.destination = receipt.path().map(std::path::Path::to_owned);
     result.detail = format!(
         "{}; validated before move: {files} files, {directories} directories",

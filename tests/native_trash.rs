@@ -72,6 +72,208 @@ fn trash_child() {
     println!("NATIVE_TRASH_EXERCISED");
     #[cfg(target_os = "linux")]
     trash_metadata_claim(&root);
+    #[cfg(target_os = "linux")]
+    late_scope_changes(&root);
+    #[cfg(target_os = "linux")]
+    independent_leaf_scopes(&root);
+}
+
+#[cfg(target_os = "linux")]
+fn independent_leaf_scopes(root: &std::path::Path) {
+    use terminal_file_manager::operations::Outcome;
+    let paths: Vec<_> = (0..5)
+        .map(|index| root.join(format!("approved-{index}")))
+        .collect();
+    for path in &paths {
+        fs::write(path, "approved bytes").unwrap();
+    }
+    let plan = counted(Plan::paths(Operation::Trash, paths.clone(), None).unwrap());
+    let retained = terminal_file_manager::fs::inspect(&paths[2])
+        .identity
+        .unwrap()
+        .object;
+    fs::write(&paths[2], "changed bytes retained").unwrap();
+    let record = execute(&plan, Options::default(), &false.into(), |_| Decision::Skip);
+    assert_eq!(record.completed_files(), 4, "{record:?}");
+    assert_eq!(record.entries.len(), 5);
+    for entry in &record.entries {
+        if entry.source == paths[2] {
+            assert_eq!(entry.outcome, Outcome::Changed);
+            assert!(entry.trash.is_none());
+        } else {
+            assert_eq!(entry.outcome, Outcome::Completed);
+            assert!(!entry.source.exists());
+            let receipt = entry.trash.as_ref().unwrap();
+            assert_eq!(
+                (receipt.validated_files, receipt.validated_directories),
+                (1, 0)
+            );
+            assert_eq!(
+                fs::read(entry.destination.as_ref().unwrap()).unwrap(),
+                b"approved bytes"
+            );
+        }
+    }
+    assert_eq!(fs::read(&paths[2]).unwrap(), b"changed bytes retained");
+    assert_eq!(
+        terminal_file_manager::fs::inspect(&paths[2])
+            .identity
+            .unwrap()
+            .object,
+        retained
+    );
+    println!("INDEPENDENT_APPROVED_TRASH_ROOTS_EXERCISED");
+}
+
+#[cfg(target_os = "linux")]
+fn late_scope_changes(root: &std::path::Path) {
+    fs::create_dir(root.join("outside")).unwrap();
+    fs::write(root.join("outside/sentinel"), "outside preserved").unwrap();
+    for change in ["write", "replace", "new", "link", "cancel"] {
+        late_scope_case(root, change);
+    }
+    assert_eq!(
+        fs::read(root.join("outside/sentinel")).unwrap(),
+        b"outside preserved"
+    );
+    println!("LATE_TRASH_SCOPE_REFUSALS_EXERCISED");
+}
+
+#[cfg(target_os = "linux")]
+fn late_scope_case(root: &std::path::Path, change: &str) {
+    use terminal_file_manager::operations::{Event, Outcome, Stage};
+    let selected = root.join(format!("late-{change}"));
+    fs::create_dir_all(selected.join("nested")).unwrap();
+    fs::write(selected.join("nested/file"), "original").unwrap();
+    let plan = counted(Plan::paths(Operation::Trash, vec![selected.clone()], None).unwrap());
+    let file_object = terminal_file_manager::fs::inspect(&selected.join("nested/file"))
+        .identity
+        .unwrap()
+        .object;
+    let before = terminal_file_manager::fs::inspect(&selected)
+        .identity
+        .unwrap()
+        .object;
+    let cancel = std::sync::atomic::AtomicBool::new(false);
+    let mut observed = false;
+    let record = execute(&plan, Options::default(), &cancel, |event| {
+        if matches!(
+            event,
+            Event::Progress {
+                stage: Stage::Removing,
+                ..
+            }
+        ) {
+            alter_scope(root, &selected, change, &cancel);
+            observed = true;
+        }
+        Decision::Skip
+    });
+    let expected = if change == "cancel" {
+        Outcome::Cancelled
+    } else {
+        Outcome::Changed
+    };
+    assert_eq!(record.entries[0].outcome, expected, "{change}: {record:?}");
+    assert!(observed, "exercise the actual pre-submission boundary");
+    assert_eq!(
+        terminal_file_manager::fs::inspect(&selected)
+            .identity
+            .unwrap()
+            .object,
+        before
+    );
+    assert!(record.entries[0].trash.is_none());
+    retained_scope(root, &selected, change, file_object);
+}
+
+#[cfg(target_os = "linux")]
+fn retained_scope(
+    root: &std::path::Path,
+    selected: &std::path::Path,
+    change: &str,
+    original: Option<(u64, u64)>,
+) {
+    assert_eq!(
+        fs::read_dir(root.join("data/Trash/files")).unwrap().count(),
+        1
+    );
+    assert_eq!(
+        fs::read_dir(root.join("data/Trash/info")).unwrap().count(),
+        1
+    );
+    let retained = if change == "link" {
+        root.join("retained-directory/file")
+    } else {
+        selected.join("nested/file")
+    };
+    let expected_bytes = if matches!(change, "write" | "replace") {
+        b"external change".as_slice()
+    } else {
+        b"original".as_slice()
+    };
+    assert_eq!(fs::read(&retained).unwrap(), expected_bytes);
+    let current = terminal_file_manager::fs::inspect(&retained)
+        .identity
+        .unwrap()
+        .object;
+    if change == "replace" {
+        assert_eq!(fs::read(root.join("retained-file")).unwrap(), b"original");
+        assert_eq!(
+            terminal_file_manager::fs::inspect(&root.join("retained-file"))
+                .identity
+                .unwrap()
+                .object,
+            original
+        );
+        assert_ne!(current, original);
+    } else {
+        assert_eq!(current, original);
+    }
+    if change == "new" {
+        assert_eq!(
+            fs::read(selected.join("nested/new")).unwrap(),
+            b"unapproved"
+        );
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn counted(plan: Plan) -> Plan {
+    use std::time::Duration;
+    use terminal_file_manager::operations::{Queue, Update};
+    let mut queue = Queue::new().unwrap();
+    queue.preview(plan).unwrap();
+    loop {
+        match queue.next(Duration::from_secs(10)).unwrap() {
+            Update::Preview { plan, .. } => return *plan,
+            Update::Finished { record, .. } => panic!("preview failed: {record:?}"),
+            _ => {}
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn alter_scope(
+    root: &std::path::Path,
+    selected: &std::path::Path,
+    change: &str,
+    cancel: &std::sync::atomic::AtomicBool,
+) {
+    match change {
+        "write" => fs::write(selected.join("nested/file"), "external change").unwrap(),
+        "replace" => {
+            fs::rename(selected.join("nested/file"), root.join("retained-file")).unwrap();
+            fs::write(selected.join("nested/file"), "external change").unwrap();
+        }
+        "new" => fs::write(selected.join("nested/new"), "unapproved").unwrap(),
+        "link" => {
+            fs::rename(selected.join("nested"), root.join("retained-directory")).unwrap();
+            std::os::unix::fs::symlink(root.join("outside"), selected.join("nested")).unwrap();
+        }
+        "cancel" => cancel.store(true, std::sync::atomic::Ordering::Relaxed),
+        _ => panic!("unknown scope change"),
+    }
 }
 
 #[cfg(not(windows))]

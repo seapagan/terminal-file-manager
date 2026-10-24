@@ -76,6 +76,10 @@ fn job_outcome_precedence_keeps_partial_unknown_and_critical_distinct() {
             .collect();
         job.finish(Record { entries }, job.started + Duration::from_secs(4));
         assert_eq!(job.state, expected);
+        assert_eq!(
+            job.can_retry(),
+            job.plan.retry(job.record.as_ref().unwrap()).is_ok()
+        );
     }
 }
 
