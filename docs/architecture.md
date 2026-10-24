@@ -37,8 +37,8 @@ kernel read cannot be forcibly interrupted, and no mutation is submitted.
 Traversal has a 128-directory depth bound and bounded error diagnostics;
 errors, cancellation and overflow never become complete totals.
 
-`watch` keeps one logical native subscription per local pane, including hidden
-panes, with nonrecursive current-directory and immediate-parent targets.
+On Linux and macOS, `watch` keeps one logical native subscription per local pane,
+including hidden panes, with nonrecursive current-directory and immediate-parent targets.
 Two bounded background owners register, retry and release native watchers;
 callbacks coalesce invalidations and errors into pane-local atomic flags.
 Changing the directory context replaces those flags, so old callbacks cannot
@@ -47,8 +47,17 @@ invalidate the new context. Registration completion requests a catch-up scan.
 The deterministic coordinator debounces changes for 200 ms, caps continuous
 deferral at one second and spaces sustained scan starts by at least one second.
 It retains late dirty state through an in-flight scan. Each pane also receives
-an unconditional 30-second reconciliation. Native errors enable two-second
+an unconditional 30-second reconciliation on those platforms. Native errors enable two-second
 fallback reconciliation and re-registration with one-to-30-second backoff.
+
+Windows uses intentional two-second polling. It creates no native watch owner,
+directory subscription or recovery loop, and reports no native-watcher failure
+for this normal mode. The coordinator schedules both panes, including the hidden
+pane, without filesystem I/O on the input/render thread. A due poll remains one
+coalesced intent until the current listing and pending navigation finish; it
+never cancels an in-flight listing to meet the interval. Slow enumeration can
+therefore extend visibility latency beyond two seconds.
+
 All enumeration uses the existing six read-only lanes. Manual refresh and M2
 completion use the same coalesced ordinary refresh intent; navigation retains
 priority and its separate pending path/history state.
@@ -62,13 +71,20 @@ available creation evidence, and native namespace. Enumeration brackets that
 evidence before accepting a snapshot. Missing or changed evidence retains the last
 good view and blocks new mutation approvals. Explicit reopening establishes a new context. A missing
 cursor chooses the nearest surviving row; marks require object continuity.
-Metadata and count generations invalidate on each installed snapshot.
+Metadata and count generations invalidate on changed snapshots and explicit
+refresh. A Windows no-op reconciliation preserves an in-flight or completed
+on-demand count only for the same trusted selected directory and unchanged
+entry metadata (excluding access time). Recursive totals remain cached count
+snapshots, not continuously updated descendant totals; explicit recount/refresh,
+selection changes, replacement or errors invalidate them.
 
-Watcher shutdown signals its owners without waiting for a potentially stalled
+Linux/macOS watcher shutdown signals its owners without waiting for a potentially stalled
 filesystem call on the UI thread. Normal owners release their watches on exit;
 an owner stalled inside a kernel call releases them when that call returns.
 Native notifications may miss changes on network or pseudo-filesystems. Periodic
 enumeration supplies eventual reconciliation where enumeration still works.
+Windows polling retains no watch handles, although ordinary enumeration still
+uses brief filesystem handles and can race external operations.
 Remote refresh remains a separate M3 capability.
 
 `terminal` restores attempted raw/alternate-screen/mouse/paste/keyboard modes on

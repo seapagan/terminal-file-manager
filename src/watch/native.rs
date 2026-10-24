@@ -228,6 +228,7 @@ mod tests {
         assert_eq!(signals.bits.load(Ordering::Acquire), READY | DIRTY);
     }
 
+    #[cfg(not(windows))]
     fn wait_for(signals: &Signals, mask: u8) {
         let deadline = Instant::now() + Duration::from_secs(5);
         while signals.bits.load(Ordering::Acquire) & mask == 0 {
@@ -237,6 +238,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn native_failed_registration_retries_and_shutdown_releases_its_owner() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("temporarily-missing");
@@ -268,6 +270,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn native_rebind_keeps_only_latest_pending_subscription_and_handles_roots() {
         let root = tempfile::tempdir().unwrap();
         let started = Instant::now();

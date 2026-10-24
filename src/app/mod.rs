@@ -38,6 +38,40 @@ pub struct Detail {
     pub counting: bool,
 }
 
+impl Detail {
+    fn retains_count(&self, selection: Option<&Entry>, snapshot: &Snapshot) -> bool {
+        if self.path.as_deref() != selection.map(|entry| entry.path.as_path())
+            || self.stale.is_some()
+            || (!self.counting && self.totals.is_none())
+        {
+            return false;
+        }
+        let Some(previous) = selection.filter(|entry| {
+            entry.may_recurse()
+                && self.entry.as_ref().is_some_and(|cached| {
+                    cached.error.is_none() && cached.identity == entry.identity
+                })
+                && entry
+                    .identity
+                    .as_ref()
+                    .is_some_and(|id| id.object.is_some())
+        }) else {
+            return false;
+        };
+        let Some(fresh) = snapshot
+            .entries
+            .iter()
+            .find(|entry| entry.path == previous.path)
+        else {
+            return false;
+        };
+        let mut cached = previous.clone();
+        // Traversal itself can change access time without invalidating its count.
+        cached.accessed = fresh.accessed;
+        cached == *fresh
+    }
+}
+
 /// Both panes remain alive when hidden or temporarily collapsed by width.
 pub struct App {
     pub operations: crate::operations::State,
@@ -120,6 +154,7 @@ impl App {
         state.restoring = None;
         state.listing = true;
         state.refresh_pending = false;
+        state.reconciling = false;
         Request {
             pane,
             generation: state.generation,
@@ -135,7 +170,15 @@ impl App {
             return None;
         }
         state.refresh_pending = true;
+        state.reconciling = false;
         self.take_refresh(pane)
+    }
+
+    /// Reconcile a periodic snapshot without discarding an unchanged count target.
+    pub(crate) fn request_reconciliation(&mut self, pane: usize) -> Option<Request> {
+        let request = self.request_refresh(pane)?;
+        self.panes[pane].reconciling = true;
+        Some(request)
     }
 
     /// Start one deferred ordinary refresh after the current listing has completed.
@@ -168,35 +211,54 @@ impl App {
         if generation != state.generation {
             return false;
         }
+        let reconciling = std::mem::take(&mut state.reconciling);
         let attempted = state.pending.take();
         state.listing = false;
         match result {
-            Ok(snapshot) => {
-                if attempted
-                    .as_ref()
-                    .is_some_and(|path| path != &snapshot.path)
-                {
-                    return false;
-                }
-                if attempted.is_none() && !state.accepts_refresh(&snapshot) {
-                    state.error = Some("Directory identity changed or unavailable; reopen the directory to select a new context".into());
-                    self.invalidate_listing_details(pane);
-                    return true;
-                }
-                state.error = snapshot.directory.is_none().then(||
-                    "Directory identity unavailable; reopen the directory before using this context".into());
-                if attempted.is_some() || state.context == 0 {
-                    state.context += 1;
-                }
-                state.install(snapshot);
-            }
+            Ok(snapshot) => self.install_listing(pane, attempted, snapshot, reconciling),
             Err(error) => {
                 state.restoring = None;
                 state.error = Some(format!(
                     "{}: {error}",
                     attempted.as_deref().unwrap_or(&state.path).display()
                 ));
+                self.invalidate_listing_details(pane);
+                true
             }
+        }
+    }
+
+    fn install_listing(
+        &mut self,
+        pane: usize,
+        attempted: Option<PathBuf>,
+        snapshot: Snapshot,
+        reconciling: bool,
+    ) -> bool {
+        let state = &mut self.panes[pane];
+        if attempted
+            .as_ref()
+            .is_some_and(|path| path != &snapshot.path)
+        {
+            return false;
+        }
+        if attempted.is_none() && !state.accepts_refresh(&snapshot) {
+            state.error = Some("Directory identity changed or unavailable; reopen the directory to select a new context".into());
+            self.invalidate_listing_details(pane);
+            return true;
+        }
+        let preserve_count =
+            reconciling && self.details[pane].retains_count(state.current(), &snapshot);
+        state.error = snapshot.directory.is_none().then(|| {
+            "Directory identity unavailable; reopen the directory before using this context".into()
+        });
+        if attempted.is_some() || state.context == 0 {
+            state.context += 1;
+        }
+        state.install(snapshot);
+        if preserve_count {
+            self.details[pane].entry = state.current().cloned();
+            return true;
         }
         self.invalidate_listing_details(pane);
         true

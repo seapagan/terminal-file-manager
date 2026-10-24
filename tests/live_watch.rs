@@ -319,6 +319,7 @@ fn native_permission_loss_keeps_last_good_rows_and_recovers_without_navigation()
 }
 
 #[test]
+#[cfg(not(windows))]
 fn native_reads_and_unrelated_parent_chatter_do_not_schedule_scans() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("current");

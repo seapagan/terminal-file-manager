@@ -1,0 +1,5 @@
+# Retain native Windows polling measurements in successful hosted test logs.
+[[profile.default.overrides]]
+platform = 'cfg(target_os = "windows")'
+filter = 'binary(windows_polling) or test(native_live_changes_render_without_input_and_terminal_reentry_is_clean)'
+success-output = "immediate"

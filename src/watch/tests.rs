@@ -5,10 +5,13 @@ use crate::{
 };
 use std::sync::atomic::AtomicBool;
 
-fn prepared() -> (tempfile::TempDir, App, Pool, Runtime) {
+pub(super) fn prepared() -> (tempfile::TempDir, App, Pool, Runtime) {
     let root = tempfile::tempdir().unwrap();
     let mut app = App::new(root.path().into());
-    let mut runtime = Runtime::default();
+    let mut runtime = Runtime {
+        mode: Mode::Native,
+        ..Runtime::default()
+    };
     for pane in 0..2 {
         app.complete_listing(
             pane,
@@ -24,6 +27,7 @@ fn prepared() -> (tempfile::TempDir, App, Pool, Runtime) {
         slot.worker = None;
         slot.path = Some(app.panes[pane].path.clone());
         slot.context = app.panes[pane].context;
+        slot.sweep = Duration::from_secs(30);
     }
     (
         root,
@@ -33,7 +37,7 @@ fn prepared() -> (tempfile::TempDir, App, Pool, Runtime) {
     )
 }
 
-fn finish(app: &mut App, pool: &mut Pool) {
+pub(super) fn finish(app: &mut App, pool: &mut Pool) {
     while pool.active_count() != 0 {
         let completion = pool
             .next(Duration::from_secs(5))
@@ -149,7 +153,10 @@ fn initial_listing_error_still_receives_bounded_automatic_reconciliation() {
     let root = tempfile::tempdir().unwrap();
     let mut app = App::new(root.path().into());
     app.complete_listing(0, 1, Err("transient initial error".into()));
-    let mut runtime = Runtime::default();
+    let mut runtime = Runtime {
+        mode: Mode::Native,
+        ..Runtime::default()
+    };
     runtime.slots[0].worker = None;
     let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
     runtime.poll(&mut app, &mut pool, Duration::from_secs(30));

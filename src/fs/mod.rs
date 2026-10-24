@@ -39,7 +39,7 @@ pub struct Identity {
 }
 
 /// Cached entry metadata. Missing fields are unavailable, never invented.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Entry {
     pub path: PathBuf,
     pub name: OsString,

@@ -217,12 +217,14 @@ fn schedule_metadata(
 }
 
 #[cfg(test)]
+mod polling_tests;
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::{fs, input::Action};
     use std::sync::{Arc, Mutex, atomic::AtomicBool, mpsc};
 
-    fn counting_controller(root: &Path) -> Controller {
+    pub(super) fn counting_controller(root: &Path) -> Controller {
         let directory = root.join("directory");
         std::fs::create_dir(&directory).unwrap();
         std::fs::write(directory.join("file"), "1234").unwrap();
@@ -239,7 +241,7 @@ mod tests {
         )
     }
 
-    fn collect_until_idle(controller: &mut Controller, pool: &mut Pool) {
+    pub(super) fn collect_until_idle(controller: &mut Controller, pool: &mut Pool) {
         let deadline = Instant::now() + Duration::from_secs(10);
         let mut changed = false;
         while pool.active_count() != 0 {
@@ -440,8 +442,9 @@ mod tests {
         assert!(!c.preferences.fuzzy_timestamps && !c.preferences_changed);
     }
 
-    fn hold_first_count(
+    pub(super) fn hold_first_count(
         pool: &mut Pool,
+        expect_cancelled: bool,
     ) -> (mpsc::Receiver<()>, mpsc::SyncSender<()>, mpsc::Receiver<()>) {
         let (entered, running) = mpsc::sync_channel(1);
         let (release, wait) = mpsc::sync_channel(1);
@@ -457,7 +460,10 @@ mod tests {
                     .unwrap()
                     .recv_timeout(Duration::from_secs(10))
                     .unwrap();
-                assert!(cancelled.load(std::sync::atomic::Ordering::Relaxed));
+                assert_eq!(
+                    cancelled.load(std::sync::atomic::Ordering::Relaxed),
+                    expect_cancelled
+                );
                 confirmed.send(()).unwrap();
             }
         }));
@@ -469,7 +475,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let mut controller = counting_controller(root.path());
         let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
-        let (running, release, stopped) = hold_first_count(&mut pool);
+        let (running, release, stopped) = hold_first_count(&mut pool, true);
         let geometry = ui::geometry(&controller.app, ratatui::layout::Rect::new(0, 0, 120, 24));
         let first = controller.dispatch(Action::Count, &geometry).pop().unwrap();
         pool.submit(first.clone());

@@ -10,7 +10,7 @@ pub enum OwnerDisplay {
 }
 
 /// Preserve raw UID/GID alongside worker-resolved display names.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Ownership {
     pub uid: u32,
     pub gid: u32,

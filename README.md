@@ -75,13 +75,16 @@ These are the default bindings. You can customise them in `config.toml`.
 
 Local directories refresh automatically, including the hidden pane. External
 creates, deletes, renames and metadata edits update the listing while preserving
-the cursor and surviving marks. File reads do not trigger a refresh. You can
-still press `r` to refresh manually.
+the cursor and surviving marks. Linux and macOS use native filesystem
+notifications; file reads do not trigger them. Windows checks displayed local
+directories approximately every two seconds. Press `r` to refresh manually.
 
-TFM also reconciles each pane every 30 seconds to catch missed notifications.
-If native watching fails, it warns once and refreshes periodically while retrying.
-Network and pseudo-filesystems may update more slowly. If a directory disappears
-or another directory replaces it, TFM retains the last good view and reports the
+Linux and macOS also reconcile each pane every 30 seconds to catch missed
+notifications. If native watching fails, TFM warns once and refreshes periodically
+while retrying. Windows polling is its normal mode. Large or slow directories,
+concurrent operations and unavailable mounts can extend visibility latency.
+If a directory disappears or another directory replaces it, TFM retains the
+last good view and reports the
 error; navigate out and reopen the directory to select the replacement.
 
 ### Information and exit
@@ -159,6 +162,7 @@ view preferences.
 Press `c` in a metadata view for an on-demand directory count and size. In the
 **sidebar**, Esc cancels an active count but does not close the sidebar. In the
 **popup**, Esc cancels the count or closes the popup.
+Counts are on-demand snapshots; press `c` again to update them.
 
 ## Saving and restoring sessions
 

@@ -40,7 +40,7 @@ pub fn drive(command: CommandBuilder, steps: &[(&str, &str)], resize: bool) -> S
 }
 
 pub struct Session {
-    child: Box<dyn Child + Send + Sync>,
+    pub(crate) child: Box<dyn Child + Send + Sync>,
     master: Option<Box<dyn MasterPty + Send>>,
     writer: Option<Box<dyn Write + Send>>,
     reader: Option<JoinHandle<()>>,

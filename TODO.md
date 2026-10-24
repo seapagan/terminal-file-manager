@@ -61,6 +61,35 @@ embedded terminal, plugin/scripting ecosystem, drag-and-drop and cloud backends
 remain excluded from v1. No sync/resume/editor implementation is added merely
 for future readiness.
 
+## Future Windows notification backend
+
+Investigate a non-interfering, near-real-time backend that could replace the
+approved two-second Windows polling policy. This is deferred work, not a new
+pre-v1 blocker.
+
+On the tested Windows Server 2025 hosts, per-directory
+`ReadDirectoryChangesW`/`notify` and `SHChangeNotifyRegister` Shell registrations
+blocked ancestor renames. The native directory handles already used
+`FILE_SHARE_DELETE`; deletion sharing did not solve the restriction. Shell-only
+notifications missed ordinary external changes. Shell+interrupt delivery added
+latency, still blocked ancestor renames and failed extended-path registration.
+The retained [spike source and references](https://github.com/seapagan/terminal-file-manager/tree/f970878b7bad7b9170f32afa643bb1ba986128c7/research/windows-watch)
+and [native isolation run](https://github.com/seapagan/terminal-file-manager/actions/runs/40123944312)
+record those limits; do not import the temporary research implementation.
+
+A wider-root recursive native watch passed the owned rename topology, but also
+produced unrelated sibling invalidations. Before considering it, measure
+volume-wide event load/overflow, mount/UNC/drive variation, access restrictions,
+resource use, rebinding and teardown.
+
+Before changing the default, require native Windows 11 desktop and Windows Server
+validation with ordinary external create/delete/rename/content/attribute writers;
+current, parent and grandparent rename freedom; deletion/replacement and recovery;
+long/native paths; and selection, physical identity and operation-approval safety.
+Record change-to-visible latency, idle/load CPU, memory/handles, queue/scan bounds,
+event-loss reconciliation and fallback behaviour. A working API example or an
+owned-root result alone does not establish a production backend.
+
 ## Future Windows-focused PR: attributes and ownership
 
 Add compact `RHSA` attributes with `-` for unset flags, retaining the existing

@@ -1,5 +1,37 @@
 # Acceptance gates
 
+## Approved Windows polling policy: native acceptance pending
+
+The maintainer approved intentional two-second reconciliation on Windows after
+the isolated Shell investigation. Linux/macOS retain native `notify`, 200 ms
+debounce, one-second sustained scan spacing and 30-second reconciliation.
+Windows creates no native directory-watch owner or failure/recovery loop. Both
+panes use the existing bounded listing lanes and generation/identity checks;
+overdue polls defer behind in-flight listings and navigation.
+
+Deterministic polling regressions now cover two-second hidden-pane updates,
+healthy operation without watcher warnings, overdue-work coalescing and stale
+navigation completions. The existing parent-rename regression remains intact.
+Windows-native tests add current/grandparent renames, deletion/path reuse,
+explicit reopen, mark/approval safety, navigation, manual refresh and read/sibling
+cadence. The native measurement case records idle/process resources, scan bounds,
+listing duration, isolated model visibility and continuous-write convergence on
+owned 2,000- and 10,000-entry directories. It also samples the actual ConPTY TUI's
+idle process resources, external-create render/exit and clean re-entry. Successful Nextest logs retain these
+observations; they are not a visibility SLA or a release-build benchmark.
+
+The Linux suite passes 519 tests at this implementation checkpoint, with the two
+existing child-entry skips. Windows execution, final-head native CI, combined
+coverage and Codacy review remain outstanding. Historical Windows failures below
+remain failures until the new production backend passes native acceptance.
+
+Review reproduced cancellation of a directory count at every periodic listing.
+The Windows reconciliation intent now preserves running/completed counts only
+for unchanged, identity-verified selected directories. Real worker/metadata
+scheduling regressions prove that no-op polls do not cancel counts, while manual
+refresh and replacement reject old results. Counts remain on-demand snapshots;
+unchanged directory metadata does not establish unchanged descendant contents.
+
 ## Live local refresh: implementation checkpoint, 24 October 2026
 
 The first post-M2 feature adds native nonrecursive subscriptions for both local
