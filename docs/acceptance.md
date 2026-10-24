@@ -54,6 +54,14 @@ enumeration provides eventual reconciliation where enumeration succeeds. A
 stalled filesystem syscall can delay its background owner's resource release;
 UI shutdown does not wait for it. SFTP refresh remains separate M3 scope.
 
+The first draft-PR run at `9dd9d5c` passed policy, security, packaging, advisory
+quality and Codacy static analysis with zero new issues. Native CI stopped before
+tests because Rust 1.99 deprecates `AtomicU8::fetch_update`; the exact Rust 1.95
+job passed. A compatible compare-and-exchange loop preserves the same bounded
+signal state. Local Rust 1.99 Clippy and all 511 native tests pass after that
+correction, including concurrent publication, backend overflow/error and recovery regressions. Native
+macOS/Windows execution and combined coverage still require the new-head run.
+
 ## Current status and evidence
 
 M0's engineering foundation is complete at the accepted checkpoints below. The

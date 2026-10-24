@@ -25,11 +25,19 @@ impl Signals {
         if bits & (READY | ERROR) == 0 {
             self.bits.fetch_or(bits, Ordering::Release);
         } else {
-            let _ = self
-                .bits
-                .fetch_update(Ordering::AcqRel, Ordering::Acquire, |previous| {
-                    Some((previous & !(READY | ERROR)) | bits)
-                });
+            let mut previous = self.bits.load(Ordering::Acquire);
+            loop {
+                let next = (previous & !(READY | ERROR)) | bits;
+                match self.bits.compare_exchange(
+                    previous,
+                    next,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                ) {
+                    Ok(_) => break,
+                    Err(current) => previous = current,
+                }
+            }
         }
     }
 }
@@ -122,25 +130,29 @@ fn register(binding: &Binding) -> notify::Result<RecommendedWatcher> {
     let physical = std::fs::canonicalize(&raw).map_err(notify::Error::io)?;
     let signals = binding.signals.clone();
     let mut watcher =
-        notify::recommended_watcher(move |result: notify::Result<Event>| match result {
-            Ok(event) if event.need_rescan() => {
-                signals.failed.store(true, Ordering::Release);
-                signals.publish(ERROR | DIRTY);
-            }
-            Ok(event) if relevant(&event, &raw, &physical) => {
-                signals.publish(DIRTY);
-            }
-            Err(_) => {
-                signals.failed.store(true, Ordering::Release);
-                signals.publish(ERROR | DIRTY);
-            }
-            _ => {}
-        })?;
+        notify::recommended_watcher(move |result| on_event(result, &raw, &physical, &signals))?;
     watcher.watch(&binding.path, RecursiveMode::NonRecursive)?;
     if let Some(parent) = binding.path.parent().filter(|p| !p.as_os_str().is_empty()) {
         watcher.watch(parent, RecursiveMode::NonRecursive)?;
     }
     Ok(watcher)
+}
+
+fn on_event(result: notify::Result<Event>, raw: &Path, physical: &Path, signals: &Signals) {
+    match result {
+        Ok(event) if event.need_rescan() => {
+            signals.failed.store(true, Ordering::Release);
+            signals.publish(ERROR | DIRTY);
+        }
+        Ok(event) if relevant(&event, raw, physical) => {
+            signals.publish(DIRTY);
+        }
+        Err(_) => {
+            signals.failed.store(true, Ordering::Release);
+            signals.publish(ERROR | DIRTY);
+        }
+        _ => {}
+    }
 }
 
 fn relevant(event: &Event, raw: &Path, physical: &Path) -> bool {
@@ -168,6 +180,53 @@ fn relevant(event: &Event, raw: &Path, physical: &Path) -> bool {
 mod tests {
     use super::*;
     use notify::event::{AccessKind, AccessMode, Flag, MetadataKind, ModifyKind};
+
+    #[test]
+    fn backend_errors_and_overflow_require_rescan_and_native_re_registration() {
+        let path = Path::new("/current");
+        for result in [
+            Err(notify::Error::generic("forced backend failure")),
+            Ok(Event::new(EventKind::Other).set_flag(Flag::Rescan)),
+        ] {
+            let signals = Signals::default();
+            on_event(result, path, path, &signals);
+            assert!(signals.failed.load(Ordering::Acquire));
+            assert_eq!(signals.bits.load(Ordering::Acquire), ERROR | DIRTY);
+        }
+    }
+
+    #[test]
+    fn concurrent_health_and_dirty_publication_preserves_bounded_atomic_state() {
+        let signals = Arc::<Signals>::default();
+        let start = Arc::new(std::sync::Barrier::new(3));
+        let producers: Vec<_> = [DIRTY, ERROR | DIRTY]
+            .into_iter()
+            .map(|bits| {
+                let signals = signals.clone();
+                let start = start.clone();
+                thread::spawn(move || {
+                    start.wait();
+                    for _ in 0..5000 {
+                        signals.publish(bits);
+                    }
+                })
+            })
+            .collect();
+        start.wait();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while producers.iter().any(|producer| !producer.is_finished()) {
+            let bits = signals.bits.swap(0, Ordering::AcqRel);
+            assert_ne!(bits & (READY | ERROR), READY | ERROR);
+            assert!(Instant::now() < deadline, "atomic producers stalled");
+            thread::yield_now();
+        }
+        for producer in producers {
+            producer.join().unwrap();
+        }
+        signals.publish(DIRTY);
+        signals.publish(READY | DIRTY);
+        assert_eq!(signals.bits.load(Ordering::Acquire), READY | DIRTY);
+    }
 
     fn wait_for(signals: &Signals, mask: u8) {
         let deadline = Instant::now() + Duration::from_secs(5);
