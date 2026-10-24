@@ -10,13 +10,15 @@ fn tfm(arguments: &[&str]) -> Output {
 }
 
 #[test]
-fn help_describes_the_read_only_browser() {
+fn help_describes_local_operations_and_safe_exit() {
     for arguments in [&["--help"][..], &["-h"][..]] {
         let output = tfm(arguments);
         assert!(output.status.success());
         let text = String::from_utf8(output.stdout).expect("help is UTF-8");
         assert!(text.contains("Usage: tfm"));
-        assert!(text.contains("read-only"));
+        assert!(text.contains("F5/F6 copy/move"));
+        assert!(text.contains("F8 Trash"));
+        assert!(text.contains("quit safely"));
         assert!(text.contains("DIRECTORY"));
         assert!(output.stderr.is_empty());
     }

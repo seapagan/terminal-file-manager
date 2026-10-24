@@ -20,6 +20,7 @@ fn loaded() -> (tempfile::TempDir, Controller) {
             id,
             1,
             Ok(fs::Snapshot {
+                directory: None,
                 path: root.path().into(),
                 entries: entries.clone(),
                 errors: vec![],

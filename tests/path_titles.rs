@@ -273,6 +273,7 @@ fn navigated_app() -> App {
         0,
         request.generation,
         Ok(terminal_file_manager::fs::Snapshot {
+            directory: None,
             path: LONG.into(),
             entries: Vec::new(),
             errors: Vec::new(),

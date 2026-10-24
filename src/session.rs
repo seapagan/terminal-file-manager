@@ -59,7 +59,7 @@ pub struct NavigationSession {
 }
 
 impl NavigationSession {
-    fn capture(app: &App) -> Self {
+    pub(crate) fn capture(app: &App) -> Self {
         Self {
             version: 1,
             locations: std::array::from_fn(|i| NativePath::capture(&app.panes[i].path)),
@@ -125,8 +125,16 @@ impl SessionStore {
     /// Leaves old bytes intact on staging errors; refuses linked/nonregular destinations.
     pub fn save(&self, app: &App) -> Result<(), String> {
         let session = NavigationSession::capture(app);
+        self.save_snapshot(&session)
+    }
+
+    /// Persist the navigation intent captured before waiting for active jobs.
+    ///
+    /// # Errors
+    /// Refuses invalid paths and unsafe destinations; preserves the previous session on staging errors.
+    pub fn save_snapshot(&self, session: &NavigationSession) -> Result<(), String> {
         session.locations()?;
-        let text = toml::to_string_pretty(&session).map_err(|e| e.to_string())?;
+        let text = toml::to_string_pretty(session).map_err(|e| e.to_string())?;
         crate::settings::atomic_write(&self.path, &text).map_err(|e| self.error(e))
     }
 

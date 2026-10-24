@@ -61,12 +61,13 @@ fn filter_accept_cancel_paste_and_quit_do_not_confuse_actions_with_text() {
 }
 
 #[test]
-fn files_and_mutations_explain_unavailability_without_launching() {
+fn files_explain_viewer_unavailability_and_copy_opens_a_frozen_dialog() {
     let (_root, mut controller) = controller();
     key(&mut controller, "Enter");
     assert!(controller.app.status.contains("M6"));
-    key(&mut controller, "F8");
-    assert!(controller.app.status.contains("M2"));
+    key(&mut controller, "F5");
+    assert!(controller.app.operations.dialog.is_some());
+    assert!(controller.app.operations.outbox.is_empty());
     key(&mut controller, "Ctrl+c");
     assert!(controller.quit);
 }

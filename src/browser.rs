@@ -1,4 +1,5 @@
 //! Runtime orchestration: terminal events and bounded worker results meet here.
+mod operations;
 use crate::{
     app::{App, Request, RequestKind},
     color::Theme,
@@ -52,6 +53,7 @@ fn browse(app: App, settings: Settings, store: &mut Option<Store>) -> Result<(),
     let mut controller = Controller::new(app, bindings, settings.clone());
     let theme = Theme::for_stdout();
     let mut pool = Pool::new(IgnoreContext::default()).map_err(|e| e.to_string())?;
+    let mut jobs = crate::operations::Queue::new().map_err(|error| error.to_string())?;
     for pane in 0..2 {
         pool.submit(Request {
             pane,
@@ -61,11 +63,19 @@ fn browse(app: App, settings: Settings, store: &mut Option<Store>) -> Result<(),
         });
     }
     terminal::with_terminal(settings.mouse, |terminal| {
-        drive(terminal, &mut controller, &mut pool, &theme)
+        drive(terminal, &mut controller, &mut pool, &mut jobs, &theme)
     })
     .map_err(|e| e.to_string())?;
+    save_state(controller, store)
+}
+
+fn save_state(controller: Controller, store: &mut Option<Store>) -> Result<(), String> {
     if controller.save_session {
-        crate::startup::session_store()?.save(&controller.app)?;
+        if let Some(snapshot) = &controller.app.operations.exit_snapshot {
+            crate::startup::session_store()?.save_snapshot(snapshot)?;
+        } else {
+            crate::startup::session_store()?.save(&controller.app)?;
+        }
     }
     if controller.preferences_changed {
         let Some(store) = store.as_mut() else {
@@ -81,6 +91,7 @@ fn drive(
     terminal: &mut NativeTerminal,
     controller: &mut Controller,
     pool: &mut Pool,
+    jobs: &mut crate::operations::Queue,
     theme: &Theme,
 ) -> io::Result<()> {
     let started = Instant::now();
@@ -90,6 +101,7 @@ fn drive(
     while !controller.quit {
         dirty |= tick(&mut controller.app);
         dirty |= collect(controller, pool);
+        dirty |= operations::collect(controller, jobs, pool);
         dirty |= schedule_metadata(controller, pool, &mut metadata);
         if dirty {
             terminal.draw(|frame| {
@@ -103,6 +115,7 @@ fn drive(
             for request in requests {
                 pool.submit(request);
             }
+            operations::submit(controller, jobs);
             dirty = true;
         }
     }
@@ -116,7 +129,15 @@ fn tick(app: &mut App) -> bool {
         return false;
     }
     app.now = now;
-    app.panes.iter().any(|pane| pane.fuzzy_timestamps)
+    let expired = app
+        .operations
+        .notices
+        .iter()
+        .any(|notice| notice.expires <= now);
+    app.operations.notices.retain(|notice| notice.expires > now);
+    expired
+        || app.operations.active()
+        || app.panes.iter().any(|pane| pane.fuzzy_timestamps)
         || app
             .metadata_formats
             .iter()

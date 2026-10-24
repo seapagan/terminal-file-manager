@@ -1,0 +1,236 @@
+use crate::operations::safety::{self, Result};
+use std::{
+    fs::{File, Metadata},
+    io::{self, Seek, SeekFrom, Write},
+};
+
+#[cfg(windows)]
+mod windows;
+
+// Coalesce zero sectors into holes; logical bytes still pass through SHA-256.
+pub(super) struct Writer<'a> {
+    file: &'a mut File,
+    position: u64,
+    materialized: u64,
+}
+
+impl<'a> Writer<'a> {
+    pub fn new(file: &'a mut File) -> Self {
+        Self {
+            file,
+            position: 0,
+            materialized: 0,
+        }
+    }
+    pub fn finish(self, bytes: u64) -> Result<()> {
+        if self.file.metadata()?.len() != self.materialized {
+            return Err(safety::changed("Staged destination size mismatch"));
+        }
+        if self.materialized < bytes {
+            self.file.set_len(bytes)?;
+        }
+        Ok(())
+    }
+
+    fn region(&mut self, bytes: &[u8], zero: bool) -> io::Result<()> {
+        let end = self.end(bytes.len())?;
+        if zero {
+            self.file.seek(SeekFrom::Start(end))?;
+        } else {
+            self.file.write_all(bytes)?;
+            self.materialized = end;
+        }
+        self.position = end;
+        Ok(())
+    }
+
+    fn end(&self, count: usize) -> io::Result<u64> {
+        self.position
+            .checked_add(count as u64)
+            .ok_or_else(|| io::Error::other("Sparse byte count overflow"))
+    }
+}
+
+impl Write for Writer<'_> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.end(bytes.len())?;
+        let base = self.position;
+        let (mut start, mut offset, mut zero) = (0, 0, false);
+        while offset < bytes.len() {
+            let count = (512 - (base + offset as u64) % 512) as usize;
+            let end = (offset + count).min(bytes.len());
+            let is_zero = bytes[offset..end].iter().all(|byte| *byte == 0);
+            if is_zero != zero {
+                if start < offset {
+                    self.region(&bytes[start..offset], zero)?;
+                }
+                start = offset;
+                zero = is_zero;
+            }
+            offset = end;
+        }
+        if start < bytes.len() {
+            self.region(&bytes[start..], zero)?;
+        }
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        self.file.flush()
+    }
+}
+
+#[cfg(unix)]
+pub(super) fn prepare(_source_file: &File, _target: &File, source: &Metadata) -> io::Result<u64> {
+    use std::os::unix::fs::MetadataExt;
+    Ok(source.blocks().saturating_mul(512))
+}
+
+#[cfg(windows)]
+pub(super) fn prepare(source_file: &File, target: &File, source: &Metadata) -> io::Result<u64> {
+    use std::os::windows::fs::MetadataExt;
+    if source.file_attributes() & 0x800 != 0 {
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "NTFS compression preservation is unsupported; transfer refused before staging payload",
+        ));
+    }
+    if source.file_attributes() & 0x200 != 0 {
+        windows::mark_sparse(target)?;
+        windows::allocated(source_file)
+    } else {
+        Ok(source.len())
+    }
+}
+
+#[cfg(unix)]
+fn allocated(file: &File) -> io::Result<u64> {
+    use std::os::unix::fs::MetadataExt;
+    Ok(file.metadata()?.blocks().saturating_mul(512))
+}
+
+#[cfg(windows)]
+use windows::allocated;
+
+pub(super) fn verify(source_allocation: u64, size: u64, target: &File) -> io::Result<()> {
+    if source_allocation >= size {
+        return Ok(());
+    }
+    verify_allocation(source_allocation, allocated(target)?)
+}
+
+fn verify_allocation(source_allocation: u64, target_allocation: u64) -> io::Result<()> {
+    // Bound incidental rounding independently of how much of the source is allocated.
+    if target_allocation.saturating_sub(source_allocation) > 64 * 1024 {
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "Destination allocation expanded; sparse/compressed fidelity unsupported on this filesystem; transfer refused",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Read;
+
+    #[test]
+    fn intermediate_allocation_growth_is_refused_above_the_incidental_limit() {
+        for (source, target) in [(600, 900), (128, 256), (512, 768), (768, 1024)] {
+            assert_eq!(
+                verify_allocation(source * 1024, target * 1024)
+                    .unwrap_err()
+                    .kind(),
+                io::ErrorKind::Unsupported,
+                "{source} KiB to {target} KiB"
+            );
+        }
+    }
+
+    #[test]
+    fn allocation_growth_limit_includes_exact_boundaries_without_overflow() {
+        for source in [0, 128 * 1024, 600 * 1024, 1024 * 1024, u64::MAX - 65537] {
+            for growth in [0, 1, 65535, 65536, 65537] {
+                let result = verify_allocation(source, source + growth);
+                assert_eq!(result.is_ok(), growth <= 65536, "{source} + {growth}");
+            }
+        }
+        verify_allocation(u64::MAX, 0).unwrap();
+        verify_allocation(u64::MAX, u64::MAX).unwrap();
+    }
+
+    #[test]
+    fn full_materialization_is_refused_even_when_the_source_is_mostly_allocated() {
+        let mut output = tempfile::tempfile().unwrap();
+        let bytes = vec![1; 1024 * 1024];
+        output.write_all(&bytes).unwrap();
+        output.sync_all().unwrap();
+        let size = output.metadata().unwrap().len();
+        assert!(allocated(&output).unwrap() >= size);
+        assert_eq!(
+            verify(size * 3 / 4, size, &output).unwrap_err().kind(),
+            io::ErrorKind::Unsupported
+        );
+        verify(size, size, &output).unwrap();
+        output.seek(SeekFrom::Start(0)).unwrap();
+        let mut actual = Vec::new();
+        output.read_to_end(&mut actual).unwrap();
+        assert_eq!(actual, bytes);
+    }
+
+    #[test]
+    fn bounded_allocation_rounding_is_not_material_sparse_expansion() {
+        for (size, source_allocation) in [(4096, 0), (128 * 1024, 128 * 1024 - 512)] {
+            let mut output = tempfile::tempfile().unwrap();
+            let bytes = vec![17; size];
+            output.write_all(&bytes).unwrap();
+            output.sync_all().unwrap();
+            verify(source_allocation, size as u64, &output).unwrap();
+            output.rewind().unwrap();
+            let mut actual = Vec::new();
+            output.read_to_end(&mut actual).unwrap();
+            assert_eq!(actual, bytes);
+        }
+    }
+
+    fn native_allocation(expected: &[u8]) -> u64 {
+        let mut file = tempfile::tempfile().unwrap();
+        #[cfg(windows)]
+        windows::mark_sparse(&file).unwrap();
+        file.write_all(&expected[..1024]).unwrap();
+        file.seek(SeekFrom::Start(512 * 1024)).unwrap();
+        file.write_all(&expected[512 * 1024..512 * 1024 + 512])
+            .unwrap();
+        file.set_len(expected.len() as u64).unwrap();
+        file.sync_all().unwrap();
+        allocated(&file).unwrap()
+    }
+
+    #[test]
+    fn unaligned_short_writes_preserve_zero_runs_trailing_length_and_all_bytes() {
+        let mut output = tempfile::tempfile().unwrap();
+        #[cfg(windows)]
+        windows::mark_sparse(&output).unwrap();
+        let mut expected = vec![0; 1024 * 1024];
+        expected[..1024].fill(1);
+        expected[512 * 1024..512 * 1024 + 512].fill(2);
+        let mut writer = Writer::new(&mut output);
+        for part in expected.chunks(511) {
+            writer.write_all(part).unwrap();
+        }
+        writer.finish(expected.len() as u64).unwrap();
+        output.sync_all().unwrap();
+        let allocation = allocated(&output).unwrap();
+        let native = native_allocation(&expected);
+        assert!(
+            allocation <= native,
+            "{allocation} allocated versus {native} native of {} logical bytes; temp directory {:?}",
+            expected.len(),
+            std::env::temp_dir()
+        );
+        output.seek(SeekFrom::Start(0)).unwrap();
+        let mut actual = Vec::new();
+        output.read_to_end(&mut actual).unwrap();
+        assert_eq!(actual, expected);
+    }
+}

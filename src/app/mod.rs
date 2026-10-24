@@ -39,6 +39,7 @@ pub struct Detail {
 
 /// Both panes remain alive when hidden or temporarily collapsed by width.
 pub struct App {
+    pub operations: crate::operations::State,
     pub panes: [Pane; 2],
     pub active: usize,
     pub dual: bool,
@@ -69,6 +70,7 @@ impl App {
     /// Every invocation starts single-pane, with two independent original locations.
     pub fn new(path: PathBuf) -> Self {
         Self {
+            operations: Default::default(),
             panes: [Pane::new(path.clone()), Pane::new(path)],
             active: 0,
             dual: false,
@@ -92,7 +94,7 @@ impl App {
             overlay_scroll: 0,
             metadata_scroll: 0,
             metadata_formats: [None; 2],
-            status: "Read-only — ? for help".into(),
+            status: "Local files — ? for help, F9 / Alt+J for jobs".into(),
             now: std::time::SystemTime::now(),
             details: std::array::from_fn(|_| Detail::default()),
         }

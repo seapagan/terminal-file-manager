@@ -77,6 +77,8 @@ impl Entry {
 /// One atomic directory result, with explicit partial/ignore errors.
 #[derive(Clone, Debug)]
 pub struct Snapshot {
+    /// Physical directory identity for later mutation approvals; absent if unresolved/changed.
+    pub directory: Option<Box<Entry>>,
     pub path: PathBuf,
     pub entries: Vec<Entry>,
     pub errors: Vec<String>,
@@ -87,10 +89,11 @@ pub struct Snapshot {
 /// # Errors
 /// Returns the selected directory's error, or Interrupted on cancellation.
 pub fn list(path: &Path, context: &IgnoreContext, cancelled: &AtomicBool) -> io::Result<Snapshot> {
+    let mut owners = crate::owner::Cache::default();
+    let initial_directory = directory_identity(path, &mut owners);
     let directory = fs::read_dir(path)?;
     let (rules, mut errors) = rules::load(path, context);
     let mut entries = Vec::new();
-    let mut owners = crate::owner::Cache::default();
     for item in directory {
         check_cancelled(cancelled)?;
         match item {
@@ -105,11 +108,28 @@ pub fn list(path: &Path, context: &IgnoreContext, cancelled: &AtomicBool) -> io:
             .map(|rules| rules.ignored(&entry.path, entry.may_recurse()));
     }
     check_cancelled(cancelled)?;
+    let directory = initial_directory
+        .zip(directory_identity(path, &mut owners))
+        .and_then(|(before, after)| {
+            (before.path == after.path
+                && before.identity.as_ref().and_then(|id| id.object)
+                    == after.identity.as_ref().and_then(|id| id.object))
+            .then_some(Box::new(before))
+        });
     Ok(Snapshot {
+        directory,
         path: path.to_path_buf(),
         entries,
         errors,
     })
+}
+
+fn directory_identity(path: &Path, owners: &mut crate::owner::Cache) -> Option<Entry> {
+    let canonical = fs::canonicalize(path).ok()?;
+    let entry = inspect_no_follow(&canonical, Some(owners));
+    (entry.kind == EntryKind::Directory
+        && entry.identity.as_ref().and_then(|id| id.object).is_some())
+    .then_some(entry)
 }
 
 pub(crate) fn check_cancelled(cancelled: &AtomicBool) -> io::Result<()> {

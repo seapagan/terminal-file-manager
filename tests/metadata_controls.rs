@@ -2,7 +2,6 @@
 use colored_text::ColorLevel;
 use crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::{Terminal, backend::TestBackend, buffer::Buffer, layout::Rect};
-use std::time::Duration;
 use terminal_file_manager::{
     app::App,
     color::{Role, Theme},
@@ -64,7 +63,7 @@ fn click(c: &mut Controller, x: u16, y: u16, geometry: &ui::Geometry) {
                 modifiers: KeyModifiers::NONE,
             }),
             geometry,
-            Duration::ZERO
+            std::time::Duration::ZERO
         )
         .is_empty()
     );
@@ -244,7 +243,7 @@ fn wrapped_scrolled_values_match_click_regions_and_exclude_padding_and_overlays(
 }
 
 fn cached_times(c: &mut Controller) {
-    use std::time::SystemTime;
+    use std::time::{Duration, SystemTime};
     let mut entry = c.app.details[0].entry.clone().unwrap();
     entry.modified = Some(SystemTime::UNIX_EPOCH + Duration::new(10 * 86_400, 123_456_700));
     c.app.now = entry.modified.unwrap() + Duration::from_secs(86_400);
@@ -254,6 +253,7 @@ fn cached_times(c: &mut Controller) {
         0,
         1,
         Ok(fs::Snapshot {
+            directory: None,
             path: c.app.panes[0].path.clone(),
             entries: vec![entry.clone()],
             errors: vec![],
@@ -285,7 +285,7 @@ fn metadata_times_follow_pane_mode_and_advance_from_cached_timestamps() {
                 .collect::<String>()
                 .contains("unavailable")
         );
-        c.app.now += Duration::from_secs(86_400);
+        c.app.now += std::time::Duration::from_secs(86_400);
         find(&draw(&c.app, 180, 40, ColorLevel::NoColor), "2 days ago");
         c.app.panes[0].fuzzy_timestamps = false;
         let buffer = draw(&c.app, 180, 40, ColorLevel::NoColor);
@@ -396,7 +396,7 @@ fn timestamp_continuations_remain_clickable_after_narrow_overlay_and_sidebar_scr
                 modifiers: KeyModifiers::NONE,
             }),
             &geometry,
-            Duration::ZERO,
+            std::time::Duration::ZERO,
         );
         assert!(!c.app.panes[0].fuzzy_timestamps);
         click(&mut c, position.x, position.y, &geometry);

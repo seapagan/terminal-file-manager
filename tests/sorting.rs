@@ -136,6 +136,7 @@ fn unsorted_transition_restores_snapshot_order_without_losing_cursor_or_marks() 
         0,
         1,
         Ok(Snapshot {
+            directory: None,
             path: root.path().to_path_buf(),
             entries: original.clone(),
             errors: vec![],
@@ -184,6 +185,7 @@ fn refreshed_snapshot_replaces_the_remembered_filesystem_order() {
             0,
             request.generation,
             Ok(Snapshot {
+                directory: None,
                 path: root.path().to_path_buf(),
                 entries: original.clone(),
                 errors: vec![],

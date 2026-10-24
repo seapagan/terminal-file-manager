@@ -18,7 +18,7 @@ pub struct Controller {
     pub preferences_changed: bool,
     pub preferences: Settings,
     pub(super) bindings: Bindings,
-    filter_before: Option<(usize, String)>,
+    pub(super) filter_before: Option<(usize, String)>,
     pub(super) last_click: Option<(usize, PathBuf, Duration)>,
     pub(super) dragging_divider: bool,
 }
@@ -51,12 +51,11 @@ impl Controller {
         if super::diagnostics::handle(self, &event, geometry) {
             return Vec::new();
         }
+        if super::operations::handle(self, &event, geometry) {
+            return Vec::new();
+        }
         match event {
             Event::Key(key) if key.kind != KeyEventKind::Release => {
-                if key.code == KeyCode::Char('c') && key.modifiers == KeyModifiers::CONTROL {
-                    self.quit = true;
-                    return Vec::new();
-                }
                 if self.filter_before.is_some() {
                     self.filter_key(key);
                     return Vec::new();
@@ -93,6 +92,9 @@ impl Controller {
         if self.app.help && !super::help::accepts(action) {
             return Vec::new();
         }
+        if super::operations::action(self, action, geometry) {
+            return Vec::new();
+        }
         if let Some(reason) = unavailable(action) {
             self.app.status = reason.into();
             return Vec::new();
@@ -126,13 +128,7 @@ impl Controller {
                 self.layout(action, geometry)
             }
             Quit | SaveQuit => self.exit(action),
-            Filter => {
-                self.filter_before = Some((
-                    self.app.active,
-                    self.app.panes[self.app.active].filter.clone(),
-                ));
-                self.app.status = "Filter: type to narrow; Enter accepts, Esc restores".into();
-            }
+            Filter => self.begin_filter(),
             Count => return self.count(geometry),
             Cancel => self.cancel(),
             _ => {}
@@ -140,9 +136,16 @@ impl Controller {
         Vec::new()
     }
 
+    fn begin_filter(&mut self) {
+        self.filter_before = Some((
+            self.app.active,
+            self.app.panes[self.app.active].filter.clone(),
+        ));
+        self.app.status = "Filter: type to narrow; Enter accepts, Esc restores".into();
+    }
+
     fn exit(&mut self, action: Action) {
-        self.save_session = action == Action::SaveQuit;
-        self.quit = true;
+        super::operations::exit(self, action == Action::SaveQuit);
     }
 
     fn preferred_action(&self, action: Action) -> Action {
@@ -493,9 +496,6 @@ fn unavailable(action: Action) -> Option<&'static str> {
     match action {
         Action::Viewer | Action::Editor => {
             Some("Viewer/editor unavailable until M6; files are never launched")
-        }
-        Action::Copy | Action::Move | Action::Mkdir | Action::Trash | Action::Delete => {
-            Some("File mutations unavailable until M2 — M1 is read-only")
         }
         Action::Path | Action::Zoxide | Action::OppositeZoxide | Action::ExitDirectory => {
             Some("Navigation integration/shell handoff unavailable until M5")

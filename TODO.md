@@ -1,4 +1,40 @@
-# Post-v1 TODO
+# TODO
+
+## Pre-v1 compatibility
+
+Enable permission changes for unreadable owned files and directories on macOS
+before v1 without weakening object-identity or no-follow safety guarantees.
+The current implementation deliberately fails closed. Never introduce an unsafe
+pathname fallback.
+
+### NTFS compressed transfers
+
+Support native NTFS-compressed source transfers before v1. M2 refuses files
+with `FILE_ATTRIBUTE_COMPRESSED` before writing their payload because the
+current sparse allocation query does not establish compression fidelity.
+The source and any previous destination remain intact.
+
+Acceptance: create an actually compressed file with `compact.exe` on NTFS,
+then prove Copy and Move preserve all logical bytes, native compression and
+bounded allocation, including cancellation and destination collision. Until
+that support exists, the native refusal regression must preserve both original
+objects and their identities. See the
+[Claude correction round](docs/acceptance.md#m2-claude-review-corrections--24-october-2026).
+
+## Pre-v1 reliability
+
+Define durable ownership, discovery, quarantine and reconciliation for orphan
+`.tfm-stage-*` artifacts after a crash or panic. Current payload sync and
+session-local recovery records do not establish ownership after restart.
+Do not sweep stages by filename or erase uncertain payloads.
+
+Before shipping, exercise process termination before and after stage commit and
+source removal, missing records and replaced identities. Discovery must preserve
+the only remaining payload, quarantine uncertainty, avoid deleting user files
+and require validated evidence before cleanup or any new mutation. See the
+[M2 correction checkpoint](docs/acceptance.md#m2-deepseek-correction-round--23-october-2026).
+
+## Post-v1 TODO
 
 These items are deferred contracts, without dormant implementations. Each needs
 separate approved scope and review; none removes a v1 acceptance obligation.

@@ -1,0 +1,368 @@
+use super::{
+    Outcome,
+    plan::invalid,
+    safety::{self, Parents, Result},
+};
+use crate::fs::Entry;
+use std::{
+    fs::{self, File, OpenOptions},
+    io,
+    path::{Path, PathBuf},
+};
+
+mod rename;
+pub(super) use rename::rename_new;
+
+pub(super) struct OwnedStage {
+    pub path: PathBuf,
+    pub file: Option<File>,
+    root: Entry,
+    entry: Entry,
+    parents: Parents,
+}
+
+impl OwnedStage {
+    pub fn claim_event(&self) -> super::Event {
+        super::Event::OwnedStage {
+            root: Box::new(self.root.clone()),
+            payload: Box::new(self.entry.clone()),
+        }
+    }
+
+    pub fn recovery(
+        &self,
+        source: &Entry,
+        destination: &Path,
+        previous: Option<&Entry>,
+        guards: &[Parents; 2],
+    ) -> super::Recovery {
+        super::Recovery {
+            source: source.clone(),
+            destination: destination.to_owned(),
+            previous: previous.cloned(),
+            committed: None,
+            staging: Some(super::recovery::Staging {
+                root: self.root.clone(),
+                payload: self.entry.clone(),
+            }),
+            guards: guards.clone(),
+        }
+    }
+
+    pub fn seal(&mut self) -> Result<()> {
+        let current = crate::fs::inspect(&self.path);
+        if let Some(file) = &self.file {
+            // APFS can adjust birth time when we preserve an older mtime; the held handle pins identity.
+            safety::opened_object(&self.entry, file)?;
+            safety::opened_object(&current, file)?;
+        } else {
+            safety::owned_object(&self.entry)?;
+        }
+        self.entry = current;
+        Ok(())
+    }
+    pub fn finish(self, transfer: Result<Entry>) -> Result<Entry> {
+        let recovery = self.root.path.clone();
+        if transfer
+            .as_ref()
+            .is_err_and(|error| error.outcome == Outcome::OutcomeUnknown)
+        {
+            return Err(safety::Failure {
+                outcome: Outcome::OutcomeUnknown,
+                detail: format!(
+                    "Outcome unknown; staging quarantined at {}",
+                    recovery.display()
+                ),
+            });
+        }
+        if let Err(error) = self.cleanup() {
+            return Err(safety::Failure {
+                outcome: Outcome::OutcomeUnknown,
+                detail: format!(
+                    "Cleanup unverified; staging retained at {}: {}",
+                    recovery.display(),
+                    error.detail
+                ),
+            });
+        }
+        transfer
+    }
+
+    pub fn create(destination: &Path, link: Option<&Entry>) -> Result<Self> {
+        let parents = Parents::capture(destination)?;
+        let parent = destination
+            .parent()
+            .ok_or_else(|| invalid("Destination lacks parent"))?;
+        let root = tempfile::Builder::new()
+            .prefix(".tfm-stage-")
+            .tempdir_in(parent)?
+            .keep();
+        let root = crate::fs::inspect(&root);
+        let path = root.path.join("payload");
+        let file = if let Some(source) = link {
+            create_link(source, &path).map(|()| None)
+        } else {
+            OpenOptions::new()
+                .write(true)
+                .read(true)
+                .create_new(true)
+                .open(&path)
+                .map(Some)
+        };
+        let file = match file {
+            Ok(file) => file,
+            Err(error) => return Err(construction_failure(&root, &parents, error)),
+        };
+        Ok(Self {
+            entry: crate::fs::inspect(&path),
+            parents,
+            path,
+            file,
+            root,
+        })
+    }
+    pub fn validate(&self) -> Result<()> {
+        self.parents.validate()?;
+        safety::revalidate(&self.root, false)?;
+        safety::revalidate(&self.entry, true)
+    }
+    pub fn commit(&mut self, destination: &Path, replace: bool) -> Result<()> {
+        self.validate()?;
+        if let Some(file) = self.file.take() {
+            file.sync_all()?;
+            #[cfg(unix)]
+            nix::unistd::close(file).map_err(io::Error::from)?;
+        }
+        let renamed = if replace {
+            fs::rename(&self.path, destination)
+        } else {
+            rename_new(&self.path, destination)
+        };
+        if let Err(error) = renamed {
+            if safety::owned_object(&self.entry).is_ok() {
+                return Err(error.into());
+            }
+            return Err(safety::Failure {
+                outcome: Outcome::OutcomeUnknown,
+                detail: format!(
+                    "Commit unacknowledged; staging/final state requires reconciliation: {error}"
+                ),
+            });
+        }
+        Ok(())
+    }
+    pub fn cleanup(self) -> Result<()> {
+        self.parents.validate()?;
+        safety::revalidate(&self.root, false)?;
+        if safety::existing(&self.path)?.is_some() {
+            safety::owned_object(&self.entry)?;
+            remove_leaf(&self.path)?;
+        }
+        fs::remove_dir(&self.root.path)?;
+        Ok(())
+    }
+
+    pub fn committed(&self, destination: &Path) -> Result<Entry> {
+        let mut expected = self.entry.clone();
+        expected.path = destination.to_owned();
+        safety::owned_object(&expected)?;
+        safety::revalidate(&expected, true)?;
+        Ok(crate::fs::inspect(destination))
+    }
+}
+
+fn construction_failure(root: &Entry, parents: &Parents, error: io::Error) -> safety::Failure {
+    let cleanup = parents
+        .validate()
+        .and_then(|()| safety::revalidate(root, false))
+        .and_then(|()| fs::remove_dir(&root.path).map_err(Into::into));
+    if let Err(cleanup) = cleanup {
+        return safety::Failure {
+            outcome: Outcome::OutcomeUnknown,
+            detail: format!(
+                "Stage construction failed: {error}; cleanup unverified at {}: {}",
+                root.path.display(),
+                cleanup.detail
+            ),
+        };
+    }
+    error.into()
+}
+
+pub(super) fn open_source(path: &Path) -> io::Result<File> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(nix::libc::O_NOFOLLOW | nix::libc::O_NONBLOCK);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        options.custom_flags(0x0020_0000);
+    }
+    let file = options.open(path)?;
+    if !file.metadata()?.is_file() {
+        return Err(invalid("Source is no longer a regular file"));
+    }
+    Ok(file)
+}
+
+pub(super) fn remove_leaf(path: &Path) -> io::Result<()> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::FileTypeExt;
+        if fs::symlink_metadata(path)?.file_type().is_symlink_dir() {
+            return fs::remove_dir(path);
+        }
+    }
+    fs::remove_file(path)
+}
+
+fn create_link(source: &Entry, destination: &Path) -> io::Result<()> {
+    let target = source
+        .link_target
+        .as_ref()
+        .ok_or_else(|| invalid("Link target unavailable"))?;
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(target, destination)
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::FileTypeExt;
+        let kind = fs::symlink_metadata(&source.path)?.file_type();
+        if kind.is_symlink_dir() {
+            std::os::windows::fs::symlink_dir(target, destination)
+        } else {
+            std::os::windows::fs::symlink_file(target, destination)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn failed_payload_creation_removes_only_the_new_empty_stage() {
+        use std::os::unix::ffi::OsStringExt;
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source");
+        fs::write(&source, "original bytes").unwrap();
+        let mut link = crate::fs::inspect(&source);
+        link.link_target = Some(std::ffi::OsString::from_vec(b"invalid\0target".to_vec()).into());
+        assert!(OwnedStage::create(&root.path().join("target"), Some(&link)).is_err());
+        assert_eq!(
+            fs::read_dir(root.path()).unwrap().count(),
+            1,
+            "empty stage leaked"
+        );
+        assert_eq!(fs::read(source).unwrap(), b"original bytes");
+    }
+
+    #[test]
+    fn construction_cleanup_preserves_foreign_content_and_replacement_directories() {
+        for replacement in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let path = root.path().join("stage");
+            fs::create_dir(&path).unwrap();
+            let owned = crate::fs::inspect(&path);
+            let parents = Parents::capture(&path).unwrap();
+            if replacement {
+                fs::rename(&path, root.path().join("retained-owned")).unwrap();
+                fs::create_dir(&path).unwrap();
+            }
+            fs::write(path.join("unrelated"), "preserved").unwrap();
+            let error = construction_failure(
+                &owned,
+                &parents,
+                io::Error::other("injected creation failure"),
+            );
+            assert_eq!(error.outcome, Outcome::OutcomeUnknown);
+            assert_eq!(fs::read(path.join("unrelated")).unwrap(), b"preserved");
+            assert!(path.is_dir());
+        }
+    }
+
+    #[test]
+    fn failed_no_clobber_commit_keeps_existing_data_and_cleans_only_its_owned_stage() {
+        let root = tempfile::tempdir().unwrap();
+        let destination = root.path().join("final");
+        fs::write(&destination, "existing").unwrap();
+        let mut stage = OwnedStage::create(&destination, None).unwrap();
+        fs::write(&stage.path, "incoming").unwrap();
+        stage.seal().unwrap();
+        assert!(stage.commit(&destination, false).is_err());
+        assert_eq!(fs::read(&stage.path).unwrap(), b"incoming");
+        assert_eq!(fs::read(&destination).unwrap(), b"existing");
+        let directory = stage.root.path.clone();
+        stage.cleanup().unwrap();
+        assert!(!directory.exists());
+        assert_eq!(fs::read(destination).unwrap(), b"existing");
+    }
+
+    #[test]
+    fn unknown_transfer_never_cleans_an_owned_stage_as_if_completion_were_known() {
+        let root = tempfile::tempdir().unwrap();
+        let destination = root.path().join("final");
+        let stage = OwnedStage::create(&destination, None).unwrap();
+        let payload = stage.path.clone();
+        let result = stage.finish(Err(safety::Failure {
+            outcome: Outcome::OutcomeUnknown,
+            detail: "controlled lost acknowledgement".into(),
+        }));
+        assert_eq!(result.unwrap_err().outcome, Outcome::OutcomeUnknown);
+        assert!(payload.exists());
+        assert!(!destination.exists());
+    }
+
+    #[test]
+    fn preserving_an_older_mtime_keeps_the_owned_stage_valid() {
+        let root = tempfile::tempdir().unwrap();
+        let mut stage = OwnedStage::create(&root.path().join("final"), None).unwrap();
+        let before = stage.entry.identity.clone();
+        stage
+            .file
+            .as_ref()
+            .unwrap()
+            .set_times(
+                fs::FileTimes::new()
+                    .set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_secs(1000)),
+            )
+            .unwrap();
+        let after = crate::fs::inspect(&stage.path).identity;
+        let result = stage.seal();
+        assert!(
+            result.is_ok(),
+            "before={before:?}; after={after:?}; result={result:?}"
+        );
+        stage.cleanup().unwrap();
+    }
+
+    #[test]
+    fn sealing_never_adopts_an_unrelated_replacement() {
+        let root = tempfile::tempdir().unwrap();
+        let mut stage = OwnedStage::create(&root.path().join("final"), None).unwrap();
+        fs::rename(&stage.path, root.path().join("owned-original")).unwrap();
+        fs::write(&stage.path, "external replacement").unwrap();
+        assert!(stage.seal().is_err());
+        assert_eq!(fs::read(&stage.path).unwrap(), b"external replacement");
+    }
+
+    #[test]
+    fn committed_identity_is_the_owned_stage_not_a_fresh_unrelated_destination() {
+        let root = tempfile::tempdir().unwrap();
+        let destination = root.path().join("final");
+        let mut stage = OwnedStage::create(&destination, None).unwrap();
+        stage.seal().unwrap();
+        stage.commit(&destination, false).unwrap();
+        fs::rename(&destination, root.path().join("committed-original")).unwrap();
+        fs::write(&destination, "external").unwrap();
+        assert!(stage.committed(&destination).is_err());
+        assert_eq!(fs::read(&destination).unwrap(), b"external");
+        stage.cleanup().unwrap();
+    }
+}

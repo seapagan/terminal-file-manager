@@ -6,13 +6,17 @@ mod diagnostics;
 mod divider;
 mod help;
 mod metadata;
+mod operation_dialog;
+mod operation_exit;
+mod operation_jobs;
+mod operations;
 mod profiles;
 mod scroll;
 pub(crate) mod view;
 pub use bindings::{Bindings, chord};
 pub use controller::Controller;
 
-/// Only read-only M1 actions execute; later actions explain their unavailability.
+/// Browser and local-operation actions share dispatch; later milestones explain unavailability.
 #[derive(
     Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize,
 )]
@@ -75,6 +79,11 @@ pub enum Action {
     Mkdir,
     Trash,
     Delete,
+    Rename,
+    Attributes,
+    Jobs,
+    CopyQuick,
+    MoveQuick,
     Path,
     Zoxide,
     OppositeZoxide,
