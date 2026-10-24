@@ -191,6 +191,9 @@ impl Controller {
 
     fn navigate(&mut self, action: Action) -> Vec<Request> {
         let id = self.app.active;
+        if action == Action::Refresh {
+            return self.app.request_refresh(id).into_iter().collect();
+        }
         if action == Action::Back {
             return self.app.history(false).into_iter().collect();
         }

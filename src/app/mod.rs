@@ -27,6 +27,7 @@ pub enum RequestKind {
 /// Metadata cache shared by sidebar and popup for each pane.
 #[derive(Clone, Debug, Default)]
 pub struct Detail {
+    pub stale: Option<String>,
     pub generation: u64,
     pub path: Option<PathBuf>,
     pub entry: Option<Entry>,
@@ -117,12 +118,41 @@ impl App {
         state.pending = Some(path.clone());
         state.error = None;
         state.restoring = None;
+        state.listing = true;
+        state.refresh_pending = false;
         Request {
             pane,
             generation: state.generation,
             path,
             kind: RequestKind::Listing,
         }
+    }
+
+    /// Invalidate the displayed directory without stealing navigation or cancelling a scan.
+    pub fn request_refresh(&mut self, pane: usize) -> Option<Request> {
+        let state = self.panes.get_mut(pane)?;
+        if state.pending.is_some() {
+            return None;
+        }
+        state.refresh_pending = true;
+        self.take_refresh(pane)
+    }
+
+    /// Start one deferred ordinary refresh after the current listing has completed.
+    pub fn take_refresh(&mut self, pane: usize) -> Option<Request> {
+        let state = self.panes.get_mut(pane)?;
+        if !state.refresh_pending || state.listing || state.pending.is_some() {
+            return None;
+        }
+        state.refresh_pending = false;
+        state.listing = true;
+        state.generation += 1;
+        Some(Request {
+            pane,
+            generation: state.generation,
+            path: state.path.clone(),
+            kind: RequestKind::Listing,
+        })
     }
 
     /// Reject stale or invalid pane results, retaining the last good listing on error.
@@ -139,6 +169,7 @@ impl App {
             return false;
         }
         let attempted = state.pending.take();
+        state.listing = false;
         match result {
             Ok(snapshot) => {
                 if attempted
@@ -147,13 +178,17 @@ impl App {
                 {
                     return false;
                 }
+                if attempted.is_none() && !state.accepts_refresh(&snapshot) {
+                    state.error = Some("Directory identity changed or unavailable; reopen the directory to select a new context".into());
+                    self.invalidate_listing_details(pane);
+                    return true;
+                }
+                state.error = snapshot.directory.is_none().then(||
+                    "Directory identity unavailable; reopen the directory before using this context".into());
+                if attempted.is_some() || state.context == 0 {
+                    state.context += 1;
+                }
                 state.install(snapshot);
-                self.details[pane].generation += 1;
-                self.details[pane].path = None;
-                self.details[pane].entry = None;
-                self.details[pane].totals = None;
-                self.details[pane].totals_generation += 1;
-                self.details[pane].counting = false;
             }
             Err(error) => {
                 state.restoring = None;
@@ -163,18 +198,34 @@ impl App {
                 ));
             }
         }
+        self.invalidate_listing_details(pane);
         true
+    }
+
+    fn invalidate_listing_details(&mut self, pane: usize) {
+        let detail = &mut self.details[pane];
+        detail.stale = self.panes[pane].error.clone();
+        detail.generation += 1;
+        detail.entry = None;
+        detail.canonical = None;
+        detail.canonical_pending = false;
+        detail.totals = None;
+        detail.totals_generation += 1;
+        detail.counting = false;
     }
 
     /// Coalesce metadata work by current native path and selection generation.
     pub fn request_metadata(&mut self, pane: usize) -> Option<Request> {
+        if self.panes[pane].error.is_some() {
+            return None;
+        }
         let entry = self.panes[pane].current();
         let path = entry.map(|entry| entry.path.clone());
         let detail = &mut self.details[pane];
-        if path == detail.path {
+        if path == detail.path && (detail.entry.is_some() || path.is_none()) {
             return None;
         }
-        if pane == self.active {
+        if pane == self.active && path != detail.path {
             self.metadata_scroll = 0;
         }
         detail.generation += 1;
@@ -238,6 +289,9 @@ impl App {
     /// Start an explicit count using a generation independent of metadata loading.
     pub fn request_totals(&mut self) -> Option<Request> {
         let pane = self.active;
+        if self.panes[pane].error.is_some() {
+            return None;
+        }
         let entry = self.panes[pane].current()?;
         if !entry.may_recurse() {
             return None;

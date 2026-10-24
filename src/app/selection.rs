@@ -8,6 +8,15 @@ pub(super) struct RangeSelection {
 }
 
 impl Pane {
+    pub(super) fn reconcile_range(&mut self) {
+        if let Some(range) = &mut self.range {
+            range.added.retain(|path| self.marks.contains_key(path));
+            if !self.entries.iter().any(|entry| entry.path == range.anchor) {
+                self.range = None;
+            }
+        }
+    }
+
     /// End range ownership without removing any current marks.
     pub fn reset_range(&mut self) {
         self.range = None;

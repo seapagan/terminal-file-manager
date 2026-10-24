@@ -20,7 +20,7 @@ fn loaded() -> (tempfile::TempDir, Controller) {
             id,
             1,
             Ok(fs::Snapshot {
-                directory: None,
+                directory: Some(Box::new(fs::inspect(root.path()))),
                 path: root.path().into(),
                 entries: entries.clone(),
                 errors: vec![],
@@ -43,6 +43,26 @@ fn loaded() -> (tempfile::TempDir, Controller) {
 fn action(c: &mut Controller, action: Action) {
     let geometry = crate::ui::geometry(&c.app, Rect::new(0, 0, 180, 40));
     c.dispatch(action, &geometry);
+}
+
+#[test]
+fn stale_directory_views_show_the_error_instead_of_cached_metadata_or_totals() {
+    let (_root, mut c) = loaded();
+    c.app.request_metadata(0).unwrap();
+    let refresh = c.app.request_refresh(0).unwrap();
+    let snapshot = fs::Snapshot {
+        directory: None,
+        path: c.app.panes[0].path.clone(),
+        entries: vec![],
+        errors: vec![],
+    };
+    c.app.complete_listing(0, refresh.generation, Ok(snapshot));
+    for floating in [false, true] {
+        let text = metadata_text(&c.app, floating);
+        assert!(text.contains("Stale directory listing"), "{text}");
+        assert!(text.contains("identity"), "{text}");
+        assert!(!text.contains("Canonical:") && !text.contains("Descendants:"));
+    }
 }
 
 fn assert_cached_fields(text: &str, name: &str, size: &str) {

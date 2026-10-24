@@ -39,7 +39,7 @@ pub fn drive(command: CommandBuilder, steps: &[(&str, &str)], resize: bool) -> S
     text
 }
 
-struct Session {
+pub struct Session {
     child: Box<dyn Child + Send + Sync>,
     master: Option<Box<dyn MasterPty + Send>>,
     writer: Option<Box<dyn Write + Send>>,
@@ -51,7 +51,7 @@ struct Session {
 }
 
 impl Session {
-    fn open(command: CommandBuilder) -> io::Result<Self> {
+    pub fn open(command: CommandBuilder) -> io::Result<Self> {
         let pair = native_pty_system()
             .openpty(PtySize {
                 rows: 24,
@@ -83,7 +83,7 @@ impl Session {
         Ok(session)
     }
 
-    fn drive(
+    pub fn drive(
         &mut self,
         steps: &[(&str, &str)],
         deadline: Instant,
@@ -121,7 +121,7 @@ impl Session {
         }
         script.finish(steps, &status.unwrap(), transcript)
     }
-    fn read_step(
+    pub fn read_step(
         &mut self,
         wait: Duration,
         script: &mut Script,
@@ -200,10 +200,10 @@ fn read_output(mut reader: Box<dyn Read + Send>, sender: mpsc::Sender<io::Result
 }
 
 #[derive(Default)]
-struct Script {
+pub struct Script {
     pending: Vec<u8>,
     query: [Vec<u8>; 3],
-    step: usize,
+    pub step: usize,
     ansi: u8,
 }
 

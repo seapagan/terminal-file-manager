@@ -61,6 +61,9 @@ pub struct Pane {
     pub measurements: crate::ui::Measurements,
     pub generation: u64,
     pub pending: Option<PathBuf>,
+    pub(crate) listing: bool,
+    pub(crate) refresh_pending: bool,
+    pub(crate) context: u64,
     pub error: Option<String>,
     pub warnings: Vec<String>,
     pub(super) range: Option<super::selection::RangeSelection>,
@@ -72,6 +75,23 @@ pub struct Pane {
 }
 
 impl Pane {
+    pub(super) fn accepts_refresh(&self, snapshot: &Snapshot) -> bool {
+        let Some(previous) = &self.directory else {
+            return self.context == 0;
+        };
+        if snapshot.path != self.path {
+            return false;
+        }
+        snapshot.directory.as_ref().is_some_and(|fresh| {
+            previous.path == fresh.path
+                && previous
+                    .identity
+                    .as_ref()
+                    .zip(fresh.identity.as_ref())
+                    .is_some_and(|(a, b)| same_object(a, b))
+        })
+    }
+
     /// Profile identity remains separate from navigation and saved profile bytes.
     pub fn profile_label(&self) -> String {
         match (&self.profile, self.profile_modified) {
@@ -105,6 +125,9 @@ impl Pane {
             measurements: crate::ui::Measurements::default(),
             generation: 1,
             pending: None,
+            listing: true,
+            refresh_pending: false,
+            context: 0,
             error: None,
             warnings: Vec::new(),
             range: None,
@@ -117,6 +140,12 @@ impl Pane {
     }
 
     pub(super) fn install(&mut self, snapshot: Snapshot) {
+        let previous_index = self.cursor_index().unwrap_or(0);
+        let continuous = self.accepts_refresh(&snapshot);
+        let range = self.range.take().filter(|_| continuous);
+        if !continuous {
+            self.marks.clear();
+        }
         self.directory = snapshot.directory.map(|entry| *entry);
         self.reset_range();
         let navigating = self.path != snapshot.path;
@@ -147,6 +176,21 @@ impl Pane {
             .collect();
         self.entries = snapshot.entries;
         self.warnings = snapshot.errors;
+        self.reconcile_marks();
+        self.sort.apply(&mut self.entries);
+        self.refilter_at(if navigating { 0 } else { previous_index });
+        if let Some(visit) = self.restoring.take() {
+            self.cursor = visit.cursor;
+            self.scroll = visit.scroll;
+            self.refilter();
+        }
+        if !navigating {
+            self.range = range;
+            self.reconcile_range();
+        }
+    }
+
+    fn reconcile_marks(&mut self) {
         self.marks = self
             .entries
             .iter()
@@ -156,27 +200,27 @@ impl Pane {
                 same_object(previous, fresh).then(|| (entry.path.clone(), previous.clone()))
             })
             .collect();
-        self.resort();
-        if let Some(visit) = self.restoring.take() {
-            self.cursor = visit.cursor;
-            self.scroll = visit.scroll;
-            self.refilter();
-        }
     }
 
     /// Apply sort/grouping while preserving cursor and raw marked paths.
     pub fn resort(&mut self) {
+        let previous_index = self.cursor_index().unwrap_or(0);
         self.reset_range();
         if self.sort.sort == Sort::Unsorted {
             self.entries
                 .sort_by_key(|entry| self.listing_order.get(&entry.path).copied());
         }
         self.sort.apply(&mut self.entries);
-        self.refilter();
+        self.refilter_at(previous_index);
     }
 
     /// Recompute the working set only when policy or input changes, never during draw.
     pub fn refilter(&mut self) {
+        let previous_index = self.cursor_index().unwrap_or(0);
+        self.refilter_at(previous_index);
+    }
+
+    fn refilter_at(&mut self, previous_index: usize) {
         self.visible = self
             .entries
             .iter()
@@ -194,8 +238,12 @@ impl Pane {
             .iter()
             .any(|i| Some(&self.entries[*i].path) == self.cursor.as_ref())
         {
-            self.cursor = self.visible.first().map(|i| self.entries[*i].path.clone());
-            self.scroll = 0;
+            let index = previous_index.min(self.visible.len().saturating_sub(1));
+            self.cursor = self
+                .visible
+                .get(index)
+                .map(|i| self.entries[*i].path.clone());
+            self.scroll = self.scroll.min(index);
         }
     }
 
@@ -245,9 +293,11 @@ impl Pane {
 
     /// Visible row index for rendering and paging.
     pub fn cursor_index(&self) -> Option<usize> {
-        self.visible
-            .iter()
-            .position(|i| Some(&self.entries[*i].path) == self.cursor.as_ref())
+        self.visible.iter().position(|i| {
+            self.entries
+                .get(*i)
+                .is_some_and(|e| Some(&e.path) == self.cursor.as_ref())
+        })
     }
 
     /// Shared viewport calculation for drawing and mouse row hit testing.

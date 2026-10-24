@@ -1,11 +1,147 @@
 # Acceptance gates
 
+## Live local refresh: implementation checkpoint, 24 October 2026
+
+The first post-M2 feature adds native nonrecursive subscriptions for both local
+panes, ordinary refresh intents, 200 ms debounce, one-second sustained scan
+spacing, post-registration catch-up and unconditional 30-second reconciliation.
+Errors retain the last good view; native registration retries back off from one
+to 30 seconds while two-second fallback reconciliation remains available.
+
+Local Linux `RUSTUP_TOOLCHAIN=1.95.0 cargo make test` passed 509 tests, with two
+intentional child-entry skips exercised by their parent terminal tests.
+Regressions cover scheduler deadlines, late dirty state, silent watches,
+failure/recovery, stale subscriptions, navigation, physical directory replacement,
+marks, deep cursor recovery, metadata scroll and stale metadata/count results.
+Native cases exercise create/write/rename/delete, permissions, parent rename,
+symlink spelling, registration failure/retry, read-event and sibling filtering,
+bounded bursts and clean owner shutdown. PTY tests show automatic rendering
+without input and successful terminal re-entry. An active Copy conflict supplies
+a deterministic boundary for external changes while the frozen job remains live.
+
+The pinned `notify` 8.2.0 graph passes `cargo make audit` and `cargo make deny`.
+The maintainer approved CC0-1.0 and ISC in the normal licence allowlist and the
+exact `windows-sys =0.60.2` duplicate exception. Other policy remains unchanged.
+ISC notices accompany the Cargo source package and the README in binary archives.
+The exact stable crate lacks `EventKindMask`; access-event exclusion occurs in
+TFM's adapter rather than an unavailable backend configuration API.
+
+Linux xwin check/Clippy/build and `cargo make verify-infra` passed at development
+checkpoints. The unmodified full gate passed native Rust/static/build checks and
+stopped at Cargo's clean-source package requirement on the uncommitted tree.
+The exact-MSRV aggregate likewise reached that packaging boundary. These results
+are interim evidence; clean-tree full verification and hosted Linux/macOS/Windows,
+Codacy and combined coverage remain delivery gates. Four historical complexity
+advisories remain; changed functions introduce no new threshold exceptions.
+
+Single-workstation Linux measurements: an isolated create appeared in the
+2,000-row release TUI in 233 ms; a 1,000-file burst converged in 1.011 s with one
+scan per pane, peak two active listing lanes and zero pending lanes. A fresh
+1,000-row manual listing took 1.34 ms and matched both installed snapshots.
+Latest-only registration/rebinding took 0.259 ms and owner shutdown after recovery
+took 0.129 ms in separate native fixtures. These observations do not guarantee
+kernel notification or completed-scan deadlines.
+
+After warmup, a two-second idle release-TUI sample used 0.15 CPU seconds versus
+0.13 on the exported merged-main baseline; neither emitted terminal output.
+Watch-owner threads accumulated no measurable CPU ticks. Feature RSS stayed at
+9.35 MiB during the sample, versus 7.49 MiB for the baseline. These short samples
+include the existing UI polling cost and do not establish a general benchmark.
+
+No network mount, UNC server, or interactive GNOME Terminal/Ptyxis/Ghostty/Zellij
+session was tested locally. Native notifications remain best effort; periodic
+enumeration provides eventual reconciliation where enumeration succeeds. A
+stalled filesystem syscall can delay its background owner's resource release;
+UI shutdown does not wait for it. SFTP refresh remains separate M3 scope.
+
+The first draft-PR run at `9dd9d5c` passed policy, security, packaging, advisory
+quality and Codacy static analysis with zero new issues. Native CI stopped before
+tests because Rust 1.99 deprecates `AtomicU8::fetch_update`; the exact Rust 1.95
+job passed. A compatible compare-and-exchange loop preserves the same bounded
+signal state. Local Rust 1.99 Clippy and all 511 native tests pass after that
+correction, including concurrent publication, backend overflow/error and recovery regressions. Native
+macOS/Windows execution and combined coverage still require the new-head run.
+
+Review also reproduced immediate directory inode reuse in an owned Linux fixture.
+The listing adapter now compares available creation stamps as well as canonical
+path and native object ID before accepting the result of enumeration. A focused
+regression rejects a recycled ID with a changed creation stamp; ordinary
+directory length/mtime changes remain valid. Existing M2 operation-time guards
+remain unchanged; no destructive-operation bypass was demonstrated.
+
+At `05e53ef`, hosted Linux passed 511 tests and macOS passed 490; each ran the
+watch and PTY regressions with two intentional child-entry skips. Windows ran
+467 tests: 466 passed and the parent-directory rename case failed with access
+denied while a descendant watch handle remained open. The native Windows policy
+requires a maintainer decision before acceptance; the failing regression remains
+intact. Combined coverage could not run after that failure.
+
+The nonpublishing [eight-target rehearsal](https://github.com/seapagan/terminal-file-manager/actions/runs/40112763161)
+passed at that same code/dependency checkpoint: GNU glibc-cap and static MUSL
+checks, Intel/ARM Mach-O and Windows x64/ARM64 PE checks, native installer
+regressions, actual-archive installation and complete inventory validation.
+This proves that checkpoint's builds and distribution compatibility; it does not
+replace the pending Windows watch-policy acceptance or certify a public release.
+
+### Independent verification checkpoint at `2738df5`
+
+The creation-stamp correction has two deterministic regressions: recycled native
+object IDs with different creation stamps invalidate directory continuity, while
+ordinary directory length/mtime activity preserves it. All three feature commits
+have valid GPG signatures and Signed-off-by trailers.
+
+The unchanged clean Linux `RUSTUP_TOOLCHAIN=1.95.0 cargo make verify` passed in
+49.81 seconds, then passed again in 48.49 seconds during the Windows-policy
+investigation. The latter run followed an identical elevated retry after three
+restricted-environment test failures. Both successful runs include 513 native
+tests, exact MSRV, clean source packaging, audit/deny, coverage and mandatory
+Windows MSVC xwin check/Clippy/build. Two intentional child-entry skips remain.
+The earlier infrastructure verification still applies to the unchanged harness.
+Four historical Lizard advisories remain; this feature adds no threshold or
+suppression exception.
+
+At this runtime checkpoint, [hosted Rust CI](https://github.com/seapagan/terminal-file-manager/actions/runs/40114194104)
+passed 513 Linux and 492 macOS tests. Windows ran 469: 468 passed and the existing
+ancestor-rename regression failed with `AccessDenied` while the native watch was
+active. Each platform reports two intentional child-entry skips. The other four
+ordinary workflows and Codacy static analysis passed; combined coverage was
+skipped after the Windows failure. New combined coverage acceptance remains
+outstanding. The draft PR remains unmerged, and Windows policy remains undecided.
+
+A corrected release-TUI collector aggregates threads with duplicate names.
+Its owned 2,000-file fixture measured 233.87 ms isolated-change visibility;
+2.008 seconds of idle browsing used 0.12 CPU seconds, emitted zero terminal
+bytes and retained 9,244,672 bytes of RSS. Watch owners and the notification
+backend accumulated zero measurable CPU ticks; the two watch owners recorded
+40 context switches combined. These values supersede the earlier feature idle
+sample above. The separately measured baseline remains 0.13 CPU seconds and
+7.49 MiB RSS; short samples do not establish a general performance comparison.
+
+A separate native Linux coordinator/worker probe used a debug build and 2,000
+rows. An external writer made 666 updates over 3.401 seconds. Both panes started
+four scans at 1.009, 2.017, 3.024 and 4.027 seconds, with 1.003–1.008 seconds
+between starts. Peak listing occupancy was two active lanes and zero pending;
+both snapshots matched a fresh manual listing after the final write. Final
+catch-up took 642 ms; that manual listing took 4.31 ms. This measures sustained
+native scheduling separately from the earlier finite 1,000-file burst and the
+release-TUI latency sample. It does not establish Windows Shell-notification
+performance or network-filesystem behaviour.
+
+The [eight-target rehearsal at `2738df5`](https://github.com/seapagan/terminal-file-manager/actions/runs/40116517330)
+passed preparation, all eight native build jobs and complete inventory checks.
+Logs confirm GNU glibc 2.28 limits, static MUSL checks, Mach-O/PE validation,
+native installer regressions and actual-archive installation. Windows x64 and
+ARM64 each ran PowerShell 5.1 and 7 security/installer cases without native skips.
+This closes build/distribution compatibility for the current runtime sources;
+the failing Windows watcher gate and combined coverage remain outstanding.
+
 ## Current status and evidence
 
 M0's engineering foundation is complete at the accepted checkpoints below. The
-application includes the M1 local browser and the M2 implementation in progress below.
+application includes the M1 local browser and completed M2 local operations.
 The maintainer merged M1 in [PR #2](https://github.com/seapagan/terminal-file-manager/pull/2)
-on 18 October 2026. M2 is in progress; M2–M8 cover the remaining
+on 18 October 2026 and M2 in [PR #3](https://github.com/seapagan/terminal-file-manager/pull/3)
+on 24 October 2026. The post-M2 live-refresh feature is in development; M3–M8 cover the remaining
 application and final release. Genuine direct SSH-to-SSH transfer
 remains post-v1 work.
 

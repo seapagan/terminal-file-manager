@@ -140,12 +140,8 @@ impl Controller {
 fn refresh(controller: &mut Controller) -> Vec<Request> {
     let mut requests = Vec::new();
     for id in 0..2 {
-        if controller.app.panes[id].pending.is_none() {
-            requests.push(
-                controller
-                    .app
-                    .request_listing(id, controller.app.panes[id].path.clone()),
-            );
+        if let Some(request) = controller.app.request_refresh(id) {
+            requests.push(request);
         }
     }
     requests
