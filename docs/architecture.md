@@ -57,9 +57,10 @@ The pinned stable `notify` 8.2.0 has no event-kind configuration mask. TFM filte
 access and access-time-only events in its adapter, along with unrelated parent
 sibling paths. Its Linux backend still subscribes to open events. Notifications
 describe possible changes; snapshots determine the displayed result.
-Ordinary refresh requires the same physical directory identity and native
-namespace. Missing or changed evidence retains the last good view and blocks
-new mutation approvals. Explicit reopening establishes a new context. A missing
+Ordinary refresh requires the same physical directory identity, including
+available creation evidence, and native namespace. Enumeration brackets that
+evidence before accepting a snapshot. Missing or changed evidence retains the last
+good view and blocks new mutation approvals. Explicit reopening establishes a new context. A missing
 cursor chooses the nearest surviving row; marks require object continuity.
 Metadata and count generations invalidate on each installed snapshot.
 

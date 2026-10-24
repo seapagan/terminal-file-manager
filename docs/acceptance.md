@@ -62,6 +62,27 @@ signal state. Local Rust 1.99 Clippy and all 511 native tests pass after that
 correction, including concurrent publication, backend overflow/error and recovery regressions. Native
 macOS/Windows execution and combined coverage still require the new-head run.
 
+Review also reproduced immediate directory inode reuse in an owned Linux fixture.
+The listing adapter now compares available creation stamps as well as canonical
+path and native object ID before accepting the result of enumeration. A focused
+regression rejects a recycled ID with a changed creation stamp; ordinary
+directory length/mtime changes remain valid. Existing M2 operation-time guards
+remain unchanged; no destructive-operation bypass was demonstrated.
+
+At `05e53ef`, hosted Linux passed 511 tests and macOS passed 490; each ran the
+watch and PTY regressions with two intentional child-entry skips. Windows ran
+467 tests: 466 passed and the parent-directory rename case failed with access
+denied while a descendant watch handle remained open. The native Windows policy
+requires a maintainer decision before acceptance; the failing regression remains
+intact. Combined coverage could not run after that failure.
+
+The nonpublishing [eight-target rehearsal](https://github.com/seapagan/terminal-file-manager/actions/runs/40112763161)
+passed at that same code/dependency checkpoint: GNU glibc-cap and static MUSL
+checks, Intel/ARM Mach-O and Windows x64/ARM64 PE checks, native installer
+regressions, actual-archive installation and complete inventory validation.
+This proves that checkpoint's builds and distribution compatibility; it does not
+replace the pending Windows watch-policy acceptance or certify a public release.
+
 ## Current status and evidence
 
 M0's engineering foundation is complete at the accepted checkpoints below. The
