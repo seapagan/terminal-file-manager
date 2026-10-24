@@ -13,6 +13,7 @@ pub(in crate::operations) fn rename_new(
     // SAFETY: both native byte buffers are NUL-terminated and live for this
     // synchronous syscall. Only exclusive rename is requested; errors have no fallback.
     #[cfg(target_os = "linux")]
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     let status = unsafe {
         nix::libc::syscall(
             nix::libc::SYS_renameat2,
@@ -25,6 +26,7 @@ pub(in crate::operations) fn rename_new(
     };
     // SAFETY: same buffer/lifetime contract; RENAME_EXCL refuses existing names.
     #[cfg(target_os = "macos")]
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     let status = unsafe {
         nix::libc::renamex_np(
             source.as_ptr(),
@@ -73,6 +75,7 @@ pub(in crate::operations) fn rename_new(
     let destination = wide(destination)?;
     // SAFETY: both buffers are NUL-terminated native UTF-16 and remain live for
     // the call. Zero flags prohibit replacement and cross-volume copy/delete.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     if unsafe {
         windows_sys::Win32::Storage::FileSystem::MoveFileExW(
             source.as_ptr(),

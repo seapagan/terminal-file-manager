@@ -8,6 +8,7 @@ pub(super) fn mark_sparse(file: &File) -> io::Result<()> {
     let mut returned = 0;
     // SAFETY: File owns a live synchronous handle throughout the call. Null
     // buffers request only setting sparse state, never deallocation or clearing.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     let success = unsafe {
         windows_sys::Win32::System::IO::DeviceIoControl(
             file.as_raw_handle(),
@@ -38,6 +39,7 @@ pub(super) fn allocated(file: &File) -> io::Result<u64> {
     let mut info = FILE_STANDARD_INFO::default();
     // SAFETY: the handle remains owned by File. The initialized output buffer
     // has the exact documented structure and size and lives through this call.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     let success = unsafe {
         GetFileInformationByHandleEx(
             file.as_raw_handle(),
