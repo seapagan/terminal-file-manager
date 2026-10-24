@@ -115,13 +115,12 @@ pub(super) fn verify(source_allocation: u64, size: u64, target: &File) -> io::Re
     if source_allocation >= size {
         return Ok(());
     }
-    let target_allocation = allocated(target)?;
-    // Bound incidental allocation/inline-data rounding; large materialization still fails closed.
-    if target_allocation.saturating_sub(source_allocation) <= 64 * 1024 {
-        return Ok(());
-    }
-    if target_allocation >= size || (source_allocation < size / 2 && target_allocation >= size / 2)
-    {
+    verify_allocation(source_allocation, allocated(target)?)
+}
+
+fn verify_allocation(source_allocation: u64, target_allocation: u64) -> io::Result<()> {
+    // Bound incidental rounding independently of how much of the source is allocated.
+    if target_allocation.saturating_sub(source_allocation) > 64 * 1024 {
         return Err(io::Error::new(
             io::ErrorKind::Unsupported,
             "Destination allocation expanded; sparse/compressed fidelity unsupported on this filesystem; transfer refused",
@@ -134,6 +133,31 @@ pub(super) fn verify(source_allocation: u64, size: u64, target: &File) -> io::Re
 mod tests {
     use super::*;
     use std::io::Read;
+
+    #[test]
+    fn intermediate_allocation_growth_is_refused_above_the_incidental_limit() {
+        for (source, target) in [(600, 900), (128, 256), (512, 768), (768, 1024)] {
+            assert_eq!(
+                verify_allocation(source * 1024, target * 1024)
+                    .unwrap_err()
+                    .kind(),
+                io::ErrorKind::Unsupported,
+                "{source} KiB to {target} KiB"
+            );
+        }
+    }
+
+    #[test]
+    fn allocation_growth_limit_includes_exact_boundaries_without_overflow() {
+        for source in [0, 128 * 1024, 600 * 1024, 1024 * 1024, u64::MAX - 65537] {
+            for growth in [0, 1, 65535, 65536, 65537] {
+                let result = verify_allocation(source, source + growth);
+                assert_eq!(result.is_ok(), growth <= 65536, "{source} + {growth}");
+            }
+        }
+        verify_allocation(u64::MAX, 0).unwrap();
+        verify_allocation(u64::MAX, u64::MAX).unwrap();
+    }
 
     #[test]
     fn full_materialization_is_refused_even_when_the_source_is_mostly_allocated() {

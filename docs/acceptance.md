@@ -1118,6 +1118,15 @@ compression preservation. NTFS-compressed sources now receive an explicit
 preflight refusal; the [pre-v1 compatibility task](../TODO.md#ntfs-compressed-transfers)
 requires native compression/allocation preservation before enabling them.
 
+The final allocation correction replaces the half-size and full-size thresholds
+with a direct growth limit for sources allocated below their logical length:
+destination allocation may exceed source allocation by at most 64 KiB.
+Dense sources retain their existing bypass for native preallocation differences.
+This also refuses intermediate expansion, including 600 KiB
+to 900 KiB for a 1 MiB file. Deterministic regressions cover unchanged and reduced
+allocation, the exact 64 KiB boundary, one byte beyond it, full expansion and
+counts near `u64::MAX`. The NTFS-compression preflight refusal remains unchanged.
+
 The first signed state/UI commit passed unchanged clean Rust 1.95.0 full local
 verification, including mandatory xwin check, Clippy and build: 458 Linux tests
 passed, with the two established owned-child entry skips. Final-head native
