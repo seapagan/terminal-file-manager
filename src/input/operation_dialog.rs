@@ -98,7 +98,7 @@ fn destructive(controller: &mut Controller, dialog: &mut OperationDialog, key: K
     submit(controller, dialog)
 }
 
-fn cancel_preview(controller: &mut Controller, dialog: &OperationDialog) {
+pub(super) fn cancel_preview(controller: &mut Controller, dialog: &OperationDialog) {
     if let Some(id) = dialog.preview_id {
         controller.app.operations.outbox.push(Intent::Cancel(id));
     }
@@ -138,6 +138,7 @@ fn prepare(controller: &mut Controller, dialog: &mut OperationDialog) -> io::Res
             dialog.plan.destination.clone(),
         )?;
         if !same_scope(&dialog.plan, &fresh) {
+            cancel_preview(controller, dialog);
             dialog.plan = fresh;
             if matches!(dialog.plan.operation, Operation::Delete | Operation::Trash) {
                 dialog.ready = false;

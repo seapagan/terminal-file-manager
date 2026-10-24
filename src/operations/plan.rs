@@ -128,17 +128,8 @@ impl Plan {
     /// # Errors
     /// Unknown outcomes require reconciliation. Fully completed jobs have nothing to retry.
     pub fn retry(&self, record: &super::Record) -> io::Result<Self> {
-        if record.unresolved() {
-            return Err(invalid("Outcome unknown; reconcile before retry"));
-        }
+        self.retry_eligibility(record)?;
         if self.operation == Operation::Mkdir {
-            if record
-                .entries
-                .iter()
-                .any(|entry| entry.outcome == super::Outcome::Completed)
-            {
-                return Err(invalid("No incomplete directory creation to retry"));
-            }
             return Ok(self.clone());
         }
         let mut retry = self.clone();
@@ -164,10 +155,37 @@ impl Plan {
         retry
             .operands
             .retain(|entry| !retry.completed.contains(&entry.path));
-        if retry.operands.is_empty() {
+        Ok(retry)
+    }
+
+    pub(super) fn retry_eligibility(&self, record: &super::Record) -> io::Result<()> {
+        if record.unresolved() {
+            return Err(invalid("Outcome unknown; reconcile before retry"));
+        }
+        if self.operation == Operation::Mkdir {
+            if record
+                .entries
+                .iter()
+                .any(|entry| entry.outcome == super::Outcome::Completed)
+            {
+                return Err(invalid("No incomplete directory creation to retry"));
+            }
+            return Ok(());
+        }
+        let completed: HashSet<_> = record
+            .entries
+            .iter()
+            .filter(|entry| entry.outcome == super::Outcome::Completed)
+            .map(|entry| &entry.source)
+            .collect();
+        if !self
+            .operands
+            .iter()
+            .any(|entry| !self.completed.contains(&entry.path) && !completed.contains(&entry.path))
+        {
             return Err(invalid("No incomplete operands to retry"));
         }
-        Ok(retry)
+        Ok(())
     }
 
     pub(super) fn target(&self, source: &Entry) -> Option<PathBuf> {

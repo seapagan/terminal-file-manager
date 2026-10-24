@@ -397,12 +397,6 @@ fn run(
             record: super::reconcile(&job.plan, record, &job.cancel),
         };
     }
-    if let Err(error) = job.plan.refresh_retry() {
-        return Update::Finished {
-            id: job.id,
-            record: unsuccessful(&job.plan, Outcome::Changed, &error.to_string()),
-        };
-    }
     if job.preview {
         return prepare(job);
     }

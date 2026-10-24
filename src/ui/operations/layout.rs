@@ -2,12 +2,13 @@ use super::{OperationControl, OperationTarget, actions, content};
 use crate::app::App;
 use ratatui::{layout::Rect, text::Line};
 
-pub(super) struct Layout {
+#[derive(Clone, Debug)]
+pub(in crate::ui) struct Layout {
     pub outer: Rect,
     pub body: Rect,
     pub list: Rect,
     pub buttons: Vec<OperationControl>,
-    pub rows: Vec<content::Row>,
+    pub(super) rows: Vec<content::Row>,
 }
 
 impl Layout {

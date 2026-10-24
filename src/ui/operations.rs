@@ -13,7 +13,7 @@ mod actions;
 mod content;
 mod jobs;
 mod layout;
-use layout::Layout;
+pub(super) use layout::Layout;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OperationTarget {
@@ -41,11 +41,14 @@ pub(super) fn visible(app: &App) -> bool {
             || app.operations.waiting_exit.is_some())
 }
 
-pub(super) fn geometry(app: &App, terminal: Rect) -> (Vec<OperationControl>, usize) {
+pub(super) fn geometry(
+    app: &App,
+    terminal: Rect,
+) -> (Vec<OperationControl>, usize, Option<Layout>) {
     if !visible(app) {
-        return (Vec::new(), 0);
+        return (Vec::new(), 0, None);
     }
-    let layout = Layout::new(app, terminal);
+    let mut layout = Layout::new(app, terminal);
     let mut controls = layout.buttons.clone();
     controls.extend(jobs::controls(app, layout.list));
     let rows = &layout.rows;
@@ -71,15 +74,22 @@ pub(super) fn geometry(app: &App, terminal: Rect) -> (Vec<OperationControl>, usi
             });
         }
     }
-    (controls, layout.limit(rows.len()))
+    let limit = layout.limit(rows.len());
+    // Retain only the rows whose geometry was used for this frame's hitboxes.
+    layout.rows = layout
+        .rows
+        .into_iter()
+        .skip(scroll)
+        .take(usize::from(layout.body.height))
+        .collect();
+    (controls, limit, Some(layout))
 }
 
 pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, geometry: &super::Geometry) {
     notices(frame, app, theme, geometry.status);
-    if !visible(app) {
+    let Some(layout) = &geometry.operation_layout else {
         return;
-    }
-    let layout = Layout::new(app, frame.area());
+    };
     frame.render_widget(Clear, layout.outer);
     frame.render_widget(
         Block::default()
@@ -90,14 +100,10 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, geometry: &sup
         layout.outer,
     );
     jobs::render(frame, app, theme, layout.list);
-    let rows = &layout.rows;
-    let scroll = app.operations.scroll.min(layout.limit(rows.len()));
     let text: Vec<_> = layout
         .rows
-        .into_iter()
-        .skip(scroll)
-        .take(usize::from(layout.body.height))
-        .map(|row| Line::styled(row.text, theme.style(row.role)))
+        .iter()
+        .map(|row| Line::styled(row.text.as_str(), theme.style(row.role)))
         .collect();
     frame.render_widget(Paragraph::new(text), layout.body);
     for control in &geometry.operation_controls {

@@ -48,6 +48,8 @@ pub enum JobState {
 }
 
 pub struct Job {
+    /// Cached by `finish`; rendering never clones a plan or scans recursive results.
+    pub retry_eligible: bool,
     pub id: u64,
     pub plan: Plan,
     pub options: Options,
@@ -65,17 +67,17 @@ impl Job {
     }
     /// Retry remains an explicit fresh attempt; the plan revalidates its frozen identities.
     pub fn can_retry(&self) -> bool {
-        !self.active()
-            && self
-                .record
-                .as_ref()
-                .is_some_and(|record| self.plan.retry(record).is_ok())
+        !matches!(
+            self.state,
+            JobState::Queued | JobState::Running | JobState::Unknown | JobState::Critical
+        ) && self.retry_eligible
     }
     /// Only unknown entries with retained ownership evidence can be reconciled.
     pub fn can_reconcile(&self) -> bool {
         !self.active() && self.record.as_ref().is_some_and(Record::reconcilable)
     }
     pub fn finish(&mut self, record: Record, now: SystemTime) {
+        self.retry_eligible = self.plan.retry_eligibility(&record).is_ok();
         self.finished.get_or_insert(now);
         self.state = finished_state(&record);
         self.record = Some(record);

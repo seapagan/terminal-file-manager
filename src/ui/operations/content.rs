@@ -5,6 +5,7 @@ use crate::{
     operations::{Dialog, Event, Operation, OperationDialog},
 };
 
+#[derive(Clone, Debug)]
 pub(super) struct Row {
     pub text: String,
     pub role: Role,

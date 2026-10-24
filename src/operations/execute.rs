@@ -16,6 +16,25 @@ pub fn execute(
     plan: &Plan,
     options: Options,
     cancel: &AtomicBool,
+    notify: impl FnMut(Event) -> Decision,
+) -> Record {
+    let mut refreshed;
+    let plan = if plan.retrying {
+        refreshed = plan.clone();
+        if let Err(error) = refreshed.refresh_retry() {
+            return super::queue::unsuccessful(plan, Outcome::Changed, &error.to_string());
+        }
+        &refreshed
+    } else {
+        plan
+    };
+    execute_ready(plan, options, cancel, notify)
+}
+
+fn execute_ready(
+    plan: &Plan,
+    options: Options,
+    cancel: &AtomicBool,
     mut notify: impl FnMut(Event) -> Decision,
 ) -> Record {
     if let Err(error) = plan.validate_directories() {
@@ -59,16 +78,6 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
             if self.plan.completed.contains(&entry.path) {
                 continue;
             }
-            let refreshed;
-            let entry = if self.plan.retrying
-                && entry.may_recurse()
-                && safety::revalidate(entry, false).is_ok()
-            {
-                refreshed = crate::fs::inspect(&entry.path);
-                &refreshed
-            } else {
-                entry
-            };
             let destination = self.plan.target(entry);
             self.entry(entry, destination.as_deref(), 0);
             if self.record.unresolved() || self.cancel.load(Ordering::Relaxed) {

@@ -18,6 +18,7 @@ impl Controller {
         retry_of: Option<u64>,
     ) {
         self.app.operations.history.push(Job {
+            retry_eligible: false,
             id,
             plan,
             options,

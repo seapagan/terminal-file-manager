@@ -12,7 +12,7 @@ use ratatui::style::{Color, Modifier, Style};
 use std::time::SystemTime;
 
 /// Semantic styles never embed ANSI escape strings in widgets.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Role {
     Normal,
     Header,

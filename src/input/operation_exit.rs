@@ -3,6 +3,9 @@ use crate::operations::{Dialog, Intent};
 use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
 
 pub(super) fn request(controller: &mut Controller, save: bool) {
+    if let Some(Dialog::Operation(dialog)) = controller.app.operations.dialog.take() {
+        super::operation_dialog::cancel_preview(controller, &dialog);
+    }
     controller.app.operations.waiting_exit = None;
     controller.app.operations.scroll = 0;
     controller.app.operations.exit_snapshot =

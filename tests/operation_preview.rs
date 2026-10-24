@@ -119,3 +119,38 @@ fn retry_a_failed_directory_creation_keeps_its_explicit_destination() {
     assert_eq!(second.completed_directories(), 1);
     assert!(destination.is_dir());
 }
+
+#[test]
+fn direct_retry_refreshes_a_changed_directory_but_refuses_a_replaced_root() {
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("source");
+    let target = root.path().join("target");
+    fs::create_dir(&source).unwrap();
+    fs::create_dir(&target).unwrap();
+    fs::write(source.join("first"), "first").unwrap();
+    let plan = Plan::paths(Operation::Delete, vec![source.clone()], None).unwrap();
+    let cancelled = execute(&plan, Options::default(), &true.into(), |_| Decision::Skip);
+    let retry = plan.retry(&cancelled).unwrap();
+    fs::write(source.join("later"), "later").unwrap();
+    let result = execute(&retry, Options::default(), &false.into(), |_| {
+        Decision::Skip
+    });
+    assert_eq!(result.completed_files(), 2);
+    assert!(!source.exists());
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("sentinel"), "replacement retained").unwrap();
+    let plan = Plan::paths(Operation::Delete, vec![source.clone()], None).unwrap();
+    let cancelled = execute(&plan, Options::default(), &true.into(), |_| Decision::Skip);
+    let retry = plan.retry(&cancelled).unwrap();
+    fs::rename(&source, root.path().join("retained-original")).unwrap();
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("sentinel"), "replacement retained").unwrap();
+    let result = execute(&retry, Options::default(), &false.into(), |_| {
+        Decision::Skip
+    });
+    assert_eq!(result.entries[0].outcome, Outcome::Changed);
+    assert_eq!(
+        fs::read(source.join("sentinel")).unwrap(),
+        b"replacement retained"
+    );
+}

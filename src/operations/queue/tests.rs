@@ -1,6 +1,57 @@
 use super::*;
 
 #[test]
+fn superseded_preview_completion_and_queued_cancellation_release_all_worker_state() {
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("selected");
+    std::fs::create_dir(&source).unwrap();
+    std::fs::write(source.join("sentinel"), "retained").unwrap();
+    for operation in [
+        super::super::Operation::Delete,
+        super::super::Operation::Trash,
+    ] {
+        let plan = Plan::paths(operation, vec![source.clone()], None).unwrap();
+        let mut driver = Driver::new();
+        let old = driver.queue.preview(plan.clone()).unwrap();
+        driver.pump();
+        let held = driver
+            .messages
+            .recv_timeout(Duration::from_secs(5))
+            .unwrap();
+        assert!(matches!(&held, Message::Update(Update::Preview { id, .. }) if *id == old));
+        driver.queue.cancel(old);
+        let replacement = driver.queue.preview(plan.clone()).unwrap();
+        driver.pump();
+        assert_eq!(driver.pending.len(), 1);
+        receive(
+            held,
+            &mut driver.active,
+            &mut driver.coordinator,
+            &driver.updates,
+        );
+        while !matches!(driver.queue.next(Duration::ZERO).unwrap(), Update::Preview { id, .. } if id == old)
+        {
+        }
+        driver.queue.cancel(replacement);
+        driver.pump();
+        let Some(Update::Finished { id, record }) = driver.queue.next(Duration::ZERO) else {
+            panic!("queued replacement cancellation acknowledgement");
+        };
+        assert_eq!(id, replacement);
+        assert!(
+            record
+                .entries
+                .iter()
+                .all(|entry| entry.outcome == Outcome::Cancelled)
+        );
+        assert!(driver.queue.tokens.is_empty());
+        assert!(driver.active.is_empty() && driver.pending.is_empty());
+        assert!(driver.coordinator.acquire(999, &plan).unwrap());
+        assert_eq!(std::fs::read(source.join("sentinel")).unwrap(), b"retained");
+    }
+}
+
+#[test]
 fn reconciliation_without_evidence_keeps_the_original_quarantined_claims() {
     let root = tempfile::tempdir().unwrap();
     std::fs::write(root.path().join("source"), "preserved").unwrap();

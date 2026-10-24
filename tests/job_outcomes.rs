@@ -19,6 +19,7 @@ fn fixture() -> (tempfile::TempDir, Job, Record) {
         terminal_file_manager::operations::Decision::Skip
     });
     let job = Job {
+        retry_eligible: false,
         id: 1,
         plan,
         options: Default::default(),
@@ -103,6 +104,53 @@ fn stopped_job_actions_exclude_completed_unknown_and_critical_results() {
         );
         assert!(!job.active());
         assert_eq!(job.can_retry(), retry, "{outcome:?}");
+        assert_eq!(
+            job.can_retry(),
+            job.plan.retry(job.record.as_ref().unwrap()).is_ok()
+        );
         assert!(!job.can_reconcile());
     }
+}
+
+#[test]
+fn retry_eligibility_queries_do_not_repeat_large_preview_clones() {
+    use terminal_file_manager::operations::{Queue, Update};
+    let (root, mut job, _) = fixture();
+    let selected = root.path().join("selected");
+    fs::create_dir(&selected).unwrap();
+    for index in 0..2000 {
+        fs::write(selected.join(index.to_string()), "retained").unwrap();
+    }
+    let plan = Plan::paths(Operation::Delete, vec![selected], None).unwrap();
+    let mut queue = Queue::new().unwrap();
+    queue.preview(plan).unwrap();
+    job.plan = loop {
+        if let Update::Preview { plan, .. } = queue.next(Duration::from_secs(10)).unwrap() {
+            break *plan;
+        }
+    };
+    let record = execute(&job.plan, Default::default(), &true.into(), |_| {
+        terminal_file_manager::operations::Decision::Skip
+    });
+    job.finish(record, job.started);
+    let baseline = std::time::Instant::now();
+    for _ in 0..100 {
+        assert!(std::hint::black_box(
+            job.plan.retry(job.record.as_ref().unwrap()).is_ok()
+        ));
+    }
+    let baseline = baseline.elapsed();
+    let cached = std::time::Instant::now();
+    for _ in 0..10_000 {
+        assert!(std::hint::black_box(job.can_retry()));
+    }
+    eprintln!(
+        "RETRY_COST: 2000-entry preview, 100 original queries {baseline:?}, 10000 cached queries {:?}",
+        cached.elapsed()
+    );
+    assert_eq!(job.plan.preview.as_ref().unwrap().files, 2000);
+    assert_eq!(
+        fs::read(job.plan.operands[0].path.join("0")).unwrap(),
+        b"retained"
+    );
 }
