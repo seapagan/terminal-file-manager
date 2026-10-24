@@ -84,8 +84,7 @@ notifications. If native watching fails, TFM warns once and refreshes periodical
 while retrying. Windows polling is its normal mode. Large or slow directories,
 concurrent operations and unavailable mounts can extend visibility latency.
 If a directory disappears or another directory replaces it, TFM retains the
-last good view and reports the
-error; navigate out and reopen the directory to select the replacement.
+last good view and reports the error; navigate out and reopen the directory to select the replacement.
 
 ### Information and exit
 

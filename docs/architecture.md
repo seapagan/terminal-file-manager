@@ -85,6 +85,10 @@ Native notifications may miss changes on network or pseudo-filesystems. Periodic
 enumeration supplies eventual reconciliation where enumeration still works.
 Windows polling retains no watch handles, although ordinary enumeration still
 uses brief filesystem handles and can race external operations.
+Native Server 2025 acceptance passed current/parent/grandparent rename and
+replacement/recovery checks. Instrumented 2,000-/10,000-entry samples maintained
+two-second starts with no pending backlog; CPU cost was material at 10,000 entries.
+See [acceptance evidence](acceptance.md) for measurements and their limits.
 Remote refresh remains a separate M3 capability.
 
 `terminal` restores attempted raw/alternate-screen/mouse/paste/keyboard modes on

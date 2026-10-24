@@ -1,36 +1,81 @@
 # Acceptance gates
 
-## Approved Windows polling policy: native acceptance pending
+## Windows polling: native acceptance, 24 October 2026
 
-The maintainer approved intentional two-second reconciliation on Windows after
-the isolated Shell investigation. Linux/macOS retain native `notify`, 200 ms
-debounce, one-second sustained scan spacing and 30-second reconciliation.
-Windows creates no native directory-watch owner or failure/recovery loop. Both
-panes use the existing bounded listing lanes and generation/identity checks;
-overdue polls defer behind in-flight listings and navigation.
+Signed implementation `944c83f` uses intentional two-second reconciliation on
+Windows. Linux/macOS retain native `notify`, 200 ms debounce, one-second sustained
+scan spacing and 30-second reconciliation. Windows creates no native watch owner
+or failure/recovery loop. Both panes use the existing bounded listing lanes,
+generation checks and directory identity validation. Overdue polls defer behind
+in-flight listings and navigation. Unchanged, identity-verified selected directory
+counts survive no-op polls; manual refresh, replacement and errors invalidate old
+results. Counts remain on-demand snapshots, not live recursive totals.
 
-Deterministic polling regressions now cover two-second hidden-pane updates,
-healthy operation without watcher warnings, overdue-work coalescing and stale
-navigation completions. The existing parent-rename regression remains intact.
-Windows-native tests add current/grandparent renames, deletion/path reuse,
-explicit reopen, mark/approval safety, navigation, manual refresh and read/sibling
-cadence. The native measurement case records idle/process resources, scan bounds,
-listing duration, isolated model visibility and continuous-write convergence on
-owned 2,000- and 10,000-entry directories. It also samples the actual ConPTY TUI's
-idle process resources, external-create render/exit and clean re-entry. Successful Nextest logs retain these
-observations; they are not a visibility SLA or a release-build benchmark.
+The unchanged clean `RUSTUP_TOOLCHAIN=1.95.0 cargo make verify` passed in 49.06 s,
+including exact MSRV, packaging, security, coverage and mandatory Linux xwin.
+`cargo make verify-infra` passed in 16.25 s. The completed-tree gate first reached
+Cargo's strict uncommitted-source rejection; the approved interim 188-file package,
+signed commit and immediate clean full gate completed that sequence. Four
+historical complexity advisories remain; no new exception or suppression was added.
 
-The Linux suite passes 519 tests at this implementation checkpoint, with the two
-existing child-entry skips. Windows execution, final-head native CI, combined
-coverage and Codacy review remain outstanding. Historical Windows failures below
-remain failures until the new production backend passes native acceptance.
+[Native CI at 944c83f](https://github.com/seapagan/terminal-file-manager/actions/runs/40128806190)
+passed Linux 519, macOS 498 and Windows 479 tests, with the two existing terminal
+child-entry skips on each platform. The original parent-rename regression passed
+unchanged. Current-directory and grandparent renames, deletion/path reuse,
+explicit reopening, mark/approval safety, navigation during polling, manual
+refresh, read/sibling cadence and ConPTY refresh without input all passed.
+Deterministic tests additionally cover concealed-pane updates, no warning/recovery
+loop, held-listing deferral, bounded catch-up and stale generations. Frozen M2
+operands and operation-time validation remain covered by the native suites.
+The previous Windows failure is closed by these native results, not reclassified.
 
-Review reproduced cancellation of a directory count at every periodic listing.
-The Windows reconciliation intent now preserves running/completed counts only
-for unchanged, identity-verified selected directories. Real worker/metadata
-scheduling regressions prove that no-op polls do not cancel counts, while manual
-refresh and replacement reject old results. Counts remain on-demand snapshots;
-unchanged directory metadata does not establish unchanged descendant contents.
+All five ordinary workflows passed at that implementation head. Combined native
+LLVM/LCOV coverage merged successfully and was reported to Codacy; static
+analysis, diff coverage and coverage variation checks passed. The draft PR remains
+unmerged. Historical checkpoints below describe their original evidence only.
+
+### Owned Windows polling measurements
+
+The actual `windows-2025` host was Windows Server 2025, image
+`windows-2025-vs2026` version `20261021.278.1`. The existing workflow executed
+`cargo llvm-cov nextest --all-targets --all-features --locked --no-fail-fast
+--remap-path-prefix --lcov --output-path=coverage-windows.lcov`, followed by the
+JSON report. Successful Nextest logs retain the measurement output. These are
+instrumented debug observations, not release-build benchmarks or visibility SLAs.
+
+| Observation | 2,000 entries | 10,000 entries |
+| --- | --- | --- |
+| Per-pane scan starts | 2.001–2.014 s apart | 2.000–2.013 s apart |
+| Listing completion, including collection delay | 131–169 ms | 645–776 ms |
+| Three isolated changes, both-pane model visibility | 1.041 / 1.996 / 2.017 s | 1.683 / 2.034 / 1.978 s |
+| Sustained writer, final model convergence | 196 writes; 1.985 s | 193 writes; 1.937 s |
+| Peak active / pending listing lanes | 2 / 0 | 2 / 0 |
+| Fresh manual listing, exact model agreement | 86.97 ms | 436.78 ms |
+| Idle model CPU / sampled wall interval | 875 ms / 6.557 s | 4,234 ms / 6.833 s |
+| Idle TUI CPU / sampled wall interval | 641 ms / 4.530 s | 2,938 ms / 4.584 s |
+| Idle TUI working set, before → after | 14,196,736 → 14,893,056 bytes | 24,711,168 → 26,066,944 bytes |
+| Idle TUI handles, before → after | 110 → 110 | 110 → 109 |
+| External create, TUI render **and exit** | 1.415 s | 1.985 s |
+
+Each size recorded three idle listings per pane in approximately 6.2–6.5 seconds,
+then isolated changes and continuous writes. Both installed snapshots matched a
+fresh manual listing, including final size and modification time. No overlap,
+pending backlog or repeated cancellation occurred. The 10,000-entry TUI sample
+used approximately 64% of one core; polling cost is material, even though scans
+finished within the approved interval. Release-build and longer load/idle
+benchmarks remain useful future performance evidence; no slower cadence was
+silently substituted.
+
+After model shutdown, handle counts returned to their respective pre-runtime
+baselines (99 and 102). The native cases renamed current/parent/grandparent while
+polling remained enabled and idle listing lanes had drained; teardown allowed
+another rename, fixture cleanup and terminal re-entry. This proves absence of a
+persistent polling watch-handle obstruction in the owned topology, not immunity
+from brief ordinary enumeration handles racing another operation. Allocator
+working-set retention is not claimed to be a leak or a fixed memory bound.
+Windows 11 desktop, UNC/network mounts and unusually slow/unavailable mounts were
+not performance-tested. The deferred notification investigation in TODO retains
+its broader native path, mount, lifecycle and platform requirements.
 
 ## Live local refresh: implementation checkpoint, 24 October 2026
 
