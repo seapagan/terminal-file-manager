@@ -60,6 +60,36 @@ public sealed class Capture {
 }
 
 public interface ProbeWatch : IDisposable { object State(); }
+public sealed class PidlWatch : ProbeWatch {
+    readonly List<IntPtr> pidls = new List<IntPtr>();
+    readonly List<string> resolvedPaths = new List<string>();
+    public int freed;
+    public PidlWatch(string current, bool il, bool resolve) {
+        try {
+            foreach(string path in new[]{current, Path.GetDirectoryName(current)}) {
+                IntPtr pidl;
+                if(il) {
+                    pidl=Native.ILCreateFromPathW(path);
+                    if(pidl==IntPtr.Zero) throw new InvalidOperationException("ILCreateFromPathW returned null");
+                } else {
+                    uint attributes; int hr=Native.SHParseDisplayName(path,IntPtr.Zero,out pidl,0,out attributes);
+                    if(hr<0) Marshal.ThrowExceptionForHR(hr);
+                }
+                pidls.Add(pidl);
+                if(resolve) {
+                    string converted=Native.PidlPath(pidl);
+                    resolvedPaths.Add(converted);
+                    if(converted==null) throw new InvalidOperationException("PIDL path conversion failed in resolution control");
+                }
+            }
+        } catch { Dispose(); throw; }
+    }
+    public object State() { return new { retained_pidls=pidls.Count, freed, registrations=0, resolved_paths=resolvedPaths.ToArray() }; }
+    public void Dispose() {
+        foreach(var pidl in pidls) { Native.CoTaskMemFree(pidl); freed++; }
+        pidls.Clear();
+    }
+}
 public sealed class EmptyWatch : ProbeWatch {
     bool disposed;
     public object State() { return new { active = !disposed, registrations = 0 }; }
@@ -92,6 +122,7 @@ public sealed class HandleWatch : ProbeWatch {
 
 public sealed class ShellWatch : ProbeWatch {
     readonly Capture capture;
+    readonly bool raw, il;
     readonly string className = "TFMProbe" + Guid.NewGuid().ToString("N");
     readonly List<uint> ids = new List<uint>();
     readonly List<IntPtr> pidls = new List<IntPtr>();
@@ -100,8 +131,8 @@ public sealed class ShellWatch : ProbeWatch {
     ushort atom;
     public int deregistered, freed;
     public bool destroyed;
-    public ShellWatch(string current, bool interrupts, Capture target) {
-        capture = target; callback = OnMessage;
+    public ShellWatch(string current, bool interrupts, Capture target, bool rawEvents=false, bool ilPaths=false) {
+        capture = target; callback = OnMessage; raw=rawEvents; il=ilPaths;
         try {
             var cls = new Native.WindowClass { proc = callback, name = className, instance = Native.GetModuleHandleW(null) };
             atom = Native.RegisterClassW(ref cls);
@@ -114,8 +145,13 @@ public sealed class ShellWatch : ProbeWatch {
     }
     void Register(string path, bool interrupts, uint message) {
         IntPtr pidl; uint attributes;
-        int hr = Native.SHParseDisplayName(path, IntPtr.Zero, out pidl, 0, out attributes);
-        if (hr < 0) Marshal.ThrowExceptionForHR(hr);
+        if(il) {
+            pidl=Native.ILCreateFromPathW(path);
+            if(pidl==IntPtr.Zero) throw new InvalidOperationException("ILCreateFromPathW returned null");
+        } else {
+            int hr = Native.SHParseDisplayName(path, IntPtr.Zero, out pidl, 0, out attributes);
+            if (hr < 0) Marshal.ThrowExceptionForHR(hr);
+        }
         pidls.Add(pidl);
         var entry = new Native.Entry { pidl = pidl, recursive = 0 };
         uint id = Native.SHChangeNotifyRegister(window, 0x8002 | (interrupts ? 1 : 0), 0x0002381f, message, 1, ref entry);
@@ -132,6 +168,7 @@ public sealed class ShellWatch : ProbeWatch {
             IntPtr items; int flags;
             held = Native.SHChangeNotification_Lock(new IntPtr(unchecked((long)wp.ToUInt64())), unchecked((uint)lp.ToInt64()), out items, out flags);
             if (held == IntPtr.Zero) { capture.lockFailures++; return; }
+            if(raw) { capture.Add(flags,null,null,true); return; }
             string first = items == IntPtr.Zero ? null : Native.PidlPath(Marshal.ReadIntPtr(items));
             string second = items == IntPtr.Zero ? null : Native.PidlPath(Marshal.ReadIntPtr(items, IntPtr.Size));
             capture.Add(flags, first, second);

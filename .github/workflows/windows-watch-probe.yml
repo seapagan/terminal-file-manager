@@ -56,7 +56,7 @@ jobs:
           git rev-parse HEAD | Set-Content reports/source-sha.txt
           $PSVersionTable | Out-String | Set-Content reports/powershell.txt
           Get-ComputerInfo -Property WindowsProductName,WindowsVersion,OsBuildNumber | ConvertTo-Json | Set-Content reports/windows-host.json
-          & ./research/windows-watch/run.ps1 -NotifyHelper ./research/windows-watch/notify-probe.exe -Output reports/probe.json
+          & ./research/windows-watch/run.ps1 -Isolation -NotifyHelper ./research/windows-watch/notify-probe.exe -Output reports/probe.json
       - name: Preserve the original failing native gate without changing its expectations
         shell: pwsh
         run: |

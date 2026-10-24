@@ -21,6 +21,7 @@ public static class WatchProbe {
     static readonly List<object> Cases = new List<object>();
     static string script, helper, output, root;
     static object host;
+    static bool isolationOnly;
     static string Current(string fixture) { return Path.Combine(fixture, "grand", "parent", "current"); }
     static string MakeFixture(string label, bool empty = false) {
         string fixture = Path.Combine(root, label + "-" + Guid.NewGuid().ToString("N"));
@@ -39,6 +40,8 @@ public static class WatchProbe {
     static ProbeWatch Open(string mode, string fixture, string current, Capture capture) {
         switch(mode) {
             case "none": return new EmptyWatch();
+            case "pidl-only": case "pidl-resolve": case "pidl-il": return new PidlWatch(current, mode=="pidl-il", mode=="pidl-resolve");
+            case "shell-raw": case "shell-il": case "shell-only-raw": return new ShellWatch(current,mode!="shell-only-raw",capture,true,mode=="shell-il");
             case "handle-child": case "handle-parent": case "handle-both": return new HandleWatch(current, mode);
             case "notify-pair": case "notify-root": return new NotifyWatch(helper, fixture, current, mode == "notify-root", capture);
             case "shell-only": case "shell-interrupt": return new ShellWatch(current, mode == "shell-interrupt", capture);
@@ -52,12 +55,12 @@ public static class WatchProbe {
         return capture.FirstAfter(started)!=0;
     }
     static object Ready(string mode, string fixture, Capture capture) {
-        if(mode=="none" || mode.StartsWith("handle-")) return new { native_handle_control=true };
+        if(mode=="none" || mode.StartsWith("handle-") || mode.StartsWith("pidl-")) return new { native_handle_control=true };
         Native.Pump(300); capture.Reset();
         var pulse=Writer(fixture,"warmup");
         bool external=AwaitHint(capture,pulse[0].started);
         bool shellControl=false;
-        if(mode=="shell-only" && !external) {
+        if(mode.StartsWith("shell-only") && !external) {
             capture.Reset(); var control=Writer(fixture,"warmup-control");
             shellControl=AwaitHint(capture,control[0].started);
         }
@@ -83,7 +86,7 @@ public static class WatchProbe {
         }
     }
     static void RenameCase(string mode, string operation) {
-        string fixture = MakeFixture(mode, operation == "delete-chain");
+        string fixture = MakeFixture(isolationOnly ? mode+"-雪-🙂-e\u0301" : mode, operation == "delete-chain");
         string current = Current(fixture);
         var capture = new Capture(current);
         var clock = Stopwatch.StartNew();
@@ -246,7 +249,8 @@ public static class WatchProbe {
     public static string LongPath(string fixture) {
         return @"\\?\" + Path.Combine(Current(fixture),new string('a',100),new string('b',100),new string('c',100));
     }
-    public static void Run(string writerScript, string notifyHelper, string outputFile) {
+    public static void Run(string writerScript, string notifyHelper, string outputFile, bool isolation=false) {
+        isolationOnly=isolation;
         script=Path.GetFullPath(writerScript); helper=Path.GetFullPath(notifyHelper); output=Path.GetFullPath(outputFile);
         Exception failure=null;
         var thread=new Thread(() => { try { Execute(); } catch(Exception error) { failure=error; } }) { IsBackground=true };
@@ -270,6 +274,14 @@ public static class WatchProbe {
             untested=new[]{"UNC/SMB", "ReFS", "removable media", "volume GUID paths", "Explorer manually stopped", "production TFM Shell adapter"}};
         Save();
         try {
+            if(isolationOnly) {
+                foreach(var mode in new[]{"none","pidl-only","pidl-resolve","pidl-il","shell-only-raw","shell-raw","shell-il"})
+                    foreach(var operation in new[]{"rename-current","rename-parent","rename-grandparent"})
+                        RenameCase(mode,operation);
+                foreach(var mode in new[]{"shell-only-raw","shell-raw","shell-il"})
+                    foreach(var operation in new[]{"create","modify","attributes","read"}) EventCase(mode,operation);
+                return;
+            }
             foreach(var mode in new[]{"none","handle-child","handle-parent","handle-both","notify-pair","shell-only","shell-interrupt","notify-root"})
                 foreach(var operation in new[]{"rename-current","rename-parent","rename-grandparent","delete-chain","replace-current","replace-parent","replace-grandparent"})
                     RenameCase(mode,operation);

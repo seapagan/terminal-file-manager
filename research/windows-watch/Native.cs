@@ -31,6 +31,7 @@ public static class Native {
     [DllImport("user32.dll", SetLastError=true)] public static extern bool DestroyWindow(IntPtr window);
     [DllImport("user32.dll")] public static extern IntPtr GetShellWindow();
     [DllImport("shell32.dll", CharSet=CharSet.Unicode)] public static extern int SHParseDisplayName(string path, IntPtr context, out IntPtr pidl, uint attributes, out uint result);
+    [DllImport("shell32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr ILCreateFromPathW(string path);
     [DllImport("shell32.dll")] public static extern uint SHChangeNotifyRegister(IntPtr window, int sources, int events, uint message, int count, ref Entry entry);
     [DllImport("shell32.dll")] public static extern bool SHChangeNotifyDeregister(uint id);
     [DllImport("shell32.dll")] public static extern IntPtr SHChangeNotification_Lock(IntPtr change, uint process, out IntPtr pidls, out int changeEvent);

@@ -63,3 +63,12 @@ Primary references inspected:
 UNC/SMB, ReFS, removable media, volume GUID paths, deliberate Explorer shutdown
 and production TFM Shell integration remain untested. Report actual host shell
 presence instead of assuming a desktop Explorer process exists.
+
+The follow-up workflow uses `-Isolation`. It compares retained PIDLs without a
+registration (`SHParseDisplayName`, with/without path conversion, and
+`ILCreateFromPathW`) against active Shell registrations whose callbacks only
+lock/count/unlock and never resolve event paths. Mutation fixtures include
+Unicode ancestor names. Raw-event variants deliberately perform no path
+attribution; their counters cannot prove nonrecursive filtering. These controls
+separate registration effects from PIDL creation and event-path conversion.
+The original full matrix remains available without `-Isolation`.
