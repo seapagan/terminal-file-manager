@@ -37,6 +37,39 @@ kernel read cannot be forcibly interrupted, and no mutation is submitted.
 Traversal has a 128-directory depth bound and bounded error diagnostics;
 errors, cancellation and overflow never become complete totals.
 
+`watch` keeps one logical native subscription per local pane, including hidden
+panes, with nonrecursive current-directory and immediate-parent targets.
+Two bounded background owners register, retry and release native watchers;
+callbacks coalesce invalidations and errors into pane-local atomic flags.
+Changing the directory context replaces those flags, so old callbacks cannot
+invalidate the new context. Registration completion requests a catch-up scan.
+
+The deterministic coordinator debounces changes for 200 ms, caps continuous
+deferral at one second and spaces sustained scan starts by at least one second.
+It retains late dirty state through an in-flight scan. Each pane also receives
+an unconditional 30-second reconciliation. Native errors enable two-second
+fallback reconciliation and re-registration with one-to-30-second backoff.
+All enumeration uses the existing six read-only lanes. Manual refresh and M2
+completion use the same coalesced ordinary refresh intent; navigation retains
+priority and its separate pending path/history state.
+
+The pinned stable `notify` 8.2.0 has no event-kind configuration mask. TFM filters
+access and access-time-only events in its adapter, along with unrelated parent
+sibling paths. Its Linux backend still subscribes to open events. Notifications
+describe possible changes; snapshots determine the displayed result.
+Ordinary refresh requires the same physical directory identity and native
+namespace. Missing or changed evidence retains the last good view and blocks
+new mutation approvals. Explicit reopening establishes a new context. A missing
+cursor chooses the nearest surviving row; marks require object continuity.
+Metadata and count generations invalidate on each installed snapshot.
+
+Watcher shutdown signals its owners without waiting for a potentially stalled
+filesystem call on the UI thread. Normal owners release their watches on exit;
+an owner stalled inside a kernel call releases them when that call returns.
+Native notifications may miss changes on network or pseudo-filesystems. Periodic
+enumeration supplies eventual reconciliation where enumeration still works.
+Remote refresh remains a separate M3 capability.
+
 `terminal` restores attempted raw/alternate-screen/mouse/paste/keyboard modes on
 normal exit, I/O errors and unwind. Keyboard protocol pushes are capability
 negotiated and paired with pops. Unix selects Crossterm's level-triggered

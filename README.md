@@ -73,6 +73,17 @@ These are the default bindings. You can customise them in `config.toml`.
 | `r` | Refresh the directory |
 | `V` / Alt+V | View options / view profiles |
 
+Local directories refresh automatically, including the hidden pane. External
+creates, deletes, renames and metadata edits update the listing while preserving
+the cursor and surviving marks. File reads do not trigger a refresh. You can
+still press `r` to refresh manually.
+
+TFM also reconciles each pane every 30 seconds to catch missed notifications.
+If native watching fails, it warns once and refreshes periodically while retrying.
+Network and pseudo-filesystems may update more slowly. If a directory disappears
+or another directory replaces it, TFM retains the last good view and reports the
+error; navigate out and reopen the directory to select the replacement.
+
 ### Information and exit
 
 | Keys | Action |
@@ -220,3 +231,24 @@ diagnostics when needed.
 - [Source attribution](docs/provenance.md) and [third-party notices](THIRD_PARTY_NOTICES.md)
 
 `tfm` is licensed under [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE).
+
+### Linux filesystem notification licence
+
+The `inotify` and `inotify-sys` dependencies carry this ISC notice, retained here
+for binary archives:
+
+```text
+Copyright (c) Hanno Braun and contributors
+
+Permission to use, copy, modify, and/or distribute this software for any purpose
+with or without fee is hereby granted, provided that the above copyright notice
+and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
+OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+THIS SOFTWARE.
+```

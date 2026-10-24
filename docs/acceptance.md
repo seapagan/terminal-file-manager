@@ -1,11 +1,66 @@
 # Acceptance gates
 
+## Live local refresh: implementation checkpoint, 24 October 2026
+
+The first post-M2 feature adds native nonrecursive subscriptions for both local
+panes, ordinary refresh intents, 200 ms debounce, one-second sustained scan
+spacing, post-registration catch-up and unconditional 30-second reconciliation.
+Errors retain the last good view; native registration retries back off from one
+to 30 seconds while two-second fallback reconciliation remains available.
+
+Local Linux `RUSTUP_TOOLCHAIN=1.95.0 cargo make test` passed 509 tests, with two
+intentional child-entry skips exercised by their parent terminal tests.
+Regressions cover scheduler deadlines, late dirty state, silent watches,
+failure/recovery, stale subscriptions, navigation, physical directory replacement,
+marks, deep cursor recovery, metadata scroll and stale metadata/count results.
+Native cases exercise create/write/rename/delete, permissions, parent rename,
+symlink spelling, registration failure/retry, read-event and sibling filtering,
+bounded bursts and clean owner shutdown. PTY tests show automatic rendering
+without input and successful terminal re-entry. An active Copy conflict supplies
+a deterministic boundary for external changes while the frozen job remains live.
+
+The pinned `notify` 8.2.0 graph passes `cargo make audit` and `cargo make deny`.
+The maintainer approved CC0-1.0 and ISC in the normal licence allowlist and the
+exact `windows-sys =0.60.2` duplicate exception. Other policy remains unchanged.
+ISC notices accompany the Cargo source package and the README in binary archives.
+The exact stable crate lacks `EventKindMask`; access-event exclusion occurs in
+TFM's adapter rather than an unavailable backend configuration API.
+
+Linux xwin check/Clippy/build and `cargo make verify-infra` passed at development
+checkpoints. The unmodified full gate passed native Rust/static/build checks and
+stopped at Cargo's clean-source package requirement on the uncommitted tree.
+The exact-MSRV aggregate likewise reached that packaging boundary. These results
+are interim evidence; clean-tree full verification and hosted Linux/macOS/Windows,
+Codacy and combined coverage remain delivery gates. Four historical complexity
+advisories remain; changed functions introduce no new threshold exceptions.
+
+Single-workstation Linux measurements: an isolated create appeared in the
+2,000-row release TUI in 233 ms; a 1,000-file burst converged in 1.011 s with one
+scan per pane, peak two active listing lanes and zero pending lanes. A fresh
+1,000-row manual listing took 1.34 ms and matched both installed snapshots.
+Latest-only registration/rebinding took 0.259 ms and owner shutdown after recovery
+took 0.129 ms in separate native fixtures. These observations do not guarantee
+kernel notification or completed-scan deadlines.
+
+After warmup, a two-second idle release-TUI sample used 0.15 CPU seconds versus
+0.13 on the exported merged-main baseline; neither emitted terminal output.
+Watch-owner threads accumulated no measurable CPU ticks. Feature RSS stayed at
+9.35 MiB during the sample, versus 7.49 MiB for the baseline. These short samples
+include the existing UI polling cost and do not establish a general benchmark.
+
+No network mount, UNC server, or interactive GNOME Terminal/Ptyxis/Ghostty/Zellij
+session was tested locally. Native notifications remain best effort; periodic
+enumeration provides eventual reconciliation where enumeration succeeds. A
+stalled filesystem syscall can delay its background owner's resource release;
+UI shutdown does not wait for it. SFTP refresh remains separate M3 scope.
+
 ## Current status and evidence
 
 M0's engineering foundation is complete at the accepted checkpoints below. The
-application includes the M1 local browser and the M2 implementation in progress below.
+application includes the M1 local browser and completed M2 local operations.
 The maintainer merged M1 in [PR #2](https://github.com/seapagan/terminal-file-manager/pull/2)
-on 18 October 2026. M2 is in progress; M2–M8 cover the remaining
+on 18 October 2026 and M2 in [PR #3](https://github.com/seapagan/terminal-file-manager/pull/3)
+on 24 October 2026. The post-M2 live-refresh feature is in development; M3–M8 cover the remaining
 application and final release. Genuine direct SSH-to-SSH transfer
 remains post-v1 work.
 

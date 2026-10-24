@@ -4,6 +4,44 @@ use portable_pty::CommandBuilder;
 use std::{fs, path::Path};
 use terminal_driver::drive;
 
+#[test]
+fn native_live_changes_render_without_input_and_terminal_reentry_is_clean() {
+    use std::time::{Duration, Instant};
+    use terminal_driver::{Script, Session};
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("initial-ready"), "owned").unwrap();
+    for attempt in 0..2 {
+        let mut session = Session::open(command(root.path(), root.path(), None)).unwrap();
+        let mut transcript = Vec::new();
+        let mut script = Script::default();
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while script.step == 0 {
+            assert!(Instant::now() < deadline, "initial listing timed out");
+            session
+                .read_step(
+                    Duration::from_millis(20),
+                    &mut script,
+                    &[("initial-ready", "")],
+                    &mut transcript,
+                    false,
+                )
+                .unwrap();
+        }
+        let marker = format!("external-arrival-{attempt}");
+        let changed = Instant::now();
+        fs::write(root.path().join(&marker), "external").unwrap();
+        session
+            .drive(&[(&marker, "q")], deadline, &mut transcript, false)
+            .unwrap();
+        eprintln!(
+            "Native PTY external create, render and clean exit: {:?}",
+            changed.elapsed()
+        );
+        assert!(transcript.windows(8).any(|w| w == b"\x1b[?2004l"));
+        assert!(transcript.windows(8).any(|w| w == b"\x1b[?1049l"));
+    }
+}
+
 fn command(root: &Path, left: &Path, right: Option<&Path>) -> CommandBuilder {
     let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
     if let Some(right) = right {

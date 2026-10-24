@@ -97,11 +97,14 @@ fn drive(
     let started = Instant::now();
     let mut metadata: [Option<(Request, Instant)>; 2] = [None, None];
     let mut dirty = true;
+    let mut watches = crate::watch::Runtime::default();
     let mut geometry = ui::geometry(&controller.app, terminal.size()?.into());
     while !controller.quit {
         dirty |= tick(&mut controller.app);
         dirty |= collect(controller, pool);
         dirty |= operations::collect(controller, jobs, pool);
+        dirty |= watches.poll(&mut controller.app, pool, started.elapsed());
+        submit_refreshes(&mut controller.app, pool);
         dirty |= schedule_metadata(controller, pool, &mut metadata);
         if dirty {
             terminal.draw(|frame| {
@@ -120,6 +123,14 @@ fn drive(
         }
     }
     Ok(())
+}
+
+fn submit_refreshes(app: &mut App, pool: &mut Pool) {
+    for pane in 0..2 {
+        if let Some(request) = app.take_refresh(pane) {
+            pool.submit(request);
+        }
+    }
 }
 
 fn tick(app: &mut App) -> bool {
