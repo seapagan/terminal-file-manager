@@ -45,7 +45,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $notify = Get-ChildItem target/debug/deps/libnotify-*.rlib | Select-Object -First 1
           if (-not $notify) { throw 'Built notify library not found' }
-          rustc --edition=2024 research/windows-watch/notify_probe.rs -L dependency=target/debug/deps --extern "notify=$($notify.FullName)" -o research/windows-watch/notify-probe.exe
+          $nativeArgs = @(Get-ChildItem target/debug/build/windows_x86_64_msvc-*/output | Get-Content | Where-Object { $_ -like 'cargo:rustc-link-search=native=*' } | ForEach-Object { '-L'; $_.Substring('cargo:rustc-link-search='.Length) })
+          if (-not $nativeArgs) { throw 'Cargo Windows native library search path not found' }
+          rustc @nativeArgs --edition=2024 research/windows-watch/notify_probe.rs -L dependency=target/debug/deps --extern "notify=$($notify.FullName)" -o research/windows-watch/notify-probe.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Run owned native fixtures and both Shell source modes
         shell: pwsh

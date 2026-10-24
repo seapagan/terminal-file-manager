@@ -11,7 +11,8 @@ Run on Windows with PowerShell 7:
 ```powershell
 cargo make build
 $notify = Get-ChildItem target/debug/deps/libnotify-*.rlib | Select-Object -First 1
-rustc --edition=2024 research/windows-watch/notify_probe.rs -L dependency=target/debug/deps --extern "notify=$($notify.FullName)" -o research/windows-watch/notify-probe.exe
+$nativeArgs = @(Get-ChildItem target/debug/build/windows_x86_64_msvc-*/output | Get-Content | Where-Object { $_ -like 'cargo:rustc-link-search=native=*' } | ForEach-Object { '-L'; $_.Substring('cargo:rustc-link-search='.Length) })
+rustc @nativeArgs --edition=2024 research/windows-watch/notify_probe.rs -L dependency=target/debug/deps --extern "notify=$($notify.FullName)" -o research/windows-watch/notify-probe.exe
 ./research/windows-watch/run.ps1 -NotifyHelper ./research/windows-watch/notify-probe.exe -Output probe.json
 ```
 
