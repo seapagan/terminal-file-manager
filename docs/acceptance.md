@@ -1087,3 +1087,39 @@ audited call-site scanner comments remains pending; no suppression or remote
 disposition has changed. Only this append-only evidence follows the tested
 runtime source. Final pushed-head checks belong in the ignored ledger and
 maintainer handoff; PR #3 remains draft and unmerged.
+
+## M2 Claude review corrections — 24 October 2026
+
+The maintainer authorised the nine reviewed items on the existing M2 branch.
+All five narrow native-call scanner comments and their function-scoped unsafe
+allowances are approved; the tenth review finding is not a defect. Earlier
+acceptance evidence remains historical, including its pending-approval wording.
+
+Preview replacement and safe-exit entry cancel the superseded preview. Late
+results cannot authorise its replacement. Retry eligibility uses the same
+validation as action submission and caches the result when the job finishes.
+Execution refreshes retry identities for both direct and Queue callers; preview
+preparation refreshes before counting. Jobs rendering reuses the layout used
+for hitboxes and retains only visible rows. A release-mode 2,500-result fixture
+with 40-component paths measured bottom redraw at 40.61 ms before and 13.77 ms
+after; its final row remains reachable beyond 65,535 wrapped rows. With a
+2,000-entry preview, 100 former clone-based retry queries took 37.76 ms;
+10,000 cached queries took 3.32 microseconds. These are local measurements.
+
+Allocation checks permit up to 64 KiB of incidental growth for block rounding
+and inline-data differences. Larger full materialisation, and expansion from
+below half the logical size to at least half, still fail before commit. The
+75%-allocated materialisation regression uses a 1 MiB logical file so its
+256 KiB expansion exceeds that explicit allowance. Ordinary 1-byte through
+1 MiB-plus-one Copy/Move fixtures verify length, every byte and checksum;
+existing native sparse-hole, trailing-zero, cancellation and retention tests
+remain. These checks do not promise identical extent maps or universal
+compression preservation. NTFS-compressed sources now receive an explicit
+preflight refusal; the [pre-v1 compatibility task](../TODO.md#ntfs-compressed-transfers)
+requires native compression/allocation preservation before enabling them.
+
+The first signed state/UI commit passed unchanged clean Rust 1.95.0 full local
+verification, including mandatory xwin check, Clippy and build: 458 Linux tests
+passed, with the two established owned-child entry skips. Final-head native
+and hosted proof will be recorded in the ignored ledger and maintainer handoff.
+PR #3 remains draft and unmerged.

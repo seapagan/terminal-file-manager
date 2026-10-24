@@ -7,6 +7,20 @@ before v1 without weakening object-identity or no-follow safety guarantees.
 The current implementation deliberately fails closed. Never introduce an unsafe
 pathname fallback.
 
+### NTFS compressed transfers
+
+Support native NTFS-compressed source transfers before v1. M2 refuses files
+with `FILE_ATTRIBUTE_COMPRESSED` before writing their payload because the
+current sparse allocation query does not establish compression fidelity.
+The source and any previous destination remain intact.
+
+Acceptance: create an actually compressed file with `compact.exe` on NTFS,
+then prove Copy and Move preserve all logical bytes, native compression and
+bounded allocation, including cancellation and destination collision. Until
+that support exists, the native refusal regression must preserve both original
+objects and their identities. See the
+[Claude correction round](docs/acceptance.md#m2-claude-review-corrections--24-october-2026).
+
 ## Pre-v1 reliability
 
 Define durable ownership, discovery, quarantine and reconciliation for orphan

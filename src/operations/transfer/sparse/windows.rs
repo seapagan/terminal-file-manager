@@ -64,6 +64,52 @@ mod tests {
         sync::atomic::{AtomicBool, Ordering},
     };
 
+    #[test]
+    fn native_compressed_move_refuses_expansion_and_retains_both_originals() {
+        use std::os::windows::fs::MetadataExt;
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("compressed");
+        fs::write(&source, vec![23; 1024 * 1024]).unwrap();
+        let output = std::process::Command::new("compact.exe")
+            .args(["/C", "/I", "/Q"])
+            .arg(&source)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+        assert_ne!(
+            fs::metadata(&source).unwrap().file_attributes() & 0x800,
+            0,
+            "native fixture must establish NTFS compression"
+        );
+        let target = root.path().join("target");
+        fs::create_dir(&target).unwrap();
+        fs::write(target.join("compressed"), "previous").unwrap();
+        let before = crate::fs::inspect(&source).identity;
+        let previous = crate::fs::inspect(&target.join("compressed")).identity;
+        let plan =
+            Plan::paths(Operation::Move, vec![source.clone()], Some(target.clone())).unwrap();
+        let record = operations::execute(&plan, Options { checksum: true }, &false.into(), |_| {
+            Decision::Replace
+        });
+        assert_eq!(record.entries[0].outcome, Outcome::Failed);
+        assert!(
+            record.entries[0]
+                .detail
+                .contains("NTFS compression preservation")
+        );
+        assert_eq!(fs::read(&source).unwrap(), vec![23; 1024 * 1024]);
+        assert_eq!(crate::fs::inspect(&source).identity, before);
+        assert_eq!(fs::read(target.join("compressed")).unwrap(), b"previous");
+        assert_eq!(
+            crate::fs::inspect(&target.join("compressed")).identity,
+            previous
+        );
+        assert_eq!(fs::read_dir(&target).unwrap().count(), 1);
+        eprintln!(
+            "NATIVE_COMPRESSION_REFUSAL_EXERCISED: NTFS compressed source and previous destination retained"
+        );
+    }
+
     fn fixture() -> (tempfile::TempDir, Plan, Vec<u8>) {
         let root = tempfile::tempdir().unwrap();
         let source = root.path().join("sparse");

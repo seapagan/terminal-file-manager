@@ -88,6 +88,12 @@ pub(super) fn prepare(_source_file: &File, _target: &File, source: &Metadata) ->
 #[cfg(windows)]
 pub(super) fn prepare(source_file: &File, target: &File, source: &Metadata) -> io::Result<u64> {
     use std::os::windows::fs::MetadataExt;
+    if source.file_attributes() & 0x800 != 0 {
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "NTFS compression preservation is unsupported; transfer refused before staging payload",
+        ));
+    }
     if source.file_attributes() & 0x200 != 0 {
         windows::mark_sparse(target)?;
         windows::allocated(source_file)
@@ -110,6 +116,10 @@ pub(super) fn verify(source_allocation: u64, size: u64, target: &File) -> io::Re
         return Ok(());
     }
     let target_allocation = allocated(target)?;
+    // Bound incidental allocation/inline-data rounding; large materialization still fails closed.
+    if target_allocation.saturating_sub(source_allocation) <= 64 * 1024 {
+        return Ok(());
+    }
     if target_allocation >= size || (source_allocation < size / 2 && target_allocation >= size / 2)
     {
         return Err(io::Error::new(
@@ -128,7 +138,7 @@ mod tests {
     #[test]
     fn full_materialization_is_refused_even_when_the_source_is_mostly_allocated() {
         let mut output = tempfile::tempfile().unwrap();
-        let bytes = vec![1; 64 * 1024];
+        let bytes = vec![1; 1024 * 1024];
         output.write_all(&bytes).unwrap();
         output.sync_all().unwrap();
         let size = output.metadata().unwrap().len();
@@ -142,6 +152,21 @@ mod tests {
         let mut actual = Vec::new();
         output.read_to_end(&mut actual).unwrap();
         assert_eq!(actual, bytes);
+    }
+
+    #[test]
+    fn bounded_allocation_rounding_is_not_material_sparse_expansion() {
+        for (size, source_allocation) in [(4096, 0), (128 * 1024, 128 * 1024 - 512)] {
+            let mut output = tempfile::tempfile().unwrap();
+            let bytes = vec![17; size];
+            output.write_all(&bytes).unwrap();
+            output.sync_all().unwrap();
+            verify(source_allocation, size as u64, &output).unwrap();
+            output.rewind().unwrap();
+            let mut actual = Vec::new();
+            output.read_to_end(&mut actual).unwrap();
+            assert_eq!(actual, bytes);
+        }
     }
 
     fn native_allocation(expected: &[u8]) -> u64 {

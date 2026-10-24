@@ -5,6 +5,32 @@ use std::{
 use terminal_file_manager::operations::{Decision, Operation, Options, Plan, execute};
 
 #[test]
+fn ordinary_non_sparse_files_copy_and_move_with_exact_bytes_and_lengths() {
+    for operation in [Operation::Copy, Operation::Move] {
+        for size in [1, 4097, 65_535, 1024 * 1024 + 1] {
+            let root = tempfile::tempdir().unwrap();
+            let source = root.path().join("ordinary");
+            let target = root.path().join("target");
+            fs::create_dir(&target).unwrap();
+            let expected = vec![29; size];
+            fs::write(&source, &expected).unwrap();
+            let plan = Plan::paths(operation, vec![source.clone()], Some(target.clone())).unwrap();
+            let record = execute(&plan, Options { checksum: true }, &false.into(), |_| {
+                Decision::Skip
+            });
+            assert_eq!(record.completed_files(), 1, "{record:?}");
+            assert!(record.entries[0].checksum_verified);
+            assert_eq!(
+                fs::metadata(target.join("ordinary")).unwrap().len(),
+                size as u64
+            );
+            assert_eq!(fs::read(target.join("ordinary")).unwrap(), expected);
+            assert_eq!(source.exists(), operation == Operation::Copy);
+        }
+    }
+}
+
+#[test]
 fn destination_access_time_uses_metadata_frozen_before_reads_and_checksum() {
     for operation in [Operation::Copy, Operation::Move] {
         for checksum in [false, true] {
