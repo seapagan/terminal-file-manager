@@ -1,0 +1,70 @@
+name: Temporary Windows watch probe
+
+on:
+  push:
+    branches: [spike/windows-shell-notify]
+    paths:
+      - .github/workflows/windows-watch-probe.yml
+      - research/windows-watch/*.cs
+      - research/windows-watch/*.ps1
+      - research/windows-watch/*.rs
+
+concurrency:
+  group: windows-watch-probe-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Disposable Windows experiment ${{ matrix.attempt }}
+    runs-on: windows-2025
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        attempt: [1, 2]
+    steps:
+      - name: Checkout isolated spike
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install verified stable Rust for the standalone notify comparison
+        uses: seapagan/setup-rust@a91f5a34c552642ece0e8cef8b5e9226f41a3c0b # v1.0.0
+        with:
+          toolchain: 1.99.1
+      - name: Install existing Cargo Make and native test tooling
+        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
+        with:
+          tool: cargo-make@0.37.24, cargo-nextest@0.9.149
+      - name: Build unchanged project and standalone helper
+        shell: pwsh
+        run: |
+          cargo make build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $notify = Get-ChildItem target/debug/deps/libnotify-*.rlib | Select-Object -First 1
+          if (-not $notify) { throw 'Built notify library not found' }
+          rustc --edition=2024 research/windows-watch/notify_probe.rs -L dependency=target/debug/deps --extern "notify=$($notify.FullName)" -o research/windows-watch/notify-probe.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run owned native fixtures and both Shell source modes
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path reports | Out-Null
+          git rev-parse HEAD | Set-Content reports/source-sha.txt
+          $PSVersionTable | Out-String | Set-Content reports/powershell.txt
+          Get-ComputerInfo -Property WindowsProductName,WindowsVersion,OsBuildNumber | ConvertTo-Json | Set-Content reports/windows-host.json
+          & ./research/windows-watch/run.ps1 -NotifyHelper ./research/windows-watch/notify-probe.exe -Output reports/probe.json
+      - name: Preserve the original failing native gate without changing its expectations
+        shell: pwsh
+        run: |
+          cargo make test 2>&1 | Tee-Object -FilePath reports/original-native-suite.log
+          exit $LASTEXITCODE
+      - name: Retain bounded research evidence even when the original gate fails
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-watch-probe-${{ matrix.attempt }}
+          path: reports/
+          if-no-files-found: error
+          retention-days: 7
