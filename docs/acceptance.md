@@ -83,6 +83,58 @@ regressions, actual-archive installation and complete inventory validation.
 This proves that checkpoint's builds and distribution compatibility; it does not
 replace the pending Windows watch-policy acceptance or certify a public release.
 
+### Independent verification checkpoint at `2738df5`
+
+The creation-stamp correction has two deterministic regressions: recycled native
+object IDs with different creation stamps invalidate directory continuity, while
+ordinary directory length/mtime activity preserves it. All three feature commits
+have valid GPG signatures and Signed-off-by trailers.
+
+The unchanged clean Linux `RUSTUP_TOOLCHAIN=1.95.0 cargo make verify` passed in
+49.81 seconds, then passed again in 48.49 seconds during the Windows-policy
+investigation. The latter run followed an identical elevated retry after three
+restricted-environment test failures. Both successful runs include 513 native
+tests, exact MSRV, clean source packaging, audit/deny, coverage and mandatory
+Windows MSVC xwin check/Clippy/build. Two intentional child-entry skips remain.
+The earlier infrastructure verification still applies to the unchanged harness.
+Four historical Lizard advisories remain; this feature adds no threshold or
+suppression exception.
+
+At this runtime checkpoint, [hosted Rust CI](https://github.com/seapagan/terminal-file-manager/actions/runs/40114194104)
+passed 513 Linux and 492 macOS tests. Windows ran 469: 468 passed and the existing
+ancestor-rename regression failed with `AccessDenied` while the native watch was
+active. Each platform reports two intentional child-entry skips. The other four
+ordinary workflows and Codacy static analysis passed; combined coverage was
+skipped after the Windows failure. New combined coverage acceptance remains
+outstanding. The draft PR remains unmerged, and Windows policy remains undecided.
+
+A corrected release-TUI collector aggregates threads with duplicate names.
+Its owned 2,000-file fixture measured 233.87 ms isolated-change visibility;
+2.008 seconds of idle browsing used 0.12 CPU seconds, emitted zero terminal
+bytes and retained 9,244,672 bytes of RSS. Watch owners and the notification
+backend accumulated zero measurable CPU ticks; the two watch owners recorded
+40 context switches combined. These values supersede the earlier feature idle
+sample above. The separately measured baseline remains 0.13 CPU seconds and
+7.49 MiB RSS; short samples do not establish a general performance comparison.
+
+A separate native Linux coordinator/worker probe used a debug build and 2,000
+rows. An external writer made 666 updates over 3.401 seconds. Both panes started
+four scans at 1.009, 2.017, 3.024 and 4.027 seconds, with 1.003–1.008 seconds
+between starts. Peak listing occupancy was two active lanes and zero pending;
+both snapshots matched a fresh manual listing after the final write. Final
+catch-up took 642 ms; that manual listing took 4.31 ms. This measures sustained
+native scheduling separately from the earlier finite 1,000-file burst and the
+release-TUI latency sample. It does not establish Windows Shell-notification
+performance or network-filesystem behaviour.
+
+The [eight-target rehearsal at `2738df5`](https://github.com/seapagan/terminal-file-manager/actions/runs/40116517330)
+passed preparation, all eight native build jobs and complete inventory checks.
+Logs confirm GNU glibc 2.28 limits, static MUSL checks, Mach-O/PE validation,
+native installer regressions and actual-archive installation. Windows x64 and
+ARM64 each ran PowerShell 5.1 and 7 security/installer cases without native skips.
+This closes build/distribution compatibility for the current runtime sources;
+the failing Windows watcher gate and combined coverage remain outstanding.
+
 ## Current status and evidence
 
 M0's engineering foundation is complete at the accepted checkpoints below. The
