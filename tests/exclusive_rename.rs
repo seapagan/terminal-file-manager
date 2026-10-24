@@ -114,6 +114,113 @@ fn native_exclusive_rename_preserves_files_and_nonempty_directories() {
 }
 
 #[test]
+fn native_case_only_rename_preserves_identity_and_requested_spelling() {
+    for directory in [false, true] {
+        for (old, new) in [("Case-雪", "case-雪"), ("CASE-Γ", "case-γ")] {
+            let root = tempfile::tempdir().unwrap();
+            let source = root.path().join(old);
+            let target = root.path().join(new);
+            make(&source, directory, b"selected bytes");
+            let insensitive = target.exists();
+            #[cfg(any(windows, target_os = "macos"))]
+            assert!(
+                insensitive,
+                "Native case-insensitive assurance needs a case-insensitive test volume"
+            );
+            let plan = Plan::paths(Operation::Rename, vec![source], Some(target.clone())).unwrap();
+            let record = execute(&plan, Options::default(), &false.into(), |_| Decision::Skip);
+            assert_eq!(record.entries[0].outcome, Outcome::Completed, "{record:?}");
+            assert_eq!(bytes(&target, directory), b"selected bytes");
+            assert_eq!(
+                terminal_file_manager::fs::inspect(&target).identity,
+                plan.operands[0].identity
+            );
+            let names: Vec<_> = fs::read_dir(root.path())
+                .unwrap()
+                .map(|entry| entry.unwrap().file_name())
+                .collect();
+            assert_eq!(names, vec![std::ffi::OsString::from(new)]);
+            eprintln!(
+                "NATIVE_CASE_RENAME_EXERCISED: insensitive={insensitive}, directory={directory}, {old} -> {new}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_distinct_hard_link_name_is_not_a_case_only_rename() {
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("selected");
+    let target = root.path().join("alias");
+    fs::write(&source, "retained").unwrap();
+    fs::hard_link(&source, &target).unwrap();
+    let plan = Plan::paths(
+        Operation::Rename,
+        vec![source.clone()],
+        Some(target.clone()),
+    )
+    .unwrap();
+    let record = execute(&plan, Options::default(), &false.into(), |_| Decision::Skip);
+    assert_ne!(record.entries[0].outcome, Outcome::Completed);
+    assert_eq!(fs::read(&source).unwrap(), b"retained");
+    assert_eq!(fs::read(&target).unwrap(), b"retained");
+    assert_eq!(
+        terminal_file_manager::fs::inspect(&source).identity,
+        plan.operands[0].identity
+    );
+    assert_eq!(
+        terminal_file_manager::fs::inspect(&target).identity,
+        plan.operands[0].identity
+    );
+    assert_eq!(fs::read_dir(root.path()).unwrap().count(), 2);
+}
+
+#[test]
+fn case_only_rename_refuses_a_source_replaced_at_the_native_boundary() {
+    for directory in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("Case-雪");
+        let target = root.path().join("case-雪");
+        let retained = root.path().join("retained");
+        make(&source, directory, b"selected bytes");
+        let plan = Plan::paths(Operation::Rename, vec![source.clone()], Some(target)).unwrap();
+        let mut replaced = false;
+        let record = execute(&plan, Options::default(), &false.into(), |event| {
+            if matches!(
+                event,
+                Event::Progress {
+                    stage: Stage::Verified,
+                    ..
+                }
+            ) {
+                fs::rename(&source, &retained).unwrap();
+                make(&source, directory, b"external replacement");
+                replaced = true;
+            }
+            Decision::Skip
+        });
+        assert!(replaced);
+        assert_eq!(record.entries[0].outcome, Outcome::Changed);
+        assert_eq!(bytes(&retained, directory), b"selected bytes");
+        assert_eq!(bytes(&source, directory), b"external replacement");
+        assert_eq!(
+            terminal_file_manager::fs::inspect(&retained).identity,
+            plan.operands[0].identity
+        );
+        assert_ne!(
+            terminal_file_manager::fs::inspect(&source).identity,
+            plan.operands[0].identity
+        );
+        let names: Vec<_> = fs::read_dir(root.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert!(names.contains(&std::ffi::OsString::from("Case-雪")));
+        assert!(!names.contains(&std::ffi::OsString::from("case-雪")));
+    }
+}
+
+#[test]
 fn exclusive_rename_moves_only_the_selected_symlink() {
     let root = tempfile::tempdir().unwrap();
     let source = root.path().join("link");

@@ -170,6 +170,57 @@ pub(super) fn reject_overlap(source: &Entry, destination: &Path) -> Result<()> {
     Ok(())
 }
 
+pub(super) fn same_entry_rename(source: &Entry, destination: &Path) -> Result<bool> {
+    let Some(target) = existing(destination)? else {
+        return Ok(false);
+    };
+    if !native_alias(source, &target) || source.path.file_name() == destination.file_name() {
+        return Ok(false);
+    }
+    let Some(parent) = rename_parent(source, destination)? else {
+        return Ok(false);
+    };
+    let selected = selected_name_only(&parent.path, &source.path, destination)?;
+    for entry in [&parent, source, &target] {
+        revalidate(entry, true)?;
+    }
+    Ok(selected)
+}
+
+fn native_alias(a: &Entry, b: &Entry) -> bool {
+    a.identity
+        .as_ref()
+        .zip(b.identity.as_ref())
+        .is_some_and(|(a, b)| a.object.is_some() && same_object(a, b))
+}
+
+fn rename_parent(source: &Entry, destination: &Path) -> Result<Option<Entry>> {
+    let source_parent = source
+        .path
+        .parent()
+        .ok_or_else(|| invalid("Rename parent required"))?;
+    let target_parent = destination
+        .parent()
+        .ok_or_else(|| invalid("Rename parent required"))?;
+    let parent = crate::fs::inspect(source_parent);
+    revalidate(&parent, false)?;
+    let other = crate::fs::inspect(target_parent);
+    if !native_alias(&parent, &other) {
+        return Ok(None);
+    }
+    Ok(Some(parent))
+}
+
+fn selected_name_only(parent: &Path, source: &Path, destination: &Path) -> io::Result<bool> {
+    let (mut selected, mut separate_target) = (false, false);
+    for entry in fs::read_dir(parent)? {
+        let name = entry?.file_name();
+        selected |= Some(name.as_os_str()) == source.file_name();
+        separate_target |= Some(name.as_os_str()) == destination.file_name();
+    }
+    Ok(selected && !separate_target)
+}
+
 pub(super) fn acknowledged_remove(
     entry: &Entry,
     remove: impl FnOnce(&Path) -> io::Result<()>,

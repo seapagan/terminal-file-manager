@@ -63,6 +63,50 @@ fn two_running_jobs_leave_a_third_queued_and_cancel_it_without_mutation() {
 }
 
 #[test]
+fn independent_directory_copies_both_reach_conflict_before_either_is_released() {
+    let root = tempfile::tempdir().unwrap();
+    let mut queue = Queue::new().unwrap();
+    let mut ids = Vec::new();
+    for name in ["a", "b"] {
+        let source = root.path().join(name);
+        let target = root.path().join(format!("target-{name}"));
+        fs::create_dir(&source).unwrap();
+        fs::write(source.join("file"), "incoming").unwrap();
+        fs::create_dir_all(target.join(name)).unwrap();
+        fs::write(target.join(name).join("file"), "previous").unwrap();
+        let plan = Plan::paths(Operation::Copy, vec![source], Some(target)).unwrap();
+        ids.push(queue.submit(plan, Options::default()).unwrap());
+    }
+    let replies = waiting_conflicts(&mut queue, [ids[0], ids[1]]);
+    for reply in replies {
+        reply.send(Decision::Skip).unwrap();
+    }
+    let mut finished = 0;
+    while finished < 2 {
+        if let Update::Finished { record, .. } = queue.next(Duration::from_secs(5)).unwrap() {
+            assert_eq!(record.completed_files(), 0);
+            assert!(
+                record
+                    .entries
+                    .iter()
+                    .any(|entry| entry.outcome == Outcome::Skipped)
+            );
+            finished += 1;
+        }
+    }
+    for name in ["a", "b"] {
+        assert_eq!(
+            fs::read(root.path().join(name).join("file")).unwrap(),
+            b"incoming"
+        );
+        assert_eq!(
+            fs::read(root.path().join(format!("target-{name}/{name}/file"))).unwrap(),
+            b"previous"
+        );
+    }
+}
+
+#[test]
 fn cancelling_a_waiting_conflict_acknowledges_before_shutdown() {
     let root = tempfile::tempdir().unwrap();
     let mut queue = Queue::new().unwrap();

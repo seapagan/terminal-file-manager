@@ -122,8 +122,7 @@ fn rename(
     source_parents: &Parents,
 ) -> Result<()> {
     let destination = rename_destination(plan)?;
-    safety::reject_overlap(source, destination)?;
-    if safety::existing(destination)?.is_some() {
+    if !rename_available(source, destination)? {
         result.outcome = Outcome::Skipped;
         result.detail = "Rename destination exists; choose a different name".into();
         return Ok(());
@@ -142,6 +141,14 @@ fn rename(
     commit_rename(source, destination, result)
 }
 
+fn rename_available(source: &Entry, destination: &std::path::Path) -> Result<bool> {
+    if safety::same_entry_rename(source, destination)? {
+        return Ok(true);
+    }
+    safety::reject_overlap(source, destination)?;
+    Ok(safety::existing(destination)?.is_none())
+}
+
 fn commit_rename(
     source: &Entry,
     destination: &std::path::Path,
@@ -158,7 +165,7 @@ fn commit_rename(
         }
         if error.kind() == io::ErrorKind::AlreadyExists {
             result.outcome = Outcome::Skipped;
-            result.detail = "Rename destination appeared; source retained".into();
+            result.detail = "Native rename refused an existing destination; source retained".into();
             return Ok(());
         }
         return Err(error.into());
@@ -169,7 +176,24 @@ fn commit_rename(
         outcome: Outcome::OutcomeUnknown,
         detail: format!("Renamed object identity unverified: {}", error.detail),
     })?;
-    Ok(())
+    renamed_spelling(destination).map_err(|error| safety::Failure {
+        outcome: Outcome::OutcomeUnknown,
+        detail: format!(
+            "Native rename returned success but filename spelling is unverified: {error}"
+        ),
+    })
+}
+
+fn renamed_spelling(destination: &std::path::Path) -> io::Result<()> {
+    let parent = destination
+        .parent()
+        .ok_or_else(|| io::Error::other("Rename parent required"))?;
+    for entry in fs::read_dir(parent)? {
+        if Some(entry?.file_name().as_os_str()) == destination.file_name() {
+            return Ok(());
+        }
+    }
+    Err(io::Error::other("Requested native name not found"))
 }
 
 fn rename_destination(plan: &Plan) -> io::Result<&std::path::Path> {

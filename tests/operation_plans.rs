@@ -71,6 +71,54 @@ fn coordinator_limits_jobs_and_holds_all_overlapping_claims_atomically() {
 }
 
 #[test]
+fn nonempty_independent_directory_claims_share_but_descendant_hard_links_conflict() {
+    let root = tempfile::tempdir().unwrap();
+    for name in ["a", "b"] {
+        fs::create_dir_all(root.path().join(name).join("nested")).unwrap();
+        fs::write(root.path().join(name).join("nested/file"), name).unwrap();
+    }
+    let a = Plan::paths(Operation::Delete, vec![root.path().join("a")], None).unwrap();
+    let b = Plan::paths(Operation::Delete, vec![root.path().join("b")], None).unwrap();
+    let mut coordinator = Coordinator::default();
+    assert!(coordinator.acquire(1, &a).unwrap());
+    assert!(coordinator.acquire(2, &b).unwrap());
+    coordinator.release(2);
+    coordinator.release(1);
+    fs::hard_link(
+        root.path().join("a/nested/file"),
+        root.path().join("b/nested/alias"),
+    )
+    .unwrap();
+    assert!(coordinator.acquire(1, &a).unwrap());
+    assert!(!coordinator.acquire(2, &b).unwrap());
+    coordinator.quarantine(1);
+    assert!(!coordinator.acquire(2, &b).unwrap());
+    coordinator.release(1);
+    assert!(coordinator.acquire(2, &b).unwrap());
+    assert_eq!(fs::read(root.path().join("a/nested/file")).unwrap(), b"a");
+}
+
+#[test]
+fn uncertain_native_directory_identity_keeps_broad_claims_through_quarantine() {
+    let root = tempfile::tempdir().unwrap();
+    for name in ["a", "b"] {
+        fs::create_dir(root.path().join(name)).unwrap();
+        fs::write(root.path().join(name).join("sentinel"), name).unwrap();
+    }
+    let mut a = Plan::paths(Operation::Delete, vec![root.path().join("a")], None).unwrap();
+    a.operands[0].identity.as_mut().unwrap().object = None;
+    let b = Plan::paths(Operation::Delete, vec![root.path().join("b")], None).unwrap();
+    let mut coordinator = Coordinator::default();
+    assert!(coordinator.acquire(1, &a).unwrap());
+    assert!(!coordinator.acquire(2, &b).unwrap());
+    coordinator.quarantine(1);
+    assert!(!coordinator.acquire(2, &b).unwrap());
+    coordinator.release(1);
+    assert!(coordinator.acquire(2, &b).unwrap());
+    assert_eq!(fs::read(root.path().join("a/sentinel")).unwrap(), b"a");
+}
+
+#[test]
 fn source_aliases_and_ancestor_writes_conflict_but_independent_reads_share() {
     let root = tempfile::tempdir().unwrap();
     fs::create_dir(root.path().join("tree")).unwrap();

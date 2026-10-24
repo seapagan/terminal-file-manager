@@ -1123,3 +1123,27 @@ verification, including mandatory xwin check, Clippy and build: 458 Linux tests
 passed, with the two established owned-child entry skips. Final-head native
 and hosted proof will be recorded in the ignored ledger and maintainer handoff.
 PR #3 remains draft and unmerged.
+
+Directory claims now inventory native descendant identities without following
+links or crossing known mount boundaries. Complete disjoint inventories allow
+two independent directory jobs; shared objects, ancestry, private staging and
+Trash namespaces still conflict. Incomplete or changed inventories retain broad
+claims, including through quarantine. This is process-local coordination with
+fresh validation, not isolation from arbitrary external writers. Windows
+non-ASCII namespace comparisons still serialize where native case equivalence
+cannot be established by the existing path policy.
+
+Rename permits a destination that resolves to the selected entry only after
+proving the same native parent and object, an exact selected directory-entry
+name and no separately enumerated target name. Native exclusive/no-replace
+rename remains mandatory. Success also requires the requested filename spelling
+and object identity. Native fixtures cover Unicode case changes, files and
+nonempty directories, hard-link refusal and source replacement. Windows/macOS
+fixtures require an actually case-insensitive test volume; Linux exercises its
+sensitive volume. No extra FFI or unsafe allowance was added. The Apple native
+exclusive-rename path explicitly supports the same-entry case-only operation.
+
+Exclusive rename maps ENOSYS, ENOTSUP and EOPNOTSUPP as unsupported mechanisms.
+EINVAL retains its native error and errno because invalid ancestry and paths
+can produce it. An actual descendant-rename regression reproduced the earlier
+misclassification. No error enables an overwrite or copy/delete fallback.

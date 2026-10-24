@@ -37,17 +37,22 @@ pub(in crate::operations) fn rename_new(
     if status == 0 {
         Ok(())
     } else {
-        let error = std::io::Error::last_os_error();
-        if error.raw_os_error().is_some_and(|code| {
-            [nix::libc::ENOSYS, nix::libc::EINVAL, nix::libc::EOPNOTSUPP].contains(&code)
-        }) {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Unsupported,
-                format!("Native exclusive rename unavailable; no fallback: {error}"),
-            ));
-        }
-        Err(error)
+        Err(classify(std::io::Error::last_os_error()))
     }
+}
+
+#[cfg(unix)]
+fn classify(error: std::io::Error) -> std::io::Error {
+    if error.raw_os_error().is_some_and(|code| {
+        [nix::libc::ENOSYS, nix::libc::ENOTSUP, nix::libc::EOPNOTSUPP].contains(&code)
+    }) {
+        return std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            format!("Native exclusive rename unavailable; no fallback: {error}"),
+        );
+    }
+    // EINVAL also describes invalid paths; it does not establish a missing primitive.
+    error
 }
 
 #[cfg(windows)]
@@ -87,5 +92,42 @@ pub(in crate::operations) fn rename_new(
         Ok(())
     } else {
         Err(std::io::Error::last_os_error())
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_descendant_rename_keeps_native_einval_and_preserves_the_tree() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source");
+        std::fs::create_dir_all(source.join("child")).unwrap();
+        std::fs::write(source.join("sentinel"), "retained").unwrap();
+        let error = rename_new(&source, &source.join("child/new")).unwrap_err();
+        assert_eq!(error.raw_os_error(), Some(nix::libc::EINVAL));
+        assert_eq!(std::fs::read(source.join("sentinel")).unwrap(), b"retained");
+        assert!(!source.join("child/new").exists());
+    }
+
+    #[test]
+    fn only_documented_unsupported_errnos_lose_the_native_error_kind() {
+        use std::io;
+        for code in [nix::libc::ENOSYS, nix::libc::ENOTSUP, nix::libc::EOPNOTSUPP] {
+            let error = classify(io::Error::from_raw_os_error(code));
+            assert_eq!(error.kind(), io::ErrorKind::Unsupported);
+            assert!(error.to_string().contains("no fallback"));
+        }
+        for code in [
+            nix::libc::EINVAL,
+            nix::libc::EACCES,
+            nix::libc::EXDEV,
+            nix::libc::EEXIST,
+        ] {
+            let error = classify(io::Error::from_raw_os_error(code));
+            assert_eq!(error.raw_os_error(), Some(code));
+            assert_eq!(error.kind(), io::Error::from_raw_os_error(code).kind());
+        }
     }
 }

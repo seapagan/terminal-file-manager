@@ -1,6 +1,6 @@
 use super::{Operation, Plan, plan::invalid};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     io,
     path::{Path, PathBuf},
 };
@@ -11,7 +11,10 @@ struct Claim {
     object: Option<(u64, u64)>,
     write: bool,
     unknown_aliases: bool,
+    objects: HashSet<(u64, u64)>,
 }
+
+mod aliases;
 
 /// One process-wide coordinator for all local mutation kinds, with two active jobs.
 #[derive(Default)]
@@ -135,13 +138,13 @@ fn operand_claims(plan: &Plan, claims: &mut Vec<Claim>) -> io::Result<()> {
     for entry in &plan.operands {
         claims.push(source_claim(entry, plan.operation)?);
         if let Some(destination) = plan.target(entry) {
-            claims.push(destination_claim(&destination)?);
+            claims.push(destination_claim(&destination, true)?);
         }
     }
     if plan.operands.is_empty()
         && let Some(destination) = &plan.destination
     {
-        claims.push(destination_claim(destination)?);
+        claims.push(destination_claim(destination, true)?);
     }
     Ok(())
 }
@@ -155,6 +158,7 @@ fn trash_claim(root: &Path) -> io::Result<Claim> {
             .and_then(|identity| identity.object),
         write: true,
         unknown_aliases: false,
+        objects: HashSet::new(),
     })
 }
 
@@ -189,11 +193,13 @@ fn source_claim(entry: &crate::fs::Entry, operation: Operation) -> io::Result<Cl
         .identity
         .as_ref()
         .ok_or_else(|| invalid("Missing source identity"))?;
+    let objects = aliases::capture(entry);
     Ok(Claim {
         path: namespace(&entry.path)?,
         object: identity.object,
         write: operation != Operation::Copy,
-        unknown_aliases: unknown_aliases(entry),
+        unknown_aliases: objects.is_err(),
+        objects: objects.unwrap_or_default(),
     })
 }
 
@@ -204,18 +210,23 @@ fn staging_claim(plan: &Plan) -> io::Result<Option<Claim>> {
     let Some(directory) = &plan.destination else {
         return Ok(None);
     };
-    let mut claim = destination_claim(directory)?;
+    let mut claim = destination_claim(directory, false)?;
     // Only private staging names are mutated here, not arbitrary existing descendants.
     claim.unknown_aliases = false;
     Ok(Some(claim))
 }
 
-fn destination_claim(path: &Path) -> io::Result<Claim> {
+fn destination_claim(path: &Path, recursive: bool) -> io::Result<Claim> {
     let entry = match std::fs::symlink_metadata(path) {
         Ok(_) => Some(crate::fs::inspect(path)),
         Err(error) if error.kind() == io::ErrorKind::NotFound => None,
         Err(error) => return Err(error),
     };
+    let objects = entry
+        .as_ref()
+        .filter(|_| recursive)
+        .map(aliases::capture)
+        .transpose();
     Ok(Claim {
         path: namespace(path)?,
         object: entry
@@ -223,7 +234,8 @@ fn destination_claim(path: &Path) -> io::Result<Claim> {
             .and_then(|entry| entry.identity.as_ref())
             .and_then(|id| id.object),
         write: true,
-        unknown_aliases: entry.as_ref().is_some_and(unknown_aliases),
+        unknown_aliases: objects.is_err(),
+        objects: objects.unwrap_or_default().unwrap_or_default(),
     })
 }
 
@@ -242,11 +254,11 @@ fn conflicts(a: &Claim, b: &Claim) -> bool {
     if !a.write && !b.write {
         return false;
     }
-    // Descendant hard-link equivalence is unknown without a full namespace scan.
-    if (a.unknown_aliases && b.object.is_some()) || (b.unknown_aliases && a.object.is_some()) {
+    // Incomplete, changed or mounted inventories cannot establish independent ownership.
+    if a.unknown_aliases || b.unknown_aliases {
         return true;
     }
-    if a.object.is_some() && a.object == b.object {
+    if object_conflicts(a, b) {
         return true;
     }
     #[cfg(windows)]
@@ -259,11 +271,11 @@ fn conflicts(a: &Claim, b: &Claim) -> bool {
     }
 }
 
-fn unknown_aliases(entry: &crate::fs::Entry) -> bool {
-    entry.may_recurse()
-        && std::fs::read_dir(&entry.path)
-            .map(|mut children| children.next().is_some())
-            .unwrap_or(true)
+fn object_conflicts(a: &Claim, b: &Claim) -> bool {
+    a.object
+        .into_iter()
+        .chain(a.objects.iter().copied())
+        .any(|object| b.object == Some(object) || b.objects.contains(&object))
 }
 
 #[cfg(windows)]
