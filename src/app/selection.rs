@@ -1,9 +1,11 @@
 //! Inclusive visible ranges never take ownership of independent marks.
-use super::Pane;
+use super::{Pane, pane::same_object};
+use crate::fs::Identity;
 use std::{collections::HashSet, path::PathBuf};
 
 pub(super) struct RangeSelection {
     anchor: PathBuf,
+    identity: Option<Identity>,
     added: HashSet<PathBuf>,
 }
 
@@ -11,7 +13,19 @@ impl Pane {
     pub(super) fn reconcile_range(&mut self) {
         if let Some(range) = &mut self.range {
             range.added.retain(|path| self.marks.contains_key(path));
-            if !self.entries.iter().any(|entry| entry.path == range.anchor) {
+            if !self.entries.iter().any(|entry| {
+                entry.path == range.anchor
+                    && entry.error.is_none()
+                    && range
+                        .identity
+                        .as_ref()
+                        .zip(entry.identity.as_ref())
+                        .is_some_and(|(old, fresh)| {
+                            old.object.is_some()
+                                && fresh.object.is_some()
+                                && same_object(old, fresh)
+                        })
+            }) {
                 self.range = None;
             }
         }
@@ -24,8 +38,13 @@ impl Pane {
 
     /// Ordinary movement/click starts a new gesture at this pane's native cursor.
     pub fn anchor_range(&mut self) {
+        let identity = self
+            .current()
+            .filter(|entry| entry.error.is_none())
+            .and_then(|entry| entry.identity.clone());
         self.range = self.cursor.clone().map(|anchor| RangeSelection {
             anchor,
+            identity,
             added: HashSet::new(),
         });
     }
@@ -55,6 +74,7 @@ impl Pane {
         }
         let mut range = self.range.take().unwrap_or_else(|| RangeSelection {
             anchor: path.clone(),
+            identity: self.entries[self.visible[target]].identity.clone(),
             added: HashSet::new(),
         });
         let anchor = self
@@ -63,6 +83,7 @@ impl Pane {
             .position(|i| self.entries[*i].path == range.anchor);
         if anchor.is_none() {
             range.anchor = path.clone();
+            range.identity = self.entries[self.visible[target]].identity.clone();
             range.added.clear();
         }
         let anchor = anchor.unwrap_or(target);

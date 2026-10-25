@@ -94,6 +94,39 @@ fn dirty_during_scan_never_cancels_it_and_requires_a_final_follow_up() {
 }
 
 #[test]
+fn sustained_hints_throttle_scan_starts_and_require_a_final_catch_up() {
+    let (_root, mut app, mut pool, mut runtime) = prepared();
+    let mut starts = Vec::new();
+    for millis in (0..=6500).step_by(10) {
+        runtime.slots[0].signals.publish(DIRTY);
+        let generation = app.panes[0].generation;
+        runtime.poll(&mut app, &mut pool, Duration::from_millis(millis));
+        if app.panes[0].generation != generation {
+            starts.push(millis);
+        }
+        assert!(pool.pending_count() == 0 && pool.active_count() <= 1);
+        finish(&mut app, &mut pool);
+    }
+    assert_eq!(starts.len(), 6);
+    assert_eq!(starts[0], 1000);
+    // The first post-scan hint arrives on the next ten-millisecond clock tick.
+    assert!(
+        starts
+            .windows(2)
+            .all(|pair| (1000..=1010).contains(&(pair[1] - pair[0])))
+    );
+    let generation = app.panes[0].generation;
+    let final_start = starts.last().unwrap() + 1000;
+    runtime.poll(&mut app, &mut pool, Duration::from_millis(final_start - 1));
+    assert_eq!(app.panes[0].generation, generation);
+    runtime.poll(&mut app, &mut pool, Duration::from_millis(final_start));
+    assert_eq!(app.panes[0].generation, generation + 1);
+    finish(&mut app, &mut pool);
+    runtime.poll(&mut app, &mut pool, Duration::from_secs(8));
+    assert_eq!(pool.active_count(), 0);
+}
+
+#[test]
 fn repeated_errors_are_bounded_and_fallback_recovers_without_warning_spam() {
     let (root, mut app, mut pool, mut runtime) = prepared();
     for time in (0..=2000).step_by(10) {

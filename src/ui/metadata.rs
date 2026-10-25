@@ -98,7 +98,7 @@ fn fields(
     floating: bool,
 ) -> Vec<Field> {
     if let Some(error) = &detail.stale {
-        return stale_fields(error, theme);
+        return stale_fields(error, theme, floating);
     }
     let mut fields = entry_fields(detail, pane, now);
     if let Some(totals) = &detail.totals {
@@ -141,10 +141,20 @@ fn fields(
         .collect()
 }
 
-fn stale_fields(error: &str, theme: &Theme) -> Vec<Field> {
+fn stale_fields(error: &str, theme: &Theme, floating: bool) -> Vec<Field> {
     vec![
         Field::plain("Status", "Stale directory listing".into(), theme),
         Field::plain("Error", error.into(), theme),
+        Field::plain(
+            "Keys",
+            if floating {
+                "Esc closes"
+            } else {
+                "r: refresh; reopen to select a new context"
+            }
+            .into(),
+            theme,
+        ),
     ]
 }
 

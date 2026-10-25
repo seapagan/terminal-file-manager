@@ -156,13 +156,16 @@ fn on_event(result: notify::Result<Event>, raw: &Path, physical: &Path, signals:
 }
 
 fn relevant(event: &Event, raw: &Path, physical: &Path) -> bool {
-    use notify::event::{MetadataKind, ModifyKind};
+    use notify::event::{AccessKind, AccessMode, MetadataKind, ModifyKind};
     if event.need_rescan() {
         return true;
     }
     if matches!(
         event.kind,
-        EventKind::Access(_) | EventKind::Modify(ModifyKind::Metadata(MetadataKind::AccessTime))
+        EventKind::Access(kind) if kind != AccessKind::Close(AccessMode::Write)
+    ) || matches!(
+        event.kind,
+        EventKind::Modify(ModifyKind::Metadata(MetadataKind::AccessTime))
     ) {
         return false;
     }
@@ -198,8 +201,8 @@ mod tests {
     #[test]
     fn concurrent_health_and_dirty_publication_preserves_bounded_atomic_state() {
         let signals = Arc::<Signals>::default();
-        let start = Arc::new(std::sync::Barrier::new(3));
-        let producers: Vec<_> = [DIRTY, ERROR | DIRTY]
+        let start = Arc::new(std::sync::Barrier::new(4));
+        let producers: Vec<_> = [DIRTY, READY | DIRTY, ERROR | DIRTY]
             .into_iter()
             .map(|bits| {
                 let signals = signals.clone();
@@ -304,6 +307,8 @@ mod tests {
         for kind in [
             EventKind::Access(AccessKind::Read),
             EventKind::Access(AccessKind::Open(AccessMode::Read)),
+            EventKind::Access(AccessKind::Close(AccessMode::Read)),
+            EventKind::Access(AccessKind::Close(AccessMode::Execute)),
             EventKind::Modify(ModifyKind::Metadata(MetadataKind::AccessTime)),
         ] {
             let event = Event::new(kind).add_path(raw.join("file"));
@@ -330,6 +335,7 @@ mod tests {
                 EventKind::Create(notify::event::CreateKind::File),
                 EventKind::Remove(notify::event::RemoveKind::File),
                 EventKind::Modify(ModifyKind::Any),
+                EventKind::Access(AccessKind::Close(AccessMode::Write)),
             ] {
                 assert!(relevant(
                     &Event::new(kind).add_path(path.clone()),

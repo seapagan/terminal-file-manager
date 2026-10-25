@@ -48,20 +48,85 @@ fn action(c: &mut Controller, action: Action) {
 #[test]
 fn stale_directory_views_show_the_error_instead_of_cached_metadata_or_totals() {
     let (_root, mut c) = loaded();
-    c.app.request_metadata(0).unwrap();
-    let refresh = c.app.request_refresh(0).unwrap();
-    let snapshot = fs::Snapshot {
-        directory: None,
-        path: c.app.panes[0].path.clone(),
-        entries: vec![],
+    let request = c.app.request_metadata(0).unwrap();
+    let entry = c.app.panes[0].current().unwrap().clone();
+    c.app
+        .complete_metadata(&request, entry, Some("CACHED-CANONICAL".into()));
+    c.app.details[0].totals = Some(Ok(fs::Totals {
+        files: 7,
+        directories: 2,
+        bytes: 123,
         errors: vec![],
-    };
-    c.app.complete_listing(0, refresh.generation, Ok(snapshot));
+    }));
+    for floating in [false, true] {
+        let text = metadata_text(&c.app, floating);
+        assert!(
+            text.contains("CACHED-CANONICAL") && text.contains("7 files, 2 directories, 123 B"),
+            "{text}"
+        );
+    }
+    c.app.details[0].stale = Some("Directory identity changed".into());
     for floating in [false, true] {
         let text = metadata_text(&c.app, floating);
         assert!(text.contains("Stale directory listing"), "{text}");
         assert!(text.contains("identity"), "{text}");
         assert!(!text.contains("Canonical:") && !text.contains("Descendants:"));
+        assert!(!text.contains("CACHED-CANONICAL") && !text.contains("123 B"));
+        assert!(text.contains("Keys:"), "{text}");
+        assert!(
+            text.contains(if floating { "Esc closes" } else { "r: refresh" }),
+            "{text}"
+        );
+    }
+}
+
+#[test]
+fn navigation_keeps_the_old_stale_view_until_success_and_reports_failure() {
+    for success in [false, true] {
+        let (root, mut c) = loaded();
+        let refresh = c.app.request_refresh(0).unwrap();
+        c.app.complete_listing(
+            0,
+            refresh.generation,
+            Err("old directory identity changed".into()),
+        );
+        let next = root.path().join("next");
+        std::fs::create_dir(&next).unwrap();
+        std::fs::write(next.join("new-entry"), "new").unwrap();
+        let navigation = c.app.request_listing(0, next.clone());
+        for floating in [false, true] {
+            let text = metadata_text(&c.app, floating);
+            assert_eq!(c.app.panes[0].path, root.path());
+            assert!(text.contains("old directory identity changed"), "{text}");
+            assert!(!text.contains("new-entry"));
+        }
+        let result = if success {
+            Ok(fs::list(&next, &fs::IgnoreContext::isolated(), &false.into()).unwrap())
+        } else {
+            Err("NAVIGATION_DENIED".into())
+        };
+        c.app.complete_listing(0, navigation.generation, result);
+        if success {
+            c.app.request_metadata(0).unwrap();
+        }
+        for floating in [false, true] {
+            let text = metadata_text(&c.app, floating);
+            if success {
+                assert_eq!(c.app.panes[0].path, next);
+                assert!(
+                    text.contains("new-entry") && !text.contains("Stale"),
+                    "{text}"
+                );
+            } else {
+                assert_eq!(c.app.panes[0].path, root.path());
+                assert!(
+                    text.contains("NAVIGATION_DENIED")
+                        && !text.contains("old directory identity changed"),
+                    "{text}"
+                );
+                assert!(c.app.request_metadata(0).is_none());
+            }
+        }
     }
 }
 

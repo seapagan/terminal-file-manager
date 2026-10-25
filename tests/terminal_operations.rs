@@ -55,8 +55,10 @@ fn manual_refresh_after_idle(
         io::Write,
         time::{Duration, Instant},
     };
+    // Detect regression to the obsolete two-second Windows polling policy.
+    const MANUAL_ONLY_IDLE_WINDOW: Duration = Duration::from_millis(2200);
     let idle = Instant::now();
-    while idle.elapsed() < Duration::from_millis(2200) {
+    while idle.elapsed() < MANUAL_ONLY_IDLE_WINDOW {
         session
             .read_step(Duration::from_millis(20), script, &[], transcript, false)
             .unwrap();

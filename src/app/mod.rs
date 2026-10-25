@@ -113,6 +113,9 @@ impl App {
     /// Request navigation; commit the location/history only on successful completion.
     pub fn request_listing(&mut self, pane: usize, path: PathBuf) -> Request {
         let state = &mut self.panes[pane];
+        if state.pending.is_some() && state.refresh_pending {
+            self.status = "Deferred refresh cancelled by newer navigation".into();
+        }
         state.reset_range();
         state.generation += 1;
         state.pending = Some(path.clone());
@@ -139,9 +142,13 @@ impl App {
         Some(request)
     }
 
-    /// Explicit refresh invalidates details even if the next snapshot is unchanged.
+    /// Refresh explicitly, or defer once to the pending navigation's successful target.
+    /// Failed or superseding navigation cancels that deferred intent.
     pub fn request_refresh(&mut self, pane: usize) -> Option<Request> {
-        if self.panes.get(pane)?.pending.is_some() {
+        let state = self.panes.get_mut(pane)?;
+        if let Some(path) = &state.pending {
+            state.refresh_pending = true;
+            self.status = format!("Refresh queued for {} after navigation", path.display());
             return None;
         }
         self.invalidate_listing_details(pane);
@@ -193,6 +200,10 @@ impl App {
         match result {
             Ok(snapshot) => self.install_listing(pane, attempted, snapshot),
             Err(error) => {
+                if attempted.is_some() && state.refresh_pending {
+                    state.refresh_pending = false;
+                    self.status = "Deferred refresh cancelled because navigation failed".into();
+                }
                 state.restoring = None;
                 state.parent_restoring = None;
                 state.error = Some(format!(
@@ -216,6 +227,8 @@ impl App {
             .as_ref()
             .is_some_and(|path| path != &snapshot.path)
         {
+            state.refresh_pending = false;
+            self.status = "Navigation result rejected; deferred refresh cancelled".into();
             state.restoring = None;
             state.parent_restoring = None;
             return false;
@@ -259,6 +272,12 @@ impl App {
     }
 
     fn invalidate_listing_details(&mut self, pane: usize) {
+        if pane == self.active {
+            self.metadata_scroll = 0;
+            if self.popup {
+                self.overlay_scroll = 0;
+            }
+        }
         let detail = &mut self.details[pane];
         detail.stale = self.panes[pane].error.clone();
         detail.generation += 1;

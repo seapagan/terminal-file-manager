@@ -16,6 +16,16 @@ use terminal_file_manager::{
     workers::{Pool, Value},
 };
 
+#[test]
+fn windows_builtin_powershell_samples_owned_process_counters() {
+    let before = counters(std::process::id());
+    let after = counters(std::process::id());
+    assert!(before.rss > 0 && after.rss > 0);
+    assert!(before.handles > 0 && after.handles > 0);
+    assert!(after.cpu_ticks >= before.cpu_ticks);
+    assert!(before.elapsed_to(&after) > Duration::ZERO);
+}
+
 fn snapshot(path: &Path) -> fs::Snapshot {
     fs::list(path, &IgnoreContext::isolated(), &AtomicBool::new(false)).unwrap()
 }

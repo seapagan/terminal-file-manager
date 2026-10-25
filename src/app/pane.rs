@@ -470,7 +470,7 @@ impl Pane {
     }
 }
 
-fn same_object(a: &Identity, b: &Identity) -> bool {
+pub(super) fn same_object(a: &Identity, b: &Identity) -> bool {
     match (a.object, b.object) {
         (Some(left), Some(right)) => left == right && a.created == b.created,
         _ => a == b,

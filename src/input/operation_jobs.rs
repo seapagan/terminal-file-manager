@@ -140,6 +140,10 @@ impl Controller {
 fn refresh(controller: &mut Controller) -> Vec<Request> {
     let mut requests = Vec::new();
     for id in 0..2 {
+        let pane = &controller.app.panes[id];
+        if id != controller.app.active && pane.context == 0 && pane.pending.is_none() {
+            continue;
+        }
         if let Some(request) = controller.app.request_refresh(id) {
             requests.push(request);
         }
@@ -313,5 +317,48 @@ fn selected(choice: usize) -> Decision {
         3 => Decision::Newer,
         4 => Decision::Cancel,
         _ => Decision::Skip,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{app::App, fs, input::Bindings};
+
+    #[test]
+    fn operation_refresh_leaves_an_unloaded_inactive_pane_unscheduled() {
+        let root = tempfile::tempdir().unwrap();
+        let snapshot =
+            fs::list(root.path(), &fs::IgnoreContext::isolated(), &false.into()).unwrap();
+        let mut app = App::new(root.path().into());
+        app.complete_listing(0, 1, Ok(snapshot.clone()));
+        let mut controller = Controller::new(
+            app,
+            Bindings::new(&Default::default()).unwrap(),
+            Default::default(),
+        );
+        let requests = refresh(&mut controller);
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].pane, 0);
+        controller.app.complete_listing(1, 1, Ok(snapshot));
+        assert!(controller.app.take_refresh(1).is_none());
+    }
+
+    #[test]
+    fn operation_refresh_retries_a_loaded_but_unverified_inactive_context() {
+        let root = tempfile::tempdir().unwrap();
+        let mut snapshot =
+            fs::list(root.path(), &fs::IgnoreContext::isolated(), &false.into()).unwrap();
+        snapshot.directory = None;
+        let mut app = App::new(root.path().into());
+        app.complete_listing(1, 1, Ok(snapshot));
+        let mut controller = Controller::new(
+            app,
+            Bindings::new(&Default::default()).unwrap(),
+            Default::default(),
+        );
+        let requests = refresh(&mut controller);
+        assert!(requests.iter().any(|request| request.pane == 1));
+        assert!(controller.app.panes[1].error.is_some());
     }
 }

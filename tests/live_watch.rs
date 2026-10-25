@@ -67,7 +67,9 @@ fn until(
     watch: &mut Runtime,
     started: Instant,
     done: impl Fn(&App) -> bool,
-) {
+) -> [Vec<Duration>; 2] {
+    let mut generations = [app.panes[0].generation, app.panes[1].generation];
+    let mut starts: [Vec<Duration>; 2] = Default::default();
     // Windows runs the same filesystem/safety cases after deliberate refresh;
     // Linux/macOS continue to prove native automatic convergence.
     #[cfg(windows)]
@@ -79,7 +81,14 @@ fn until(
     let deadline = Instant::now() + Duration::from_secs(5);
     let (mut active, mut queued) = (0, 0);
     loop {
-        watch.poll(app, pool, started.elapsed());
+        let now = started.elapsed();
+        watch.poll(app, pool, now);
+        for pane in 0..2 {
+            if app.panes[pane].generation != generations[pane] {
+                starts[pane].push(now);
+                generations[pane] = app.panes[pane].generation;
+            }
+        }
         active = active.max(pool.active_count());
         queued = queued.max(pool.pending_count());
         if let Some(completion) = pool.next(Duration::from_millis(10))
@@ -93,7 +102,7 @@ fn until(
         }
         if done(app) && pool.active_count() == 0 && pool.pending_count() == 0 {
             eprintln!("Watch convergence: peak active lanes {active}, pending lanes {queued}");
-            return;
+            return starts;
         }
         assert!(
             Instant::now() < deadline,
@@ -120,7 +129,7 @@ fn native_writes_rename_delete_and_storm_converge_with_bounded_scans() {
     std::fs::rename(root.path().join("item0000"), root.path().join("renamed")).unwrap();
     std::fs::remove_file(root.path().join("item0001")).unwrap();
     std::fs::write(root.path().join("ready"), "new-length").unwrap();
-    until(&mut app, &mut pool, &mut watch, started, |app| {
+    let starts = until(&mut app, &mut pool, &mut watch, started, |app| {
         app.panes.iter().all(|p| {
             p.entries.len() == 1000
                 && p.entries.iter().any(|e| e.name == "renamed")
@@ -134,7 +143,16 @@ fn native_writes_rename_delete_and_storm_converge_with_bounded_scans() {
         })
     });
     let scans = app.panes[0].generation - baseline;
-    assert!(scans <= 5, "unbounded scans: {scans}");
+    assert_eq!(scans as usize, starts[0].len());
+    for pane in &starts {
+        assert!(!pane.is_empty());
+        // Native churn permits one start per second, regardless of CI disk speed.
+        assert!(
+            pane.windows(2)
+                .all(|pair| pair[1] - pair[0] >= Duration::from_secs(1)),
+            "unthrottled scan starts: {pane:?}"
+        );
+    }
     eprintln!(
         "1000-file burst: {scans} scans/pane, convergence {:?}",
         changed.elapsed()
@@ -211,18 +229,24 @@ fn native_metadata_changes_update_the_selected_detail_without_cursor_motion() {
         app.panes.iter().all(|p| p.generation > 1)
     });
     app.request_metadata(0).unwrap();
+    // Content writes provide a reliable native hint on FSEvents too; chmod alone may not.
+    std::fs::write(&path, "new content and metadata").unwrap();
     let mut readonly = original.clone();
     readonly.set_readonly(true);
     std::fs::set_permissions(&path, readonly).unwrap();
     let expected = fs::inspect(&path);
     until(&mut app, &mut pool, &mut watch, started, |app| {
         app.panes.iter().all(|p| {
-            p.current()
-                .is_some_and(|e| e.mode == expected.mode && e.attributes == expected.attributes)
+            p.current().is_some_and(|e| {
+                e.size == expected.size
+                    && e.mode == expected.mode
+                    && e.attributes == expected.attributes
+            })
         })
     });
     app.request_metadata(0).unwrap();
     assert_eq!(app.details[0].entry.as_ref().unwrap().mode, expected.mode);
+    assert_eq!(app.details[0].entry.as_ref().unwrap().size, Some(24));
     assert_eq!(
         app.details[0].entry.as_ref().unwrap().attributes,
         expected.attributes
