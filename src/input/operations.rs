@@ -279,12 +279,8 @@ fn modal_click(controller: &mut Controller, event: &Event, geometry: &Geometry) 
             || controller.app.operations.waiting_exit.is_some())
         && mouse.kind == MouseEventKind::Down(MouseButton::Left)
     {
-        if let Some(control) = geometry
-            .operation_controls
-            .iter()
-            .find(|control| control.area.contains((mouse.column, mouse.row).into()))
-        {
-            return activate_control(controller, control.target, geometry);
+        if let Some(target) = geometry.operation_target(mouse.column, mouse.row) {
+            return activate_control(controller, target, geometry);
         }
         return true;
     }

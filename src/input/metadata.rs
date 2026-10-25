@@ -32,3 +32,28 @@ impl Controller {
         requests
     }
 }
+
+/// The floating metadata surface owns focus; only its controls and global exit remain active.
+pub(super) fn accepts(action: Action) -> bool {
+    matches!(
+        action,
+        Action::Up
+            | Action::Down
+            | Action::Home
+            | Action::End
+            | Action::PageUp
+            | Action::PageDown
+            | Action::Count
+            | Action::Cancel
+            | Action::Metadata
+            | Action::Info
+            | Action::Help
+            | Action::Quit
+            | Action::SaveQuit
+            | Action::Permissions
+            | Action::OwnerDisplay
+            | Action::FuzzyTimestamps
+            | Action::MetadataPresentation
+            | Action::Diagnostics
+    )
+}

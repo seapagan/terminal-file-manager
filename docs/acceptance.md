@@ -1,5 +1,29 @@
 # Acceptance gates
 
+## PM3-01 shared modal source checkpoint — 25 October 2026
+
+Operation overlays and floating metadata use the same measured, padded shell
+and centred action geometry. Structured source/result rows retain lexical native
+operands, display useful common roots and keep right-aligned binary sizes whole.
+M2 controllers retain preview readiness, explicit T/D confirmation, conflict
+eligibility and the typed ACKNOWLEDGE/F10 incident-exit protocol. The metadata
+sidebar retains its docked layout, shared cache and field formatting. Popup
+keyboard input no longer marks, navigates or opens operations behind the overlay.
+
+New TestBackend and input regressions cover 20/40/80/120-cell layouts, tiny
+heights, Unicode/graphemes, escaped controls/bidi, fixed actions, centred hit
+regions, safe preset defaults, disabled actions, destructive/focused styling,
+metadata focus and successive open/resize/close frames. The Jobs stress fixture
+still reaches its final result beyond 65,535 rows using long diagnostics now
+that filenames truncate. Existing M2 safety and PTY lifecycle regressions remain.
+
+Local Linux native and instrumented suites passed 577 tests, with the two
+established child-entry skips. Linux xwin check, Clippy and build passed;
+this is compilation evidence, not native Windows execution. Native macOS/Windows
+and hosted acceptance remain pending at this source checkpoint. No manual visual
+smoke check or release rehearsal was performed. The ignored work controller
+records subsequent clean-tree and hosted evidence for the delivered commit.
+
 ## Windows manual-refresh decision — 25 October 2026
 
 Windows now requires explicit `r` refresh or navigation. It creates no directory

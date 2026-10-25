@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
     layout::Rect,
     text::Line,
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Clear, Paragraph},
 };
 mod actions;
 mod content;
@@ -90,30 +90,23 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, geometry: &sup
     let Some(layout) = &geometry.operation_layout else {
         return;
     };
-    frame.render_widget(Clear, layout.outer);
-    frame.render_widget(
-        Block::default()
-            .title(content::title(app))
-            .borders(Borders::ALL)
-            .border_style(theme.style(Role::ActivePane))
-            .style(theme.style(Role::Normal)),
-        layout.outer,
-    );
+    super::modal::render_shell(frame, layout.outer, content::title(app), theme);
     jobs::render(frame, app, theme, layout.list);
     let text: Vec<_> = layout
         .rows
         .iter()
-        .map(|row| Line::styled(row.text.as_str(), theme.style(row.role)))
+        .map(|row| row.line(layout.body.width, theme))
         .collect();
     frame.render_widget(Paragraph::new(text), layout.body);
-    for control in &geometry.operation_controls {
-        if matches!(control.target, OperationTarget::Key(_)) {
-            frame.render_widget(
-                Paragraph::new(format!("[{}]", control.label)).style(theme.style(Role::Key)),
-                control.area,
-            );
-        }
-    }
+    let selected = actions::focused(app).and_then(|key| {
+        layout
+            .shell
+            .actions
+            .iter()
+            .find(|region| region.action.intent == OperationTarget::Key(key))
+            .map(|region| region.index)
+    });
+    super::modal::actions::render(frame, &layout.shell, theme, selected);
 }
 
 fn notices(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {

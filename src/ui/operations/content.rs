@@ -5,42 +5,7 @@ use crate::{
     operations::{Dialog, Event, Operation, OperationDialog},
 };
 
-#[derive(Clone, Debug)]
-pub(super) struct Row {
-    pub text: String,
-    pub role: Role,
-    pub field: Option<usize>,
-}
-impl Row {
-    pub fn plain(text: impl Into<String>) -> Self {
-        Self {
-            text: text.into(),
-            role: Role::Value,
-            field: None,
-        }
-    }
-    pub fn styled(text: impl Into<String>, role: Role) -> Self {
-        Self {
-            text: text.into(),
-            role,
-            field: None,
-        }
-    }
-    fn field(label: &str, value: &str, index: usize, selected: usize) -> Self {
-        Self {
-            text: format!(
-                "{}{label}: {value}",
-                if index == selected { "> " } else { "  " }
-            ),
-            role: if index == selected {
-                Role::Cursor
-            } else {
-                Role::Value
-            },
-            field: Some(index),
-        }
-    }
-}
+pub(super) type Row = crate::ui::modal::Row<usize>;
 
 pub(super) fn title(app: &App) -> &'static str {
     match &app.operations.dialog {
@@ -67,17 +32,7 @@ pub(super) fn operation(operation: Operation) -> &'static str {
 }
 
 pub(super) fn wrapped(rows: Vec<Row>, width: u16) -> Vec<Row> {
-    rows.into_iter()
-        .flat_map(|row| {
-            super::super::text::wrap_value(&super::super::clean(&row.text), usize::from(width))
-                .into_iter()
-                .map(move |text| Row {
-                    text,
-                    role: row.role,
-                    field: row.field,
-                })
-        })
-        .collect()
+    rows.into_iter().flat_map(|row| row.wrap(width)).collect()
 }
 
 pub(super) fn rows(app: &App) -> Vec<Row> {
@@ -108,7 +63,7 @@ fn incident(app: &App, typed: &str) -> Vec<Row> {
             "Jobs evidence is session only and is lost on exit. Record the F9 details first.",
         ),
         Row::plain("Enter or Esc: Stay. Type ACKNOWLEDGE manually, then press F10 to exit."),
-        Row::field("Acknowledgment", typed, 0, 0),
+        Row::field("Acknowledgment", typed, 0, true),
     ];
     if app.operations.active() {
         rows.push(Row::styled(
@@ -145,15 +100,18 @@ fn exit(save: bool) -> Vec<Row> {
 fn dialog_rows(dialog: &OperationDialog) -> Vec<Row> {
     let mut rows = dialog_error(dialog);
     if dialog.plan.operation != Operation::Mkdir {
-        rows.push(Row::plain(format!(
-            "Local operation: {} selected {}",
-            dialog.plan.operands.len(),
-            if dialog.plan.operands.len() == 1 {
-                "entry"
-            } else {
-                "entries"
-            }
-        )));
+        rows.push(Row::styled(
+            format!(
+                "Local operation: {} selected {}",
+                dialog.plan.operands.len(),
+                if dialog.plan.operands.len() == 1 {
+                    "entry"
+                } else {
+                    "entries"
+                }
+            ),
+            Role::Status,
+        ));
     }
     if matches!(dialog.plan.operation, Operation::Delete | Operation::Trash) {
         rows.extend(destructive(dialog));
@@ -163,7 +121,7 @@ fn dialog_rows(dialog: &OperationDialog) -> Vec<Row> {
             field_label(dialog.plan.operation),
             &dialog.text,
             0,
-            dialog.field,
+            dialog.field == 0,
         ));
         if matches!(dialog.plan.operation, Operation::Copy | Operation::Move) {
             rows.extend(transfer(dialog));
@@ -180,14 +138,7 @@ fn dialog_rows(dialog: &OperationDialog) -> Vec<Row> {
             ));
         }
     }
-    for source in &dialog.plan.operands {
-        rows.push(Row::plain(format!(
-            "{} · {} · {}",
-            source.path.display(),
-            kind(source.kind),
-            super::super::listing::size(source.size)
-        )));
-    }
+    rows.extend(sources(&dialog.plan.operands));
     rows
 }
 
@@ -235,7 +186,7 @@ fn transfer(dialog: &OperationDialog) -> Vec<Row> {
             "Incoming name (optional)",
             &dialog.incoming,
             1,
-            dialog.field,
+            dialog.field == 1,
         ));
         rows.push(Row::styled(
             "Tab switches fields; blank incoming name preserves the original.",
@@ -268,23 +219,31 @@ fn destructive(dialog: &OperationDialog) -> Vec<Row> {
     if dialog.error.is_some() {
         return rows;
     }
-    rows.push(Row::plain(dialog.plan.preview.as_ref().map_or_else(
-        || "Counting recursively… confirmation disabled".into(),
-        |preview| {
-            format!(
-                "Preview: {} {}, {} {}, {} bytes",
-                preview.files,
-                if preview.files == 1 { "file" } else { "files" },
-                preview.directories,
-                if preview.directories == 1 {
-                    "directory"
-                } else {
-                    "directories"
-                },
-                preview.bytes
-            )
-        },
-    )));
+    let role = if dialog.plan.preview.is_some() {
+        Role::Status
+    } else {
+        Role::Disabled
+    };
+    rows.push(Row::styled(
+        dialog.plan.preview.as_ref().map_or_else(
+            || "Counting recursively… confirmation disabled".into(),
+            |preview| {
+                format!(
+                    "Preview: {} {}, {} {}, {} bytes",
+                    preview.files,
+                    if preview.files == 1 { "file" } else { "files" },
+                    preview.directories,
+                    if preview.directories == 1 {
+                        "directory"
+                    } else {
+                        "directories"
+                    },
+                    preview.bytes
+                )
+            },
+        ),
+        role,
+    ));
     rows
 }
 
@@ -361,4 +320,27 @@ pub(super) fn kind(kind: EntryKind) -> &'static str {
         EntryKind::Device => "device",
         EntryKind::Unknown => "unknown type",
     }
+}
+
+/// Display-only lexical grouping; approved operands and symlink spelling stay untouched.
+pub(super) fn sources(entries: &[Entry]) -> Vec<Row> {
+    let root = crate::ui::modal::common_root(entries.iter().map(|entry| entry.path.as_path()));
+    let mut rows = Vec::new();
+    if let Some(root) = &root {
+        rows.push(Row::styled(
+            format!("From: {}", root.display()),
+            Role::Label,
+        ));
+    }
+    for entry in entries {
+        let path = root
+            .as_ref()
+            .and_then(|root| entry.path.strip_prefix(root).ok())
+            .unwrap_or(&entry.path);
+        rows.push(Row::file(
+            format!("{} · {}", path.display(), kind(entry.kind)),
+            crate::ui::modal::file_size(entry.size),
+        ));
+    }
+    rows
 }

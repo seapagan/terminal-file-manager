@@ -7,6 +7,7 @@ mod layout;
 mod listing;
 mod measure;
 mod metadata;
+pub mod modal;
 mod operations;
 pub use operations::{OperationControl, OperationTarget};
 mod path_title;

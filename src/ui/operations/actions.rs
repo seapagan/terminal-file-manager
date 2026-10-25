@@ -1,8 +1,46 @@
+use crate::color::Role;
 use crate::{
     app::App,
     operations::{Dialog, Event, Operation},
 };
 use crossterm::event::KeyCode;
+
+pub(super) fn role(app: &App, key: KeyCode) -> Role {
+    match (&app.operations.dialog, key) {
+        (Some(Dialog::IncidentExit { .. }), KeyCode::F(10))
+        | (Some(Dialog::Operation(_)), KeyCode::Char('D')) => Role::Error,
+        (Some(Dialog::Operation(_)), KeyCode::Char('T')) => Role::Warning,
+        (None, KeyCode::Char('r'))
+            if !app.operations.conflicts.is_empty() && !app.operations.show_history =>
+        {
+            Role::Warning
+        }
+        _ => Role::Key,
+    }
+}
+
+/// Presentation mirrors existing domain focus; it never changes Enter authorization.
+pub(super) fn focused(app: &App) -> Option<KeyCode> {
+    match &app.operations.dialog {
+        Some(Dialog::IncidentExit { .. }) => Some(KeyCode::Esc),
+        Some(Dialog::Exit { .. }) => Some(KeyCode::Char('r')),
+        Some(Dialog::Operation(dialog))
+            if matches!(dialog.plan.operation, Operation::Delete | Operation::Trash) =>
+        {
+            Some(KeyCode::Enter)
+        }
+        None if !app.operations.show_history => app.operations.conflicts.front().map(|conflict| {
+            [
+                KeyCode::Char('s'),
+                KeyCode::Char('r'),
+                KeyCode::Char('k'),
+                KeyCode::Char('n'),
+                KeyCode::Esc,
+            ][conflict.choice.min(4)]
+        }),
+        _ => None,
+    }
+}
 
 type Button = (&'static str, KeyCode);
 
@@ -65,7 +103,7 @@ fn operation(dialog: &crate::operations::OperationDialog, narrow: bool) -> Vec<B
             buttons
         }
         operation => {
-            let mut buttons = vec![("Enter Run", KeyCode::Enter), ("Esc Cancel", KeyCode::Esc)];
+            let mut buttons = vec![("Esc Cancel", KeyCode::Esc), ("Enter Run", KeyCode::Enter)];
             if matches!(operation, Operation::Copy | Operation::Move) {
                 buttons.push(("F2 SHA-256", KeyCode::F(2)));
             }

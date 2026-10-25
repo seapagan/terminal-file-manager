@@ -169,6 +169,9 @@ Press `c` in a metadata view for an on-demand directory count and size. In the
 **sidebar**, Esc cancels an active count but does not close the sidebar. In the
 **popup**, Esc cancels the count or closes the popup.
 Counts are on-demand snapshots; press `c` again to update them.
+The floating popup keeps keyboard and mouse focus until you close it; pane
+selection and file-operation shortcuts stay inactive behind it. Its fixed
+**Esc Close** control remains available while the fields scroll.
 
 ## Saving and restoring sessions
 

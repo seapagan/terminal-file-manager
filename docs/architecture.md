@@ -217,6 +217,14 @@ reconcile an incident, retry a mutation or write a recovery file. Terminal
 restoration precedes navigation-session persistence. Job diagnostics remain
 session-local.
 
+`ui::modal` supplies the shared measured shell for operation dialogs and floating
+metadata. Content rows wrap prose and fields, while structured file/result rows
+truncate filenames and right-align indivisible sizes. Lexical common parents
+reduce repeated source paths without changing native operands. Standard action
+groups return typed intents with safe defaults; M2 controllers retain approval,
+preview, conflict and incident authorization. The docked metadata sidebar keeps
+its own layout and shares its existing fields and cache with the popup.
+
 Operation dialogs size to wrapped content within terminal bounds. The renderer
 and input controller share exact button, field and job-row rectangles. Jobs use
 a bounded selection viewport and a separate details scroll position; completed

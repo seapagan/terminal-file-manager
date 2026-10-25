@@ -33,7 +33,8 @@ fn fixture() -> (tempfile::TempDir, App) {
             created_directory: false,
             recovery: None,
             trash: None,
-            detail: String::new(),
+            // Structured source rows now truncate; long diagnostics still need full-size offsets.
+            detail: "diagnostic evidence ".repeat(160),
         })
         .collect();
     entries.push(EntryResult {

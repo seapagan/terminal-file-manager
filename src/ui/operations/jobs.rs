@@ -112,10 +112,24 @@ pub(super) fn details(app: &App) -> Vec<Row> {
     }
     rows.extend(disabled(job));
     if let Some(record) = &job.record {
-        rows.push(Row::plain(format!("Observed bytes: {}", record.bytes())));
-        for entry in &record.entries {
-            rows.extend(result(entry));
-        }
+        rows.extend(results(record));
+    }
+    rows
+}
+
+fn results(record: &crate::operations::Record) -> Vec<Row> {
+    let mut rows = Vec::new();
+    rows.push(Row::plain(format!("Observed bytes: {}", record.bytes())));
+    let root =
+        crate::ui::modal::common_root(record.entries.iter().map(|entry| entry.source.as_path()));
+    if let Some(root) = &root {
+        rows.push(Row::styled(
+            format!("Results from: {}", root.display()),
+            Role::Label,
+        ));
+    }
+    for entry in &record.entries {
+        rows.extend(result(entry, root.as_deref()));
     }
     rows
 }
@@ -133,9 +147,7 @@ fn route(app: &App, job: &Job) -> Vec<Row> {
     if let Some(id) = job.retry_of {
         rows.push(Row::plain(format!("Retry of job {id}")));
     }
-    for source in &job.plan.operands {
-        rows.push(Row::plain(format!("Source: {}", source.path.display())));
-    }
+    rows.extend(content::sources(&job.plan.operands));
     if let Some(destination) = &job.plan.destination {
         rows.push(Row::plain(format!(
             "Destination: {}",
@@ -173,17 +185,22 @@ fn disabled(job: &Job) -> Vec<Row> {
     Vec::new()
 }
 
-fn result(entry: &crate::operations::EntryResult) -> Vec<Row> {
+fn result(entry: &crate::operations::EntryResult, root: Option<&std::path::Path>) -> Vec<Row> {
     let role = match entry.outcome {
         Outcome::SafetyIncident | Outcome::Failed => Role::Error,
         Outcome::Changed | Outcome::OutcomeUnknown | Outcome::CopiedSourceRetained => Role::Warning,
         Outcome::Completed => Role::Status,
         _ => Role::Value,
     };
-    let mut rows = vec![Row::styled(
-        format!("{}: {}", outcome(entry.outcome), entry.source.display()),
-        role,
-    )];
+    let source = root
+        .and_then(|root| entry.source.strip_prefix(root).ok())
+        .unwrap_or(&entry.source);
+    let mut heading = Row::file(
+        format!("{}: {}", outcome(entry.outcome), source.display()),
+        crate::ui::modal::file_size(Some(entry.bytes)),
+    );
+    heading.role = role;
+    let mut rows = vec![heading];
     if let Some(destination) = &entry.destination {
         rows.push(Row::plain(format!(
             "  Destination: {}",
