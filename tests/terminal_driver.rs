@@ -42,7 +42,7 @@ pub fn drive(command: CommandBuilder, steps: &[(&str, &str)], resize: bool) -> S
 pub struct Session {
     pub(crate) child: Box<dyn Child + Send + Sync>,
     master: Option<Box<dyn MasterPty + Send>>,
-    writer: Option<Box<dyn Write + Send>>,
+    pub(crate) writer: Option<Box<dyn Write + Send>>,
     reader: Option<JoinHandle<()>>,
     output: Receiver<io::Result<Vec<u8>>>,
     // Keep recv_timeout usable after the reader sends EOF and exits.

@@ -14,7 +14,7 @@ use std::{
     time::Duration,
 };
 
-/// Coordinates native hints and polling with the existing listing workers.
+/// Coordinates native refresh hints; Windows uses explicit manual refresh only.
 pub struct Runtime {
     slots: [Slot; 2],
     mode: Mode,
@@ -23,24 +23,11 @@ pub struct Runtime {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Mode {
     Native,
-    Polling,
+    Manual,
 }
 
-impl Mode {
-    fn interval(self, failed: bool) -> Duration {
-        Duration::from_secs(if self == Self::Polling || failed {
-            2
-        } else {
-            30
-        })
-    }
-
-    fn request(self, app: &mut App, pane: usize) -> Option<crate::app::Request> {
-        match self {
-            Self::Native => app.request_refresh(pane),
-            Self::Polling => app.request_reconciliation(pane),
-        }
-    }
+fn interval(failed: bool) -> Duration {
+    Duration::from_secs(if failed { 2 } else { 30 })
 }
 
 struct Slot {
@@ -57,7 +44,7 @@ struct Slot {
 impl Default for Runtime {
     fn default() -> Self {
         Self::new(if cfg!(windows) {
-            Mode::Polling
+            Mode::Manual
         } else {
             Mode::Native
         })
@@ -71,13 +58,13 @@ impl Runtime {
             slots: std::array::from_fn(|_| Slot {
                 worker: match mode {
                     Mode::Native => Worker::new().ok(),
-                    Mode::Polling => None,
+                    Mode::Manual => None,
                 },
                 signals: Arc::default(),
                 path: None,
                 context: 0,
                 schedule: Schedule::default(),
-                sweep: mode.interval(false),
+                sweep: interval(false),
                 failed: false,
                 urgent: false,
             }),
@@ -88,24 +75,25 @@ impl Runtime {
 impl Runtime {
     /// Consume bounded hints without waiting on filesystem calls.
     pub fn poll(&mut self, app: &mut App, pool: &mut Pool, now: Duration) -> bool {
+        if self.mode == Mode::Manual {
+            return false;
+        }
         let mut changed = false;
         for (pane, slot) in self.slots.iter_mut().enumerate() {
             if app.panes[pane].context == 0 && app.panes[pane].listing {
                 continue;
             }
-            slot.rebind(&app.panes[pane], now, self.mode);
-            if self.mode == Mode::Native {
-                changed |= slot.consume(app, pane, now);
-            }
+            slot.rebind(&app.panes[pane], now);
+            changed |= slot.consume(app, pane, now);
             if now >= slot.sweep {
                 slot.urgent = true;
             }
             if slot.due(&app.panes[pane], now)
-                && let Some(request) = self.mode.request(app, pane)
+                && let Some(request) = app.request_refresh(pane)
             {
                 slot.schedule.started(now);
                 slot.urgent = false;
-                slot.sweep = now + self.mode.interval(slot.failed);
+                slot.sweep = now + interval(slot.failed);
                 pool.submit(request);
             }
         }
@@ -118,7 +106,7 @@ impl Slot {
         pane.pending.is_none() && !pane.listing && (self.urgent || self.schedule.due(now))
     }
 
-    fn rebind(&mut self, pane: &crate::app::Pane, now: Duration, mode: Mode) {
+    fn rebind(&mut self, pane: &crate::app::Pane, now: Duration) {
         if self.path.as_ref() == Some(&pane.path) && self.context == pane.context {
             return;
         }
@@ -126,11 +114,8 @@ impl Slot {
         self.context = pane.context;
         self.signals = Arc::default();
         self.schedule = Schedule::default();
-        self.sweep = now + mode.interval(false);
+        self.sweep = now + interval(false);
         self.urgent = false;
-        if mode == Mode::Polling {
-            return;
-        }
         if let Some(worker) = &self.worker {
             worker.bind(Binding {
                 path: pane.path.clone(),

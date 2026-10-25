@@ -65,6 +65,14 @@ jobs:
           cargo make build
           cargo make package
 
+      - name: Check Windows release manual-refresh idle cost
+        if: runner.os == 'Windows'
+        run: |
+          cargo make release-build
+          rustc -vV
+          sha256sum target/release/tfm.exe
+          cargo test --release --locked --test windows_polling windows_manual_cost_and_refresh_on_2000_and_10000_entries -- --exact --nocapture
+
       - name: Run native Rust tests with coverage
         env:
           COVERAGE_PLATFORM: ${{ matrix.coverage }}

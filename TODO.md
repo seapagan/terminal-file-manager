@@ -61,34 +61,39 @@ embedded terminal, plugin/scripting ecosystem, drag-and-drop and cloud backends
 remain excluded from v1. No sync/resume/editor implementation is added merely
 for future readiness.
 
-## Future Windows notification backend
+## Future Windows automatic refresh investigation
 
-Investigate a non-interfering, near-real-time backend that could replace the
-approved two-second Windows polling policy. This is deferred work, not a new
-pre-v1 blocker.
+Windows currently requires `r` to refresh. Manual mode avoids persistent watch
+handles and idle directory enumeration; it is the approved policy, not a hidden
+polling fallback. Linux/macOS retain native automatic refresh.
 
-On the tested Windows Server 2025 hosts, per-directory
-`ReadDirectoryChangesW`/`notify` and `SHChangeNotifyRegister` Shell registrations
-blocked ancestor renames. The native directory handles already used
-`FILE_SHARE_DELETE`; deletion sharing did not solve the restriction. Shell-only
-notifications missed ordinary external changes. Shell+interrupt delivery added
-latency, still blocked ancestor renames and failed extended-path registration.
-The retained [spike source and references](https://github.com/seapagan/terminal-file-manager/tree/f970878b7bad7b9170f32afa643bb1ba986128c7/research/windows-watch)
-and [native isolation run](https://github.com/seapagan/terminal-file-manager/actions/runs/40123944312)
-record those limits; do not import the temporary research implementation.
+Before revisiting Windows auto-refresh, read the private local archive at
+`specs/windows-refresh-investigations-2026-10/FULL_REPORT.md`. This Git-ignored
+path is unavailable in public clones. External readers can use the signed
+[Windows polling performance report](https://github.com/seapagan/terminal-file-manager/blob/a8b205564ba6c2af272a271f719bdf6e4b2b8caa/research/windows-polling-report.md)
+and [Shell registration isolation](https://github.com/seapagan/terminal-file-manager/actions/runs/40123944312).
 
-A wider-root recursive native watch passed the owned rename topology, but also
-produced unrelated sibling invalidations. Before considering it, measure
-volume-wide event load/overflow, mount/UNC/drive variation, access restrictions,
-resource use, rebinding and teardown.
+On Windows Server 2025, per-directory `ReadDirectoryChangesW`/`notify` and Shell
+registrations blocked ancestor renames despite deletion sharing. Shell-only
+notifications missed ordinary external writes; interrupt delivery still blocked
+renames and failed extended-path registration. Wider-root recursive watching
+passed the owned rename topology but produced sibling noise, without whole-volume,
+UNC, overflow or resource proof.
 
-Before changing the default, require native Windows 11 desktop and Windows Server
-validation with ordinary external create/delete/rename/content/attribute writers;
-current, parent and grandparent rename freedom; deletion/replacement and recovery;
-long/native paths; and selection, physical identity and operation-approval safety.
-Record change-to-visible latency, idle/load CPU, memory/handles, queue/scan bounds,
-event-loss reconciliation and fallback behaviour. A working API example or an
-owned-root result alone does not establish a production backend.
+Two-second polling passed correctness tests but consumed about 17% of one logical
+core at 2,000 entries and 72–75% at 10,000 in release TUI measurements. Identical
+and hidden panes duplicated scans. Buffered NTFS metadata then returned stale
+3-byte sizes where fresh inspection returned 35 bytes for hard links and open
+writers; matching file IDs and birth stamps did not establish metadata freshness.
+Do not repeat these approaches without new evidence addressing their failures.
+
+Fresh one-handle inspection, scan coalescing, wider-root notification or opt-in
+automatic refresh remain unselected alternatives requiring separate approval.
+Before reintroduction, prove native Windows 11 desktop and Server behaviour,
+ordinary external writers, raw/long paths and mount/UNC variation, genuine denied
+cases, complete metadata parity, current/parent/grandparent rename during activity
+and after cleanup, bounded CPU/resources, stale generations and independent M2
+operation-time validation. A stable-fixture API benchmark alone is insufficient.
 
 ## Future Windows-focused PR: attributes and ownership
 

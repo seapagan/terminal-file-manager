@@ -1,5 +1,37 @@
 # Acceptance gates
 
+## Windows manual-refresh decision — 25 October 2026
+
+Windows now requires explicit `r` refresh or navigation. It creates no directory
+watch owner, periodic listing, reconciliation timer or watcher-unavailable retry.
+Hidden panes retain their last listing. Linux/macOS retain native automatic
+notifications, debounce, recovery and 30-second reconciliation; `r` works on
+every platform. M2 still validates selected objects and destinations independently
+of displayed snapshots.
+
+The maintainer rejected buffered candidate `f85fd78` after
+[native Windows run 40178904166](https://github.com/seapagan/terminal-file-manager/actions/runs/40178904166):
+directory records returned 3-byte sizes where fresh file inspection returned
+35 bytes for both changed hard links and flushed open writers. The hard-link
+timestamps were stale despite matching IDs and creation stamps. A third ACL
+fixture failed to establish denial even for the original backend; its failure
+does not justify an access-bypass claim or weaker assertions.
+
+Signed revert `18fffdf` restores the tracked tree exactly to accepted polling
+checkpoint `19e1951`; its unchanged clean Rust 1.95.0 full gate passed in 60.11 s,
+including mandatory xwin. The signed
+[polling performance report](https://github.com/seapagan/terminal-file-manager/blob/a8b205564ba6c2af272a271f719bdf6e4b2b8caa/research/windows-polling-report.md)
+measured substantial release CPU at 2,000/10,000 entries. Native watchers blocked
+ancestor renames; polling avoided persistent handles but repeatedly enumerated
+large directories. Those findings explain the manual policy.
+
+The ignored local archive
+`specs/windows-refresh-investigations-2026-10/FULL_REPORT.md` preserves raw
+experiments, failed approaches, exact sources, hosted artifacts and limitations.
+Future agents must consult it before revisiting Windows auto-refresh. The
+historical checkpoints below retain their original scope. Final manual-policy
+native and release measurements will be recorded after hosted verification.
+
 ## Windows polling: native acceptance, 24 October 2026
 
 Signed implementation `944c83f` uses intentional two-second reconciliation on

@@ -5,7 +5,7 @@ use std::{fs, path::Path};
 use terminal_driver::drive;
 
 #[test]
-fn native_live_changes_render_without_input_and_terminal_reentry_is_clean() {
+fn platform_refresh_renders_external_changes_and_terminal_reentry_is_clean() {
     use std::time::{Duration, Instant};
     use terminal_driver::{Script, Session};
     let root = tempfile::tempdir().unwrap();
@@ -30,6 +30,8 @@ fn native_live_changes_render_without_input_and_terminal_reentry_is_clean() {
         let marker = format!("external-arrival-{attempt}");
         let changed = Instant::now();
         fs::write(root.path().join(&marker), "external").unwrap();
+        #[cfg(windows)]
+        manual_refresh_after_idle(&mut session, &mut script, &mut transcript, &marker);
         session
             .drive(&[(&marker, "q")], deadline, &mut transcript, false)
             .unwrap();
@@ -40,6 +42,29 @@ fn native_live_changes_render_without_input_and_terminal_reentry_is_clean() {
         assert!(transcript.windows(8).any(|w| w == b"\x1b[?2004l"));
         assert!(transcript.windows(8).any(|w| w == b"\x1b[?1049l"));
     }
+}
+
+#[cfg(windows)]
+fn manual_refresh_after_idle(
+    session: &mut terminal_driver::Session,
+    script: &mut terminal_driver::Script,
+    transcript: &mut Vec<u8>,
+    marker: &str,
+) {
+    use std::{
+        io::Write,
+        time::{Duration, Instant},
+    };
+    let idle = Instant::now();
+    while idle.elapsed() < Duration::from_millis(2200) {
+        session
+            .read_step(Duration::from_millis(20), script, &[], transcript, false)
+            .unwrap();
+    }
+    assert!(!String::from_utf8_lossy(transcript).contains(marker));
+    let input = session.writer.as_mut().unwrap();
+    input.write_all(b"r").unwrap();
+    input.flush().unwrap();
 }
 
 fn command(root: &Path, left: &Path, right: Option<&Path>) -> CommandBuilder {

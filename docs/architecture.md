@@ -50,13 +50,11 @@ It retains late dirty state through an in-flight scan. Each pane also receives
 an unconditional 30-second reconciliation on those platforms. Native errors enable two-second
 fallback reconciliation and re-registration with one-to-30-second backoff.
 
-Windows uses intentional two-second polling. It creates no native watch owner,
-directory subscription or recovery loop, and reports no native-watcher failure
-for this normal mode. The coordinator schedules both panes, including the hidden
-pane, without filesystem I/O on the input/render thread. A due poll remains one
-coalesced intent until the current listing and pending navigation finish; it
-never cancels an in-flight listing to meet the interval. Slow enumeration can
-therefore extend visibility latency beyond two seconds.
+Windows uses intentional manual refresh. Its coordinator creates no native watch
+owner and schedules no timed listing, reconciliation, retry or failure warning.
+Both panes retain their last listing until deliberate refresh or navigation;
+hidden panes do not stay automatically current. The `r` action refreshes the
+active pane through the existing bounded workers.
 
 All enumeration uses the existing six read-only lanes. Manual refresh and M2
 completion use the same coalesced ordinary refresh intent; navigation retains
@@ -72,23 +70,22 @@ evidence before accepting a snapshot. Missing or changed evidence retains the la
 good view and blocks new mutation approvals. Explicit reopening establishes a new context. A missing
 cursor chooses the nearest surviving row; marks require object continuity.
 Metadata and count generations invalidate on changed snapshots and explicit
-refresh. A Windows no-op reconciliation preserves an in-flight or completed
-on-demand count only for the same trusted selected directory and unchanged
-entry metadata (excluding access time). Recursive totals remain cached count
-snapshots, not continuously updated descendant totals; explicit recount/refresh,
+refresh. Recursive totals remain cached count snapshots, not continuously
+updated descendant totals; explicit recount/refresh,
 selection changes, replacement or errors invalidate them.
 
 Linux/macOS watcher shutdown signals its owners without waiting for a potentially stalled
 filesystem call on the UI thread. Normal owners release their watches on exit;
 an owner stalled inside a kernel call releases them when that call returns.
 Native notifications may miss changes on network or pseudo-filesystems. Periodic
-enumeration supplies eventual reconciliation where enumeration still works.
-Windows polling retains no watch handles, although ordinary enumeration still
-uses brief filesystem handles and can race external operations.
-Native Server 2025 acceptance passed current/parent/grandparent rename and
-replacement/recovery checks. Instrumented 2,000-/10,000-entry samples maintained
-two-second starts with no pending backlog; CPU cost was material at 10,000 entries.
-See [acceptance evidence](acceptance.md) for measurements and their limits.
+enumeration supplies eventual reconciliation on Linux/macOS where enumeration
+still works. Windows manual refresh avoids persistent watch handles and idle
+enumeration, although deliberate listings still use transient handles and can
+race external operations. Native directory watches blocked ancestor renames;
+regular polling consumed substantial CPU in large directories. Buffered NTFS
+records returned stale hard-link/open-writer metadata despite matching identities.
+The original listing and independent M2 validation remain authoritative.
+See [acceptance evidence](acceptance.md) for historical and current proof.
 Remote refresh remains a separate M3 capability.
 
 `terminal` restores attempted raw/alternate-screen/mouse/paste/keyboard modes on

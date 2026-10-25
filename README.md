@@ -73,16 +73,21 @@ These are the default bindings. You can customise them in `config.toml`.
 | `r` | Refresh the directory |
 | `V` / Alt+V | View options / view profiles |
 
-Local directories refresh automatically, including the hidden pane. External
-creates, deletes, renames and metadata edits update the listing while preserving
-the cursor and surviving marks. Linux and macOS use native filesystem
-notifications; file reads do not trigger them. Windows checks displayed local
-directories approximately every two seconds. Press `r` to refresh manually.
+Linux and macOS refresh local directories automatically, including the hidden
+pane. External changes update the listing while preserving the cursor and
+surviving marks. Press `r` to refresh manually on every platform.
+
+**Windows requires `r` to refresh.** Native directory watches blocked ancestor
+renames, and two-second polling proved expensive in large directories. Manual
+refresh avoids persistent watcher handles and idle enumeration. Windows panes,
+including hidden panes, retain their last listing until deliberate refresh or
+navigation.
 
 Linux and macOS also reconcile each pane every 30 seconds to catch missed
 notifications. If native watching fails, TFM warns once and refreshes periodically
-while retrying. Windows polling is its normal mode. Large or slow directories,
-concurrent operations and unavailable mounts can extend visibility latency.
+while retrying. These automatic recovery checks apply to Linux and macOS.
+Large or slow directories, concurrent operations and unavailable mounts can
+extend refresh latency.
 If a directory disappears or another directory replaces it, TFM retains the
 last good view and reports the error; navigate out and reopen the directory to select the replacement.
 

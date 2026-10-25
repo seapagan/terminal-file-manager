@@ -2,38 +2,45 @@ use super::tests::{collect_until_idle, counting_controller, hold_first_count};
 use super::*;
 
 fn reconcile(controller: &mut Controller, pool: &mut Pool) {
-    let request = controller.app.request_reconciliation(0).unwrap();
+    let request = controller.app.request_refresh(0).unwrap();
     pool.submit(request);
     let deadline = Instant::now() + Duration::from_secs(10);
     while controller.app.panes[0].listing {
         collect(controller, pool);
-        assert!(Instant::now() < deadline, "periodic listing timed out");
+        assert!(Instant::now() < deadline, "explicit listing timed out");
         std::thread::yield_now();
     }
     schedule_metadata(controller, pool, &mut [None, None]);
 }
 
 #[test]
-fn unchanged_periodic_listings_preserve_running_and_completed_directory_counts() {
+fn explicit_refresh_invalidates_running_and_completed_directory_counts() {
     let root = tempfile::tempdir().unwrap();
     let mut controller = counting_controller(root.path());
     let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
     pool.submit(controller.app.request_metadata(0).unwrap());
     collect_until_idle(&mut controller, &mut pool);
-    let (running, release, stopped) = hold_first_count(&mut pool, false);
+    let (running, release, stopped) = hold_first_count(&mut pool, true);
     let count = controller.app.request_totals().unwrap();
     pool.submit(count.clone());
     running.recv_timeout(Duration::from_secs(10)).unwrap();
     reconcile(&mut controller, &mut pool);
-    assert!(controller.app.details[0].counting);
-    assert_eq!(
+    assert!(!controller.app.details[0].counting);
+    assert_ne!(
         controller.app.details[0].totals_generation,
         count.generation
     );
     release.send(()).unwrap();
     stopped.recv_timeout(Duration::from_secs(10)).unwrap();
     collect_until_idle(&mut controller, &mut pool);
-    reconcile(&mut controller, &mut pool);
+    assert!(
+        !controller
+            .app
+            .complete_totals(&count, Ok(Default::default()))
+    );
+    let fresh = controller.app.request_totals().unwrap();
+    pool.submit(fresh);
+    collect_until_idle(&mut controller, &mut pool);
     assert_eq!(
         controller.app.details[0]
             .totals
@@ -44,23 +51,12 @@ fn unchanged_periodic_listings_preserve_running_and_completed_directory_counts()
             .bytes,
         4
     );
-    assert_eq!(
-        controller.app.details[0].totals_generation,
-        count.generation
-    );
-    let explicit = controller.app.request_refresh(0).unwrap();
-    pool.submit(explicit);
-    collect_until_idle(&mut controller, &mut pool);
+    reconcile(&mut controller, &mut pool);
     assert!(controller.app.details[0].totals.is_none());
-    assert!(
-        !controller
-            .app
-            .complete_totals(&count, Ok(Default::default()))
-    );
 }
 
 #[test]
-fn periodic_directory_replacement_invalidates_old_count_and_metadata_results() {
+fn explicit_directory_replacement_invalidates_old_count_and_metadata_results() {
     let root = tempfile::tempdir().unwrap();
     let mut controller = counting_controller(root.path());
     let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
