@@ -29,8 +29,44 @@ The ignored local archive
 `specs/windows-refresh-investigations-2026-10/FULL_REPORT.md` preserves raw
 experiments, failed approaches, exact sources, hosted artifacts and limitations.
 Future agents must consult it before revisiting Windows auto-refresh. The
-historical checkpoints below retain their original scope. Final manual-policy
-native and release measurements will be recorded after hosted verification.
+historical checkpoints below retain their original scope.
+
+Signed manual-policy commit `d13e521` passed the unchanged clean Rust 1.95.0
+full gate in 60.85 s, including xwin; infrastructure checks passed in 11.66 s.
+[Native run 40182448012](https://github.com/seapagan/terminal-file-manager/actions/runs/40182448012)
+passed Linux 520, macOS 499 and Windows 481 tests, with two established child-entry
+skips per platform. Windows passed the original parent-rename regression,
+current/parent/grandparent recovery, deleted/reused paths, navigation and stale
+generations, independent hidden panes, surviving marks, frozen/stale Copy refusal
+and real `r` input with ConPTY restoration/re-entry. External changes remained
+absent before deliberate refresh. Controlled-clock tests also prove no scheduled
+listing or retry through 3,600 seconds.
+All five ordinary workflows and Codacy static analysis passed; three-platform
+coverage merged successfully and its Codacy upload/final notification succeeded.
+The four existing complexity advisories remain in unchanged functions.
+
+The same run measured the actual release TUI, Rust 1.99.0, on Windows Server 2025
+build 26100. Binary SHA-256:
+`bb9e40a711414cc1289e5fb875680838e33467eb35f90c26f1c445a57acaa8cd`.
+One visible pane used identical left/right paths; each size had one settled sample
+after four seconds of warm-up. CPU is process user+kernel time divided by wall
+time; 100% means one logical core.
+
+| Entries | Sample wall | CPU / one-core % | RSS before → after | Handles | `r` to render and exit |
+| --- | --- | --- | --- | --- | --- |
+| 2,000 | 30.340 s | 343.75 ms / 1.13% | 12,222,464 → 12,140,544 B | 116 → 115 | 135.6 ms |
+| 10,000 | 30.324 s | 406.25 ms / 1.34% | 21,745,664 → 21,651,456 B | 110 → 109 | 437.8 ms |
+
+The historical polling report measured 17.12% / 71.66% median for this layout,
+with three samples per size. Different hosts/toolchains prevent a same-host speedup
+claim. The current check is proportionate idle evidence, not another performance
+matrix. The model had zero idle scan starts for both panes, no pending work, and
+at most two active lanes during deliberate refresh. Three explicit model updates
+took 136.6–142.0 ms at 2k and 629.4–651.1 ms at 10k; final continuous-writer state
+converged after explicit refresh. Debug/coverage samples remain separately labelled
+in the archived log. Windows 11 desktop, UNC/SMB, ReFS and slow/offline mounts were
+not newly verified. Deliberate enumeration still uses transient handles; idle
+rename success does not prove freedom from contention during an active scan.
 
 ## Windows polling: native acceptance, 24 October 2026
 
