@@ -1,8 +1,11 @@
 use crate::{
-    fs::{Entry, Identity, Snapshot},
+    fs::{Entry, EntryKind, Identity, Snapshot},
     listing::{Sort, SortPolicy},
 };
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 /// Hidden, ignored and fuzzy-filter exclusions remain independent.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -19,6 +22,9 @@ pub(super) struct Visit {
     pub path: PathBuf,
     pub cursor: Option<PathBuf>,
     pub scroll: usize,
+    pub directory_identity: Option<Identity>,
+    pub cursor_identity: Option<Identity>,
+    pub entered: Option<(PathBuf, EntryKind, Identity)>,
 }
 
 /// Visible and excluded marks use mutually exclusive exclusion reasons.
@@ -71,6 +77,7 @@ pub struct Pane {
     pub(super) back: Vec<Visit>,
     pub(super) forward: Vec<Visit>,
     pub(super) restoring: Option<Visit>,
+    pub(super) parent_restoring: Option<Visit>,
     pub(super) history_forward: bool,
 }
 
@@ -135,6 +142,7 @@ impl Pane {
             back: Vec::new(),
             forward: Vec::new(),
             restoring: None,
+            parent_restoring: None,
             history_forward: false,
         }
     }
@@ -146,12 +154,11 @@ impl Pane {
         if !continuous {
             self.marks.clear();
         }
-        self.directory = snapshot.directory.map(|entry| *entry);
         self.reset_range();
         let navigating = self.path != snapshot.path;
         if navigating {
             if self.restoring.is_some() {
-                let previous = self.visit();
+                let previous = self.visit(&snapshot.path);
                 if self.history_forward {
                     self.forward.pop();
                     self.back.push(previous);
@@ -160,7 +167,7 @@ impl Pane {
                     self.forward.push(previous);
                 }
             } else {
-                self.back.push(self.visit());
+                self.back.push(self.visit(&snapshot.path));
                 self.forward.clear();
             }
             self.path = snapshot.path;
@@ -168,6 +175,7 @@ impl Pane {
             self.cursor = None;
             self.scroll = 0;
         }
+        self.directory = snapshot.directory.map(|entry| *entry);
         self.listing_order = snapshot
             .entries
             .iter()
@@ -179,11 +187,7 @@ impl Pane {
         self.reconcile_marks();
         self.sort.apply(&mut self.entries);
         self.refilter_at(if navigating { 0 } else { previous_index });
-        if let Some(visit) = self.restoring.take() {
-            self.cursor = visit.cursor;
-            self.scroll = visit.scroll;
-            self.refilter();
-        }
+        self.restore_cursor();
         if !navigating {
             self.range = range;
             self.reconcile_range();
@@ -376,12 +380,93 @@ impl Pane {
         counts
     }
 
-    pub(super) fn visit(&self) -> Visit {
+    fn visit(&self, destination: &Path) -> Visit {
         Visit {
             path: self.path.clone(),
             cursor: self.cursor.clone(),
             scroll: self.scroll,
+            directory_identity: self.directory.as_ref().and_then(|e| e.identity.clone()),
+            cursor_identity: self.current().and_then(|e| e.identity.clone()),
+            entered: self
+                .entries
+                .iter()
+                .find(|entry| entry.path == destination)
+                .and_then(|entry| Some((entry.path.clone(), entry.kind, entry.identity.clone()?))),
         }
+    }
+
+    pub(super) fn parent_visit(&self, parent: PathBuf) -> Visit {
+        let saved = self
+            .back
+            .iter()
+            .rev()
+            .chain(self.forward.iter().rev())
+            .find(|visit| visit.path == parent);
+        let identity = saved
+            .and_then(|visit| visit.entered.as_ref())
+            .filter(|(path, kind, _)| {
+                path == &self.path && matches!(kind, EntryKind::Link | EntryKind::Junction)
+            })
+            .map(|(_, _, identity)| identity.clone())
+            .or_else(|| {
+                self.directory
+                    .as_ref()
+                    .and_then(|entry| entry.identity.clone())
+            });
+        Visit {
+            path: parent,
+            cursor: Some(self.path.clone()),
+            scroll: saved.map_or(0, |visit| visit.scroll),
+            directory_identity: saved.and_then(|visit| visit.directory_identity.clone()),
+            cursor_identity: identity,
+            entered: None,
+        }
+    }
+
+    fn restore_parent(&mut self) {
+        let Some(visit) = self.parent_restoring.take() else {
+            return;
+        };
+        if let Some(cursor) = self.visit_cursor(&visit) {
+            self.cursor = Some(cursor);
+            if self.matches_visit(&visit) {
+                self.scroll = visit.scroll.min(self.cursor_index().unwrap_or(0));
+            }
+        }
+    }
+
+    fn visit_cursor(&self, visit: &Visit) -> Option<PathBuf> {
+        self.visible
+            .iter()
+            .map(|i| &self.entries[*i])
+            .find(|entry| {
+                Some(&entry.path) == visit.cursor.as_ref()
+                    && entry
+                        .identity
+                        .as_ref()
+                        .zip(visit.cursor_identity.as_ref())
+                        .is_some_and(|(fresh, old)| same_object(fresh, old))
+            })
+            .map(|entry| entry.path.clone())
+    }
+
+    fn matches_visit(&self, visit: &Visit) -> bool {
+        self.directory
+            .as_ref()
+            .and_then(|entry| entry.identity.as_ref())
+            .zip(visit.directory_identity.as_ref())
+            .is_some_and(|(fresh, old)| same_object(fresh, old))
+    }
+
+    fn restore_cursor(&mut self) {
+        if let Some(visit) = self.restoring.take()
+            && self.matches_visit(&visit)
+        {
+            self.cursor = self.visit_cursor(&visit);
+            self.scroll = visit.scroll;
+            self.refilter();
+        }
+        self.restore_parent();
     }
 }
 

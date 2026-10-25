@@ -200,6 +200,13 @@ impl Controller {
         if action == Action::Forward {
             return self.app.history(true).into_iter().collect();
         }
+        if action == Action::Parent {
+            if let Some(request) = self.app.parent() {
+                return vec![request];
+            }
+            self.app.status = "Filesystem root".into();
+            return Vec::new();
+        }
         let pane = &self.app.panes[id];
         let path = match action {
             Action::Enter => {
@@ -213,13 +220,6 @@ impl Controller {
                     return Vec::new();
                 }
                 entry.path.clone()
-            }
-            Action::Parent => {
-                let Some(parent) = pane.path.parent() else {
-                    self.app.status = "Filesystem root".into();
-                    return Vec::new();
-                };
-                parent.to_path_buf()
             }
             _ => pane.path.clone(),
         };

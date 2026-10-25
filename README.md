@@ -52,7 +52,7 @@ These are the default bindings. You can customise them in `config.toml`.
 | --- | --- |
 | Up/Down or `k`/`j` | Move through the listing |
 | Home / End / PageUp / PageDown | Jump or scroll through the listing |
-| Enter / Backspace (or Alt+Up) | Enter directory / go to parent |
+| Enter / Backspace (or Alt+Up) | Enter directory / go to parent, highlighting the directory just exited |
 | Alt+Left / Alt+Right | Go back / forward in directory history |
 | Alt+P | Toggle one or two panes |
 | Tab / Shift+Tab | Switch active pane |

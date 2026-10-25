@@ -118,6 +118,7 @@ impl App {
         state.pending = Some(path.clone());
         state.error = None;
         state.restoring = None;
+        state.parent_restoring = None;
         state.listing = true;
         state.refresh_pending = false;
         Request {
@@ -126,6 +127,16 @@ impl App {
             path,
             kind: RequestKind::Listing,
         }
+    }
+
+    /// Return to the lexical parent, retaining the exited entry's native identity.
+    pub fn parent(&mut self) -> Option<Request> {
+        let pane = &self.panes[self.active];
+        let parent = pane.path.parent()?.to_path_buf();
+        let visit = pane.parent_visit(parent.clone());
+        let request = self.request_listing(self.active, parent);
+        self.panes[self.active].parent_restoring = Some(visit);
+        Some(request)
     }
 
     /// Invalidate the displayed directory without stealing navigation or cancelling a scan.
@@ -174,6 +185,7 @@ impl App {
             Ok(snapshot) => self.install_listing(pane, attempted, snapshot),
             Err(error) => {
                 state.restoring = None;
+                state.parent_restoring = None;
                 state.error = Some(format!(
                     "{}: {error}",
                     attempted.as_deref().unwrap_or(&state.path).display()
@@ -195,6 +207,8 @@ impl App {
             .as_ref()
             .is_some_and(|path| path != &snapshot.path)
         {
+            state.restoring = None;
+            state.parent_restoring = None;
             return false;
         }
         if attempted.is_none() && !state.accepts_refresh(&snapshot) {
