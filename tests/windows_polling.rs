@@ -445,7 +445,10 @@ fn measure(entries: usize) {
     std::fs::rename(&moved, root.path()).unwrap();
 }
 
+/// Run on native Windows for release measurements (no CPU pass/fail threshold):
+/// `cargo test --release --locked --test windows_polling windows_manual_cost_and_refresh_on_2000_and_10000_entries -- --ignored --exact --nocapture`
 #[test]
+#[ignore = "Extended Windows CPU/latency measurement; run explicitly in release mode"]
 fn windows_manual_cost_and_refresh_on_2000_and_10000_entries() {
     measure(2000);
     measure(10000);

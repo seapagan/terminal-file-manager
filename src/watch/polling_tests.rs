@@ -38,6 +38,8 @@ fn manual_refresh_updates_only_the_requested_pane_and_preserves_its_mark() {
     let hidden_generation = app.panes[1].generation;
     std::fs::write(&selected, "updated size").unwrap();
     runtime.poll(&mut app, &mut pool, Duration::from_secs(60));
+    assert_eq!(app.panes[0].current().unwrap().size, Some(5));
+    assert_eq!(pool.active_count(), 0);
     pool.submit(app.request_refresh(0).unwrap());
     finish(&mut app, &mut pool);
     assert_eq!(app.panes[0].current().unwrap().size, Some(12));

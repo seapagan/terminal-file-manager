@@ -1,5 +1,0 @@
-# Retain native Windows manual-refresh measurements in successful hosted test logs.
-[[profile.default.overrides]]
-platform = 'cfg(target_os = "windows")'
-filter = 'binary(windows_polling) or test(platform_refresh_renders_external_changes_and_terminal_reentry_is_clean)'
-success-output = "immediate"
