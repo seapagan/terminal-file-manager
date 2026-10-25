@@ -46,6 +46,7 @@ impl SelectionCounts {
 /// One independent session-only pane.
 pub struct Pane {
     pub directory: Option<Entry>,
+    pub(super) entry_identity: Option<Identity>,
     pub path: PathBuf,
     pub entries: Vec<Entry>,
     pub visible: Vec<usize>,
@@ -110,6 +111,7 @@ impl Pane {
 
     pub(super) fn new(path: PathBuf) -> Self {
         Self {
+            entry_identity: None,
             directory: None,
             path,
             entries: Vec::new(),
@@ -408,11 +410,7 @@ impl Pane {
                 path == &self.path && matches!(kind, EntryKind::Link | EntryKind::Junction)
             })
             .map(|(_, _, identity)| identity.clone())
-            .or_else(|| {
-                self.directory
-                    .as_ref()
-                    .and_then(|entry| entry.identity.clone())
-            });
+            .or_else(|| self.directory.as_ref().and(self.entry_identity.clone()));
         Visit {
             path: parent,
             cursor: Some(self.path.clone()),

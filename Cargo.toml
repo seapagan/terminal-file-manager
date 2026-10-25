@@ -36,7 +36,6 @@ path = "src/main.rs"
 colored_text = "=0.6.0"
 crossterm = { version = "=0.29.0", default-features = false, features = ["bracketed-paste", "events", "windows"] }
 ignore = "=0.4.33"
-notify = "=8.2.0"
 ratatui = { version = "=0.30.2", default-features = false, features = ["crossterm_0_29", "layout-cache"] }
 serde = { version = "=1.0.229", features = ["derive"] }
 toml = { version = "=1.1.8", default-features = false, features = ["parse", "serde", "display"] }
@@ -46,6 +45,9 @@ vsort = "=0.2.0"
 
 tempfile = "=3.27.0"
 sha2 = "=0.11.1"
+
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+notify = "=8.2.0"
 
 # Level-triggered Unix input preserves pending keys when resize and input coincide.
 [target.'cfg(unix)'.dependencies]

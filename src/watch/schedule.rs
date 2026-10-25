@@ -1,5 +1,21 @@
 use std::time::Duration;
 
+pub(super) struct Backoff(Duration);
+
+impl Default for Backoff {
+    fn default() -> Self {
+        Self(Duration::from_secs(1))
+    }
+}
+
+impl Backoff {
+    pub(super) fn next(&mut self) -> Duration {
+        let delay = self.0;
+        self.0 = (delay * 2).min(Duration::from_secs(30));
+        delay
+    }
+}
+
 #[derive(Default)]
 pub(super) struct Schedule {
     first: Option<Duration>,

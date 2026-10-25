@@ -76,6 +76,8 @@ These are the default bindings. You can customise them in `config.toml`.
 Linux and macOS refresh local directories automatically, including the hidden
 pane. External changes update the listing while preserving the cursor and
 surviving marks. Press `r` to refresh manually on every platform.
+If native notifications fail, automatic refresh slows to a maximum 30-second
+interval while TFM retries the watcher. Press `r` for an immediate refresh.
 
 **Windows requires `r` to refresh.** Native directory watches blocked ancestor
 renames, and two-second polling proved expensive in large directories. Manual

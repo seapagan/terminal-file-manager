@@ -36,6 +36,7 @@ fn loaded() -> (tempfile::TempDir, Controller) {
             1,
             Ok(fs::Snapshot {
                 directory: Some(Box::new(fs::inspect(root.path()))),
+                entry_identity: None,
                 path: root.path().into(),
                 entries: vec![entry.clone()],
                 errors: vec![],
@@ -172,6 +173,7 @@ fn popup_and_sidebar_invocations_are_independent_and_entry_changes_retain_choice
         1,
         Ok(fs::Snapshot {
             directory: c.app.panes[0].directory.clone().map(Box::new),
+            entry_identity: None,
             path: c.app.panes[0].path.clone(),
             entries: vec![first, next.clone()],
             errors: vec![],

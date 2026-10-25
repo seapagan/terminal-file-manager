@@ -141,14 +141,14 @@ fn repeated_errors_are_bounded_and_fallback_recovers_without_warning_spam() {
     assert_eq!(app.operations.notices.len(), 1);
     assert!(runtime.slots[0].failed);
     std::fs::write(root.path().join("fallback"), "data").unwrap();
-    runtime.poll(&mut app, &mut pool, Duration::from_secs(5));
+    runtime.poll(&mut app, &mut pool, Duration::from_secs(6));
     finish(&mut app, &mut pool);
     assert_eq!(app.panes[0].current().unwrap().name, "fallback");
     runtime.slots[0]
         .signals
         .bits
         .store(READY, Ordering::Release);
-    runtime.poll(&mut app, &mut pool, Duration::from_secs(6));
+    runtime.poll(&mut app, &mut pool, Duration::from_secs(7));
     assert!(!runtime.slots[0].failed);
     assert_eq!(app.operations.notices.len(), 2);
 }
@@ -193,6 +193,8 @@ fn initial_listing_error_still_receives_bounded_automatic_reconciliation() {
     runtime.slots[0].worker = None;
     let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
     runtime.poll(&mut app, &mut pool, Duration::from_secs(30));
+    assert_eq!(pool.active_count(), 0);
+    runtime.poll(&mut app, &mut pool, Duration::from_secs(31));
     assert_eq!(pool.active_count(), 1);
     finish(&mut app, &mut pool);
     assert!(app.panes[0].error.is_none());

@@ -79,6 +79,8 @@ impl Entry {
 pub struct Snapshot {
     /// Physical directory identity for later mutation approvals; absent if unresolved/changed.
     pub directory: Option<Box<Entry>>,
+    /// Bracketed no-follow identity of the lexical entry, for parent focus only.
+    pub entry_identity: Option<Identity>,
     pub path: PathBuf,
     pub entries: Vec<Entry>,
     pub errors: Vec<String>,
@@ -91,6 +93,7 @@ pub struct Snapshot {
 pub fn list(path: &Path, context: &IgnoreContext, cancelled: &AtomicBool) -> io::Result<Snapshot> {
     let mut owners = crate::owner::Cache::default();
     let initial_directory = directory_identity(path, &mut owners);
+    let initial_entry = inspect_no_follow(path, None);
     let directory = fs::read_dir(path)?;
     let (rules, mut errors) = rules::load(path, context);
     let mut entries = Vec::new();
@@ -109,8 +112,12 @@ pub fn list(path: &Path, context: &IgnoreContext, cancelled: &AtomicBool) -> io:
     }
     check_cancelled(cancelled)?;
     let directory = verified_directory(initial_directory, directory_identity(path, &mut owners));
+    let entry_identity =
+        verified_directory(Some(initial_entry), Some(inspect_no_follow(path, None)))
+            .and_then(|entry| entry.identity);
     Ok(Snapshot {
         directory,
+        entry_identity,
         path: path.to_path_buf(),
         entries,
         errors,

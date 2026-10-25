@@ -5,9 +5,9 @@ TFM's resolved graph.
 
 ## Filesystem notifications
 
-`notify` uses CC0-1.0; `notify-types` uses MIT OR Apache-2.0. They do not change
-TFM's own licence.
-`inotify` and `inotify-sys` share the following ISC notice, also retained in
+Linux/macOS use `notify` (CC0-1.0) and `notify-types` (MIT OR Apache-2.0).
+Windows builds do not include them. They do not change TFM's own licence.
+Linux uses `inotify` and `inotify-sys`, which share the following ISC notice, also retained in
 README for binary archives:
 
 ```text

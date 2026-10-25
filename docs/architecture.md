@@ -47,8 +47,21 @@ invalidate the new context. Registration completion requests a catch-up scan.
 The deterministic coordinator debounces changes for 200 ms, caps continuous
 deferral at one second and spaces sustained scan starts by at least one second.
 It retains late dirty state through an in-flight scan. Each pane also receives
-an unconditional 30-second reconciliation on those platforms. Native errors enable two-second
-fallback reconciliation and re-registration with one-to-30-second backoff.
+an unconditional 30-second reconciliation on those platforms. Native errors request
+one catch-up listing, then fallback intervals of 2, 4, 8, 16 and 30 seconds, capped
+at 30 seconds. Repeated error hints do not request extra listings. Registration
+retries use 1, 2, 4, 8, 16 and then 30 seconds; only 30 seconds of stable registration
+resets that backoff and reports recovery with a catch-up listing. A successful
+current-directory watch cannot compensate for a failed parent subscription:
+TFM retains fallback to cover namespace replacement and rename.
+
+A failed listing retains its unsafe state and retries after 1, 2, 4, 8, 16 and
+then 30 seconds, capped at 30 seconds. These deadlines start when the coordinator
+observes an idle failed listing; navigation and active listings take precedence.
+Only an identity-verified successful listing clears the error. This bounds retry
+work while allowing prompt recovery from a transient read failure. Degraded idle
+changes may take 30 seconds to appear. Linux/macOS CPU cost has not been measured;
+the historical large-directory CPU measurements concern Windows polling.
 
 Windows uses intentional manual refresh. Its coordinator creates no native watch
 owner and schedules no timed listing, reconciliation, retry or failure warning.
@@ -60,7 +73,7 @@ All enumeration uses the existing six read-only lanes. Manual refresh and M2
 completion use the same coalesced ordinary refresh intent; navigation retains
 priority and its separate pending path/history state.
 
-The pinned stable `notify` 8.2.0 has no event-kind configuration mask. TFM filters
+The Linux/macOS-only `notify` 8.2.0 has no event-kind configuration mask. TFM filters
 access and access-time-only events in its adapter, along with unrelated parent
 sibling paths. Its Linux backend still subscribes to open events. Notifications
 describe possible changes; snapshots determine the displayed result.

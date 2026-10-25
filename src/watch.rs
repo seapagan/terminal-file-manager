@@ -1,13 +1,24 @@
 //! Platform refresh policy feeds bounded same-directory listing intents.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 mod native;
 #[cfg(test)]
 mod polling_tests;
+#[cfg(test)]
+mod recovery_tests;
 mod schedule;
+mod signals;
 #[cfg(test)]
 mod tests;
 use crate::{app::App, operations::NoticeSeverity, workers::Pool};
-use native::{Binding, DIRTY, ERROR, READY, Signals, Worker};
-use schedule::Schedule;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+use native::{Binding, Worker};
+use signals::{DIRTY, ERROR, READY, Signals};
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+type NativeWorker = Worker;
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+type NativeWorker = ();
+use schedule::{Backoff, Schedule};
 use std::{
     path::PathBuf,
     sync::{Arc, atomic::Ordering},
@@ -26,12 +37,8 @@ enum Mode {
     Manual,
 }
 
-fn interval(failed: bool) -> Duration {
-    Duration::from_secs(if failed { 2 } else { 30 })
-}
-
 struct Slot {
-    worker: Option<Worker>,
+    worker: Option<NativeWorker>,
     signals: Arc<Signals>,
     path: Option<PathBuf>,
     context: u64,
@@ -39,6 +46,9 @@ struct Slot {
     sweep: Duration,
     failed: bool,
     urgent: bool,
+    fallback: Backoff,
+    retry: Option<Duration>,
+    retry_backoff: Backoff,
 }
 
 impl Default for Runtime {
@@ -56,17 +66,17 @@ impl Runtime {
         Self {
             mode,
             slots: std::array::from_fn(|_| Slot {
-                worker: match mode {
-                    Mode::Native => Worker::new().ok(),
-                    Mode::Manual => None,
-                },
+                worker: new_worker(mode),
                 signals: Arc::default(),
                 path: None,
                 context: 0,
                 schedule: Schedule::default(),
-                sweep: interval(false),
+                sweep: Duration::from_secs(30),
                 failed: false,
                 urgent: false,
+                fallback: Backoff::default(),
+                retry: None,
+                retry_backoff: Backoff::default(),
             }),
         }
     }
@@ -93,7 +103,13 @@ impl Runtime {
             {
                 slot.schedule.started(now);
                 slot.urgent = false;
-                slot.sweep = now + interval(slot.failed);
+                slot.sweep = now
+                    + if slot.failed {
+                        (slot.fallback.next() * 2).min(Duration::from_secs(30))
+                    } else {
+                        Duration::from_secs(30)
+                    };
+                slot.retry = None;
                 pool.submit(request);
             }
         }
@@ -102,8 +118,19 @@ impl Runtime {
 }
 
 impl Slot {
-    fn due(&self, pane: &crate::app::Pane, now: Duration) -> bool {
-        pane.pending.is_none() && !pane.listing && (self.urgent || self.schedule.due(now))
+    fn due(&mut self, pane: &crate::app::Pane, now: Duration) -> bool {
+        if pane.pending.is_some() || pane.listing {
+            return false;
+        }
+        if pane.error.is_some() {
+            let deadline = self
+                .retry
+                .get_or_insert_with(|| now + self.retry_backoff.next());
+            return now >= *deadline;
+        }
+        self.retry = None;
+        self.retry_backoff = Backoff::default();
+        self.urgent || self.schedule.due(now)
     }
 
     fn rebind(&mut self, pane: &crate::app::Pane, now: Duration) {
@@ -114,21 +141,28 @@ impl Slot {
         self.context = pane.context;
         self.signals = Arc::default();
         self.schedule = Schedule::default();
-        self.sweep = now + interval(false);
+        self.sweep = now + Duration::from_secs(30);
         self.urgent = false;
+        self.fallback = Backoff::default();
+        self.retry = None;
+        self.retry_backoff = Backoff::default();
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         if let Some(worker) = &self.worker {
             worker.bind(Binding {
                 path: pane.path.clone(),
                 signals: self.signals.clone(),
+                failed: Arc::default(),
             });
-        } else {
-            self.signals.bits.store(ERROR | DIRTY, Ordering::Release);
+        }
+        if self.worker.is_none() {
+            self.signals.publish(ERROR | DIRTY);
         }
     }
 
     fn consume(&mut self, app: &mut App, pane: usize, now: Duration) -> bool {
         let bits = self.signals.bits.swap(0, Ordering::AcqRel);
-        if bits & DIRTY != 0 {
+        // Repeated backend failures are covered by fallback, not fresh dirty work.
+        if bits & (DIRTY | ERROR) == DIRTY {
             self.schedule.dirty(now);
         }
         let failed = if bits & ERROR != 0 {
@@ -140,6 +174,9 @@ impl Slot {
         };
         let changed = self.failed != failed;
         self.failed = failed;
+        if bits & READY != 0 {
+            self.fallback = Backoff::default();
+        }
         if bits & READY != 0 || (changed && failed) {
             self.urgent = true;
         }
@@ -157,4 +194,13 @@ impl Slot {
         }
         changed
     }
+}
+
+fn new_worker(mode: Mode) -> Option<NativeWorker> {
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    if mode == Mode::Native {
+        return Worker::new().ok();
+    }
+    let _ = mode;
+    None
 }

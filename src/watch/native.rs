@@ -1,50 +1,24 @@
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+mod recovery;
+#[cfg(test)]
+mod registration_tests;
+use super::signals::{DIRTY, ERROR, READY, Signals};
+use recovery::Recovery;
 use std::{
     path::{Path, PathBuf},
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, AtomicU8, Ordering},
+        atomic::{AtomicBool, Ordering},
         mpsc,
     },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
 
-pub(super) const DIRTY: u8 = 1;
-pub(super) const READY: u8 = 2;
-pub(super) const ERROR: u8 = 4;
-
-#[derive(Default)]
-pub(super) struct Signals {
-    pub(super) bits: AtomicU8,
-    failed: AtomicBool,
-}
-
-impl Signals {
-    pub(super) fn publish(&self, bits: u8) {
-        if bits & (READY | ERROR) == 0 {
-            self.bits.fetch_or(bits, Ordering::Release);
-        } else {
-            let mut previous = self.bits.load(Ordering::Acquire);
-            loop {
-                let next = (previous & !(READY | ERROR)) | bits;
-                match self.bits.compare_exchange(
-                    previous,
-                    next,
-                    Ordering::AcqRel,
-                    Ordering::Acquire,
-                ) {
-                    Ok(_) => break,
-                    Err(current) => previous = current,
-                }
-            }
-        }
-    }
-}
-
 pub(super) struct Binding {
     pub(super) path: PathBuf,
     pub(super) signals: Arc<Signals>,
+    pub(super) failed: Arc<AtomicBool>,
 }
 
 /// Registration and teardown never run on the input/render thread.
@@ -93,62 +67,92 @@ impl Drop for Worker {
 fn run(pending: Arc<Mutex<Option<Binding>>>, stop: Arc<AtomicBool>, receive: mpsc::Receiver<()>) {
     let mut binding: Option<Binding> = None;
     let mut watcher = None;
-    let mut retry = Instant::now();
-    let mut backoff = Duration::from_secs(1);
+    let clock = Instant::now();
+    let mut recovery = Recovery::default();
     while !stop.load(Ordering::Acquire) {
         let next = pending.lock().unwrap_or_else(|e| e.into_inner()).take();
         if let Some(next) = next {
             watcher = None;
             binding = Some(next);
-            retry = Instant::now();
-            backoff = Duration::from_secs(1);
+            recovery = Recovery::default();
         }
         if let Some(current) = &binding {
-            if current.signals.failed.swap(false, Ordering::AcqRel) {
+            if current.failed.swap(false, Ordering::AcqRel) {
                 current.signals.publish(ERROR | DIRTY);
                 watcher = None;
-                retry = Instant::now() + backoff;
+                recovery.failed(clock.elapsed());
             }
-            if watcher.is_none() && Instant::now() >= retry {
-                watcher = register(current).ok();
-                if watcher.is_some() {
-                    current.signals.publish(READY | DIRTY);
-                    backoff = Duration::from_secs(1);
-                } else {
-                    current.signals.publish(ERROR | DIRTY);
-                    retry = Instant::now() + backoff;
-                    backoff = (backoff * 2).min(Duration::from_secs(30));
-                }
+            if watcher.is_none() && clock.elapsed() >= recovery.retry {
+                watcher = attempt_registration(current, &mut recovery, &clock);
+            }
+            if watcher.is_some() && recovery.recovered(clock.elapsed()) {
+                current.signals.publish(READY | DIRTY);
             }
         }
         let _ = receive.recv_timeout(Duration::from_millis(100));
     }
 }
 
+fn attempt_registration(
+    binding: &Binding,
+    recovery: &mut Recovery,
+    clock: &Instant,
+) -> Option<RecommendedWatcher> {
+    let watcher = register(binding).ok();
+    if watcher.is_some() {
+        if recovery.registered(clock.elapsed()) {
+            binding.signals.publish(READY | DIRTY);
+        }
+    } else {
+        binding.signals.publish(ERROR | DIRTY);
+        recovery.failed(clock.elapsed());
+    }
+    watcher
+}
+
 fn register(binding: &Binding) -> notify::Result<RecommendedWatcher> {
     let raw = binding.path.clone();
     let physical = std::fs::canonicalize(&raw).map_err(notify::Error::io)?;
     let signals = binding.signals.clone();
-    let mut watcher =
-        notify::recommended_watcher(move |result| on_event(result, &raw, &physical, &signals))?;
-    watcher.watch(&binding.path, RecursiveMode::NonRecursive)?;
-    if let Some(parent) = binding.path.parent().filter(|p| !p.as_os_str().is_empty()) {
-        watcher.watch(parent, RecursiveMode::NonRecursive)?;
-    }
+    let failed = binding.failed.clone();
+    let mut watcher = notify::recommended_watcher(move |result| {
+        on_event(result, &raw, &physical, &signals, &failed)
+    })?;
+    watch_paths(&binding.path, |path| {
+        watcher.watch(path, RecursiveMode::NonRecursive)
+    })?;
     Ok(watcher)
 }
 
-fn on_event(result: notify::Result<Event>, raw: &Path, physical: &Path, signals: &Signals) {
+fn watch_paths(
+    path: &Path,
+    mut watch: impl FnMut(&Path) -> notify::Result<()>,
+) -> notify::Result<()> {
+    watch(path)?;
+    // The parent subscription detects namespace replacement; partial is unsafe.
+    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        watch(parent)?;
+    }
+    Ok(())
+}
+
+fn on_event(
+    result: notify::Result<Event>,
+    raw: &Path,
+    physical: &Path,
+    signals: &Signals,
+    failed: &AtomicBool,
+) {
     match result {
         Ok(event) if event.need_rescan() => {
-            signals.failed.store(true, Ordering::Release);
+            failed.store(true, Ordering::Release);
             signals.publish(ERROR | DIRTY);
         }
         Ok(event) if relevant(&event, raw, physical) => {
             signals.publish(DIRTY);
         }
         Err(_) => {
-            signals.failed.store(true, Ordering::Release);
+            failed.store(true, Ordering::Release);
             signals.publish(ERROR | DIRTY);
         }
         _ => {}
@@ -192,8 +196,9 @@ mod tests {
             Ok(Event::new(EventKind::Other).set_flag(Flag::Rescan)),
         ] {
             let signals = Signals::default();
-            on_event(result, path, path, &signals);
-            assert!(signals.failed.load(Ordering::Acquire));
+            let failed = AtomicBool::new(false);
+            on_event(result, path, path, &signals, &failed);
+            assert!(failed.load(Ordering::Acquire));
             assert_eq!(signals.bits.load(Ordering::Acquire), ERROR | DIRTY);
         }
     }
@@ -233,7 +238,7 @@ mod tests {
 
     #[cfg(not(windows))]
     fn wait_for(signals: &Signals, mask: u8) {
-        let deadline = Instant::now() + Duration::from_secs(5);
+        let deadline = Instant::now() + Duration::from_secs(40);
         while signals.bits.load(Ordering::Acquire) & mask == 0 {
             assert!(Instant::now() < deadline, "native watch state timed out");
             thread::yield_now();
@@ -250,6 +255,7 @@ mod tests {
         worker.bind(Binding {
             path: path.clone(),
             signals: signals.clone(),
+            failed: Arc::default(),
         });
         wait_for(&signals, ERROR);
         std::fs::create_dir(&path).unwrap();
@@ -282,12 +288,14 @@ mod tests {
             worker.bind(Binding {
                 path: root.path().join(format!("old-{index}")),
                 signals: Arc::default(),
+                failed: Arc::default(),
             });
         }
         let signals = Arc::<Signals>::default();
         worker.bind(Binding {
             path: root.path().into(),
             signals: signals.clone(),
+            failed: Arc::default(),
         });
         wait_for(&signals, READY);
         eprintln!(

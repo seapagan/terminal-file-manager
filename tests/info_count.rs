@@ -23,6 +23,7 @@ fn loaded(sidebar: bool, popup: bool) -> (tempfile::TempDir, Controller) {
             1,
             Ok(fs::Snapshot {
                 directory: Some(Box::new(fs::inspect(root.path()))),
+                entry_identity: None,
                 path: root.path().into(),
                 entries: vec![entry.clone()],
                 errors: vec![],

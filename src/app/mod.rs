@@ -249,6 +249,7 @@ impl App {
         });
         if attempted.is_some() || state.context == 0 {
             state.context += 1;
+            state.entry_identity = snapshot.entry_identity.clone();
         }
         state.install(snapshot);
         self.reconcile_listing_details(pane, previous);

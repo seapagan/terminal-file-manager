@@ -254,6 +254,7 @@ fn cached_times(c: &mut Controller) {
         1,
         Ok(fs::Snapshot {
             directory: Some(Box::new(fs::inspect(&c.app.panes[0].path))),
+            entry_identity: None,
             path: c.app.panes[0].path.clone(),
             entries: vec![entry.clone()],
             errors: vec![],

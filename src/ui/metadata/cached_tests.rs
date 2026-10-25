@@ -21,6 +21,7 @@ fn loaded() -> (tempfile::TempDir, Controller) {
             1,
             Ok(fs::Snapshot {
                 directory: Some(Box::new(fs::inspect(root.path()))),
+                entry_identity: None,
                 path: root.path().into(),
                 entries: entries.clone(),
                 errors: vec![],

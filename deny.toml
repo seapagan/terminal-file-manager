@@ -21,8 +21,9 @@ allow = ["Unicode-3.0"]
 multiple-versions = "deny"
 wildcards = "deny"
 
-# notify 8.2 uses 0.60; the application and its other dependencies use 0.61.
-# Remove when stable notify adopts the shared Windows bindings version.
+# notify's Windows backend remains in Cargo's all-target resolution, even though
+# TFM only enables notify on Linux/macOS. The Windows target graph excludes it.
+# Remove when notify's resolved backend adopts the shared bindings version.
 [[bans.skip]]
 name = "windows-sys"
 version = "=0.60.2"
