@@ -23,11 +23,21 @@ colours into semantic Ratatui styles. No backend calls occur in input or draw.
 `fs` supplies no-follow local snapshots, platform metadata, refreshed ignore
 rules and cancellable descendant totals. Exact PathBuf/OsString identities stay
 separate from sanitized display text. Unix identity uses device/inode; Windows
-uses native volume/file ID. The private Windows boundary has exactly two
-approved function-scoped unsafe exceptions for read-only reparse-tag and
-no-follow identity queries. Search handles use FindClose through RAII; File
-handles use standard ownership. Neither adjusts privileges or changes files.
+uses native volume/file ID. The private Windows boundary has four approved
+function-scoped unsafe exceptions: reparse-tag, no-follow identity, volume
+eligibility and buffered directory queries. Search handles use FindClose
+through RAII; File handles use standard ownership. These queries do not adjust
+privileges or change files.
 Unsupported reparse points remain visible and cannot be entered or recursed.
+
+Windows listing uses buffered both-ID records only after handle-bound evidence
+establishes a local fixed NTFS volume and the selected directory identity.
+Reparse ancestors and unsupported or uncertain volumes retain ordinary listing.
+The decoder checks record bounds and preserves native UTF-16 names. Enumeration
+handles close before exceptional-entry inspection and ignore evaluation.
+Directory verification, creation stamps and mutation-time inspection remain
+independent of enumeration hints. Buffered scans can still contend with ancestor
+renames while their transient handles are open.
 
 `workers` bounds filesystem work to six lanes (listing, metadata, totals for
 each pane), with one running and one replaceable pending request per lane.

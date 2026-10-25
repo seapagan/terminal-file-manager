@@ -1,8 +1,12 @@
 //! Read-only local filesystem snapshots. Native paths never come from display text.
 
+#[cfg(any(windows, test))]
+mod directory_records;
 mod platform;
 mod rules;
 mod totals;
+#[cfg(windows)]
+mod windows_listing;
 #[cfg(windows)]
 mod windows_native;
 
@@ -89,15 +93,43 @@ pub struct Snapshot {
 /// # Errors
 /// Returns the selected directory's error, or Interrupted on cancellation.
 pub fn list(path: &Path, context: &IgnoreContext, cancelled: &AtomicBool) -> io::Result<Snapshot> {
+    #[cfg(windows)]
+    return list_backend(path, context, cancelled, true);
+    #[cfg(not(windows))]
+    list_backend(path, context, cancelled)
+}
+
+fn list_backend(
+    path: &Path,
+    context: &IgnoreContext,
+    cancelled: &AtomicBool,
+    #[cfg(windows)] buffered: bool,
+) -> io::Result<Snapshot> {
     let mut owners = crate::owner::Cache::default();
     let initial_directory = directory_identity(path, &mut owners);
+    #[cfg(windows)]
+    if buffered
+        && let Some(listing) = windows_listing::list(path, initial_directory.as_ref(), cancelled)?
+    {
+        return finish_buffered(path, context, cancelled, initial_directory, listing);
+    }
+    list_ordinary(path, context, cancelled, initial_directory, &mut owners)
+}
+
+fn list_ordinary(
+    path: &Path,
+    context: &IgnoreContext,
+    cancelled: &AtomicBool,
+    initial_directory: Option<Entry>,
+    owners: &mut crate::owner::Cache,
+) -> io::Result<Snapshot> {
     let directory = fs::read_dir(path)?;
     let (rules, mut errors) = rules::load(path, context);
     let mut entries = Vec::new();
     for item in directory {
         check_cancelled(cancelled)?;
         match item {
-            Ok(item) => entries.push(inspect_with_cache(&item.path(), &mut owners)),
+            Ok(item) => entries.push(inspect_with_cache(&item.path(), owners)),
             Err(error) => errors.push(error.to_string()),
         }
     }
@@ -108,11 +140,40 @@ pub fn list(path: &Path, context: &IgnoreContext, cancelled: &AtomicBool) -> io:
             .map(|rules| rules.ignored(&entry.path, entry.may_recurse()));
     }
     check_cancelled(cancelled)?;
-    let directory = verified_directory(initial_directory, directory_identity(path, &mut owners));
+    let directory = verified_directory(initial_directory, directory_identity(path, owners));
     Ok(Snapshot {
         directory,
         path: path.to_path_buf(),
         entries,
+        errors,
+    })
+}
+
+#[cfg(windows)]
+fn finish_buffered(
+    path: &Path,
+    context: &IgnoreContext,
+    cancelled: &AtomicBool,
+    initial: Option<Entry>,
+    mut listing: windows_listing::Listing,
+) -> io::Result<Snapshot> {
+    let (rules, mut errors) = rules::load(path, context);
+    errors.append(&mut listing.errors);
+    for entry in &mut listing.entries {
+        check_cancelled(cancelled)?;
+        entry.ignored = rules
+            .as_ref()
+            .map(|rules| rules.ignored(&entry.path, entry.may_recurse()));
+    }
+    check_cancelled(cancelled)?;
+    let directory = verified_directory(
+        initial,
+        directory_identity(path, &mut crate::owner::Cache::default()),
+    );
+    Ok(Snapshot {
+        directory,
+        path: path.to_path_buf(),
+        entries: listing.entries,
         errors,
     })
 }
