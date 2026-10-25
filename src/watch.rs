@@ -89,7 +89,7 @@ impl Runtime {
                 slot.urgent = true;
             }
             if slot.due(&app.panes[pane], now)
-                && let Some(request) = app.request_refresh(pane)
+                && let Some(request) = app.request_reconciliation(pane)
             {
                 slot.schedule.started(now);
                 slot.urgent = false;

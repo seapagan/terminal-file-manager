@@ -139,8 +139,17 @@ impl App {
         Some(request)
     }
 
-    /// Invalidate the displayed directory without stealing navigation or cancelling a scan.
+    /// Explicit refresh invalidates details even if the next snapshot is unchanged.
     pub fn request_refresh(&mut self, pane: usize) -> Option<Request> {
+        if self.panes.get(pane)?.pending.is_some() {
+            return None;
+        }
+        self.invalidate_listing_details(pane);
+        self.request_reconciliation(pane)
+    }
+
+    /// Reconcile without stealing navigation or cancelling a scan or unchanged count.
+    pub(crate) fn request_reconciliation(&mut self, pane: usize) -> Option<Request> {
         let state = self.panes.get_mut(pane)?;
         if state.pending.is_some() {
             return None;
@@ -216,6 +225,12 @@ impl App {
             self.invalidate_listing_details(pane);
             return true;
         }
+        let previous = if attempted.is_none() && state.error.is_none() && snapshot.errors.is_empty()
+        {
+            state.current().cloned()
+        } else {
+            None
+        };
         state.error = snapshot.directory.is_none().then(|| {
             "Directory identity unavailable; reopen the directory before using this context".into()
         });
@@ -223,8 +238,24 @@ impl App {
             state.context += 1;
         }
         state.install(snapshot);
-        self.invalidate_listing_details(pane);
+        self.reconcile_listing_details(pane, previous);
         true
+    }
+
+    fn reconcile_listing_details(&mut self, pane: usize, previous: Option<Entry>) {
+        let state = &self.panes[pane];
+        let unchanged = previous
+            .zip(state.current())
+            .is_some_and(|(mut old, fresh)| {
+                // Enumeration/counting can change access time without changing count inputs.
+                old.accessed = fresh.accessed;
+                old.identity.is_some() && old.error.is_none() && old == *fresh
+            });
+        if !unchanged {
+            self.invalidate_listing_details(pane);
+        } else if let Some(entry) = self.details[pane].entry.as_mut() {
+            entry.accessed = state.current().unwrap().accessed;
+        }
     }
 
     fn invalidate_listing_details(&mut self, pane: usize) {
