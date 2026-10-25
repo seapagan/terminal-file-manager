@@ -34,6 +34,25 @@ the only remaining payload, quarantine uncertainty, avoid deleting user files
 and require validated evidence before cleanup or any new mutation. See the
 [M2 correction checkpoint](docs/acceptance.md#m2-deepseek-correction-round--23-october-2026).
 
+## Pre-M3 Windows Trash confirmation UX
+
+Investigate removing the extra Windows Shell confirmation after TFM's own
+`F8` -> `T` Trash approval, without changing global Recycle Bin settings or
+requiring mouse interaction. The existing `IFileOperation` uses
+`FOFX_RECYCLEONDELETE` and `FOF_WANTNUKEWARNING`; evaluate per-operation
+`FOF_NOCONFIRMATION`, which auto-answers confirmations more broadly than the
+ordinary Recycle Bin dialog. Do not enable it based on flags alone.
+
+Acceptance: with Windows delete confirmation enabled, use disposable native
+Windows fixtures to prove quiet, recoverable recycling; refusal/cancellation
+and unchanged source identity whenever recycling is unavailable or could become
+permanent deletion; and unchanged safety checks, Shell callback/receipt handling
+and critical-incident reporting. Cover files, directories, links/junctions and
+relevant Recycle Bin/volume failure cases. Never silently permit permanent
+deletion, alter OS-wide settings or substitute keyboard/mouse dialog automation.
+If safe per-operation suppression cannot be proven, retain the Windows dialog
+and document why.
+
 ## Post-v1 TODO
 
 These items are deferred contracts, without dormant implementations. Each needs
