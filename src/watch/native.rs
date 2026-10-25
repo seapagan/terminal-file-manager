@@ -1,0 +1,362 @@
+use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+mod recovery;
+#[cfg(test)]
+mod registration_tests;
+use super::signals::{DIRTY, ERROR, READY, Signals};
+use recovery::Recovery;
+use std::{
+    path::{Path, PathBuf},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
+    thread::{self, JoinHandle},
+    time::{Duration, Instant},
+};
+
+pub(super) struct Binding {
+    pub(super) path: PathBuf,
+    pub(super) signals: Arc<Signals>,
+    pub(super) failed: Arc<AtomicBool>,
+}
+
+/// Registration and teardown never run on the input/render thread.
+pub(super) struct Worker {
+    pending: Arc<Mutex<Option<Binding>>>,
+    wake: mpsc::SyncSender<()>,
+    stop: Arc<AtomicBool>,
+    handle: Option<JoinHandle<()>>,
+}
+
+impl Worker {
+    pub(super) fn new() -> std::io::Result<Self> {
+        let pending = Arc::new(Mutex::new(None));
+        let stop = Arc::new(AtomicBool::new(false));
+        let (wake, receive) = mpsc::sync_channel(1);
+        let shared = pending.clone();
+        let stopping = stop.clone();
+        let handle = thread::Builder::new()
+            .name("tfm-watch".into())
+            .spawn(move || run(shared, stopping, receive))?;
+        Ok(Self {
+            pending,
+            wake,
+            stop,
+            handle: Some(handle),
+        })
+    }
+
+    pub(super) fn bind(&self, binding: Binding) {
+        *self.pending.lock().unwrap_or_else(|e| e.into_inner()) = Some(binding);
+        let _ = self.wake.try_send(());
+    }
+}
+
+impl Drop for Worker {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Release);
+        let _ = self.wake.try_send(());
+        if let Some(handle) = self.handle.take().filter(|h| h.is_finished()) {
+            let _ = handle.join();
+        }
+        // A filesystem syscall may stall; its single owner exits when it returns.
+    }
+}
+
+fn run(pending: Arc<Mutex<Option<Binding>>>, stop: Arc<AtomicBool>, receive: mpsc::Receiver<()>) {
+    let mut binding: Option<Binding> = None;
+    let mut watcher = None;
+    let clock = Instant::now();
+    let mut recovery = Recovery::default();
+    while !stop.load(Ordering::Acquire) {
+        let next = pending.lock().unwrap_or_else(|e| e.into_inner()).take();
+        if let Some(next) = next {
+            watcher = None;
+            binding = Some(next);
+            recovery = Recovery::default();
+        }
+        if let Some(current) = &binding {
+            if current.failed.swap(false, Ordering::AcqRel) {
+                current.signals.publish(ERROR | DIRTY);
+                watcher = None;
+                recovery.failed(clock.elapsed());
+            }
+            if watcher.is_none() && clock.elapsed() >= recovery.retry {
+                watcher = attempt_registration(current, &mut recovery, &clock);
+            }
+            if watcher.is_some() && recovery.recovered(clock.elapsed()) {
+                current.signals.publish(READY | DIRTY);
+            }
+        }
+        let _ = receive.recv_timeout(Duration::from_millis(100));
+    }
+}
+
+fn attempt_registration(
+    binding: &Binding,
+    recovery: &mut Recovery,
+    clock: &Instant,
+) -> Option<RecommendedWatcher> {
+    let watcher = register(binding).ok();
+    if watcher.is_some() {
+        if recovery.registered(clock.elapsed()) {
+            binding.signals.publish(READY | DIRTY);
+        }
+    } else {
+        binding.signals.publish(ERROR | DIRTY);
+        recovery.failed(clock.elapsed());
+    }
+    watcher
+}
+
+fn register(binding: &Binding) -> notify::Result<RecommendedWatcher> {
+    let raw = binding.path.clone();
+    let physical = std::fs::canonicalize(&raw).map_err(notify::Error::io)?;
+    let signals = binding.signals.clone();
+    let failed = binding.failed.clone();
+    let mut watcher = notify::recommended_watcher(move |result| {
+        on_event(result, &raw, &physical, &signals, &failed)
+    })?;
+    watch_paths(&binding.path, |path| {
+        watcher.watch(path, RecursiveMode::NonRecursive)
+    })?;
+    Ok(watcher)
+}
+
+fn watch_paths(
+    path: &Path,
+    mut watch: impl FnMut(&Path) -> notify::Result<()>,
+) -> notify::Result<()> {
+    watch(path)?;
+    // The parent subscription detects namespace replacement; partial is unsafe.
+    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        watch(parent)?;
+    }
+    Ok(())
+}
+
+fn on_event(
+    result: notify::Result<Event>,
+    raw: &Path,
+    physical: &Path,
+    signals: &Signals,
+    failed: &AtomicBool,
+) {
+    match result {
+        Ok(event) if event.need_rescan() => {
+            failed.store(true, Ordering::Release);
+            signals.publish(ERROR | DIRTY);
+        }
+        Ok(event) if relevant(&event, raw, physical) => {
+            signals.publish(DIRTY);
+        }
+        Err(_) => {
+            failed.store(true, Ordering::Release);
+            signals.publish(ERROR | DIRTY);
+        }
+        _ => {}
+    }
+}
+
+fn relevant(event: &Event, raw: &Path, physical: &Path) -> bool {
+    use notify::event::{AccessKind, AccessMode, MetadataKind, ModifyKind};
+    if event.need_rescan() {
+        return true;
+    }
+    if matches!(
+        event.kind,
+        EventKind::Access(kind) if kind != AccessKind::Close(AccessMode::Write)
+    ) || matches!(
+        event.kind,
+        EventKind::Modify(ModifyKind::Metadata(MetadataKind::AccessTime))
+    ) {
+        return false;
+    }
+    event.paths.is_empty()
+        || event.paths.iter().any(|path| {
+            [raw, physical].iter().any(|directory| {
+                path == directory
+                    || path.parent() == Some(directory)
+                    || Some(path.as_path()) == directory.parent()
+            })
+        })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use notify::event::{AccessKind, AccessMode, Flag, MetadataKind, ModifyKind};
+
+    #[test]
+    fn backend_errors_and_overflow_require_rescan_and_native_re_registration() {
+        let path = Path::new("/current");
+        for result in [
+            Err(notify::Error::generic("forced backend failure")),
+            Ok(Event::new(EventKind::Other).set_flag(Flag::Rescan)),
+        ] {
+            let signals = Signals::default();
+            let failed = AtomicBool::new(false);
+            on_event(result, path, path, &signals, &failed);
+            assert!(failed.load(Ordering::Acquire));
+            assert_eq!(signals.bits.load(Ordering::Acquire), ERROR | DIRTY);
+        }
+    }
+
+    #[test]
+    fn concurrent_health_and_dirty_publication_preserves_bounded_atomic_state() {
+        let signals = Arc::<Signals>::default();
+        let start = Arc::new(std::sync::Barrier::new(4));
+        let producers: Vec<_> = [DIRTY, READY | DIRTY, ERROR | DIRTY]
+            .into_iter()
+            .map(|bits| {
+                let signals = signals.clone();
+                let start = start.clone();
+                thread::spawn(move || {
+                    start.wait();
+                    for _ in 0..5000 {
+                        signals.publish(bits);
+                    }
+                })
+            })
+            .collect();
+        start.wait();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while producers.iter().any(|producer| !producer.is_finished()) {
+            let bits = signals.bits.swap(0, Ordering::AcqRel);
+            assert_ne!(bits & (READY | ERROR), READY | ERROR);
+            assert!(Instant::now() < deadline, "atomic producers stalled");
+            thread::yield_now();
+        }
+        for producer in producers {
+            producer.join().unwrap();
+        }
+        signals.publish(DIRTY);
+        signals.publish(READY | DIRTY);
+        assert_eq!(signals.bits.load(Ordering::Acquire), READY | DIRTY);
+    }
+
+    #[cfg(not(windows))]
+    fn wait_for(signals: &Signals, mask: u8) {
+        let deadline = Instant::now() + Duration::from_secs(40);
+        while signals.bits.load(Ordering::Acquire) & mask == 0 {
+            assert!(Instant::now() < deadline, "native watch state timed out");
+            thread::yield_now();
+        }
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn native_failed_registration_retries_and_shutdown_releases_its_owner() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("temporarily-missing");
+        let signals = Arc::<Signals>::default();
+        let mut worker = Worker::new().unwrap();
+        worker.bind(Binding {
+            path: path.clone(),
+            signals: signals.clone(),
+            failed: Arc::default(),
+        });
+        wait_for(&signals, ERROR);
+        std::fs::create_dir(&path).unwrap();
+        wait_for(&signals, READY);
+        let owner = worker.handle.take().unwrap();
+        let stopped = Instant::now();
+        drop(worker);
+        let deadline = stopped + Duration::from_secs(5);
+        while !owner.is_finished() {
+            assert!(
+                Instant::now() < deadline,
+                "watch owner leaked after shutdown"
+            );
+            thread::yield_now();
+        }
+        owner.join().unwrap();
+        eprintln!(
+            "Native failed registration recovered; owner shutdown {:?}",
+            stopped.elapsed()
+        );
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn native_rebind_keeps_only_latest_pending_subscription_and_handles_roots() {
+        let root = tempfile::tempdir().unwrap();
+        let started = Instant::now();
+        let worker = Worker::new().unwrap();
+        for index in 0..100 {
+            worker.bind(Binding {
+                path: root.path().join(format!("old-{index}")),
+                signals: Arc::default(),
+                failed: Arc::default(),
+            });
+        }
+        let signals = Arc::<Signals>::default();
+        worker.bind(Binding {
+            path: root.path().into(),
+            signals: signals.clone(),
+            failed: Arc::default(),
+        });
+        wait_for(&signals, READY);
+        eprintln!(
+            "Native latest-only registration/rebind: {:?}",
+            started.elapsed()
+        );
+        let filesystem_root = root.path().ancestors().last().unwrap();
+        assert!(filesystem_root.parent().is_none());
+        let event = Event::new(EventKind::Any).add_path(filesystem_root.join("child"));
+        assert!(relevant(&event, filesystem_root, filesystem_root));
+    }
+
+    #[test]
+    fn reads_and_unrelated_parent_children_do_not_invalidate() {
+        let raw = Path::new("/alias/current");
+        let physical = Path::new("/physical/current");
+        for kind in [
+            EventKind::Access(AccessKind::Read),
+            EventKind::Access(AccessKind::Open(AccessMode::Read)),
+            EventKind::Access(AccessKind::Close(AccessMode::Read)),
+            EventKind::Access(AccessKind::Close(AccessMode::Execute)),
+            EventKind::Modify(ModifyKind::Metadata(MetadataKind::AccessTime)),
+        ] {
+            let event = Event::new(kind).add_path(raw.join("file"));
+            assert!(!relevant(&event, raw, physical));
+        }
+        assert!(!relevant(
+            &Event::new(EventKind::Any).add_path("/alias/sibling/file".into()),
+            raw,
+            physical
+        ));
+        assert!(!relevant(
+            &Event::new(EventKind::Any).add_path(raw.join("child/grandchild")),
+            raw,
+            physical
+        ));
+    }
+
+    #[test]
+    fn mutations_aliases_empty_paths_and_overflow_conservatively_invalidate() {
+        let raw = Path::new("/alias/current");
+        let physical = Path::new("/physical/current");
+        for path in [raw.to_path_buf(), raw.join("file"), physical.join("file")] {
+            for kind in [
+                EventKind::Create(notify::event::CreateKind::File),
+                EventKind::Remove(notify::event::RemoveKind::File),
+                EventKind::Modify(ModifyKind::Any),
+                EventKind::Access(AccessKind::Close(AccessMode::Write)),
+            ] {
+                assert!(relevant(
+                    &Event::new(kind).add_path(path.clone()),
+                    raw,
+                    physical
+                ));
+            }
+        }
+        assert!(relevant(&Event::new(EventKind::Any), raw, physical));
+        assert!(relevant(
+            &Event::new(EventKind::Other).set_flag(Flag::Rescan),
+            raw,
+            physical
+        ));
+    }
+}

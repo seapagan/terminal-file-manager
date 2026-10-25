@@ -37,6 +37,70 @@ kernel read cannot be forcibly interrupted, and no mutation is submitted.
 Traversal has a 128-directory depth bound and bounded error diagnostics;
 errors, cancellation and overflow never become complete totals.
 
+On Linux and macOS, `watch` keeps one logical native subscription per local pane,
+including hidden panes, with nonrecursive current-directory and immediate-parent targets.
+Two bounded background owners register, retry and release native watchers;
+callbacks coalesce invalidations and errors into pane-local atomic flags.
+Changing the directory context replaces those flags, so old callbacks cannot
+invalidate the new context. Registration completion requests a catch-up scan.
+
+The deterministic coordinator debounces changes for 200 ms, caps continuous
+deferral at one second and spaces sustained scan starts by at least one second.
+It retains late dirty state through an in-flight scan. Each pane also receives
+an unconditional 30-second reconciliation on those platforms. Native errors request
+one catch-up listing, then fallback intervals of 2, 4, 8, 16 and 30 seconds, capped
+at 30 seconds. Repeated error hints do not request extra listings. Registration
+retries use 1, 2, 4, 8, 16 and then 30 seconds; only 30 seconds of stable registration
+resets that backoff and reports recovery with a catch-up listing. A successful
+current-directory watch cannot compensate for a failed parent subscription:
+TFM retains fallback to cover namespace replacement and rename.
+
+A failed listing retains its unsafe state and retries after 1, 2, 4, 8, 16 and
+then 30 seconds, capped at 30 seconds. These deadlines start when the coordinator
+observes an idle failed listing; navigation and active listings take precedence.
+Only an identity-verified successful listing clears the error. This bounds retry
+work while allowing prompt recovery from a transient read failure. Degraded idle
+changes may take 30 seconds to appear. Linux/macOS CPU cost has not been measured;
+the historical large-directory CPU measurements concern Windows polling.
+
+Windows uses intentional manual refresh. Its coordinator creates no native watch
+owner and schedules no timed listing, reconciliation, retry or failure warning.
+Both panes retain their last listing until deliberate refresh or navigation;
+hidden panes do not stay automatically current. The `r` action refreshes the
+active pane through the existing bounded workers.
+
+All enumeration uses the existing six read-only lanes. Manual refresh and M2
+completion use the same coalesced ordinary refresh intent; navigation retains
+priority and its separate pending path/history state.
+
+The Linux/macOS-only `notify` 8.2.0 has no event-kind configuration mask. TFM filters
+access and access-time-only events in its adapter, along with unrelated parent
+sibling paths. Its Linux backend still subscribes to open events. Notifications
+describe possible changes; snapshots determine the displayed result.
+Ordinary refresh requires the same physical directory identity, including
+available creation evidence, and native namespace. Enumeration brackets that
+evidence before accepting a snapshot. Missing or changed evidence retains the last
+good view and blocks new mutation approvals. Explicit reopening establishes a new context. A missing
+cursor chooses the nearest surviving row; marks require object continuity.
+Metadata and count generations invalidate on changed snapshots and explicit
+refresh. Recursive totals remain cached count snapshots, not continuously
+updated descendant totals; explicit recount/refresh,
+selection changes, replacement or errors invalidate them.
+
+Linux/macOS watcher shutdown signals its owners without waiting for a potentially stalled
+filesystem call on the UI thread. Normal owners release their watches on exit;
+an owner stalled inside a kernel call releases them when that call returns.
+Native notifications may miss changes on network or pseudo-filesystems. Periodic
+enumeration supplies eventual reconciliation on Linux/macOS where enumeration
+still works. Windows manual refresh avoids persistent watch handles and idle
+enumeration, although deliberate listings still use transient handles and can
+race external operations. Native directory watches blocked ancestor renames;
+regular polling consumed substantial CPU in large directories. Buffered NTFS
+records returned stale hard-link/open-writer metadata despite matching identities.
+The original listing and independent M2 validation remain authoritative.
+See [acceptance evidence](acceptance.md) for historical and current proof.
+Remote refresh remains a separate M3 capability.
+
 `terminal` restores attempted raw/alternate-screen/mouse/paste/keyboard modes on
 normal exit, I/O errors and unwind. Keyboard protocol pushes are capability
 negotiated and paired with pops. Unix selects Crossterm's level-triggered

@@ -34,6 +34,25 @@ the only remaining payload, quarantine uncertainty, avoid deleting user files
 and require validated evidence before cleanup or any new mutation. See the
 [M2 correction checkpoint](docs/acceptance.md#m2-deepseek-correction-round--23-october-2026).
 
+## Pre-M3 Windows Trash confirmation UX
+
+Investigate removing the extra Windows Shell confirmation after TFM's own
+`F8` -> `T` Trash approval, without changing global Recycle Bin settings or
+requiring mouse interaction. The existing `IFileOperation` uses
+`FOFX_RECYCLEONDELETE` and `FOF_WANTNUKEWARNING`; evaluate per-operation
+`FOF_NOCONFIRMATION`, which auto-answers confirmations more broadly than the
+ordinary Recycle Bin dialog. Do not enable it based on flags alone.
+
+Acceptance: with Windows delete confirmation enabled, use disposable native
+Windows fixtures to prove quiet, recoverable recycling; refusal/cancellation
+and unchanged source identity whenever recycling is unavailable or could become
+permanent deletion; and unchanged safety checks, Shell callback/receipt handling
+and critical-incident reporting. Cover files, directories, links/junctions and
+relevant Recycle Bin/volume failure cases. Never silently permit permanent
+deletion, alter OS-wide settings or substitute keyboard/mouse dialog automation.
+If safe per-operation suppression cannot be proven, retain the Windows dialog
+and document why.
+
 ## Post-v1 TODO
 
 These items are deferred contracts, without dormant implementations. Each needs
@@ -60,6 +79,40 @@ Multimedia/image/Kitty/Sixel previews, implicit external execution/launchers,
 embedded terminal, plugin/scripting ecosystem, drag-and-drop and cloud backends
 remain excluded from v1. No sync/resume/editor implementation is added merely
 for future readiness.
+
+## Future Windows automatic refresh investigation
+
+Windows currently requires `r` to refresh. Manual mode avoids persistent watch
+handles and idle directory enumeration; it is the approved policy, not a hidden
+polling fallback. Linux/macOS retain native automatic refresh.
+
+Before revisiting Windows auto-refresh, read the private local archive at
+`specs/windows-refresh-investigations-2026-10/FULL_REPORT.md`. This Git-ignored
+path is unavailable in public clones. External readers can use the signed
+[Windows polling performance report](https://github.com/seapagan/terminal-file-manager/blob/a8b205564ba6c2af272a271f719bdf6e4b2b8caa/research/windows-polling-report.md)
+and [Shell registration isolation](https://github.com/seapagan/terminal-file-manager/actions/runs/40123944312).
+
+On Windows Server 2025, per-directory `ReadDirectoryChangesW`/`notify` and Shell
+registrations blocked ancestor renames despite deletion sharing. Shell-only
+notifications missed ordinary external writes; interrupt delivery still blocked
+renames and failed extended-path registration. Wider-root recursive watching
+passed the owned rename topology but produced sibling noise, without whole-volume,
+UNC, overflow or resource proof.
+
+Two-second polling passed correctness tests but consumed about 17% of one logical
+core at 2,000 entries and 72–75% at 10,000 in release TUI measurements. Identical
+and hidden panes duplicated scans. Buffered NTFS metadata then returned stale
+3-byte sizes where fresh inspection returned 35 bytes for hard links and open
+writers; matching file IDs and birth stamps did not establish metadata freshness.
+Do not repeat these approaches without new evidence addressing their failures.
+
+Fresh one-handle inspection, scan coalescing, wider-root notification or opt-in
+automatic refresh remain unselected alternatives requiring separate approval.
+Before reintroduction, prove native Windows 11 desktop and Server behaviour,
+ordinary external writers, raw/long paths and mount/UNC variation, genuine denied
+cases, complete metadata parity, current/parent/grandparent rename during activity
+and after cleanup, bounded CPU/resources, stale generations and independent M2
+operation-time validation. A stable-fixture API benchmark alone is insufficient.
 
 ## Future Windows-focused PR: attributes and ownership
 

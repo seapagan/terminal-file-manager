@@ -273,6 +273,11 @@ pub(super) struct DirectoryGuard {
 
 impl DirectoryGuard {
     fn cached(pane: &Pane) -> io::Result<Self> {
+        if pane.pending.is_some() || pane.error.is_some() {
+            return Err(invalid(
+                "Wait for a successful listing before approving an operation",
+            ));
+        }
         let entry = pane.directory.clone().ok_or_else(|| {
             invalid("Directory identity unavailable; refresh before approving mutations")
         })?;

@@ -52,7 +52,7 @@ These are the default bindings. You can customise them in `config.toml`.
 | --- | --- |
 | Up/Down or `k`/`j` | Move through the listing |
 | Home / End / PageUp / PageDown | Jump or scroll through the listing |
-| Enter / Backspace (or Alt+Up) | Enter directory / go to parent |
+| Enter / Backspace (or Alt+Up) | Enter directory / go to parent, highlighting the directory just exited |
 | Alt+Left / Alt+Right | Go back / forward in directory history |
 | Alt+P | Toggle one or two panes |
 | Tab / Shift+Tab | Switch active pane |
@@ -72,6 +72,26 @@ These are the default bindings. You can customise them in `config.toml`.
 | `s` / `v` / `g` | Cycle sort order / reverse order / directory grouping |
 | `r` | Refresh the directory |
 | `V` / Alt+V | View options / view profiles |
+
+Linux and macOS refresh local directories automatically, including the hidden
+pane. External changes update the listing while preserving the cursor and
+surviving marks. Press `r` to refresh manually on every platform.
+If native notifications fail, automatic refresh slows to a maximum 30-second
+interval while TFM retries the watcher. Press `r` for an immediate refresh.
+
+**Windows requires `r` to refresh.** Native directory watches blocked ancestor
+renames, and two-second polling proved expensive in large directories. Manual
+refresh avoids persistent watcher handles and idle enumeration. Windows panes,
+including hidden panes, retain their last listing until deliberate refresh or
+navigation.
+
+Linux and macOS also reconcile each pane every 30 seconds to catch missed
+notifications. If native watching fails, TFM warns once and refreshes periodically
+while retrying. These automatic recovery checks apply to Linux and macOS.
+Large or slow directories, concurrent operations and unavailable mounts can
+extend refresh latency.
+If a directory disappears or another directory replaces it, TFM retains the
+last good view and reports the error; navigate out and reopen the directory to select the replacement.
 
 ### Information and exit
 
@@ -148,6 +168,7 @@ view preferences.
 Press `c` in a metadata view for an on-demand directory count and size. In the
 **sidebar**, Esc cancels an active count but does not close the sidebar. In the
 **popup**, Esc cancels the count or closes the popup.
+Counts are on-demand snapshots; press `c` again to update them.
 
 ## Saving and restoring sessions
 
@@ -220,3 +241,24 @@ diagnostics when needed.
 - [Source attribution](docs/provenance.md) and [third-party notices](THIRD_PARTY_NOTICES.md)
 
 `tfm` is licensed under [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE).
+
+### Linux filesystem notification licence
+
+The `inotify` and `inotify-sys` dependencies carry this ISC notice, retained here
+for binary archives:
+
+```text
+Copyright (c) Hanno Braun and contributors
+
+Permission to use, copy, modify, and/or distribute this software for any purpose
+with or without fee is hereby granted, provided that the above copyright notice
+and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
+OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+THIS SOFTWARE.
+```

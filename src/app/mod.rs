@@ -27,6 +27,7 @@ pub enum RequestKind {
 /// Metadata cache shared by sidebar and popup for each pane.
 #[derive(Clone, Debug, Default)]
 pub struct Detail {
+    pub stale: Option<String>,
     pub generation: u64,
     pub path: Option<PathBuf>,
     pub entry: Option<Entry>,
@@ -112,17 +113,73 @@ impl App {
     /// Request navigation; commit the location/history only on successful completion.
     pub fn request_listing(&mut self, pane: usize, path: PathBuf) -> Request {
         let state = &mut self.panes[pane];
+        if state.pending.is_some() && state.refresh_pending {
+            self.status = "Deferred refresh cancelled by newer navigation".into();
+        }
         state.reset_range();
         state.generation += 1;
         state.pending = Some(path.clone());
         state.error = None;
         state.restoring = None;
+        state.parent_restoring = None;
+        state.listing = true;
+        state.refresh_pending = false;
         Request {
             pane,
             generation: state.generation,
             path,
             kind: RequestKind::Listing,
         }
+    }
+
+    /// Return to the lexical parent, retaining the exited entry's native identity.
+    pub fn parent(&mut self) -> Option<Request> {
+        let pane = &self.panes[self.active];
+        let parent = pane.path.parent()?.to_path_buf();
+        let visit = pane.parent_visit(parent.clone());
+        let request = self.request_listing(self.active, parent);
+        self.panes[self.active].parent_restoring = Some(visit);
+        Some(request)
+    }
+
+    /// Refresh explicitly, or defer once to the pending navigation's successful target.
+    /// Failed or superseding navigation cancels that deferred intent.
+    pub fn request_refresh(&mut self, pane: usize) -> Option<Request> {
+        let state = self.panes.get_mut(pane)?;
+        if let Some(path) = &state.pending {
+            state.refresh_pending = true;
+            self.status = format!("Refresh queued for {} after navigation", path.display());
+            return None;
+        }
+        self.invalidate_listing_details(pane);
+        self.request_reconciliation(pane)
+    }
+
+    /// Reconcile without stealing navigation or cancelling a scan or unchanged count.
+    pub(crate) fn request_reconciliation(&mut self, pane: usize) -> Option<Request> {
+        let state = self.panes.get_mut(pane)?;
+        if state.pending.is_some() {
+            return None;
+        }
+        state.refresh_pending = true;
+        self.take_refresh(pane)
+    }
+
+    /// Start one deferred ordinary refresh after the current listing has completed.
+    pub fn take_refresh(&mut self, pane: usize) -> Option<Request> {
+        let state = self.panes.get_mut(pane)?;
+        if !state.refresh_pending || state.listing || state.pending.is_some() {
+            return None;
+        }
+        state.refresh_pending = false;
+        state.listing = true;
+        state.generation += 1;
+        Some(Request {
+            pane,
+            generation: state.generation,
+            path: state.path.clone(),
+            kind: RequestKind::Listing,
+        })
     }
 
     /// Reject stale or invalid pane results, retaining the last good listing on error.
@@ -139,42 +196,112 @@ impl App {
             return false;
         }
         let attempted = state.pending.take();
+        state.listing = false;
         match result {
-            Ok(snapshot) => {
-                if attempted
-                    .as_ref()
-                    .is_some_and(|path| path != &snapshot.path)
-                {
-                    return false;
-                }
-                state.install(snapshot);
-                self.details[pane].generation += 1;
-                self.details[pane].path = None;
-                self.details[pane].entry = None;
-                self.details[pane].totals = None;
-                self.details[pane].totals_generation += 1;
-                self.details[pane].counting = false;
-            }
+            Ok(snapshot) => self.install_listing(pane, attempted, snapshot),
             Err(error) => {
+                if attempted.is_some() && state.refresh_pending {
+                    state.refresh_pending = false;
+                    self.status = "Deferred refresh cancelled because navigation failed".into();
+                }
                 state.restoring = None;
+                state.parent_restoring = None;
                 state.error = Some(format!(
                     "{}: {error}",
                     attempted.as_deref().unwrap_or(&state.path).display()
                 ));
+                self.invalidate_listing_details(pane);
+                true
             }
         }
+    }
+
+    fn install_listing(
+        &mut self,
+        pane: usize,
+        attempted: Option<PathBuf>,
+        snapshot: Snapshot,
+    ) -> bool {
+        let state = &mut self.panes[pane];
+        if attempted
+            .as_ref()
+            .is_some_and(|path| path != &snapshot.path)
+        {
+            state.refresh_pending = false;
+            self.status = "Navigation result rejected; deferred refresh cancelled".into();
+            state.restoring = None;
+            state.parent_restoring = None;
+            return false;
+        }
+        if attempted.is_none() && !state.accepts_refresh(&snapshot) {
+            state.error = Some("Directory identity changed or unavailable; reopen the directory to select a new context".into());
+            self.invalidate_listing_details(pane);
+            return true;
+        }
+        let previous = if attempted.is_none() && state.error.is_none() && snapshot.errors.is_empty()
+        {
+            state.current().cloned()
+        } else {
+            None
+        };
+        state.error = snapshot.directory.is_none().then(|| {
+            "Directory identity unavailable; reopen the directory before using this context".into()
+        });
+        if attempted.is_some() || state.context == 0 {
+            state.context += 1;
+            state.entry_identity = snapshot.entry_identity.clone();
+        }
+        state.install(snapshot);
+        self.reconcile_listing_details(pane, previous);
         true
+    }
+
+    fn reconcile_listing_details(&mut self, pane: usize, previous: Option<Entry>) {
+        let state = &self.panes[pane];
+        let unchanged = previous
+            .zip(state.current())
+            .is_some_and(|(mut old, fresh)| {
+                // Enumeration/counting can change access time without changing count inputs.
+                old.accessed = fresh.accessed;
+                old.identity.is_some() && old.error.is_none() && old == *fresh
+            });
+        if !unchanged {
+            self.invalidate_listing_details(pane);
+        } else if let Some(entry) = self.details[pane].entry.as_mut() {
+            entry.accessed = state.current().unwrap().accessed;
+        }
+    }
+
+    fn invalidate_listing_details(&mut self, pane: usize) {
+        if pane == self.active {
+            self.metadata_scroll = 0;
+            if self.popup {
+                self.overlay_scroll = 0;
+            }
+        }
+        let detail = &mut self.details[pane];
+        detail.stale = self.panes[pane].error.clone();
+        detail.generation += 1;
+        detail.entry = None;
+        detail.canonical = None;
+        detail.canonical_pending = false;
+        detail.totals = None;
+        detail.totals_generation += 1;
+        detail.counting = false;
     }
 
     /// Coalesce metadata work by current native path and selection generation.
     pub fn request_metadata(&mut self, pane: usize) -> Option<Request> {
+        if self.panes[pane].error.is_some() {
+            return None;
+        }
         let entry = self.panes[pane].current();
         let path = entry.map(|entry| entry.path.clone());
         let detail = &mut self.details[pane];
-        if path == detail.path {
+        if path == detail.path && (detail.entry.is_some() || path.is_none()) {
             return None;
         }
-        if pane == self.active {
+        if pane == self.active && path != detail.path {
             self.metadata_scroll = 0;
         }
         detail.generation += 1;
@@ -238,6 +365,9 @@ impl App {
     /// Start an explicit count using a generation independent of metadata loading.
     pub fn request_totals(&mut self) -> Option<Request> {
         let pane = self.active;
+        if self.panes[pane].error.is_some() {
+            return None;
+        }
         let entry = self.panes[pane].current()?;
         if !entry.may_recurse() {
             return None;

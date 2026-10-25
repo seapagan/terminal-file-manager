@@ -39,7 +39,7 @@ pub struct Identity {
 }
 
 /// Cached entry metadata. Missing fields are unavailable, never invented.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Entry {
     pub path: PathBuf,
     pub name: OsString,
@@ -79,6 +79,8 @@ impl Entry {
 pub struct Snapshot {
     /// Physical directory identity for later mutation approvals; absent if unresolved/changed.
     pub directory: Option<Box<Entry>>,
+    /// Bracketed no-follow identity of the lexical entry, for parent focus only.
+    pub entry_identity: Option<Identity>,
     pub path: PathBuf,
     pub entries: Vec<Entry>,
     pub errors: Vec<String>,
@@ -91,6 +93,7 @@ pub struct Snapshot {
 pub fn list(path: &Path, context: &IgnoreContext, cancelled: &AtomicBool) -> io::Result<Snapshot> {
     let mut owners = crate::owner::Cache::default();
     let initial_directory = directory_identity(path, &mut owners);
+    let initial_entry = inspect_no_follow(path, None);
     let directory = fs::read_dir(path)?;
     let (rules, mut errors) = rules::load(path, context);
     let mut entries = Vec::new();
@@ -108,19 +111,30 @@ pub fn list(path: &Path, context: &IgnoreContext, cancelled: &AtomicBool) -> io:
             .map(|rules| rules.ignored(&entry.path, entry.may_recurse()));
     }
     check_cancelled(cancelled)?;
-    let directory = initial_directory
-        .zip(directory_identity(path, &mut owners))
-        .and_then(|(before, after)| {
-            (before.path == after.path
-                && before.identity.as_ref().and_then(|id| id.object)
-                    == after.identity.as_ref().and_then(|id| id.object))
-            .then_some(Box::new(before))
-        });
+    let directory = verified_directory(initial_directory, directory_identity(path, &mut owners));
+    let entry_identity =
+        verified_directory(Some(initial_entry), Some(inspect_no_follow(path, None)))
+            .and_then(|entry| entry.identity);
     Ok(Snapshot {
         directory,
+        entry_identity,
         path: path.to_path_buf(),
         entries,
         errors,
+    })
+}
+
+fn verified_directory(before: Option<Entry>, after: Option<Entry>) -> Option<Box<Entry>> {
+    before.zip(after).and_then(|(before, after)| {
+        (before.path == after.path
+            && before
+                .identity
+                .as_ref()
+                .zip(after.identity.as_ref())
+                .is_some_and(|(old, new)| {
+                    old.object.is_some() && old.object == new.object && old.created == new.created
+                }))
+        .then_some(Box::new(before))
     })
 }
 
@@ -220,5 +234,39 @@ fn fill(entry: &mut Entry, metadata: &Metadata, owners: Option<&mut crate::owner
         entry
             .error
             .get_or_insert_with(|| "Unsupported reparse point; navigation disabled".into());
+    }
+}
+
+#[cfg(test)]
+mod identity_tests {
+    use super::*;
+    use std::time::Duration;
+
+    fn before_after() -> (Entry, Entry) {
+        let root = tempfile::tempdir().unwrap();
+        let mut entry =
+            directory_identity(root.path(), &mut crate::owner::Cache::default()).unwrap();
+        entry.created = Some(SystemTime::UNIX_EPOCH + Duration::from_secs(1));
+        entry.identity.as_mut().unwrap().created = entry.created;
+        (entry.clone(), entry)
+    }
+
+    #[test]
+    fn recycled_directory_object_id_with_new_creation_stamp_is_not_verified() {
+        let (before, mut after) = before_after();
+        after.created = Some(SystemTime::UNIX_EPOCH + Duration::from_secs(2));
+        after.identity.as_mut().unwrap().created = after.created;
+        assert!(verified_directory(Some(before), Some(after)).is_none());
+    }
+
+    #[test]
+    fn directory_activity_during_enumeration_keeps_unchanged_object_evidence() {
+        let (before, mut after) = before_after();
+        let identity = after.identity.as_mut().unwrap();
+        identity.length += 1;
+        identity.modified = Some(SystemTime::UNIX_EPOCH + Duration::from_secs(3));
+        after.size = Some(identity.length);
+        after.modified = identity.modified;
+        assert!(verified_directory(Some(before), Some(after)).is_some());
     }
 }

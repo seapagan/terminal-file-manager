@@ -244,7 +244,8 @@ fn large_marked_refresh_preserves_only_matching_native_identities() {
         })
         .collect();
     let mut snapshot = Snapshot {
-        directory: None,
+        directory: app.panes[0].directory.clone().map(Box::new),
+        entry_identity: None,
         path: root.path().to_path_buf(),
         entries,
         errors: vec![],
