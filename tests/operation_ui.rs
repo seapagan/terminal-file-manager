@@ -351,14 +351,20 @@ fn preview_failure_keeps_its_reason_and_never_claims_counting_or_success() {
     }
     let (text, geometry) = draw(&app, 120, 30, ColorLevel::NoColor);
     assert!(text.contains("Preview unavailable"));
-    assert!(text.contains("permission denied"));
+    let unframed: String = text
+        .chars()
+        .filter(|c| !c.is_whitespace() && !matches!(c, '│' | '─'))
+        .collect();
+    assert!(unframed.contains("Cannotinspectselectedpath:permissiondenied"));
     assert!(!text.contains("Counting recursively"));
     assert!(!text.contains("source left"));
     assert!(
         geometry
             .operation_controls
             .iter()
-            .filter(|control| matches!(control.target, ui::OperationTarget::Key(_)))
+            .filter(
+                |control| control.enabled && matches!(control.target, ui::OperationTarget::Key(_))
+            )
             .all(|control| control.target == ui::OperationTarget::Key(KeyCode::Enter))
     );
 }

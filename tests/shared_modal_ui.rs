@@ -3,30 +3,12 @@ use ratatui::{Terminal, backend::TestBackend, layout::Rect};
 use terminal_file_manager::{
     app::App,
     color::Theme,
-    operations::{Dialog, Operation, OperationDialog, Plan},
+    operations::{Operation, Plan},
     ui::{self, OperationTarget},
 };
 
-fn dialog(plan: Plan) -> App {
-    let mut app = App::new("/controlled".into());
-    app.operations.dialog = Some(Dialog::Operation(Box::new(OperationDialog {
-        plan,
-        pane: 0,
-        base: "/controlled".into(),
-        native_target: "/controlled".into(),
-        text: String::new(),
-        incoming: String::new(),
-        edited: false,
-        field: 0,
-        options: Default::default(),
-        ready: true,
-        error: None,
-        preview_id: None,
-        track_scope: false,
-        retry_of: None,
-    })));
-    app
-}
+mod dialog_fixture;
+use dialog_fixture::dialog;
 
 #[test]
 fn action_rows_are_centred_as_groups_at_responsive_widths() {
@@ -56,7 +38,10 @@ fn action_rows_are_centred_as_groups_at_responsive_widths() {
 
 #[test]
 fn multi_source_preview_shows_one_root_and_unsplit_right_aligned_sizes() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempfile::Builder::new()
+        .prefix("Ki-size-alignment-")
+        .tempdir()
+        .unwrap();
     let a = root.path().join("first.dat");
     let b = root.path().join("資料e\u{301}.dat");
     std::fs::write(&a, vec![0; 1024]).unwrap();
@@ -82,6 +67,7 @@ fn multi_source_preview_shows_one_root_and_unsplit_right_aligned_sizes() {
     assert_eq!(file_rows.len(), 2);
     assert!(file_rows.iter().all(|row| row.contains("KiB")));
     let units: Vec<_> = (0..40)
+        .filter(|&y| rows[usize::from(y)].contains(".dat"))
         .filter_map(|y| {
             (0..118)
                 .find(|&x| buffer[(x, y)].symbol() == "K" && buffer[(x + 1, y)].symbol() == "i")
@@ -149,10 +135,7 @@ fn short_height_retains_a_visible_cancel_action_before_optional_controls() {
 fn destructive_confirmation_uses_error_style_and_a_visible_safe_default() {
     use crossterm::event::KeyCode;
     use terminal_file_manager::color::Role;
-    let mut app = dialog(Plan::mkdir("/controlled".into()));
-    if let Some(Dialog::Operation(dialog)) = &mut app.operations.dialog {
-        dialog.plan.operation = Operation::Delete;
-    }
+    let app = delete_with_preview();
     for level in [
         ColorLevel::NoColor,
         ColorLevel::Ansi16,
@@ -180,12 +163,46 @@ fn destructive_confirmation_uses_error_style_and_a_visible_safe_default() {
             terminal.backend().buffer()[(delete.x, delete.y)].fg,
             theme.style(Role::Error).fg.unwrap_or_default()
         );
+        assert_delete_warning(terminal.backend().buffer(), &theme);
         let cancel = at(KeyCode::Enter);
         assert_eq!(
             terminal.backend().buffer()[(cancel.x, cancel.y)].modifier,
             theme.style(Role::Cursor).add_modifier
         );
     }
+}
+
+fn delete_with_preview() -> App {
+    use terminal_file_manager::operations::{Queue, Update};
+    let root = tempfile::tempdir().unwrap();
+    let file = root.path().join("selected");
+    std::fs::write(&file, b"retained").unwrap();
+    let plan = Plan::paths(Operation::Delete, vec![file], None).unwrap();
+    let mut queue = Queue::new().unwrap();
+    queue.preview(plan).unwrap();
+    loop {
+        if let Update::Preview { plan, .. } = queue.next(std::time::Duration::from_secs(5)).unwrap()
+        {
+            return dialog(*plan);
+        }
+    }
+}
+
+fn assert_delete_warning(buffer: &ratatui::buffer::Buffer, theme: &Theme) {
+    use terminal_file_manager::color::Role;
+    let warning_y = (0..30)
+        .find(|&y| {
+            let row: String = (0..80).map(|x| buffer[(x, y)].symbol()).collect();
+            row.contains("PERMANENT DELETE cannot be undone.")
+        })
+        .unwrap();
+    let warning_x = (0..80)
+        .find(|&x| buffer[(x, warning_y)].symbol() == "P")
+        .unwrap();
+    assert_eq!(
+        buffer[(warning_x, warning_y)].fg,
+        theme.style(Role::Error).fg.unwrap_or_default()
+    );
 }
 
 #[test]

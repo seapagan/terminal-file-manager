@@ -206,7 +206,7 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
     }
     if let Some(dialog) = controller.app.operations.dialog.take() {
         controller.app.operations.dialog =
-            super::operation_dialog::handle(controller, dialog, event);
+            super::operation_dialog::handle(controller, dialog, event, geometry);
         return true;
     }
     if controller.app.operations.waiting_exit.is_some() {
@@ -247,11 +247,17 @@ fn scroll(controller: &mut Controller, event: &Event, geometry: &Geometry) -> bo
             KeyCode::PageDown => 8,
             _ => return false,
         },
-        Event::Mouse(mouse) => match mouse.kind {
-            MouseEventKind::ScrollUp => -3,
-            MouseEventKind::ScrollDown => 3,
-            _ => return false,
-        },
+        Event::Mouse(mouse) => {
+            let delta = match mouse.kind {
+                MouseEventKind::ScrollUp => -3,
+                MouseEventKind::ScrollDown => 3,
+                _ => return false,
+            };
+            if !geometry.operation_scroll_contains(mouse.column, mouse.row) {
+                return true;
+            }
+            delta
+        }
         _ => return false,
     };
     state.scroll = state.scroll.saturating_add_signed(delta).min(limit);

@@ -34,6 +34,17 @@ pub struct OperationDialog {
     pub error: Option<String>,
 }
 
+impl OperationDialog {
+    /// Pure syntax check shared by the form and its submit guard; no filesystem reads.
+    pub fn directory_name_valid(&self) -> bool {
+        use std::path::{Component, Path};
+        let path = Path::new(&self.text);
+        !self.text.contains('\0')
+            && path.components().count() == 1
+            && matches!(path.components().next(), Some(Component::Normal(_)))
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JobState {
     Queued,

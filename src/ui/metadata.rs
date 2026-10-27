@@ -288,7 +288,7 @@ fn layout(app: &App, bounds: Rect, theme: &Theme, floating: bool) -> Layout {
         floating,
     );
     let (shell, measured_rows) = if floating {
-        let (shell, rows) = popup_layout(&fields, bounds, theme);
+        let (shell, rows) = popup_layout(&fields, bounds, theme, &app.details[app.active]);
         (Some(shell), rows)
     } else {
         (None, Vec::new())
@@ -333,6 +333,7 @@ fn popup_layout(
     fields: &[Field],
     bounds: Rect,
     theme: &Theme,
+    detail: &Detail,
 ) -> (super::modal::Layout<Action>, Vec<Row>) {
     let mut measured_rows = Vec::new();
     let shell = {
@@ -350,10 +351,16 @@ fn popup_layout(
                     .max()
                     .unwrap_or(0),
             pinned_rows: 0,
+            footer_rows: 0,
             actions: &actions,
         }
         .measure(bounds, |width| {
             measured_rows = rows(fields, width, theme);
+            if let Some(entry) = detail.entry.as_ref().filter(|_| detail.stale.is_none()) {
+                let row = super::modal::entry_row::<()>(entry, std::path::Path::new(&entry.name));
+                let row = row.wrap(width).remove(0).line(width, theme);
+                measured_rows.insert(0, (row, None, 0));
+            }
             measured_rows.len()
         })
     };

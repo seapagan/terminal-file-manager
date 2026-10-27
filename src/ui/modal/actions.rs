@@ -8,6 +8,8 @@ use ratatui::{Frame, widgets::Paragraph};
 pub struct Action<T> {
     /// Visible label, including the shortcut when needed.
     pub label: &'static str,
+    /// Stable label budget in display cells, excluding brackets.
+    pub min_width: u16,
     /// Intent interpreted and validated by the domain controller.
     pub intent: T,
     /// Exact shortcut. Destructive actions must supply an explicit key.
@@ -25,6 +27,7 @@ impl<T> Action<T> {
     pub fn custom(label: &'static str, intent: T, key: KeyCode) -> Self {
         Self {
             label,
+            min_width: 0,
             intent,
             key,
             enabled: true,
@@ -171,7 +174,17 @@ pub fn render<T>(
             region.action.role
         };
         frame.render_widget(
-            Paragraph::new(format!("[{}]", region.action.label)).style(theme.style(role)),
+            Paragraph::new(format!(
+                "[{}{}]",
+                region.action.label,
+                " ".repeat(usize::from(
+                    region
+                        .area
+                        .width
+                        .saturating_sub(2 + super::width(region.action.label))
+                ))
+            ))
+            .style(theme.style(role)),
             region.area,
         );
     }

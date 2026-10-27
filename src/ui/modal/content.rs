@@ -16,6 +16,9 @@ pub struct Row<T> {
     pub field: Option<T>,
     /// An indivisible right-aligned value (for example a file size).
     pub trailing: Option<String>,
+    label: Option<String>,
+    focused: bool,
+    single_line: bool,
 }
 
 impl<T: Clone> Row<T> {
@@ -31,17 +34,37 @@ impl<T: Clone> Row<T> {
             role,
             field: None,
             trailing: None,
+            label: None,
+            focused: false,
+            single_line: false,
         }
     }
 
     /// A field whose focus and editing are owned by the caller.
     pub fn field(label: &str, value: &str, target: T, focused: bool) -> Self {
         Self {
-            text: format!("{}{label}: {value}", if focused { "> " } else { "  " }),
-            role: if focused { Role::Cursor } else { Role::Value },
+            text: value.into(),
+            role: Role::Value,
             field: Some(target),
             trailing: None,
+            label: Some(format!("{label}: ")),
+            focused,
+            single_line: false,
         }
+    }
+
+    /// Keep a changing summary to one measured line.
+    pub fn single_line(mut self) -> Self {
+        self.single_line = true;
+        self
+    }
+
+    /// Align a field value with a neighbouring informational label.
+    pub fn label_width(mut self, cells: u16) -> Self {
+        if let Some(label) = &mut self.label {
+            label.push_str(&" ".repeat(usize::from(cells.saturating_sub(super::width(label)))));
+        }
+        self
     }
 
     /// Structured left filename/result label and indivisible right value.
@@ -51,12 +74,19 @@ impl<T: Clone> Row<T> {
             role: Role::Value,
             field: None,
             trailing: Some(size),
+            label: None,
+            focused: false,
+            single_line: false,
         }
     }
 
     /// Intrinsic width in escaped display cells, including the column gap.
     pub fn width(&self) -> usize {
-        Line::raw(super::super::clean(&self.text)).width()
+        self.label
+            .as_ref()
+            .map_or(0, |label| Line::raw(label).width())
+            + usize::from(self.focused)
+            + Line::raw(super::super::clean(&self.text)).width()
             + self
                 .trailing
                 .as_ref()
@@ -66,6 +96,23 @@ impl<T: Clone> Row<T> {
     /// Prose/fields wrap; structured rows remain one row with filename truncation.
     pub fn wrap(mut self, width: u16) -> Vec<Self> {
         self.text = super::super::clean(&self.text);
+        if self.single_line {
+            self.text = super::truncate(&self.text, width);
+            return vec![self];
+        }
+        if self.field.is_some() {
+            if self
+                .label
+                .as_ref()
+                .is_some_and(|label| super::width(label) + 2 > width)
+            {
+                let label = Self::styled(self.label.take().unwrap(), Role::Label);
+                let mut rows = label.wrap(width);
+                rows.push(self);
+                return rows;
+            }
+            return vec![self];
+        }
         if let Some(trailing) = &mut self.trailing {
             *trailing = super::super::clean(trailing);
             return vec![self];
@@ -77,12 +124,18 @@ impl<T: Clone> Row<T> {
                 role: self.role,
                 field: self.field.clone(),
                 trailing: None,
+                label: None,
+                focused: false,
+                single_line: false,
             })
             .collect()
     }
 
     /// Render using the same column budget as measurement, with semantic size emphasis.
     pub fn line(&self, width: u16, theme: &Theme) -> Line<'static> {
+        if self.field.is_some() {
+            return self.field_line(width, theme);
+        }
         let Some(value) = &self.trailing else {
             let mut style = theme.style(self.role);
             if matches!(self.role, Role::Status) {
@@ -100,6 +153,39 @@ impl<T: Clone> Row<T> {
             Span::styled(
                 value.clone(),
                 theme.style(Role::Status).add_modifier(Modifier::BOLD),
+            ),
+        ])
+    }
+
+    fn field_line(&self, width: u16, theme: &Theme) -> Line<'static> {
+        let label = self.label.clone().unwrap_or_default();
+        let available = width.saturating_sub(super::width(&label));
+        let caret = if self.focused && available > 0 {
+            "▏"
+        } else {
+            ""
+        };
+        let budget = available.saturating_sub(super::width(caret));
+        // Keep the editing end visible without changing the native field value.
+        let mut excess = Line::raw(&self.text)
+            .width()
+            .saturating_sub(usize::from(budget));
+        let mut start = 0;
+        let line = Line::raw(&self.text);
+        for grapheme in line.styled_graphemes(ratatui::style::Style::default()) {
+            if excess == 0 {
+                break;
+            }
+            start += grapheme.symbol.len();
+            excess = excess.saturating_sub(usize::from(super::width(grapheme.symbol)));
+        }
+        let value = &self.text[start..];
+        Line::from(vec![
+            Span::styled(label, theme.style(Role::Label)),
+            Span::styled(value.to_owned(), theme.style(Role::Value)),
+            Span::styled(
+                caret,
+                theme.style(Role::Header).add_modifier(Modifier::BOLD),
             ),
         ])
     }

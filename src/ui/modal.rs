@@ -7,7 +7,7 @@ mod layout;
 #[cfg(test)]
 mod tests;
 use crate::color::{Role, Theme};
-pub use files::{common_root, file_row, file_size, truncate};
+pub use files::{common_root, entry_row, file_row, file_size, truncate};
 pub use layout::{ActionRegion, Layout};
 use ratatui::{
     Frame,
@@ -24,6 +24,8 @@ pub struct Spec<'a, T> {
     pub content_width: usize,
     /// Fixed rows above the scrollable body (for example a Jobs selector).
     pub pinned_rows: u16,
+    /// Fixed warning/error rows above the actions.
+    pub footer_rows: u16,
     /// Typed actions; authorization remains with the caller.
     pub actions: &'a [actions::Action<T>],
 }

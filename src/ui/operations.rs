@@ -6,13 +6,14 @@ use crossterm::event::KeyCode;
 use ratatui::{
     Frame,
     layout::Rect,
-    text::Line,
     widgets::{Clear, Paragraph},
 };
 mod actions;
 mod content;
 mod jobs;
 mod layout;
+#[cfg(test)]
+mod layout_tests;
 pub(super) use layout::Layout;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -27,6 +28,8 @@ pub struct OperationControl {
     pub area: Rect,
     pub target: OperationTarget,
     pub label: &'static str,
+    /// False controls are visible but inert.
+    pub enabled: bool,
 }
 
 pub(super) fn visible(app: &App) -> bool {
@@ -53,27 +56,8 @@ pub(super) fn geometry(
     controls.extend(jobs::controls(app, layout.list));
     let rows = &layout.rows;
     let scroll = app.operations.scroll.min(layout.limit(rows.len()));
-    for (offset, row) in rows
-        .iter()
-        .skip(scroll)
-        .take(usize::from(layout.body.height))
-        .enumerate()
-    {
-        if let Some(field) = row.field {
-            controls.push(OperationControl {
-                area: Rect::new(
-                    layout.body.x,
-                    layout.body.y + offset as u16,
-                    Line::raw(row.text.as_str())
-                        .width()
-                        .min(usize::from(layout.body.width)) as u16,
-                    1,
-                ),
-                target: OperationTarget::Field(field),
-                label: "",
-            });
-        }
-    }
+    controls.extend(field_controls(&layout.header, layout.shell.pinned, 0));
+    controls.extend(field_controls(rows, layout.body, scroll));
     let limit = layout.limit(rows.len());
     // Retain only the rows whose geometry was used for this frame's hitboxes.
     layout.rows = layout
@@ -92,12 +76,37 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, geometry: &sup
     };
     super::modal::render_shell(frame, layout.outer, content::title(app), theme);
     jobs::render(frame, app, theme, layout.list);
-    let text: Vec<_> = layout
-        .rows
-        .iter()
-        .map(|row| row.line(layout.body.width, theme))
-        .collect();
-    frame.render_widget(Paragraph::new(text), layout.body);
+    render_rows(frame, &layout.header, layout.shell.pinned, theme);
+    render_rows(frame, &layout.rows, layout.body, theme);
+    let footer_start = layout
+        .footer
+        .len()
+        .saturating_sub(usize::from(layout.shell.footer.height));
+    render_rows(
+        frame,
+        &layout.footer[footer_start..],
+        layout.shell.footer,
+        theme,
+    );
+    if geometry.operation_scroll_limit > 0 && layout.shell.cue.height > 0 {
+        let total = geometry.operation_scroll_limit + usize::from(layout.body.height);
+        let start = app.operations.scroll.min(geometry.operation_scroll_limit);
+        let cue = if layout.rows.is_empty() {
+            format!("0/{total} · Resize")
+        } else {
+            format!(
+                "{}-{}/{total} · PgUp/PgDown",
+                start + 1,
+                start + layout.rows.len()
+            )
+        };
+        let area = layout.shell.cue;
+        frame.render_widget(
+            Paragraph::new(super::modal::truncate(&cue, area.width))
+                .style(theme.style(Role::Label)),
+            area,
+        );
+    }
     let selected = actions::focused(app).and_then(|key| {
         layout
             .shell
@@ -107,6 +116,27 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, geometry: &sup
             .map(|region| region.index)
     });
     super::modal::actions::render(frame, &layout.shell, theme, selected);
+}
+
+fn field_controls(rows: &[content::Row], area: Rect, scroll: usize) -> Vec<OperationControl> {
+    rows.iter()
+        .skip(scroll)
+        .take(usize::from(area.height))
+        .enumerate()
+        .filter_map(|(offset, row)| {
+            row.field.map(|field| OperationControl {
+                area: Rect::new(area.x, area.y + offset as u16, area.width, 1),
+                target: OperationTarget::Field(field),
+                label: "",
+                enabled: true,
+            })
+        })
+        .collect()
+}
+
+fn render_rows(frame: &mut Frame, rows: &[content::Row], area: Rect, theme: &Theme) {
+    let text: Vec<_> = rows.iter().map(|row| row.line(area.width, theme)).collect();
+    frame.render_widget(Paragraph::new(text), area);
 }
 
 fn notices(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {

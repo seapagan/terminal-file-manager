@@ -29,7 +29,11 @@ pub fn file_row(name: &str, size: &str, cells: u16) -> String {
         return truncate(name, cells);
     }
     let name_width = cells.saturating_sub(size_width.saturating_add(1));
-    let name = truncate(name, name_width);
+    let name = if name.ends_with('/') && name_width >= 5 && super::width(name) > name_width {
+        format!("{}/", truncate(name.trim_end_matches('/'), name_width - 1))
+    } else {
+        truncate(name, name_width)
+    };
     format!(
         "{name}{}{size}",
         " ".repeat(usize::from(
@@ -71,6 +75,29 @@ pub fn file_size(bytes: Option<u64>) -> String {
                 _ => unit,
             };
             format!("{value} {unit}")
+        },
+    )
+}
+
+/// Cached no-follow metadata only; formatting never inspects or resolves a path.
+pub fn entry_row<T: Clone>(entry: &crate::fs::Entry, path: &Path) -> super::Row<T> {
+    let suffix = if entry.kind == crate::fs::EntryKind::Directory
+        || (entry.kind == crate::fs::EntryKind::Junction && entry.enterable)
+    {
+        "/"
+    } else {
+        ""
+    };
+    super::Row::file(
+        format!(
+            "{}  {}{suffix}",
+            super::super::listing::indicator(entry),
+            path.display()
+        ),
+        if entry.kind == crate::fs::EntryKind::File {
+            crate::ui::modal::file_size(entry.size)
+        } else {
+            "—".into()
         },
     )
 }

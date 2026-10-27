@@ -342,12 +342,16 @@ pub(super) fn listing_timestamp(
     }
 }
 
-fn indicator(entry: &Entry) -> &'static str {
-    match entry.kind {
+pub(super) fn indicator(entry: &Entry) -> &'static str {
+    type_indicator(entry.kind, entry.executable, entry.error.is_some())
+}
+
+pub(super) fn type_indicator(kind: EntryKind, executable: bool, broken: bool) -> &'static str {
+    match kind {
         EntryKind::Directory => "d",
-        EntryKind::File if entry.executable => "*",
+        EntryKind::File if executable => "*",
         EntryKind::File => "-",
-        EntryKind::Link if entry.error.is_some() => "!",
+        EntryKind::Link if broken => "!",
         EntryKind::Link => "@",
         EntryKind::Junction => "j",
         EntryKind::ReparsePoint => "r",

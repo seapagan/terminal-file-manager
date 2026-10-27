@@ -56,6 +56,7 @@ fn disabled_actions_and_nonpress_events_never_produce_an_intent() {
         title: "Question",
         content_width: 4,
         pinned_rows: 0,
+        footer_rows: 0,
         actions: &group.actions,
     }
     .measure(Rect::new(0, 0, 80, 25), |_| 1);
@@ -98,6 +99,7 @@ fn narrow_preset_retains_the_original_safe_action_focus_identity() {
         title: "Delete",
         content_width: 10,
         pinned_rows: 0,
+        footer_rows: 0,
         actions: &group.actions,
     }
     .measure(Rect::new(0, 0, 20, 20), |_| 1);
@@ -127,6 +129,7 @@ fn intrinsic_shell_has_padding_and_exact_centred_unicode_hit_regions() {
             title: "Title",
             content_width: 12,
             pinned_rows: 0,
+            footer_rows: 0,
             actions: &actions,
         }
         .measure(Rect::new(0, 0, width, 25), |_| 2);
@@ -187,6 +190,7 @@ fn long_content_and_titles_obey_tiny_offset_bounds_and_keep_actions_fixed() {
                 title: &"界".repeat(500),
                 content_width: 10000,
                 pinned_rows: 5,
+                footer_rows: 0,
                 actions: &group.actions,
             }
             .measure(bounds, |_| 1000);
@@ -231,6 +235,16 @@ fn structured_content_escapes_controls_and_bidi_before_measuring_or_rendering() 
 }
 
 #[test]
+fn long_escaped_field_keeps_the_editing_end_and_caret_visible() {
+    let value = format!("{}end", "\u{1b}".repeat(16384));
+    let row = Row::field("Name", &value, 0usize, true).wrap(40).remove(0);
+    let line = row.line(40, &Theme::new(colored_text::ColorLevel::NoColor));
+    assert!(line.width() <= 40);
+    assert!(line.to_string().ends_with("end▏"));
+    assert!(!line.to_string().contains('\u{1b}'));
+}
+
+#[test]
 fn common_roots_are_lexical_and_unrelated_roots_remain_uncompressed() {
     let a = Path::new("/work/link/../one/a");
     let b = Path::new("/work/link/../one/b");
@@ -269,3 +283,27 @@ fn windows_drive_and_unc_roots_do_not_compress_unrelated_locations() {
 }
 
 use std::path::{Path, PathBuf};
+
+#[test]
+fn capped_shell_centres_in_the_original_usable_area() {
+    let actions = Preset::Ok.group();
+    for width in [20, 40, 80, 120] {
+        for height in [16, 25, 40, 60] {
+            for count in [1, 100] {
+                let bounds = Rect::new(3, 5, width, height);
+                let layout = Spec {
+                    title: "Centred",
+                    content_width: 30,
+                    pinned_rows: 0,
+                    footer_rows: 0,
+                    actions: &actions.actions,
+                }
+                .measure(bounds, |_| count);
+                let top = layout.outer.y - bounds.y;
+                let bottom = bounds.bottom() - 2 - layout.outer.bottom();
+                assert!(top.abs_diff(bottom) <= 1, "{bounds:?} {layout:?}");
+                assert!(layout.outer.height <= height * 3 / 4);
+            }
+        }
+    }
+}

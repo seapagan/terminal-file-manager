@@ -122,7 +122,10 @@ Operations use visible marks, or the cursor when no visible marks remain. With
 two panes, copy and move target the other pane: one entry starts immediately,
 while multiple entries ask for confirmation. Shift+F5/F6 or `C`/`M` bypass that
 routine confirmation. With one pane, choose the destination in the dialog.
-F2 in a transfer dialog enables SHA-256 verification.
+F2 in a transfer dialog toggles SHA-256 verification; its button describes the
+next action. PgUp/PgDown or the wheel over the source list scroll selected roots.
+Trash/Delete approval stays disabled until counting finishes and the dialog can
+show the selected objects and required safety context. Resize or cancel if needed.
 
 Conflicts default to Skip. Choose Replace, Keep both or Newer, and use All to
 repeat a choice within that job and type pair. Directories merge. In Jobs,

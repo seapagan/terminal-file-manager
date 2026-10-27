@@ -418,7 +418,16 @@ fn changed_destructive_scope_cancels_the_old_preview_before_replacing_it() {
     for (action, confirm) in [(Action::Delete, 'D'), (Action::Trash, 't')] {
         let (root, mut controller) = controller();
         controller.app.panes[0].select_all();
-        let old = pending_preview(&mut controller, action, 41);
+        let mut queue = terminal_file_manager::operations::Queue::new().unwrap();
+        queue
+            .preview(pending_preview(&mut controller, action, 41))
+            .unwrap();
+        let old = loop {
+            if let Update::Preview { plan, .. } = queue.next(Duration::from_secs(5)).unwrap() {
+                break *plan;
+            }
+        };
+        preview_dialog(&mut controller).plan = old.clone();
         controller.app.panes[0].set_filter("two".into());
         key(&mut controller, KeyCode::Char(confirm));
         assert!(matches!(

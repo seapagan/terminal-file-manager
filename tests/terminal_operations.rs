@@ -157,7 +157,7 @@ fn permanent_delete_requires_separate_confirmation_and_enter_cancels() {
     fs::write(root.path().join("selected"), "owned").unwrap();
     drive(
         command(root.path(), root.path(), None),
-        &[("selected", "\x1bd"), ("Preview: 1 file", "\rq")],
+        &[("selected", "\x1bd"), ("1 file · 5 B", "\rq")],
         false,
     );
     assert_eq!(fs::read(root.path().join("selected")).unwrap(), b"owned");
@@ -165,10 +165,35 @@ fn permanent_delete_requires_separate_confirmation_and_enter_cancels() {
         command(root.path(), root.path(), None),
         &[
             ("selected", "\x1bd"),
-            ("Preview: 1 file", "D"),
+            ("1 file · 5 B", "D"),
             ("1 file permanently deleted", "q"),
         ],
         false,
     );
     assert!(!root.path().join("selected").exists());
+}
+
+#[test]
+fn completed_directory_delete_can_be_followed_by_a_real_create_dialog() {
+    let root = tempfile::tempdir().unwrap();
+    fs::create_dir(root.path().join("selected-directory")).unwrap();
+    fs::write(root.path().join("selected-directory/child"), "owned").unwrap();
+    fs::write(root.path().join("zzz-ready"), "retained").unwrap();
+    drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("zzz-ready", "\x1bd"),
+            ("1 file, 1 directory · 5 B", "D"),
+            ("permanently deleted", "\x1b[18~"),
+            ("Directory name:", "after-delete\r"),
+            ("after-delete/", "q"),
+        ],
+        false,
+    );
+    assert!(!root.path().join("selected-directory").exists());
+    assert!(root.path().join("after-delete").is_dir());
+    assert_eq!(
+        fs::read(root.path().join("zzz-ready")).unwrap(),
+        b"retained"
+    );
 }

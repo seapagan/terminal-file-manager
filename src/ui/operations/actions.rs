@@ -29,6 +29,9 @@ pub(super) fn focused(app: &App) -> Option<KeyCode> {
         {
             Some(KeyCode::Enter)
         }
+        Some(Dialog::Operation(dialog)) if dialog.plan.operation == Operation::Mkdir => {
+            Some(KeyCode::Enter)
+        }
         None if !app.operations.show_history => app.operations.conflicts.front().map(|conflict| {
             [
                 KeyCode::Char('s'),
@@ -84,32 +87,50 @@ pub(super) fn buttons(app: &App, narrow: bool) -> Vec<Button> {
 
 fn operation(dialog: &crate::operations::OperationDialog, narrow: bool) -> Vec<Button> {
     match dialog.plan.operation {
-        Operation::Delete | Operation::Trash => {
-            let mut buttons = vec![("Enter Cancel", KeyCode::Enter)];
-            if dialog.ready {
-                buttons.push(if dialog.plan.operation == Operation::Delete {
-                    (
-                        if narrow {
-                            "D DELETE"
-                        } else {
-                            "D DELETE permanently"
-                        },
-                        KeyCode::Char('D'),
-                    )
-                } else {
-                    ("T Trash", KeyCode::Char('T'))
-                });
-            }
-            buttons
-        }
+        Operation::Delete | Operation::Trash => destructive(dialog.plan.operation, narrow),
         operation => {
-            let mut buttons = vec![("Esc Cancel", KeyCode::Esc), ("Enter Run", KeyCode::Enter)];
+            let mut buttons = vec![
+                ("Esc Cancel", KeyCode::Esc),
+                (
+                    if operation == Operation::Mkdir {
+                        "Enter Create"
+                    } else {
+                        "Enter Run"
+                    },
+                    KeyCode::Enter,
+                ),
+            ];
             if matches!(operation, Operation::Copy | Operation::Move) {
-                buttons.push(("F2 SHA-256", KeyCode::F(2)));
+                buttons.push((
+                    match (narrow, dialog.options.checksum) {
+                        (true, false) => "F2 SHA-256 on",
+                        (true, true) => "F2 SHA-256 off",
+                        (false, false) => "F2 Enable SHA-256",
+                        (false, true) => "F2 Disable SHA-256",
+                    },
+                    KeyCode::F(2),
+                ));
             }
             buttons
         }
     }
+}
+
+fn destructive(operation: Operation, narrow: bool) -> Vec<Button> {
+    let mut buttons = vec![("Enter Cancel", KeyCode::Enter)];
+    buttons.push(if operation == Operation::Delete {
+        (
+            if narrow {
+                "D DELETE"
+            } else {
+                "D DELETE permanently"
+            },
+            KeyCode::Char('D'),
+        )
+    } else {
+        ("T Trash", KeyCode::Char('T'))
+    });
+    buttons
 }
 
 fn history(app: &App, narrow: bool) -> Vec<Button> {
@@ -171,4 +192,18 @@ fn conflict(app: &App, narrow: bool) -> Vec<Button> {
         KeyCode::Esc,
     ));
     buttons
+}
+
+/// Model readiness remains independent of layout visibility.
+pub(super) fn enabled(app: &App, key: KeyCode) -> bool {
+    let Some(Dialog::Operation(dialog)) = &app.operations.dialog else {
+        return true;
+    };
+    match (dialog.plan.operation, key) {
+        (Operation::Trash | Operation::Delete, KeyCode::Char('T' | 'D')) => {
+            dialog.ready && dialog.plan.preview.is_some() && dialog.error.is_none()
+        }
+        (Operation::Mkdir, KeyCode::Enter) => dialog.directory_name_valid(),
+        _ => true,
+    }
 }

@@ -3,6 +3,66 @@ use crate::ui::text::wrap_value;
 use colored_text::ColorLevel;
 
 #[test]
+fn detailed_sizes_agree_for_all_kinds_independently_of_compact_row_sizes() {
+    use crate::fs::EntryKind;
+    let root = tempfile::tempdir().unwrap();
+    let seed = crate::fs::inspect(root.path());
+    for kind in [EntryKind::Directory, EntryKind::Link, EntryKind::File] {
+        for size in [Some(1024), None] {
+            let mut entry = seed.clone();
+            entry.kind = kind;
+            entry.size = size;
+            entry.name = "cached-object".into();
+            let mut app = App::new(root.path().into());
+            app.details[0].entry = Some(entry.clone());
+            for floating in [false, true] {
+                let text = metadata_text(&app, floating);
+                assert!(
+                    text.split("Size:")
+                        .nth(1)
+                        .unwrap()
+                        .trim_start()
+                        .starts_with(&super::size(size)),
+                    "{kind:?} {floating}: {text}"
+                );
+            }
+            let row = crate::ui::modal::entry_row::<()>(&entry, std::path::Path::new(&entry.name));
+            assert_eq!(
+                row.trailing.as_deref(),
+                Some(if kind == EntryKind::File {
+                    if size.is_some() {
+                        "1 KiB"
+                    } else {
+                        "unavailable"
+                    }
+                } else {
+                    "—"
+                })
+            );
+        }
+    }
+}
+
+#[test]
+fn floating_metadata_uses_the_capped_full_area_centre() {
+    let root = tempfile::tempdir().unwrap();
+    let mut app = App::new(root.path().into());
+    app.details[0].entry = Some(crate::fs::inspect(root.path()));
+    app.details[0].canonical = Some(std::path::PathBuf::from("long/".repeat(100)));
+    let theme = Theme::new(ColorLevel::NoColor);
+    for width in [20, 40, 80, 120] {
+        for height in [16, 25, 40, 60] {
+            let bounds = Rect::new(3, 5, width, height);
+            let shown = layout(&app, bounds, &theme, true);
+            assert!(shown.area.height <= height * 3 / 4);
+            assert!(
+                (shown.area.y - bounds.y).abs_diff(bounds.bottom() - 2 - shown.area.bottom()) <= 1
+            );
+        }
+    }
+}
+
+#[test]
 fn wrapped_values_keep_graphemes_and_continue_under_value_column() {
     let theme = Theme::new(ColorLevel::Ansi16);
     let fields = vec![Field::plain(

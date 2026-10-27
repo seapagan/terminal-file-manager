@@ -37,6 +37,7 @@ pub(super) fn controls(app: &App, area: Rect) -> Vec<OperationControl> {
             ),
             target: OperationTarget::Job(index),
             label: "",
+            enabled: true,
         })
         .collect()
 }
@@ -112,12 +113,12 @@ pub(super) fn details(app: &App) -> Vec<Row> {
     }
     rows.extend(disabled(job));
     if let Some(record) = &job.record {
-        rows.extend(results(record));
+        rows.extend(results(record, &job.plan.operands));
     }
     rows
 }
 
-fn results(record: &crate::operations::Record) -> Vec<Row> {
+fn results(record: &crate::operations::Record, operands: &[crate::fs::Entry]) -> Vec<Row> {
     let mut rows = Vec::new();
     rows.push(Row::plain(format!("Observed bytes: {}", record.bytes())));
     let root =
@@ -128,8 +129,16 @@ fn results(record: &crate::operations::Record) -> Vec<Row> {
             Role::Label,
         ));
     }
+    let operands: std::collections::HashMap<_, _> = operands
+        .iter()
+        .map(|entry| (entry.path.as_path(), entry))
+        .collect();
     for entry in &record.entries {
-        rows.extend(result(entry, root.as_deref()));
+        rows.extend(result(
+            entry,
+            root.as_deref(),
+            operands.get(entry.source.as_path()).copied(),
+        ));
     }
     rows
 }
@@ -185,7 +194,11 @@ fn disabled(job: &Job) -> Vec<Row> {
     Vec::new()
 }
 
-fn result(entry: &crate::operations::EntryResult, root: Option<&std::path::Path>) -> Vec<Row> {
+fn result(
+    entry: &crate::operations::EntryResult,
+    root: Option<&std::path::Path>,
+    operand: Option<&crate::fs::Entry>,
+) -> Vec<Row> {
     let role = match entry.outcome {
         Outcome::SafetyIncident | Outcome::Failed => Role::Error,
         Outcome::Changed | Outcome::OutcomeUnknown | Outcome::CopiedSourceRetained => Role::Warning,
@@ -195,12 +208,9 @@ fn result(entry: &crate::operations::EntryResult, root: Option<&std::path::Path>
     let source = root
         .and_then(|root| entry.source.strip_prefix(root).ok())
         .unwrap_or(&entry.source);
-    let mut heading = Row::file(
-        format!("{}: {}", outcome(entry.outcome), source.display()),
-        crate::ui::modal::file_size(Some(entry.bytes)),
-    );
+    let mut heading = result_heading(entry, source, operand);
     heading.role = role;
-    let mut rows = vec![heading];
+    let mut rows = vec![heading, Row::styled(outcome(entry.outcome), role)];
     if let Some(destination) = &entry.destination {
         rows.push(Row::plain(format!(
             "  Destination: {}",
@@ -232,6 +242,39 @@ fn result(entry: &crate::operations::EntryResult, root: Option<&std::path::Path>
         }
     }
     rows
+}
+
+fn result_heading(
+    entry: &crate::operations::EntryResult,
+    source: &std::path::Path,
+    operand: Option<&crate::fs::Entry>,
+) -> Row {
+    let mut heading = operand.map_or_else(
+        || {
+            Row::file(
+                format!(
+                    "{}  {}{}",
+                    super::super::listing::type_indicator(entry.kind, false, false),
+                    source.display(),
+                    if entry.kind == crate::fs::EntryKind::Directory {
+                        "/"
+                    } else {
+                        ""
+                    }
+                ),
+                if entry.kind == crate::fs::EntryKind::File {
+                    crate::ui::modal::file_size(Some(entry.bytes))
+                } else {
+                    "—".into()
+                },
+            )
+        },
+        |operand| crate::ui::modal::entry_row(operand, source),
+    );
+    if entry.kind == crate::fs::EntryKind::File {
+        heading.trailing = Some(crate::ui::modal::file_size(Some(entry.bytes)));
+    }
+    heading
 }
 
 fn state(state: JobState) -> &'static str {
