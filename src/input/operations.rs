@@ -208,8 +208,7 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
         return true;
     }
     if let Some(dialog) = controller.app.operations.dialog.take() {
-        controller.app.operations.dialog =
-            super::operation_dialog::handle(controller, dialog, event, geometry);
+        handle_dialog(controller, dialog, event, geometry);
         return true;
     }
     if controller.app.operations.waiting_exit.is_some() {
@@ -220,6 +219,17 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
         return false;
     }
     super::operation_jobs::handle(controller, event, geometry)
+}
+
+fn handle_dialog(controller: &mut Controller, dialog: Dialog, event: &Event, geometry: &Geometry) {
+    controller.app.operations.dialog =
+        super::operation_dialog::handle(controller, dialog, event, geometry);
+    if controller.app.operations.dialog.is_none()
+        && !controller.app.operations.show_history
+        && !controller.app.operations.conflicts.is_empty()
+    {
+        controller.app.operations.scroll = 0;
+    }
 }
 
 fn waiting(controller: &mut Controller, event: &Event, geometry: &Geometry) {

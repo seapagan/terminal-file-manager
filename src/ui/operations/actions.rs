@@ -178,38 +178,27 @@ fn history(app: &App, narrow: bool) -> Vec<Button> {
 }
 
 fn conflict(app: &App, narrow: bool) -> Vec<Button> {
-    let mut buttons = vec![("S Skip", KeyCode::Char('s'))];
-    if let Some(conflict) = app.operations.conflicts.front()
-        && let Event::Conflict {
-            source,
-            destination,
-            newer_available,
-        } = &conflict.event
-    {
-        if source.may_recurse() == destination.may_recurse() {
-            buttons.push(("R Replace", KeyCode::Char('r')));
-        }
-        buttons.push(("K Keep both", KeyCode::Char('k')));
-        if *newer_available {
-            buttons.push(("N Newer", KeyCode::Char('n')));
-        }
-    }
-    buttons.push(("A All", KeyCode::Char('a')));
-    buttons.push((
-        if narrow {
-            "Esc Cancel"
-        } else {
-            "Esc Cancel job"
-        },
-        KeyCode::Esc,
-    ));
-    buttons
+    vec![
+        ("S Skip", KeyCode::Char('s')),
+        ("R Replace", KeyCode::Char('r')),
+        ("K Keep both", KeyCode::Char('k')),
+        ("N Newer", KeyCode::Char('n')),
+        (all_label(app), KeyCode::Char('a')),
+        (
+            if narrow {
+                "Esc Cancel"
+            } else {
+                "Esc Cancel job"
+            },
+            KeyCode::Esc,
+        ),
+    ]
 }
 
 /// Model readiness remains independent of layout visibility.
 pub(super) fn enabled(app: &App, key: KeyCode) -> bool {
     let Some(Dialog::Operation(dialog)) = &app.operations.dialog else {
-        return true;
+        return conflict_enabled(app, key);
     };
     match (dialog.plan.operation, key) {
         (Operation::Trash | Operation::Delete, KeyCode::Char('T' | 'D')) => {
@@ -217,5 +206,42 @@ pub(super) fn enabled(app: &App, key: KeyCode) -> bool {
         }
         (Operation::Mkdir, KeyCode::Enter) => dialog.directory_name_valid(),
         _ => true,
+    }
+}
+
+fn conflict_enabled(app: &App, key: KeyCode) -> bool {
+    if app.operations.dialog.is_none()
+        && !app.operations.show_history
+        && let Some(conflict) = app.operations.conflicts.front()
+        && let Event::Conflict {
+            source,
+            destination,
+            newer_available,
+        } = &conflict.event
+    {
+        return match key {
+            KeyCode::Char('r') => source.may_recurse() == destination.may_recurse(),
+            KeyCode::Char('n') => *newer_available,
+            _ => true,
+        };
+    }
+    true
+}
+
+fn all_label(app: &App) -> &'static str {
+    let Some(conflict) = app.operations.conflicts.front() else {
+        return "A Apply to similar: Off";
+    };
+    match (conflict.choice, conflict.all) {
+        (0, false) => "A Skip all: Off",
+        (0, true) => "A Skip all: On",
+        (1, false) => "A Replace all: Off",
+        (1, true) => "A Replace all: On",
+        (2, false) => "A Keep both: Off",
+        (2, true) => "A Keep both: On",
+        (3, false) => "A Newer only: Off",
+        (3, true) => "A Newer only: On",
+        (_, false) => "A Apply to similar: Off",
+        (_, true) => "A Apply to similar: On",
     }
 }

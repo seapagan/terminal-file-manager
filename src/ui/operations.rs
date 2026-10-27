@@ -9,6 +9,7 @@ use ratatui::{
     widgets::{Clear, Paragraph},
 };
 mod actions;
+mod conflict;
 mod content;
 mod jobs;
 mod jobs_layout;
@@ -76,7 +77,13 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, geometry: &sup
     let Some(layout) = &geometry.operation_layout else {
         return;
     };
-    super::modal::render_shell(frame, layout.outer, content::title(app), theme);
+    super::modal::render_shell_with_title_role(
+        frame,
+        layout.outer,
+        content::title(app),
+        theme,
+        content::title_role(app),
+    );
     jobs::render(frame, app, theme, layout.list);
     render_rows(frame, &layout.header, layout.shell.pinned, theme);
     render_rows(frame, &layout.rows, layout.body, theme);
@@ -112,7 +119,9 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, geometry: &sup
 }
 
 fn render_footer(frame: &mut Frame, app: &App, layout: &Layout, theme: &Theme) {
-    let footer_start = if app.operations.show_history && app.operations.dialog.is_none() {
+    let footer_start = if app.operations.dialog.is_none()
+        && (app.operations.show_history || !app.operations.conflicts.is_empty())
+    {
         0
     } else {
         layout

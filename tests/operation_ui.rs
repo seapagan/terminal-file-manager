@@ -133,7 +133,7 @@ fn completed_jobs_show_readable_details_and_no_active_controls() {
 }
 
 #[test]
-fn conflict_omits_unsafe_choices_and_formats_optional_metadata() {
+fn conflict_disables_unsafe_choices_and_formats_optional_metadata() {
     let root = tempfile::tempdir().unwrap();
     let source = root.path().join("file");
     let destination = root.path().join("directory");
@@ -157,10 +157,18 @@ fn conflict_omits_unsafe_choices_and_formats_optional_metadata() {
     assert!(text.contains("Newer disabled"));
     assert!(!text.contains("Some("));
     assert!(!text.contains("SystemTime"));
-    assert!(geometry.operation_controls.iter().all(|control| !matches!(
-        control.target,
-        ui::OperationTarget::Key(KeyCode::Char('r' | 'n'))
-    )));
+    for key in ['r', 'n'] {
+        let control = geometry
+            .operation_controls
+            .iter()
+            .find(|control| control.target == ui::OperationTarget::Key(KeyCode::Char(key)))
+            .unwrap();
+        assert!(!control.enabled);
+        assert_eq!(
+            geometry.operation_target(control.area.x, control.area.y),
+            None
+        );
+    }
 }
 
 fn completed_job(app: &App, id: u64) -> Job {

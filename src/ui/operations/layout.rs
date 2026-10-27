@@ -22,6 +22,11 @@ impl Layout {
         if app.operations.show_history && app.operations.dialog.is_none() {
             return super::jobs_layout::layout(app, terminal);
         }
+        if app.operations.dialog.is_none()
+            && let Some(layout) = super::conflict::layout(app, terminal)
+        {
+            return layout;
+        }
         Self::dialog(app, terminal)
     }
 
@@ -46,7 +51,7 @@ impl Layout {
             .is_none_or(|row| row.width() <= usize::from(width));
         let mut header = content::wrapped(header, width);
         let divider = add_divider(app, &rows, &mut header, width);
-        let (mut footer, padding) = wrapped_footer(app, footer, width);
+        let footer = content::wrapped(footer, width);
         let mut spec = modal::Spec {
             pinned_rows: spec
                 .pinned_rows
@@ -56,14 +61,6 @@ impl Layout {
         };
         let wrapped = content::wrapped(rows, width);
         let mut shell = spec.measure(terminal, |_| wrapped.len());
-        collapse_padding(
-            &mut spec,
-            &mut shell,
-            &mut footer,
-            terminal,
-            wrapped.len(),
-            padding,
-        );
         if divider && shell.body.height == 0 {
             header.pop();
             spec.pinned_rows = spec.pinned_rows.saturating_sub(1);
@@ -71,7 +68,13 @@ impl Layout {
         }
         let complete =
             shell.footer.height == spec.footer_rows && shell.pinned.height == spec.pinned_rows;
-        guard_approval(app, &mut shell, &wrapped, complete && summary_visible);
+        let title_visible = title_visible(app, shell.outer);
+        guard_approval(
+            app,
+            &mut shell,
+            &wrapped,
+            complete && summary_visible && title_visible,
+        );
         Self::measured(app, shell, header, footer, wrapped)
     }
 
@@ -99,21 +102,6 @@ impl Layout {
     }
 }
 
-fn collapse_padding(
-    spec: &mut modal::Spec<'_, OperationTarget>,
-    shell: &mut modal::Layout<OperationTarget>,
-    footer: &mut Vec<content::Row>,
-    terminal: Rect,
-    rows: usize,
-    padding: usize,
-) {
-    if padding > 0 && shell.body.height == 0 {
-        footer.drain(..padding);
-        spec.footer_rows = footer.len() as u16;
-        *shell = spec.measure(terminal, |_| rows);
-    }
-}
-
 fn footer_width(app: &App, rows: &[content::Row], width: u16) -> usize {
     let measured = desired_width(rows, width);
     let summary = summary_width(app);
@@ -122,25 +110,6 @@ fn footer_width(app: &App, rows: &[content::Row], width: u16) -> usize {
     } else {
         measured
     }
-}
-
-fn wrapped_footer(app: &App, rows: Vec<content::Row>, width: u16) -> (Vec<content::Row>, usize) {
-    let mut rows = content::wrapped(rows, width);
-    if summary_width(app) == 0 {
-        return (rows, 0);
-    }
-    // Reserve the standard failed-preview message plus one detail line so controls do not jump.
-    let warnings = usize::from(
-        matches!(&app.operations.dialog, Some(crate::operations::Dialog::Operation(d)) if d.plan.operation == crate::operations::Operation::Delete),
-    ) * usize::from(modal::width(content::PERMANENT_WARNING))
-        .div_ceil(usize::from(width).max(1));
-    let capacity = usize::from(modal::width(content::PREVIEW_ERROR))
-        .div_ceil(usize::from(width).max(1))
-        + 1
-        + warnings;
-    let padding = capacity.saturating_sub(rows.len());
-    rows.splice(0..0, std::iter::repeat_n(content::Row::plain(""), padding));
-    (rows, padding)
 }
 
 fn add_divider(
@@ -198,13 +167,25 @@ fn history_area(app: &App, shell: &modal::Layout<OperationTarget>) -> Rect {
     }
 }
 
-fn buttons(app: &App, width: u16) -> Vec<Action<OperationTarget>> {
+pub(super) fn buttons(app: &App, width: u16) -> Vec<Action<OperationTarget>> {
     actions::buttons(app, width < 44)
         .into_iter()
         .map(|(label, key)| {
             let mut action = Action::custom(label, OperationTarget::Key(key), key);
             action.role = actions::role(app, key);
             action.enabled = actions::enabled(app, key);
+            if key == crossterm::event::KeyCode::Char('a')
+                && app.operations.dialog.is_none()
+                && !app.operations.show_history
+            {
+                action.min_width =
+                    modal::width(label.trim_end_matches("On").trim_end_matches("Off")) + 3;
+                action.state = Some(if app.operations.conflicts.front().is_some_and(|c| c.all) {
+                    ("On", crate::color::Role::Status)
+                } else {
+                    ("Off", crate::color::Role::Disabled)
+                });
+            }
             if key == crossterm::event::KeyCode::F(2) {
                 action.min_width = modal::width(if width < 44 {
                     "F2 SHA-256 off"
@@ -262,4 +243,10 @@ fn summary_width(app: &App) -> usize {
     } else {
         0
     }
+}
+
+fn title_visible(app: &App, outer: Rect) -> bool {
+    !matches!(&app.operations.dialog, Some(crate::operations::Dialog::Operation(d))
+        if d.plan.operation == crate::operations::Operation::Delete)
+        || (outer.height >= 3 && modal::width(content::title(app)) <= outer.width.saturating_sub(3))
 }

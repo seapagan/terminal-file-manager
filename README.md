@@ -128,8 +128,10 @@ An ASCII activity spinner runs while Trash/Delete counts recursively.
 Approval stays disabled until counting finishes and the dialog can
 show the selected objects and required safety context. Resize or cancel if needed.
 
-Conflicts default to Skip. Choose Replace, Keep both or Newer, and use All to
-repeat a choice within that job and type pair. Directories merge. In Jobs,
+Conflicts compare Incoming with Existing and default to Skip. Newer replaces
+Existing only when Incoming has a later modified time. `A` toggles All for the
+current job and matching type pair; `Esc` cancels the job. Unavailable choices
+stay disabled. Directories merge. In Jobs,
 select a job with Up/Down or the mouse. Jobs opens with a compact summary;
 `E` toggles full evidence, including recorded errors and individual Trash receipts.
 The viewport stays fixed while you select jobs or toggle evidence.

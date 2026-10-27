@@ -40,6 +40,17 @@ impl<T: Clone> Row<T> {
         }
     }
 
+    /// Informational label/value pair; it never creates an input target.
+    pub fn key_value(label: &str, value: impl Into<String>) -> Self {
+        let mut row = Self::plain(value);
+        row.label = Some(if label.is_empty() {
+            String::new()
+        } else {
+            format!("{}: ", super::super::clean(label))
+        });
+        row
+    }
+
     /// A field whose focus and editing are owned by the caller.
     pub fn field(label: &str, value: &str, target: T, focused: bool) -> Self {
         Self {
@@ -97,7 +108,10 @@ impl<T: Clone> Row<T> {
     pub fn wrap(mut self, width: u16) -> Vec<Self> {
         self.text = super::super::clean(&self.text);
         if self.single_line {
-            self.text = super::truncate(&self.text, width);
+            self.text = super::truncate(
+                &self.text,
+                width.saturating_sub(self.label.as_ref().map_or(0, |label| super::width(label))),
+            );
             return vec![self];
         }
         if self.field.is_some() {
@@ -112,6 +126,9 @@ impl<T: Clone> Row<T> {
                 return rows;
             }
             return vec![self];
+        }
+        if self.label.is_some() {
+            return self.wrap_value(width);
         }
         if let Some(trailing) = &mut self.trailing {
             *trailing = super::super::clean(trailing);
@@ -131,10 +148,45 @@ impl<T: Clone> Row<T> {
             .collect()
     }
 
+    fn wrap_value(mut self, width: u16) -> Vec<Self> {
+        let label = self.label.take().unwrap();
+        let cells = super::width(&label);
+        if cells >= width {
+            let mut rows = Self::styled(label, Role::Label).wrap(width);
+            rows.extend(self.wrap(width));
+            return rows;
+        }
+        super::super::text::wrap_value(&self.text, usize::from(width - cells))
+            .into_iter()
+            .enumerate()
+            .map(|(index, text)| {
+                let mut row = self.clone();
+                row.text = text;
+                row.label = Some(if index == 0 {
+                    label.clone()
+                } else {
+                    " ".repeat(usize::from(cells))
+                });
+                row
+            })
+            .collect()
+    }
+
     /// Render using the same column budget as measurement, with semantic size emphasis.
     pub fn line(&self, width: u16, theme: &Theme) -> Line<'static> {
         if self.field.is_some() {
             return self.field_line(width, theme);
+        }
+        if let Some(label) = &self.label {
+            let style = if matches!(self.role, Role::Status) {
+                theme.style(self.role).add_modifier(Modifier::BOLD)
+            } else {
+                theme.style(self.role)
+            };
+            return Line::from(vec![
+                Span::styled(label.clone(), theme.style(Role::Label)),
+                Span::styled(self.text.clone(), style),
+            ]);
         }
         let Some(value) = &self.trailing else {
             let mut style = theme.style(self.role);

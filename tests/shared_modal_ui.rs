@@ -193,7 +193,7 @@ fn assert_delete_warning(buffer: &ratatui::buffer::Buffer, theme: &Theme) {
     let warning_y = (0..30)
         .find(|&y| {
             let row: String = (0..80).map(|x| buffer[(x, y)].symbol()).collect();
-            row.contains("PERMANENT DELETE cannot be undone.")
+            row.contains("PERMANENT DELETE — irreversible")
         })
         .unwrap();
     let warning_x = (0..80)

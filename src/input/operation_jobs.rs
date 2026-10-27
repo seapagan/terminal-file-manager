@@ -61,6 +61,12 @@ impl Controller {
                 }
             }
             Update::Conflict { id, event, reply } => {
+                if self.app.operations.conflicts.is_empty()
+                    && !self.app.operations.show_history
+                    && self.app.operations.dialog.is_none()
+                {
+                    self.app.operations.scroll = 0;
+                }
                 self.app.operations.conflicts.push_back(PendingConflict {
                     id,
                     event,
@@ -267,16 +273,17 @@ fn conflict_key(controller: &mut Controller, key: KeyCode) {
     };
     let _ = conflict.reply.try_send(decision);
     controller.app.operations.conflicts.pop_front();
+    controller.app.operations.scroll = 0;
 }
 
 fn choose(conflict: &mut PendingConflict, key: KeyCode) -> Option<Decision> {
     Some(match key {
         KeyCode::Up | KeyCode::Left => {
-            conflict.choice = conflict.choice.saturating_sub(1);
+            advance(conflict, -1);
             return None;
         }
         KeyCode::Down | KeyCode::Right => {
-            conflict.choice = (conflict.choice + 1).min(4);
+            advance(conflict, 1);
             return None;
         }
         KeyCode::Char('a' | 'A') => {
@@ -291,6 +298,21 @@ fn choose(conflict: &mut PendingConflict, key: KeyCode) -> Option<Decision> {
         KeyCode::Enter => selected(conflict.choice),
         _ => return None,
     })
+}
+
+fn advance(conflict: &mut PendingConflict, direction: isize) {
+    let mut choice = conflict.choice.min(4);
+    loop {
+        let next = (choice as isize + direction).clamp(0, 4) as usize;
+        if next == choice {
+            return;
+        }
+        choice = next;
+        if disabled(&conflict.event, &selected(choice)).is_none() {
+            conflict.choice = choice;
+            return;
+        }
+    }
 }
 
 fn disabled(event: &JobEvent, decision: &Decision) -> Option<&'static str> {

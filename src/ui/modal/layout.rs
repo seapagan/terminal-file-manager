@@ -206,7 +206,7 @@ fn measured_width<T>(spec: &Spec<'_, T>, terminal_width: u16) -> u16 {
         .content_width
         .max(action_width)
         .saturating_add(4)
-        .max(usize::from(width(spec.title)).saturating_add(2));
+        .max(usize::from(width(spec.title)).saturating_add(3));
     let max_width = terminal_width.saturating_sub(u16::from(terminal_width > 4) * 2);
     desired.min(usize::from(max_width)) as u16
 }

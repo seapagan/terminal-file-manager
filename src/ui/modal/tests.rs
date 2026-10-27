@@ -307,3 +307,45 @@ fn capped_shell_centres_in_the_original_usable_area() {
         }
     }
 }
+
+#[test]
+fn shared_shell_insets_all_titles_one_border_cell_and_keeps_border_style() {
+    for title in [
+        "Copy",
+        "Move",
+        "Move to Trash",
+        "PERMANENT DELETE — irreversible",
+        "Jobs / progress / results",
+        "Metadata",
+        "File already exists",
+        "界e\u{301}long title",
+    ] {
+        for width in [4, 12, 40, 80] {
+            let mut terminal = Terminal::new(TestBackend::new(width, 10)).unwrap();
+            let theme = Theme::new(colored_text::ColorLevel::Ansi16);
+            terminal
+                .draw(|frame| {
+                    render_shell_with_title_role(
+                        frame,
+                        Rect::new(0, 0, width, 10),
+                        title,
+                        &theme,
+                        Role::Error,
+                    )
+                })
+                .unwrap();
+            let b = terminal.backend().buffer();
+            assert_eq!(b[(0, 0)].symbol(), "┌");
+            assert_eq!(b[(1, 0)].symbol(), "─");
+            let shown = truncate(title, width - 3);
+            let mut x = 2;
+            for grapheme in Line::raw(&shown).styled_graphemes(ratatui::style::Style::default()) {
+                assert_eq!(b[(x, 0)].symbol(), grapheme.symbol);
+                x += super::width(grapheme.symbol);
+            }
+            assert_eq!(b[(width - 1, 0)].symbol(), "┐");
+            assert_eq!(b[(1, 0)].fg, theme.style(Role::Header).fg.unwrap());
+            assert_eq!(b[(2, 0)].fg, theme.style(Role::Error).fg.unwrap());
+        }
+    }
+}

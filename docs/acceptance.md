@@ -1,5 +1,28 @@
 # Acceptance gates
 
+## PM3-01 local conflict comparison — 26 October 2026
+
+Conflict dialogs now compare Incoming with Existing using semantic label/value
+rows, one meaningful lexical root and relative, width-aware paths. Wide layouts
+use columns; narrow layouts stack and scroll. Compact UTC dates omit fractions;
+newer direction uses the full recorded timestamps and distinguishes sub-second
+differences. Default output omits object IDs. Skip starts selected, unavailable
+choices remain visible and inert, and arrows skip them. All Off/On retains
+current-job/type-pair scope; Enter and Esc keep their decision meanings.
+
+Final Linux native and instrumented suites passed **634 tests**, with two
+established child-entry skips, plus one doctest. Strict Clippy/maintainability,
+Rust docs/builds, xwin and independent security/workflow checks passed. Strict
+`verify`/`msrv` aggregates stopped at dirty-package guards; interim
+`cargo package --locked --allow-dirty` passed. Thirteen complexity advisories
+remain, including Rust attribution spans; no threshold/suppression changed.
+The ignored controller retains full evidence and fixture commands.
+
+The maintainer's previously staged polish remains unchanged. Conflict changes
+are local and unstaged. PM3-01 remains Review; physical visual acceptance and
+native macOS/Windows execution remain pending. No Git delivery or independent
+review occurred.
+
 ## PM3-01 local Jobs and preview correction — 25 October 2026
 
 The local, uncommitted correction adds a 150 ms ASCII activity frame to pending

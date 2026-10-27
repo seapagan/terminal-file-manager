@@ -42,6 +42,29 @@ pub(super) fn shorten(path: &Path, width: usize) -> String {
     )
 }
 
+/// Comparison labels retain both endpoints when an entire final component cannot fit.
+pub(super) fn comparison(path: &Path, width: u16) -> String {
+    let shown = shorten(path, usize::from(width));
+    if width < 12 || !shown.starts_with('…') {
+        return shown;
+    }
+    let full = super::clean(&path.to_string_lossy());
+    if cells(&full) <= usize::from(width) {
+        return shown;
+    }
+    let (_, parts, _) = components(path, &path.to_string_lossy());
+    let ending = parts.last().map_or(0, |part| cells(part) + 1);
+    let width = usize::from(width);
+    let tail_width = if ending <= width * 2 / 3 {
+        ending.max(width / 2)
+    } else {
+        width / 2
+    };
+    let mut leading = super::modal::truncate(&full, (width - tail_width + 1) as u16);
+    leading.pop(); // Remove only the ellipsis inserted by truncate.
+    format!("{leading}{}", tail(&full, tail_width))
+}
+
 fn retained_ends(parts: &[String], mut remaining: usize) -> (usize, usize) {
     let widths = parts.iter().map(|part| cells(part)).collect::<Vec<_>>();
     let mut start = 0;

@@ -2,7 +2,7 @@ use crate::{
     app::App,
     color::Role,
     fs::{Entry, EntryKind},
-    operations::{Dialog, Event, Operation, OperationDialog},
+    operations::{Dialog, Operation, OperationDialog},
 };
 
 pub(super) type Row = crate::ui::modal::Row<usize>;
@@ -13,8 +13,17 @@ pub(super) fn title(app: &App) -> &'static str {
         Some(Dialog::Exit { .. }) => "Active jobs — safe exit",
         Some(Dialog::Operation(dialog)) => operation(dialog.plan.operation),
         None if app.operations.show_history => "Jobs / progress / results",
-        None if !app.operations.conflicts.is_empty() => "Destination conflict — Skip is default",
+        None if !app.operations.conflicts.is_empty() => super::conflict::title(app),
         _ => "Waiting for acknowledged completion",
+    }
+}
+
+pub(super) fn title_role(app: &App) -> Role {
+    if matches!(&app.operations.dialog, Some(Dialog::Operation(d)) if d.plan.operation == Operation::Delete)
+    {
+        Role::Error
+    } else {
+        Role::Header
     }
 }
 
@@ -47,7 +56,7 @@ pub(super) fn rows(app: &App) -> Vec<Row> {
                     "Jobs remain attached. Esc returns to the manager.",
                 )]
             },
-            conflict,
+            |_| Vec::new(),
         ),
     }
 }
@@ -189,11 +198,7 @@ pub(super) fn footer(app: &App) -> Vec<Row> {
     let Some(Dialog::Operation(dialog)) = &app.operations.dialog else {
         return Vec::new();
     };
-    let mut rows = dialog_error(dialog);
-    if dialog.plan.operation == Operation::Delete {
-        rows.push(Row::styled(PERMANENT_WARNING, Role::Error));
-    }
-    rows
+    dialog_error(dialog)
 }
 
 fn selected_summary(entries: &[Entry]) -> String {
@@ -243,7 +248,6 @@ fn rename_notice(dialog: &OperationDialog) -> Vec<Row> {
     rows
 }
 
-pub(super) const PERMANENT_WARNING: &str = "PERMANENT DELETE cannot be undone.";
 pub(super) const PREVIEW_ERROR: &str =
     "Preview unavailable — confirmation disabled. Cancel and review the selected paths.";
 
@@ -330,66 +334,6 @@ fn destructive(dialog: &OperationDialog, frame: u8) -> Vec<Row> {
             },
         )
         .single_line(),
-    ]
-}
-
-fn conflict(conflict: &crate::operations::PendingConflict) -> Vec<Row> {
-    let choices = [
-        "Skip (default)",
-        "Replace",
-        "Keep both",
-        "Newer",
-        "Cancel job",
-    ];
-    let mut rows = vec![
-        Row::plain(format!(
-            "Job {} — arrows select; Enter: {}",
-            conflict.id,
-            choices[conflict.choice.min(4)]
-        )),
-        Row::plain(format!(
-            "Apply to all matching type pairs in this job: {} (A toggles)",
-            if conflict.all { "yes" } else { "no" }
-        )),
-    ];
-    if let Event::Conflict {
-        source,
-        destination,
-        newer_available,
-    } = &conflict.event
-    {
-        rows.extend(identity("Source", source));
-        rows.extend(identity("Destination", destination));
-        if source.may_recurse() != destination.may_recurse() {
-            rows.push(Row::styled("Replace disabled: types differ; no safe atomic replacement. Use Keep both or Skip.", Role::Warning));
-        }
-        if !newer_available {
-            rows.push(Row::styled(
-                "Newer disabled: timestamps or types are untrustworthy.",
-                Role::Disabled,
-            ));
-        }
-    }
-    rows
-}
-
-fn identity(label: &str, entry: &Entry) -> Vec<Row> {
-    let identity = entry
-        .identity
-        .as_ref()
-        .and_then(|id| id.object)
-        .map_or_else(
-            || "unavailable".into(),
-            |(volume, object)| format!("volume {volume}, object {object}"),
-        );
-    vec![
-        Row::styled(label, Role::Label),
-        crate::ui::modal::entry_row(entry, &entry.path),
-        Row::plain(format!(
-            "Modified {} UTC",
-            super::super::listing::timestamp(entry.modified)
-        )),
-        Row::plain(format!("Identity: {identity}")),
     ]
 }
 

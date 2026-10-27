@@ -142,7 +142,7 @@ fn copy_and_move_replace_are_accessible_from_the_real_dual_pane_manager() {
         &[
             ("zzz-left-ready", "\t"),
             ("aaa-right-ready", "\x1b[Z\x1b[17~"),
-            ("Destination conflict", "r"),
+            ("File already exists", "r"),
             ("1 file moved", "q"),
         ],
         false,

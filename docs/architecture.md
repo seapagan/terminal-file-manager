@@ -354,3 +354,19 @@ informational shortcuts in the existing footer. Whole shortcut labels pack into
 at most the available two footer rows; an ellipsis marks omitted hints. Warnings
 retain their first row, including unknown-outcome retry/exit restrictions. The
 renderer creates no hit targets for shortcut hints or unused action-band space.
+
+Conflict dialogs present cached Incoming/Existing snapshots as side-by-side
+columns or stacked fields. One meaningful lexical root replaces repeated
+absolute paths. Comparison paths reuse component-aware title elision and share
+a grapheme-safe endpoint fallback for oversized final components; pane/Jobs
+formatting retains its existing policy. Semantic key/value rows create no input
+targets. UTC display omits fractional seconds, while newer direction compares
+the full frozen SystemTime values under the recorded availability contract.
+
+Replace/Newer controls remain visible but disabled when their existing guards
+reject them. Arrow navigation skips those choices; keyboard and mouse decisions
+still pass the existing input checks. Skip starts selected for each prompt.
+Apply-to-All shows its state in a fixed-size control and retains current-job/type-
+pair scope. A new visible conflict resets detail scrolling; clipped conflict
+footers prioritise safety warnings. The filesystem engine and native identities
+remain unchanged.

@@ -9,7 +9,7 @@ mod dialog_fixture;
 use dialog_fixture::dialog;
 
 #[test]
-fn selected_roots_scroll_below_fixed_context_and_above_fixed_delete_warning() {
+fn selected_roots_scroll_below_fixed_context_and_destructive_title() {
     let root = tempfile::tempdir().unwrap();
     let paths: Vec<_> = (0..50)
         .map(|i| {
@@ -51,7 +51,7 @@ fn fixed_positions(rows: &[String]) -> (usize, usize, usize) {
         .unwrap();
     let warning = rows
         .iter()
-        .position(|row| row.contains("PERMANENT DELETE cannot be undone."))
+        .position(|row| row.contains("PERMANENT DELETE — irreversible"))
         .unwrap();
     let actions = rows
         .iter()
@@ -134,7 +134,7 @@ fn destination_field(geometry: &ui::Geometry) -> Rect {
 }
 
 #[test]
-fn tiny_delete_never_accepts_a_hidden_warning_or_invisible_action() {
+fn tiny_delete_never_accepts_a_hidden_title_or_invisible_action() {
     use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
     use terminal_file_manager::input::{Bindings, Controller};
     let root = tempfile::tempdir().unwrap();

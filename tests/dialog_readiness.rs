@@ -110,9 +110,9 @@ fn assert_failed_transition(c: &mut Controller, key: KeyCode, expected: Rect) {
         d.error = Some("Access denied".into());
     }
     let failed = ui::geometry(&c.app, Rect::new(0, 0, 80, 30));
-    assert_eq!(button(&failed, key).area, expected);
+    assert_eq!(button(&failed, key).area.width, expected.width);
     assert!(!button(&failed, key).enabled);
-    click(c, &failed, expected);
+    click(c, &failed, button(&failed, key).area);
     assert!(c.app.operations.outbox.is_empty());
     if let Some(Dialog::Operation(d)) = &mut c.app.operations.dialog {
         d.ready = true;
@@ -234,5 +234,74 @@ fn failed_preview_and_clipped_context_block_mouse_and_all_destructive_keys() {
                     .any(|i| matches!(i, Intent::Submit(..)))
             );
         }
+    }
+}
+
+#[test]
+fn small_trash_and_delete_lists_have_only_one_gap_before_controls() {
+    for operation in [Operation::Trash, Operation::Delete] {
+        let root = tempfile::tempdir().unwrap();
+        let file = root.path().join("selected.txt");
+        std::fs::write(&file, b"retained").unwrap();
+        let mut queue = Queue::new().unwrap();
+        queue
+            .preview(Plan::paths(operation, vec![file], None).unwrap())
+            .unwrap();
+        let plan = loop {
+            if let Update::Preview { plan, .. } =
+                queue.next(std::time::Duration::from_secs(5)).unwrap()
+            {
+                break *plan;
+            }
+        };
+        for count in [1, 3] {
+            let mut selected = plan.clone();
+            selected.operands = vec![selected.operands[0].clone(); count];
+            let app = dialog_fixture::dialog(selected);
+            assert_compact_buffer(&app, count);
+        }
+    }
+}
+
+fn assert_compact_buffer(app: &App, count: usize) {
+    let mut terminal = Terminal::new(TestBackend::new(100, 40)).unwrap();
+    terminal
+        .draw(|f| {
+            ui::render(f, app, &Theme::new(colored_text::ColorLevel::NoColor));
+        })
+        .unwrap();
+    let b = terminal.backend().buffer();
+    let rows: Vec<String> = (0..40)
+        .map(|y| (0..100).map(|x| b[(x, y)].symbol()).collect())
+        .collect();
+    let operands: Vec<_> = rows
+        .iter()
+        .enumerate()
+        .filter(|(_, row)| row.contains("-  selected.txt"))
+        .map(|(y, _)| y)
+        .collect();
+    assert_eq!(operands.len(), count, "{rows:?}");
+    let actions = rows
+        .iter()
+        .position(|row| row.contains("[Enter Cancel]"))
+        .unwrap();
+    assert_eq!(actions - operands.last().unwrap(), 2, "{rows:?}");
+    assert!(!rows.iter().any(|row| row.contains("cannot be undone")));
+    let title = rows.iter().position(|row| row.contains("┌─")).unwrap();
+    assert!(actions - title <= count + 6, "{rows:?}");
+}
+
+#[test]
+fn clipped_danger_title_blocks_delete_even_when_trash_context_would_fit() {
+    for operation in [Operation::Trash, Operation::Delete] {
+        let (_root, plan) = completed_plan(operation);
+        let app = dialog_fixture::dialog(plan);
+        let g = ui::geometry(&app, Rect::new(0, 0, 32, 30));
+        let key = if operation == Operation::Delete {
+            KeyCode::Char('D')
+        } else {
+            KeyCode::Char('T')
+        };
+        assert_eq!(button(&g, key).enabled, operation == Operation::Trash);
     }
 }

@@ -1,7 +1,11 @@
 //! Safe standard action groups. Returned intents still require domain authorization.
 use crate::color::{Role, Theme};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use ratatui::{Frame, widgets::Paragraph};
+use ratatui::{
+    Frame,
+    text::{Line, Span},
+    widgets::Paragraph,
+};
 
 /// An action's label, typed intent and deliberate shortcut.
 #[derive(Clone, Debug)]
@@ -10,6 +14,8 @@ pub struct Action<T> {
     pub label: &'static str,
     /// Stable label budget in display cells, excluding brackets.
     pub min_width: u16,
+    /// Optional separately styled trailing toggle state.
+    pub state: Option<(&'static str, Role)>,
     /// Intent interpreted and validated by the domain controller.
     pub intent: T,
     /// Exact shortcut. Destructive actions must supply an explicit key.
@@ -28,6 +34,7 @@ impl<T> Action<T> {
         Self {
             label,
             min_width: 0,
+            state: None,
             intent,
             key,
             enabled: true,
@@ -173,18 +180,35 @@ pub fn render<T>(
         } else {
             region.action.role
         };
+        let padding = " ".repeat(usize::from(
+            region
+                .area
+                .width
+                .saturating_sub(2 + super::width(region.action.label)),
+        ));
+        let mut spans = vec![Span::raw("["), Span::raw(region.action.label)];
+        if let Some((state, state_role)) = region.action.state {
+            spans[1] = Span::raw(
+                region
+                    .action
+                    .label
+                    .strip_suffix(state)
+                    .unwrap_or(region.action.label),
+            );
+            spans.push(Span::styled(
+                state,
+                theme
+                    .style(state_role)
+                    .fg(theme
+                        .style(state_role)
+                        .fg
+                        .unwrap_or(ratatui::style::Color::Reset))
+                    .remove_modifier(ratatui::style::Modifier::BOLD),
+            ));
+        }
+        spans.push(Span::raw(format!("{padding}]")));
         frame.render_widget(
-            Paragraph::new(format!(
-                "[{}{}]",
-                region.action.label,
-                " ".repeat(usize::from(
-                    region
-                        .area
-                        .width
-                        .saturating_sub(2 + super::width(region.action.label))
-                ))
-            ))
-            .style(theme.style(role)),
+            Paragraph::new(Line::from(spans)).style(theme.style(role)),
             region.area,
         );
     }
