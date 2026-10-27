@@ -48,7 +48,7 @@ pub enum Event {
 }
 
 /// Source retention and unknown outcomes are distinct from completed moves.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum Outcome {
     Completed,
     Skipped,
@@ -91,6 +91,28 @@ pub struct Record {
 }
 
 impl Record {
+    /// Group exact recorded causes without merging distinct outcomes or losing evidence.
+    pub(crate) fn failure_groups(&self) -> Vec<(Outcome, &str, usize)> {
+        let mut groups = Vec::<(Outcome, &str, usize)>::new();
+        let mut positions = std::collections::HashMap::new();
+        for entry in &self.entries {
+            if matches!(entry.outcome, Outcome::Completed | Outcome::Skipped)
+                || entry.detail.is_empty()
+            {
+                continue;
+            }
+            let key = (entry.outcome, entry.detail.as_str());
+            if let Some(&index) = positions.get(&key) {
+                let group: &mut (Outcome, &str, usize) = &mut groups[index];
+                group.2 += 1;
+            } else {
+                positions.insert(key, groups.len());
+                groups.push((key.0, key.1, 1));
+            }
+        }
+        groups
+    }
+
     /// Observed transferred bytes, including copied-but-source-retained data.
     pub fn bytes(&self) -> u64 {
         self.entries.iter().map(|e| e.bytes).sum()

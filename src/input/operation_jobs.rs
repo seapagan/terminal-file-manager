@@ -180,7 +180,7 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
         return true;
     }
     if !controller.app.operations.conflicts.is_empty() {
-        conflict_key(controller, key.code);
+        conflict_key(controller, key.code, geometry);
         return true;
     }
     false
@@ -249,7 +249,7 @@ fn open_conflict(state: &mut crate::operations::State) {
     state.scroll = 0;
 }
 
-fn conflict_key(controller: &mut Controller, key: KeyCode) {
+fn conflict_key(controller: &mut Controller, key: KeyCode, geometry: &Geometry) {
     if key == KeyCode::F(9) {
         controller.app.operations.show_history = true;
         controller.app.operations.jobs_evidence = false;
@@ -259,11 +259,15 @@ fn conflict_key(controller: &mut Controller, key: KeyCode) {
     let Some(conflict) = controller.app.operations.conflicts.front_mut() else {
         return;
     };
-    let Some(decision) = choose(conflict, key) else {
+    let Some(decision) = choose(conflict, key, geometry) else {
         return;
     };
     if let Some(reason) = disabled(&conflict.event, &decision) {
         controller.app.status = reason.into();
+        return;
+    }
+    if !visible_decision(geometry, &decision) {
+        controller.app.status = "Resize to review the conflict before replacing.".into();
         return;
     }
     let decision = if conflict.all && !matches!(decision, Decision::Cancel) {
@@ -276,14 +280,14 @@ fn conflict_key(controller: &mut Controller, key: KeyCode) {
     controller.app.operations.scroll = 0;
 }
 
-fn choose(conflict: &mut PendingConflict, key: KeyCode) -> Option<Decision> {
+fn choose(conflict: &mut PendingConflict, key: KeyCode, geometry: &Geometry) -> Option<Decision> {
     Some(match key {
         KeyCode::Up | KeyCode::Left => {
-            advance(conflict, -1);
+            advance(conflict, -1, geometry);
             return None;
         }
         KeyCode::Down | KeyCode::Right => {
-            advance(conflict, 1);
+            advance(conflict, 1, geometry);
             return None;
         }
         KeyCode::Char('a' | 'A') => {
@@ -300,7 +304,7 @@ fn choose(conflict: &mut PendingConflict, key: KeyCode) -> Option<Decision> {
     })
 }
 
-fn advance(conflict: &mut PendingConflict, direction: isize) {
+fn advance(conflict: &mut PendingConflict, direction: isize, geometry: &Geometry) {
     let mut choice = conflict.choice.min(4);
     loop {
         let next = (choice as isize + direction).clamp(0, 4) as usize;
@@ -308,10 +312,20 @@ fn advance(conflict: &mut PendingConflict, direction: isize) {
             return;
         }
         choice = next;
-        if disabled(&conflict.event, &selected(choice)).is_none() {
+        if disabled(&conflict.event, &selected(choice)).is_none()
+            && visible_decision(geometry, &selected(choice))
+        {
             conflict.choice = choice;
             return;
         }
+    }
+}
+
+fn visible_decision(geometry: &Geometry, decision: &Decision) -> bool {
+    match decision {
+        Decision::Replace => geometry.operation_enabled(KeyCode::Char('r')),
+        Decision::Newer => geometry.operation_enabled(KeyCode::Char('n')),
+        _ => true,
     }
 }
 

@@ -197,8 +197,8 @@ impl State {
     }
     /// A rejected request has no worker job; preserve its evidence in the existing Jobs view.
     pub fn fail(&mut self, detail: String, now: SystemTime) {
+        self.notify(format!("Not started: {detail}"), now, NoticeSeverity::Error);
         self.last_error = Some(detail);
-        self.notify("Operation not started".into(), now, NoticeSeverity::Error);
     }
     pub fn notify(&mut self, text: String, now: SystemTime, severity: NoticeSeverity) {
         self.notices
@@ -215,6 +215,21 @@ impl State {
 }
 
 pub(crate) fn summary(job: &Job) -> String {
+    let summary = counts_summary(job);
+    let Some(record) = job.record.as_ref().filter(|r| !r.incident()) else {
+        return summary;
+    };
+    let groups = record.failure_groups();
+    groups
+        .iter()
+        .find(|g| g.0 == Outcome::OutcomeUnknown)
+        .or_else(|| groups.first())
+        .map_or(summary.clone(), |(_, reason, _)| {
+            format!("{reason} — {summary}")
+        })
+}
+
+pub(crate) fn counts_summary(job: &Job) -> String {
     let Some(record) = &job.record else {
         return format!(
             "Job {}: {}",

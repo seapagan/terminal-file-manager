@@ -129,11 +129,14 @@ Approval stays disabled until counting finishes and the dialog can
 show the selected objects and required safety context. Resize or cancel if needed.
 
 Conflicts compare Incoming with Existing and default to Skip. Newer replaces
-Existing only when Incoming has a later modified time. `A` toggles All for the
-current job and matching type pair; `Esc` cancels the job. Unavailable choices
-stay disabled. Directories merge. In Jobs,
+Existing only when Incoming has a later modified time. `A Apply to all` toggles
+whether the next chosen action also applies to matching conflicts in this job;
+`Esc` cancels the job. Unavailable choices stay disabled. Enlarge the terminal
+if the comparison cannot fit before replacing. Directories merge. In Jobs,
 select a job with Up/Down or the mouse. Jobs opens with a compact summary;
 `E` toggles full evidence, including recorded errors and individual Trash receipts.
+Failed operations show a reason in the status line. Jobs Summary groups repeated
+failure reasons with affected counts and keeps mixed outcomes visible.
 The viewport stays fixed while you select jobs or toggle evidence.
 At small terminal sizes, the Jobs footer lists eligible shortcuts when their
 buttons cannot fit; safety warnings take priority.

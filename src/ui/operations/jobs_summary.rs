@@ -57,23 +57,26 @@ pub(super) fn summary(app: &App, width: u16) -> Vec<Row> {
         rows.push(Row::plain("No jobs this session."));
         return rows;
     };
+    rows.push(Row::styled(heading(job), state_role(job.state)));
     if let Some(record) = &job.record {
-        let completed = record
-            .entries
-            .iter()
-            .filter(|e| e.outcome == Outcome::Completed)
-            .count();
-        rows.push(Row::styled(
-            format!(
-                "{completed} {} {} · {}",
-                if completed == 1 { "entry" } else { "entries" },
-                completed_verb(job.plan.operation),
-                state(job.state)
-            ),
-            state_role(job.state),
-        ));
-    } else {
-        rows.push(Row::styled(state(job.state), state_role(job.state)));
+        rows.extend(
+            record
+                .failure_groups()
+                .into_iter()
+                .map(|(kind, detail, count)| {
+                    Row::styled(
+                        format!("{count} {}: {detail}", outcome(kind).to_lowercase()),
+                        if matches!(
+                            kind,
+                            Outcome::Failed | Outcome::Changed | Outcome::SafetyIncident
+                        ) {
+                            Role::Error
+                        } else {
+                            Role::Warning
+                        },
+                    )
+                }),
+        );
     }
     let root = crate::ui::modal::common_root(job.plan.operands.iter().map(|e| e.path.as_path()));
     if let Some(root) = &root {
@@ -87,6 +90,31 @@ pub(super) fn summary(app: &App, width: u16) -> Vec<Row> {
     rows.extend(operand_rows(job, root.as_deref()));
     rows.extend(progress(job));
     rows
+}
+
+fn heading(job: &Job) -> String {
+    if job.record.is_none() {
+        return state(job.state).into();
+    }
+    if let Some(record) = job
+        .record
+        .as_ref()
+        .filter(|r| r.entries.iter().all(|e| e.outcome == Outcome::Completed))
+    {
+        let count = record.entries.len();
+        format!(
+            "{count} {} {} · {}",
+            if count == 1 { "entry" } else { "entries" },
+            completed_verb(job.plan.operation),
+            state(job.state)
+        )
+    } else {
+        format!(
+            "{} · {}",
+            crate::operations::counts_summary(job),
+            state(job.state)
+        )
+    }
 }
 
 fn path_row(label: &str, path: &std::path::Path, width: u16) -> Row {
@@ -129,12 +157,13 @@ fn operand_rows(job: &Job, root: Option<&std::path::Path>) -> Vec<Row> {
                     Outcome::Failed | Outcome::SafetyIncident => Role::Error,
                     _ => Role::Warning,
                 };
-                if last.outcome != Outcome::Completed || entries.len() > 1 {
-                    row.text = format!("{} · {} (E details)", outcome(last.outcome), row.text);
+                match last.outcome {
+                    Outcome::Failed | Outcome::Changed => row.text.insert_str(0, "! "),
+                    Outcome::Completed => {}
+                    _ => row.text = format!("{} · {}", outcome(last.outcome), row.text),
                 }
             } else {
-                row.text
-                    .push_str(" · no recorded root completion (E details)");
+                row.text.push_str(" · no recorded root completion");
                 row.role = Role::Warning;
             }
             row

@@ -202,6 +202,20 @@ pub(super) fn footer(app: &App) -> Vec<Row> {
 }
 
 fn selected_summary(entries: &[Entry]) -> String {
+    if entries
+        .iter()
+        .any(|entry| !matches!(entry.kind, EntryKind::File | EntryKind::Directory))
+    {
+        return format!(
+            "{} {} selected",
+            entries.len(),
+            if entries.len() == 1 {
+                "entry"
+            } else {
+                "entries"
+            }
+        );
+    }
     let directories = entries
         .iter()
         .filter(|e| e.kind == EntryKind::Directory)

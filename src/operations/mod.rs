@@ -6,10 +6,10 @@ mod mounts;
 mod mutations;
 mod preview;
 mod recovery;
-pub(crate) use model::summary;
 pub use model::{
     Dialog, Intent, Job, JobState, Notice, NoticeSeverity, OperationDialog, PendingConflict, State,
 };
+pub(crate) use model::{counts_summary, summary};
 pub use recovery::{Recovery, reconcile};
 mod queue;
 pub use preview::Preview;

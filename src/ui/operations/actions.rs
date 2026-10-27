@@ -229,19 +229,9 @@ fn conflict_enabled(app: &App, key: KeyCode) -> bool {
 }
 
 fn all_label(app: &App) -> &'static str {
-    let Some(conflict) = app.operations.conflicts.front() else {
-        return "A Apply to similar: Off";
-    };
-    match (conflict.choice, conflict.all) {
-        (0, false) => "A Skip all: Off",
-        (0, true) => "A Skip all: On",
-        (1, false) => "A Replace all: Off",
-        (1, true) => "A Replace all: On",
-        (2, false) => "A Keep both: Off",
-        (2, true) => "A Keep both: On",
-        (3, false) => "A Newer only: Off",
-        (3, true) => "A Newer only: On",
-        (_, false) => "A Apply to similar: Off",
-        (_, true) => "A Apply to similar: On",
+    if app.operations.conflicts.front().is_some_and(|c| c.all) {
+        "A Apply to all: On"
+    } else {
+        "A Apply to all: Off"
     }
 }

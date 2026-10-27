@@ -280,3 +280,46 @@ fn mkdir_orders_context_before_a_precisely_styled_field() {
             .contains(ratatui::style::Modifier::REVERSED)
     );
 }
+
+#[test]
+fn special_selection_objects_use_an_honest_neutral_count() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("seed");
+    std::fs::write(&path, "owned").unwrap();
+    for operation in [Operation::Copy, Operation::Move, Operation::Rename] {
+        let mut plan =
+            Plan::paths(operation, vec![path.clone()], Some(root.path().into())).unwrap();
+        for kind in [
+            terminal_file_manager::fs::EntryKind::Link,
+            terminal_file_manager::fs::EntryKind::Junction,
+            terminal_file_manager::fs::EntryKind::Socket,
+        ] {
+            plan.operands[0].kind = kind;
+            let text = rendered(&dialog(plan.clone()), 120, 40).join("\n");
+            assert!(text.contains("1 entry selected"), "{text}");
+            assert!(!text.contains("1 file selected"));
+        }
+    }
+}
+
+#[test]
+fn mixed_special_file_and_directory_selections_are_entries() {
+    let root = tempfile::tempdir().unwrap();
+    let file = root.path().join("file");
+    let directory = root.path().join("directory");
+    std::fs::write(&file, b"owned").unwrap();
+    std::fs::create_dir(&directory).unwrap();
+    for operation in [Operation::Copy, Operation::Move] {
+        let mut plan = Plan::paths(
+            operation,
+            vec![file.clone(), directory.clone()],
+            Some(root.path().into()),
+        )
+        .unwrap();
+        plan.operands.push(plan.operands[0].clone());
+        plan.operands[2].kind = terminal_file_manager::fs::EntryKind::Link;
+        let text = rendered(&dialog(plan), 120, 40).join("\n");
+        assert!(text.contains("3 entries selected"));
+        assert!(!text.contains("2 files"));
+    }
+}

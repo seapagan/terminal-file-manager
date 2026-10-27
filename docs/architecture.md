@@ -366,7 +366,23 @@ the full frozen SystemTime values under the recorded availability contract.
 Replace/Newer controls remain visible but disabled when their existing guards
 reject them. Arrow navigation skips those choices; keyboard and mouse decisions
 still pass the existing input checks. Skip starts selected for each prompt.
-Apply-to-All shows its state in a fixed-size control and retains current-job/type-
-pair scope. A new visible conflict resets detail scrolling; clipped conflict
+Apply-to-All uses a neutral, fixed-size On/Off control. The modifier wraps the
+actual submitted choice and retains current-job/type-pair scope. Replace and
+Newer require the measured filename/root and comparison rows to fit; both input
+routing and mouse eligibility enforce this guard. Skip and Cancel remain safe
+responses when comparison context is hidden. A new visible conflict resets detail scrolling; clipped conflict
 footers prioritise safety warnings. The filesystem engine and native identities
 remain unchanged.
+
+
+Copy/Move workers retain execution-time overlap and native-identity checks.
+Refusals distinguish the same output item, a source folder containing its
+output, and aliases of the same native item. Renamed outputs and Keep both keep
+their existing eligibility; the planner does not pre-reject an entire batch.
+Notifications show a recorded primary reason, prioritising uncertain outcomes,
+with the existing lifecycle-derived counts. Jobs Summary groups exact recorded
+(outcome, reason) pairs once with an affected count, before the operand rows.
+It preserves distinct causes and uncertainty restrictions. Evidence retains each
+full individual reason, native source/target spelling, receipts and recovery
+records. Mixed/special-object selection summaries use neutral entry counts;
+recursive preview accounting and lifecycle-derived job counts are unchanged.

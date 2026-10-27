@@ -1,5 +1,20 @@
 # Acceptance gates
 
+## PM3-01 local conflict clarity and failure feedback — 27 October 2026
+
+Apply-to-All uses a neutral On/Off label and modifies the actual submitted
+decision. Small terminals disable Replace/Newer when the measured comparison
+cannot fit. Special-object selections use neutral entry counts. Width regressions
+check the measured outer rectangle and rendered borders, including expansion,
+terminal limits, middle-elision and the stacked/column transition.
+
+Native fixtures cover same-folder Copy/Move, directory overlap, hard-link and
+parent aliases, native case handling and valid renamed/Keep both outputs.
+Rendered/input regressions cover immediate reasons, grouped exact causes, mixed
+counts, uncertainty, full Evidence, disabled decisions and safe defaults.
+The ignored controller records current commands, outcomes and disposable visual
+fixtures. PM3-01 remains Review pending physical visual acceptance.
+
 ## PM3-01 local conflict comparison — 26 October 2026
 
 Conflict dialogs now compare Incoming with Existing using semantic label/value

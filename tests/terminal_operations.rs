@@ -197,3 +197,28 @@ fn completed_directory_delete_can_be_followed_by_a_real_create_dialog() {
         b"retained"
     );
 }
+
+#[test]
+fn same_folder_batch_failure_explains_the_reason_before_evidence_in_a_real_terminal() {
+    for shortcut in ["\x1b[15~", "\x1b[17~"] {
+        let root = tempfile::tempdir().unwrap();
+        for name in ["first-owned", "second-owned"] {
+            fs::write(root.path().join(name), "retained").unwrap();
+        }
+        let keys = format!("\x01{shortcut}");
+        drive(
+            command(root.path(), root.path(), Some(root.path())),
+            &[
+                ("second-owned", &keys),
+                ("Enter Run", "\r"),
+                ("Source and destination are the same.", "\x1b[20~"),
+                ("2 failed: Source and destination are the same.", "e"),
+                ("Summary", "\x1b[20~q"),
+            ],
+            false,
+        );
+        for name in ["first-owned", "second-owned"] {
+            assert_eq!(fs::read(root.path().join(name)).unwrap(), b"retained");
+        }
+    }
+}

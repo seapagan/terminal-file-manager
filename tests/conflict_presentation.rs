@@ -249,6 +249,67 @@ fn single_component_elision_keeps_a_recognisable_beginning_and_end() {
 }
 
 #[test]
+fn conflict_type_values_are_descriptive_without_listing_markers() {
+    let (_root, mut app, _) = fixture();
+    for (kind, name) in [
+        (EntryKind::File, "File"),
+        (EntryKind::Directory, "Directory"),
+        (EntryKind::Link, "Link"),
+        (EntryKind::Junction, "Junction"),
+        (EntryKind::ReparsePoint, "Reparse point"),
+        (EntryKind::Socket, "Socket"),
+        (EntryKind::Fifo, "FIFO"),
+        (EntryKind::Device, "Device"),
+        (EntryKind::Unknown, "Unknown"),
+    ] {
+        edit(&mut app, |s, d, _| {
+            s.kind = kind;
+            d.kind = kind;
+        });
+        assert_type_values(&app, &format!("{name} {name}"));
+    }
+}
+
+#[test]
+fn mismatched_type_names_preserve_disabled_overwrite_choices() {
+    let (_root, mut app, _) = fixture();
+    edit(&mut app, |_, d, available| {
+        d.kind = EntryKind::Directory;
+        *available = false;
+    });
+    assert_type_values(&app, "File Directory");
+    for width in [40, 80, 120] {
+        let (_, geometry, _) = draw(&app, width, 40, ColorLevel::NoColor);
+        assert!(!geometry.operation_enabled(KeyCode::Char('r')));
+        assert!(!geometry.operation_enabled(KeyCode::Char('n')));
+    }
+}
+
+fn assert_type_values(app: &terminal_file_manager::app::App, expected: &str) {
+    for width in [40, 80, 120] {
+        let (terminal, _, text) = draw(app, width, 40, ColorLevel::NoColor);
+        let values = terminal
+            .backend()
+            .buffer()
+            .content
+            .chunks(usize::from(width))
+            .map(|row| row.iter().map(|cell| cell.symbol()).collect::<String>())
+            .filter_map(|row| {
+                row.split_once("Type:").map(|(_, values)| {
+                    values
+                        .trim_matches([' ', '│'])
+                        .split_whitespace()
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                })
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert_eq!(values, expected, "{text}");
+    }
+}
+
+#[test]
 fn non_file_types_never_gain_regular_file_sizes() {
     let (_root, mut app, _) = fixture();
     for kind in [
@@ -362,18 +423,16 @@ fn native_drive_and_unc_roots_do_not_invent_a_shared_namespace() {
 fn conflict_width_tracks_content_before_eliding_paths() {
     let (_root, mut app, _) = fixture();
     for width in [120, 160] {
-        let (_, short, _) = draw(&app, width, 50, ColorLevel::NoColor);
+        let (short, _, _) = draw(&app, width, 50, ColorLevel::NoColor);
         edit(&mut app, |s, d, _| {
             s.path = "/visual/source/nested/incoming-folder/conflict.txt".into();
             d.path = "/visual/destination/nested/existing-folder/conflict.txt".into();
         });
-        let (_, long, text) = draw(&app, width, 50, ColorLevel::NoColor);
-        let span = |g: &terminal_file_manager::ui::Geometry| {
-            let controls = &g.operation_controls;
-            controls.iter().map(|c| c.area.right()).max().unwrap()
-                - controls.iter().map(|c| c.area.x).min().unwrap()
-        };
-        assert!(span(&long) > span(&short), "{text}");
+        let (long, _, text) = draw(&app, width, 50, ColorLevel::NoColor);
+        assert!(
+            rendered_conflict_width(&long) > rendered_conflict_width(&short),
+            "{text}"
+        );
         assert!(
             text.contains("source/nested/incoming-folder/conflict.txt"),
             "{text}"
@@ -388,4 +447,19 @@ fn conflict_width_tracks_content_before_eliding_paths() {
             d.path = "/visual/destination/conflict.txt".into();
         });
     }
+}
+
+fn rendered_conflict_width(terminal: &ratatui::Terminal<ratatui::backend::TestBackend>) -> usize {
+    let b = terminal.backend().buffer();
+    let row = (0..b.area.height)
+        .map(|y| {
+            (0..b.area.width)
+                .map(|x| b[(x, y)].symbol())
+                .collect::<String>()
+        })
+        .find(|row| row.contains("┌─File already exists"))
+        .unwrap();
+    let start = row.find('┌').unwrap();
+    let end = row.rfind('┐').unwrap();
+    ratatui::text::Line::raw(&row[start..end]).width() + 1
 }

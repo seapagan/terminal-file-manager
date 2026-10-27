@@ -308,3 +308,83 @@ fn assert_spinner_stops(app: &mut App) {
         std::time::Duration::from_millis(900)
     ));
 }
+
+#[test]
+fn conflict_outer_rectangle_tracks_real_content_and_terminal_limit() {
+    let root = tempfile::tempdir().unwrap();
+    let file = root.path().join("a.txt");
+    std::fs::write(&file, "owned").unwrap();
+    let entry = crate::fs::inspect(&file);
+    let (reply, _receiver) = std::sync::mpsc::sync_channel(1);
+    let mut app = App::new(root.path().into());
+    app.operations
+        .conflicts
+        .push_back(crate::operations::PendingConflict {
+            id: 1,
+            choice: 0,
+            all: false,
+            reply,
+            event: crate::operations::Event::Conflict {
+                source: Box::new(entry.clone()),
+                destination: Box::new(entry),
+                newer_available: true,
+            },
+        });
+    for width in [80, 120, 160] {
+        assert_conflict_widths(&mut app, width);
+    }
+    for width in [64, 65] {
+        set_paths(&mut app, "source/a.txt", "destination/a.txt");
+        let layout = Layout::new(&app, Rect::new(0, 0, width, 50));
+        assert_eq!(
+            layout
+                .rows
+                .iter()
+                .any(|row| row.text.contains("Incoming (source)")
+                    && row.text.contains("Existing (destination)")),
+            width == 65
+        );
+    }
+}
+
+fn set_paths(app: &mut App, incoming: &str, existing: &str) {
+    if let crate::operations::Event::Conflict {
+        source,
+        destination,
+        ..
+    } = &mut app.operations.conflicts.front_mut().unwrap().event
+    {
+        source.path = std::path::Path::new("/visual").join(incoming);
+        destination.path = std::path::Path::new("/visual").join(existing);
+    }
+}
+
+fn assert_conflict_widths(app: &mut App, width: u16) {
+    let area = Rect::new(0, 0, width, 50);
+    set_paths(app, "source/a.txt", "destination/a.txt");
+    let short = Layout::new(app, area);
+    assert!(short.outer.width < 80);
+    set_paths(
+        app,
+        "source/nested/incoming-folder/a.txt",
+        "destination/nested/existing-folder/a.txt",
+    );
+    let long = Layout::new(app, area);
+    assert!(long.outer.width > short.outer.width);
+    assert!(long.outer.x >= 1 && long.outer.right() < width);
+    assert!(long.outer.x.abs_diff(width - long.outer.right()) <= 1);
+    assert_eq!(long.rows.iter().any(|r| r.text.contains('…')), width == 80);
+    set_paths(
+        app,
+        &format!("source/{}a.txt", "nested/".repeat(40)),
+        &format!("destination/{}a.txt", "nested/".repeat(40)),
+    );
+    let exhausted = Layout::new(app, area);
+    assert_eq!(exhausted.outer.width, width - 2);
+    assert!(
+        exhausted
+            .rows
+            .iter()
+            .any(|r| r.text.contains('…') && r.text.contains("a.txt"))
+    );
+}

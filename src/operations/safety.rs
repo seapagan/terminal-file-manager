@@ -155,17 +155,25 @@ pub(super) fn existing(path: &Path) -> Result<Option<Entry>> {
 pub(super) fn reject_overlap(source: &Entry, destination: &Path) -> Result<()> {
     let source_path = super::locks::namespace(&source.path)?;
     let destination_path = super::locks::namespace(destination)?;
-    if source_path == destination_path
-        || (source.may_recurse() && destination_path.starts_with(&source_path))
-    {
-        return Err(invalid("Source/destination overlap or self-copy refused").into());
+    if source_path == destination_path {
+        return Err(invalid(if source.path != destination {
+            "Source and destination refer to the same item."
+        } else if source.may_recurse() {
+            "Source and destination are the same folder."
+        } else {
+            "Source and destination are the same."
+        })
+        .into());
+    }
+    if source.may_recurse() && destination_path.starts_with(&source_path) {
+        return Err(invalid("Destination is inside the source folder.").into());
     }
     if let Some(target) = existing(destination)?
         && source.identity.as_ref().and_then(|id| id.object).is_some()
         && source.identity.as_ref().and_then(|id| id.object)
             == target.identity.as_ref().and_then(|id| id.object)
     {
-        return Err(invalid("Source/destination are aliases of the same object").into());
+        return Err(invalid("Source and destination refer to the same item.").into());
     }
     Ok(())
 }

@@ -34,7 +34,7 @@ pub(super) fn action(controller: &mut Controller, action: Action, geometry: &Geo
             .app
             .operations
             .fail(error.to_string(), controller.app.now);
-        controller.app.status = "Operation not started — F9 details".into();
+        controller.app.status = format!("Not started: {error} — F9 details");
     }
     true
 }

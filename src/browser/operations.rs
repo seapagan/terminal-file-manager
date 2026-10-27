@@ -48,7 +48,7 @@ pub(super) fn submit(controller: &mut Controller, queue: &mut Queue) {
                 .app
                 .operations
                 .fail(error.to_string(), controller.app.now);
-            controller.app.status = "Operation not started — F9 details".into();
+            controller.app.status = format!("Not started: {error} — F9 details");
         }
     }
 }

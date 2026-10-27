@@ -115,7 +115,7 @@ fn apply_all_mouse_and_keyboard_toggle_and_cancel_stays_job_cancel() {
     assert!(
         draw(&c.app, 80, 25, ColorLevel::NoColor)
             .2
-            .contains("A Skip all: On")
+            .contains("A Apply to all: On")
     );
     key(&mut c, &g, KeyCode::Char('A'));
     assert!(!c.app.operations.conflicts.front().unwrap().all);
@@ -281,7 +281,7 @@ fn background_conflict_preserves_form_scroll_until_that_form_closes() {
 }
 
 #[test]
-fn apply_all_label_tracks_arrow_selection_and_state_has_its_own_style() {
+fn apply_all_label_is_neutral_and_state_has_its_own_style() {
     for level in [
         ColorLevel::NoColor,
         ColorLevel::Ansi16,
@@ -294,16 +294,10 @@ fn apply_all_label_tracks_arrow_selection_and_state_has_its_own_style() {
             Bindings::new(&Default::default()).unwrap(),
             Default::default(),
         );
-        for label in [
-            "Skip all",
-            "Replace all",
-            "Keep both",
-            "Newer only",
-            "Apply to similar",
-        ] {
+        for _ in 0..5 {
             for (state, role) in [("Off", Role::Disabled), ("On", Role::Status)] {
                 let (terminal, g, text) = draw(&c.app, 100, 40, level);
-                assert!(text.contains(&format!("A {label}: {state}")), "{text}");
+                assert!(text.contains(&format!("A Apply to all: {state}")), "{text}");
                 let control = g
                     .operation_controls
                     .iter()
@@ -338,4 +332,33 @@ fn assert_toggle_style(
     assert_eq!(b[(control.area.right() - 1, control.area.y)].symbol(), "]");
 
     assert_eq!(b[(control.area.x, control.area.y)].symbol(), "[");
+}
+
+#[test]
+fn invisible_comparison_blocks_overwrite_keys_enter_and_mouse() {
+    for (width, height) in [(40, 10), (80, 8), (120, 8)] {
+        let (_root, app, response) = fixture();
+        let mut c = Controller::new(
+            app,
+            Bindings::new(&Default::default()).unwrap(),
+            Default::default(),
+        );
+        let (_, g, _) = draw(&c.app, width, height, ColorLevel::NoColor);
+        for code in [KeyCode::Char('r'), KeyCode::Char('n')] {
+            assert!(!g.operation_enabled(code), "{width}x{height}: {code:?}");
+            if let Some(b) = g
+                .operation_controls
+                .iter()
+                .find(|b| b.target == OperationTarget::Key(code))
+            {
+                click(&mut c, &g, b.area);
+            }
+            key(&mut c, &g, code);
+        }
+        c.app.operations.conflicts.front_mut().unwrap().choice = 1;
+        key(&mut c, &g, KeyCode::Enter);
+        assert!(response.try_recv().is_err());
+        key(&mut c, &g, KeyCode::Esc);
+        assert!(matches!(response.try_recv().unwrap(), Decision::Cancel));
+    }
 }

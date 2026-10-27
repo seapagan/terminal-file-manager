@@ -63,7 +63,18 @@ pub(super) fn layout(app: &App, terminal: Rect) -> Option<Layout> {
     let footer = content::wrapped(footer(source, destination, *newer_available), width);
     spec.pinned_rows = header.len() as u16;
     spec.footer_rows = footer.len() as u16;
-    let shell = spec.measure(available, |_| rows.len());
+    let mut shell = spec.measure(available, |_| rows.len());
+    let readable = shell.pinned.height == spec.pinned_rows
+        && shell.body.width > 0
+        && usize::from(shell.body.height) >= rows.len();
+    for action in &mut shell.actions {
+        if matches!(
+            action.action.key,
+            crossterm::event::KeyCode::Char('r' | 'n')
+        ) {
+            action.action.enabled &= readable;
+        }
+    }
     Some(Layout::measured(app, shell, header, footer, rows))
 }
 
@@ -221,7 +232,7 @@ fn kind(entry: &Entry) -> String {
         EntryKind::Device => "Device",
         EntryKind::Unknown => "Unknown",
     };
-    format!("{} {name}", crate::ui::listing::indicator(entry))
+    name.into()
 }
 
 fn modified(time: Option<SystemTime>) -> String {
