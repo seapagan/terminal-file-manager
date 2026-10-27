@@ -1,5 +1,40 @@
 # Acceptance gates
 
+## PM3-01 local Jobs and preview correction — 25 October 2026
+
+The local, uncommitted correction adds a 150 ms ASCII activity frame to pending
+Trash/Delete previews, compact Jobs summaries and an explicit E Evidence/Summary
+control. Jobs uses terminal-derived geometry with fixed history, safety and
+action slots. Five successful top-level Trash entries fit at 80×24 without detail
+scrolling. Source roots use shared component-aware elision; relative rows retain
+native type markers and sizes. Evidence retains full source paths, separate
+receipt targets, recovery records and recorded errors. Native identities stay in
+the authoritative plan/results.
+
+Deterministic tests verify all four spinner frames and boundary times, exactly
+one changed buffer cell per animation step, unchanged geometry/hit regions,
+and no animation after hiding, readiness, failure or cancellation. Jobs tests
+cover 40×15, 80×24, 120×40 and 300×100 layouts, state/action changes, selection,
+Summary/Evidence, scrolling, conflict Enter routing, foreign roots, invalid Unix
+filename bytes and terminal-control escaping. The existing large-evidence test
+still reaches its final record beyond 65,535 rows.
+
+Rust 1.95.0 Linux native and coverage suites passed **611 tests**, with the two
+established child entry points skipped and exercised through passing parents.
+The doctest, strict Clippy, maintainability, Rust docs/builds, xwin check/Clippy/
+build, dependency audit/deny, workflow/security and shell checks passed.
+`cargo make verify` stopped at strict dirty-tree package-list validation;
+`cargo make msrv` passed its non-package steps and stopped at strict packaging.
+Neither aggregate passed. The authorised interim
+`cargo package --locked --allow-dirty` passed. Ten Lizard advisories remain,
+including a new whole-file parsing misattribution in `jobs_presentation.rs`;
+its isolated toggle test measures 32 lines. No new production hotspot,
+dependency, suppression or QC-policy change was introduced.
+
+The ignored controller holds complete commands, logs and fixture instructions.
+Physical visual acceptance and native macOS/Windows execution remain pending.
+PM3-01 remains Review; this checkpoint includes no staging, commit or PR action.
+
 ## PM3-01 shared modal source checkpoint — 25 October 2026
 
 Operation overlays and floating metadata use the same measured, padded shell

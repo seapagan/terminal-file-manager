@@ -77,6 +77,40 @@ impl<T: Clone> Layout<T> {
         }
     }
 
+    /// Fixed consumer viewport; content and action eligibility cannot resize it.
+    pub fn viewport(spec: &Spec<'_, T>, outer: Rect) -> Self {
+        Self::viewport_with_action_rows(spec, outer, 0)
+    }
+
+    /// Reserve an action band independently of the currently available controls.
+    pub fn viewport_with_action_rows(spec: &Spec<'_, T>, outer: Rect, minimum_rows: u16) -> Self {
+        let padding = if outer.width >= 4 {
+            2
+        } else {
+            outer.width.min(1)
+        };
+        let inner_width = outer.width.saturating_sub(padding * 2);
+        let mut actions = pack(spec.actions, inner_width);
+        let action_rows = actions.last().map_or(0, |a| a.area.y + 1).max(minimum_rows);
+        let (pinned, body, footer, bottom, action_top) =
+            content_areas(spec, outer, padding, inner_width, action_rows);
+        position(&mut actions, pinned.x, action_top);
+        actions.retain(|a| a.area.bottom() <= bottom && a.area.right() <= outer.right());
+        Self {
+            outer,
+            pinned,
+            body,
+            footer,
+            actions,
+            cue: Rect::new(
+                body.x,
+                body.bottom(),
+                body.width,
+                u16::from(body.bottom() < footer.y),
+            ),
+        }
+    }
+
     /// Maximum body offset, independent of the number of retained visible rows.
     pub fn scroll_limit(&self, rows: usize) -> usize {
         rows.saturating_sub(usize::from(self.body.height))

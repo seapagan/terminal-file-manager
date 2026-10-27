@@ -15,7 +15,7 @@ pub(super) fn title(path: &Path, id: usize, active: bool, loading: bool, width: 
     format!("{label}{path}{suffix}")
 }
 
-fn shorten(path: &Path, width: usize) -> String {
+pub(super) fn shorten(path: &Path, width: usize) -> String {
     let raw = path.to_string_lossy();
     let full = super::clean(&raw);
     if cells(&full) <= width {

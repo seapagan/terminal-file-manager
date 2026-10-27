@@ -124,12 +124,18 @@ while multiple entries ask for confirmation. Shift+F5/F6 or `C`/`M` bypass that
 routine confirmation. With one pane, choose the destination in the dialog.
 F2 in a transfer dialog toggles SHA-256 verification; its button describes the
 next action. PgUp/PgDown or the wheel over the source list scroll selected roots.
-Trash/Delete approval stays disabled until counting finishes and the dialog can
+An ASCII activity spinner runs while Trash/Delete counts recursively.
+Approval stays disabled until counting finishes and the dialog can
 show the selected objects and required safety context. Resize or cancel if needed.
 
 Conflicts default to Skip. Choose Replace, Keep both or Newer, and use All to
 repeat a choice within that job and type pair. Directories merge. In Jobs,
-select a job with Up/Down or the mouse. Available controls depend on its state:
+select a job with Up/Down or the mouse. Jobs opens with a compact summary;
+`E` toggles full evidence, including recorded errors and individual Trash receipts.
+The viewport stays fixed while you select jobs or toggle evidence.
+At small terminal sizes, the Jobs footer lists eligible shortcuts when their
+buttons cannot fit; safety warnings take priority.
+Available controls depend on the job state:
 `C` requests cancellation, `R` retries incomplete work from scratch, and `X`
 rechecks an unknown outcome with retained evidence. Completed entries stay
 excluded from retries. PgUp/PgDown or the mouse wheel scroll details; results

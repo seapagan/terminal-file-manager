@@ -195,6 +195,10 @@ fn history_key(controller: &mut Controller, key: KeyCode) {
             state.cursor = (state.cursor + 1).min(state.history.len().saturating_sub(1));
             state.scroll = 0;
         }
+        KeyCode::Char('e' | 'E') => {
+            state.jobs_evidence = !state.jobs_evidence;
+            state.scroll = 0;
+        }
         KeyCode::PageUp => state.scroll = state.scroll.saturating_sub(8),
         KeyCode::PageDown => state.scroll = state.scroll.saturating_add(8),
         KeyCode::Char('r' | 'R' | 'c' | 'C') => {
@@ -242,6 +246,8 @@ fn open_conflict(state: &mut crate::operations::State) {
 fn conflict_key(controller: &mut Controller, key: KeyCode) {
     if key == KeyCode::F(9) {
         controller.app.operations.show_history = true;
+        controller.app.operations.jobs_evidence = false;
+        controller.app.operations.scroll = 0;
         return;
     }
     let Some(conflict) = controller.app.operations.conflicts.front_mut() else {

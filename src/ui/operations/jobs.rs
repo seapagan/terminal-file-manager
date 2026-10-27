@@ -157,10 +157,16 @@ fn route(app: &App, job: &Job) -> Vec<Row> {
         rows.push(Row::plain(format!("Retry of job {id}")));
     }
     rows.extend(content::sources(&job.plan.operands));
+    for operand in &job.plan.operands {
+        rows.push(Row::plain(format!(
+            "Planned source: {}",
+            native_path(&operand.path)
+        )));
+    }
     if let Some(destination) = &job.plan.destination {
         rows.push(Row::plain(format!(
             "Destination: {}",
-            destination.display()
+            native_path(destination)
         )));
     }
     rows
@@ -211,10 +217,14 @@ fn result(
     let mut heading = result_heading(entry, source, operand);
     heading.role = role;
     let mut rows = vec![heading, Row::styled(outcome(entry.outcome), role)];
+    rows.push(Row::plain(format!(
+        "  Source: {}",
+        native_path(&entry.source)
+    )));
     if let Some(destination) = &entry.destination {
         rows.push(Row::plain(format!(
             "  Destination: {}",
-            destination.display()
+            native_path(destination)
         )));
     }
     rows.push(Row::plain(format!("  {}", entry.detail)));
@@ -227,19 +237,12 @@ fn result(
         .and_then(|evidence| evidence.staging_path())
     {
         rows.push(Row::styled(
-            format!("  Owned staging checkpoint: {}", path.display()),
+            format!("  Owned staging checkpoint: {}", native_path(path)),
             Role::Warning,
         ));
     }
     if let Some(trash) = &entry.trash {
-        rows.push(Row::plain(format!("  {}", trash.receipt.description())));
-        rows.push(Row::plain(format!("  Validated inventory: {} files, {} directories (not individual Trash acknowledgments)", trash.validated_files, trash.validated_directories)));
-        if let crate::operations::trash::Receipt::Linux(receipt) = &trash.receipt {
-            rows.push(Row::plain(format!(
-                "  Recovery metadata: {}",
-                receipt.info.display()
-            )));
-        }
+        rows.extend(trash_evidence(trash));
     }
     rows
 }
@@ -277,7 +280,7 @@ fn result_heading(
     heading
 }
 
-fn state(state: JobState) -> &'static str {
+pub(super) fn state(state: JobState) -> &'static str {
     match state {
         JobState::Queued => "Queued",
         JobState::Running => "Running",
@@ -291,7 +294,7 @@ fn state(state: JobState) -> &'static str {
     }
 }
 
-fn state_role(state: JobState) -> Role {
+pub(super) fn state_role(state: JobState) -> Role {
     match state {
         JobState::Critical | JobState::Failed => Role::Error,
         JobState::Partial | JobState::Unknown => Role::Warning,
@@ -300,7 +303,7 @@ fn state_role(state: JobState) -> Role {
     }
 }
 
-fn outcome(outcome: Outcome) -> &'static str {
+pub(super) fn outcome(outcome: Outcome) -> &'static str {
     match outcome {
         Outcome::Completed => "Completed",
         Outcome::Skipped => "Skipped",
@@ -313,11 +316,80 @@ fn outcome(outcome: Outcome) -> &'static str {
     }
 }
 
-fn stage_name(stage: Stage) -> &'static str {
+pub(super) fn stage_name(stage: Stage) -> &'static str {
     match stage {
         Stage::Reading => "Reading",
         Stage::Verified => "Verified",
         Stage::Committed => "Committed",
         Stage::Removing => "Removing source",
     }
+}
+
+fn native_path(path: &std::path::Path) -> String {
+    path.to_str().map_or_else(
+        || format!("{:?} (escaped native path)", path.as_os_str()),
+        str::to_owned,
+    )
+}
+
+fn trash_evidence(trash: &crate::operations::TrashResult) -> Vec<Row> {
+    let mut rows = Vec::new();
+    rows.push(Row::plain(format!("  {}", trash.receipt.description())));
+    rows.push(Row::plain(format!(
+        "  Validated inventory: {} files, {} directories (not individual Trash acknowledgments)",
+        trash.validated_files, trash.validated_directories
+    )));
+    use crate::operations::trash::Receipt;
+    match &trash.receipt {
+        Receipt::Linux(receipt) => {
+            rows.push(Row::plain(format!(
+                "  Native Trash target: {}",
+                native_path(&receipt.path)
+            )));
+            rows.push(Row::plain(format!(
+                "  Recovery metadata: {}",
+                native_path(&receipt.info)
+            )));
+        }
+        Receipt::Mac { path: Some(path) } => {
+            rows.push(Row::plain(format!(
+                "  Native Trash target: {}",
+                native_path(path)
+            )));
+        }
+        Receipt::Windows {
+            parsing_name,
+            metadata,
+        } => {
+            rows.extend(windows_receipt(parsing_name.as_deref(), metadata));
+        }
+        Receipt::Mac { path: None } => {}
+    }
+    rows
+}
+
+fn windows_receipt(
+    parsing_name: Option<&[u16]>,
+    metadata: &crate::operations::trash::ShellMetadata,
+) -> Vec<Row> {
+    let mut rows = Vec::new();
+    for (label, value) in [
+        ("Shell parsing name", parsing_name),
+        ("Display name", metadata.display_name.as_deref()),
+        ("Deleted from", metadata.deleted_from.as_deref()),
+    ] {
+        if let Some(value) = value {
+            rows.push(Row::plain(format!(
+                "  {label}: {}",
+                String::from_utf16_lossy(value)
+            )));
+            rows.push(Row::plain(format!("  {label} (exact UTF-16): {value:?}")));
+        }
+    }
+    if let Some(time) = metadata.deletion_time {
+        rows.push(Row::plain(format!(
+            "  Deletion time (FILETIME ticks): {time}"
+        )));
+    }
+    rows
 }

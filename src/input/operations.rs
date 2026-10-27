@@ -7,7 +7,10 @@ use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, 
 
 pub(super) fn action(controller: &mut Controller, action: Action, geometry: &Geometry) -> bool {
     if action == Action::Jobs {
-        controller.app.operations.show_history = !controller.app.operations.show_history;
+        let state = &mut controller.app.operations;
+        state.show_history = !state.show_history;
+        state.jobs_evidence = false;
+        state.scroll = 0;
         return true;
     }
     let operation = match action {

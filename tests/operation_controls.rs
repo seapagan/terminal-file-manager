@@ -393,6 +393,7 @@ fn completed_job_elapsed_time_stops_at_worker_acknowledgement() {
     finish(&mut controller, Outcome::Completed);
     controller.app.now += Duration::from_secs(100);
     controller.app.operations.show_history = true;
+    controller.app.operations.jobs_evidence = true;
     let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
     terminal
         .draw(|frame| {

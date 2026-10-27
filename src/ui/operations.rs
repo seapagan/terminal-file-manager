@@ -11,6 +11,8 @@ use ratatui::{
 mod actions;
 mod content;
 mod jobs;
+mod jobs_layout;
+mod jobs_summary;
 mod layout;
 #[cfg(test)]
 mod layout_tests;
@@ -78,16 +80,7 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, geometry: &sup
     jobs::render(frame, app, theme, layout.list);
     render_rows(frame, &layout.header, layout.shell.pinned, theme);
     render_rows(frame, &layout.rows, layout.body, theme);
-    let footer_start = layout
-        .footer
-        .len()
-        .saturating_sub(usize::from(layout.shell.footer.height));
-    render_rows(
-        frame,
-        &layout.footer[footer_start..],
-        layout.shell.footer,
-        theme,
-    );
+    render_footer(frame, app, layout, theme);
     if geometry.operation_scroll_limit > 0 && layout.shell.cue.height > 0 {
         let total = geometry.operation_scroll_limit + usize::from(layout.body.height);
         let start = app.operations.scroll.min(geometry.operation_scroll_limit);
@@ -116,6 +109,23 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, geometry: &sup
             .map(|region| region.index)
     });
     super::modal::actions::render(frame, &layout.shell, theme, selected);
+}
+
+fn render_footer(frame: &mut Frame, app: &App, layout: &Layout, theme: &Theme) {
+    let footer_start = if app.operations.show_history && app.operations.dialog.is_none() {
+        0
+    } else {
+        layout
+            .footer
+            .len()
+            .saturating_sub(usize::from(layout.shell.footer.height))
+    };
+    render_rows(
+        frame,
+        &layout.footer[footer_start..],
+        layout.shell.footer,
+        theme,
+    );
 }
 
 fn field_controls(rows: &[content::Row], area: Rect, scroll: usize) -> Vec<OperationControl> {
@@ -184,4 +194,20 @@ fn short_notice(notice: &crate::operations::Notice, width: u16) -> (String, Role
         .next()
         .unwrap_or_default();
     (format!("{summary} — F9 details"), role)
+}
+
+/// The event loop calls this with monotonic elapsed time; only visible pending counts redraw.
+pub(crate) fn animate_preview(app: &mut App, elapsed: std::time::Duration) -> bool {
+    let pending = visible(app)
+        && matches!(&app.operations.dialog, Some(crate::operations::Dialog::Operation(d))
+            if matches!(d.plan.operation, crate::operations::Operation::Trash | crate::operations::Operation::Delete)
+                && d.plan.preview.is_none() && d.error.is_none());
+    if !pending {
+        app.operations.preview_frame = 0;
+        return false;
+    }
+    let frame = ((elapsed.as_millis() / 150) % 4) as u8;
+    let changed = frame != app.operations.preview_frame;
+    app.operations.preview_frame = frame;
+    changed
 }

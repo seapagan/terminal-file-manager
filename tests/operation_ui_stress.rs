@@ -84,7 +84,8 @@ fn draw(app: &App) -> String {
 
 #[test]
 fn large_job_details_scroll_beyond_u16_rows_and_reach_the_final_result() {
-    let (_root, app) = fixture();
+    let (_root, mut app) = fixture();
+    app.operations.jobs_evidence = true;
     let start = Instant::now();
     let geometry = ui::geometry(&app, Rect::new(0, 0, 120, 40));
     let geometry_time = start.elapsed();

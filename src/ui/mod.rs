@@ -9,6 +9,7 @@ mod measure;
 mod metadata;
 pub mod modal;
 mod operations;
+pub(crate) use operations::animate_preview;
 pub use operations::{OperationControl, OperationTarget};
 mod path_title;
 pub use metadata::MetadataControl;

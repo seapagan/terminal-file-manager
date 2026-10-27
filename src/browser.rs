@@ -101,6 +101,7 @@ fn drive(
     let mut geometry = ui::geometry(&controller.app, terminal.size()?.into());
     while !controller.quit {
         dirty |= tick(&mut controller.app);
+        dirty |= ui::animate_preview(&mut controller.app, started.elapsed());
         dirty |= collect(controller, pool);
         dirty |= operations::collect(controller, jobs, pool);
         dirty |= watches.poll(&mut controller.app, pool, started.elapsed());

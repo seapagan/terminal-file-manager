@@ -134,7 +134,17 @@ fn destructive(operation: Operation, narrow: bool) -> Vec<Button> {
 }
 
 fn history(app: &App, narrow: bool) -> Vec<Button> {
-    let mut buttons = Vec::new();
+    let mut buttons = vec![
+        (
+            if app.operations.jobs_evidence {
+                "E Summary"
+            } else {
+                "E Evidence"
+            },
+            KeyCode::Char('e'),
+        ),
+        ("Esc Close", KeyCode::Esc),
+    ];
     if let Some(job) = app.operations.history.get(app.operations.cursor) {
         if app.operations.waiting_exit.is_none() && job.can_reconcile() {
             buttons.push(("X Reconcile", KeyCode::Char('x')));
@@ -150,7 +160,10 @@ fn history(app: &App, narrow: bool) -> Vec<Button> {
             ));
         }
         if job.active() {
-            buttons.push(("C Cancel job", KeyCode::Char('c')));
+            buttons.push((
+                if narrow { "C Cancel" } else { "C Cancel job" },
+                KeyCode::Char('c'),
+            ));
         }
         if app
             .operations
@@ -161,7 +174,6 @@ fn history(app: &App, narrow: bool) -> Vec<Button> {
             buttons.push(("Enter Conflict", KeyCode::Enter));
         }
     }
-    buttons.push(("Esc Close", KeyCode::Esc));
     buttons
 }
 

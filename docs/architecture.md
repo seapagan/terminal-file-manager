@@ -332,3 +332,25 @@ reasons without preventing unrelated basic browsing.
 
 M2 implements local operations on the M1 browsing foundation. M3–M8 add the
 remaining application contracts, including SSH sessions.
+
+Jobs uses a responsive viewport derived from terminal size, with fixed history,
+safety and action regions. Job selection, action eligibility and Summary/Evidence
+changes leave those rectangles fixed. Summary projects the frozen plan and
+record into top-level rows, one meaningful lexical source root and an applicable
+destination. It shares component-aware path elision with pane titles. Evidence
+retains per-entry outcomes, full source paths, unique native receipt targets and
+recovery metadata; display labels never become operation operands. Switching
+jobs or detail mode resets detail scroll. Each new Jobs opening starts in Summary.
+
+The browser requests animation redraws every 150 ms while a destructive preview
+is visible and pending. Monotonic elapsed time selects one of four ASCII frames;
+readiness, worker generations and destructive confirmation remain independent.
+Hidden, ready, failed and cancelled previews request no animation redraws.
+
+Jobs centres Evidence/Summary and Close in a stable primary action row. A second
+reserved band centres only eligible contextual controls, using the shared action
+packing and hit rectangles. At constrained sizes, those controls become
+informational shortcuts in the existing footer. Whole shortcut labels pack into
+at most the available two footer rows; an ellipsis marks omitted hints. Warnings
+retain their first row, including unknown-outcome retry/exit restrictions. The
+renderer creates no hit targets for shortcut hints or unused action-band space.

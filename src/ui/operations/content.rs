@@ -112,7 +112,7 @@ pub(super) fn header(app: &App) -> Vec<Row> {
     if dialog.plan.operation != Operation::Mkdir {
         rows.extend(
             if matches!(dialog.plan.operation, Operation::Delete | Operation::Trash) {
-                destructive(dialog)
+                destructive(dialog, app.operations.preview_frame)
             } else {
                 vec![Row::styled(
                     selected_summary(&dialog.plan.operands),
@@ -300,7 +300,7 @@ fn transfer(dialog: &OperationDialog) -> Vec<Row> {
     rows
 }
 
-fn destructive(dialog: &OperationDialog) -> Vec<Row> {
+fn destructive(dialog: &OperationDialog, frame: u8) -> Vec<Row> {
     if dialog.error.is_some() {
         return vec![
             Row::styled("Preview failed — confirmation disabled", Role::Error).single_line(),
@@ -309,7 +309,12 @@ fn destructive(dialog: &OperationDialog) -> Vec<Row> {
     vec![
         Row::styled(
             dialog.plan.preview.as_ref().map_or_else(
-                || "Counting recursively… confirmation disabled".into(),
+                || {
+                    format!(
+                        "{} Counting recursively… confirmation disabled",
+                        ['|', '/', '-', '\\'][usize::from(frame % 4)]
+                    )
+                },
                 |preview| {
                     format!(
                         "{} · {}",

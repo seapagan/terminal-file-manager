@@ -156,6 +156,10 @@ pub struct State {
     pub history: Vec<Job>,
     pub conflicts: VecDeque<PendingConflict>,
     pub show_history: bool,
+    /// Explicit forensic detail; each newly opened Jobs surface starts in Summary.
+    pub jobs_evidence: bool,
+    /// Monotonic animation frame; it carries no operation authority.
+    pub preview_frame: u8,
     pub cursor: usize,
     pub scroll: usize,
     pub waiting_exit: Option<bool>,

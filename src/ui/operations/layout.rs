@@ -19,6 +19,13 @@ pub(in crate::ui) struct Layout {
 
 impl Layout {
     pub fn new(app: &App, terminal: Rect) -> Self {
+        if app.operations.show_history && app.operations.dialog.is_none() {
+            return super::jobs_layout::layout(app, terminal);
+        }
+        Self::dialog(app, terminal)
+    }
+
+    fn dialog(app: &App, terminal: Rect) -> Self {
         let rows = content::rows(app);
         let header = content::header(app);
         let footer = content::footer(app);
@@ -68,7 +75,7 @@ impl Layout {
         Self::measured(app, shell, header, footer, wrapped)
     }
 
-    fn measured(
+    pub(super) fn measured(
         app: &App,
         shell: modal::Layout<OperationTarget>,
         header: Vec<content::Row>,
@@ -249,7 +256,9 @@ fn list_rows(app: &App, height: u16) -> u16 {
 fn summary_width(app: &App) -> usize {
     if matches!(&app.operations.dialog, Some(crate::operations::Dialog::Operation(dialog)) if matches!(dialog.plan.operation, crate::operations::Operation::Trash | crate::operations::Operation::Delete))
     {
-        usize::from(modal::width("Counting recursively… confirmation disabled"))
+        usize::from(modal::width(
+            "| Counting recursively… confirmation disabled",
+        ))
     } else {
         0
     }
