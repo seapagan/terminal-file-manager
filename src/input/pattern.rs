@@ -22,7 +22,11 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
     if controller.app.operations.dialog.is_some() || !controller.app.operations.conflicts.is_empty()
     {
         controller.app.pattern = None;
-        return false;
+        if let Event::Resize(width, height) = event {
+            super::scroll::resize(controller, *width, *height);
+        }
+        // The event belonged to the pattern layer, never to a newly arrived approval.
+        return !interrupt(event);
     }
     if interrupt(event) {
         controller.app.pattern = None;
@@ -41,15 +45,7 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
 }
 
 fn key_input(controller: &mut Controller, key: KeyEvent, geometry: &Geometry) {
-    if key.kind == KeyEventKind::Release
-        || key.modifiers.intersects(
-            KeyModifiers::CONTROL
-                | KeyModifiers::ALT
-                | KeyModifiers::SUPER
-                | KeyModifiers::HYPER
-                | KeyModifiers::META,
-        )
-    {
+    if ignored_key(key) {
         return;
     }
     if key.code == KeyCode::Esc && key.kind == KeyEventKind::Press {
@@ -60,6 +56,9 @@ fn key_input(controller: &mut Controller, key: KeyEvent, geometry: &Geometry) {
     let Some(layout) = &geometry.pattern else {
         return;
     };
+    if shortcut(controller, key, layout) || key.modifiers.contains(KeyModifiers::ALT) {
+        return;
+    }
     match key.code {
         KeyCode::Tab | KeyCode::BackTab if key.kind == KeyEventKind::Press => {
             advance_focus(controller, key, layout)
@@ -75,6 +74,40 @@ fn key_input(controller: &mut Controller, key: KeyEvent, geometry: &Geometry) {
         }
         _ => edit(controller, key, layout),
     }
+}
+
+fn ignored_key(key: KeyEvent) -> bool {
+    key.kind == KeyEventKind::Release
+        || key.modifiers.intersects(
+            KeyModifiers::CONTROL | KeyModifiers::SUPER | KeyModifiers::HYPER | KeyModifiers::META,
+        )
+        || (key.modifiers.contains(KeyModifiers::ALT) && !matches!(key.code, KeyCode::Char(_)))
+}
+
+fn shortcut(controller: &mut Controller, key: KeyEvent, layout: &crate::ui::PatternLayout) -> bool {
+    use crate::app::PatternOperation::*;
+    if key.kind != KeyEventKind::Press
+        || (controller.app.pattern.as_ref().unwrap().focus == 0
+            && !key.modifiers.contains(KeyModifiers::ALT))
+    {
+        return false;
+    }
+    let KeyCode::Char(letter) = key.code else {
+        return false;
+    };
+    let target = match letter.to_ascii_lowercase() {
+        'w' => PatternControl::Mode(PatternMode::Wildcard),
+        'x' => PatternControl::Mode(PatternMode::Regex),
+        's' => PatternControl::Case,
+        'm' => PatternControl::Apply(Mark),
+        'u' => PatternControl::Apply(Unmark),
+        'r' => PatternControl::Apply(Replace),
+        _ => return false,
+    };
+    if layout.targets().contains(&target) {
+        activate(controller, target);
+    }
+    true
 }
 
 fn advance_focus(controller: &mut Controller, key: KeyEvent, layout: &crate::ui::PatternLayout) {
@@ -98,7 +131,12 @@ fn advance_focus(controller: &mut Controller, key: KeyEvent, layout: &crate::ui:
 fn enter(controller: &mut Controller, layout: &crate::ui::PatternLayout) {
     let state = controller.app.pattern.as_mut().unwrap();
     if state.focus == 0 {
-        state.focus = 6;
+        if layout
+            .targets()
+            .contains(&PatternControl::Apply(crate::app::PatternOperation::Mark))
+        {
+            state.focus = 4;
+        }
     } else if let Some(target) = layout
         .targets()
         .into_iter()
@@ -118,7 +156,7 @@ fn edit(controller: &mut Controller, key: KeyEvent, layout: &crate::ui::PatternL
         }
         KeyCode::Char(c) if state.focus == 0 => append(controller, &c.to_string()),
         KeyCode::Char(' ') if key.kind == KeyEventKind::Press => {
-            if let Some(target @ (PatternControl::Mode | PatternControl::Case)) = layout
+            if let Some(target @ (PatternControl::Mode(_) | PatternControl::Case)) = layout
                 .targets()
                 .into_iter()
                 .find(|target| index(*target) == state.focus)
@@ -151,11 +189,7 @@ fn activate(controller: &mut Controller, target: PatternControl) {
             return;
         }
         PatternControl::Expression => {}
-        PatternControl::Mode => state.set_mode(if state.mode == PatternMode::Wildcard {
-            PatternMode::Regex
-        } else {
-            PatternMode::Wildcard
-        }),
+        PatternControl::Mode(mode) => state.set_mode(mode),
         PatternControl::Case => state.toggle_case(),
         PatternControl::Apply(operation) => {
             match state.apply(&mut controller.app.panes[state.pane], operation) {
@@ -177,12 +211,13 @@ fn index(target: PatternControl) -> usize {
     use crate::app::PatternOperation::*;
     match target {
         PatternControl::Expression => 0,
-        PatternControl::Mode => 1,
-        PatternControl::Case => 2,
-        PatternControl::Apply(Mark) => 3,
-        PatternControl::Apply(Unmark) => 4,
-        PatternControl::Apply(Replace) => 5,
-        PatternControl::Cancel => 6,
+        PatternControl::Mode(PatternMode::Wildcard) => 1,
+        PatternControl::Mode(PatternMode::Regex) => 2,
+        PatternControl::Case => 3,
+        PatternControl::Apply(Mark) => 4,
+        PatternControl::Apply(Unmark) => 5,
+        PatternControl::Apply(Replace) => 6,
+        PatternControl::Cancel => 7,
     }
 }
 

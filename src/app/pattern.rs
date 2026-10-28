@@ -1,7 +1,24 @@
 //! Pattern marking is bounded by the native identities visible when opened.
 use super::{Pane, pane::same_object};
 use crate::fs::Identity;
-use std::{collections::HashMap, path::PathBuf};
+use std::{cell::RefCell, collections::HashMap, path::PathBuf};
+
+#[derive(Eq, PartialEq)]
+struct PreviewKey {
+    revision: u64,
+    mode: PatternMode,
+    case_sensitive: bool,
+    generation: u64,
+    context: u64,
+    unavailable: bool,
+    path: PathBuf,
+    directory: Option<Identity>,
+}
+
+struct CachedPreview {
+    key: PreviewKey,
+    result: Result<PatternPreview, String>,
+}
 
 /// Filename matching syntax, independent of the listing's fuzzy filter.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -45,6 +62,9 @@ pub struct PatternSelection {
     context: u64,
     directory: Option<Identity>,
     scope: HashMap<PathBuf, Identity>,
+    preview_cache: RefCell<Option<CachedPreview>>,
+    #[cfg(test)]
+    preview_scans: std::cell::Cell<usize>,
 }
 
 impl PatternSelection {
@@ -57,6 +77,7 @@ impl PatternSelection {
             mode: PatternMode::Wildcard,
             case_sensitive: true,
             expression: String::new(),
+            preview_cache: RefCell::new(None),
             matcher: Err("Enter a non-empty pattern".into()),
             path: pane.path.clone(),
             context: pane.context,
@@ -64,6 +85,8 @@ impl PatternSelection {
             scope: selectable(pane)
                 .map(|e| (e.path.clone(), e.identity.clone().unwrap()))
                 .collect(),
+            #[cfg(test)]
+            preview_scans: std::cell::Cell::new(0),
         }
     }
 
@@ -74,18 +97,21 @@ impl PatternSelection {
 
     /// Compile only when edited, with bounded regex allocation and parser limits.
     pub fn set_expression(&mut self, text: String) {
+        self.preview_cache.get_mut().take();
         self.expression = text;
         self.matcher = self.compile();
     }
 
     /// Change syntax without changing the approved working set.
     pub fn set_mode(&mut self, mode: PatternMode) {
+        self.preview_cache.get_mut().take();
         self.mode = mode;
         self.matcher = self.compile();
     }
 
     /// Matching starts case-sensitive on every open.
     pub fn toggle_case(&mut self) {
+        self.preview_cache.get_mut().take();
         self.case_sensitive = !self.case_sensitive;
         self.matcher = self.compile();
     }
@@ -146,6 +172,8 @@ impl PatternSelection {
 
     /// Compute counts without lossy conversion, I/O or changes to marks.
     pub fn preview(&self, pane: &Pane) -> Result<PatternPreview, String> {
+        #[cfg(test)]
+        self.preview_scans.set(self.preview_scans.get() + 1);
         self.validate(pane)?;
         let matcher = self.matcher.as_ref().map_err(Clone::clone)?;
         Ok(PatternPreview {
@@ -161,6 +189,28 @@ impl PatternSelection {
         })
     }
 
+    /// Rendering reuses counts until a model mutation invalidates them.
+    pub(crate) fn cached_preview(&self, pane: &Pane) -> Result<PatternPreview, String> {
+        let key = PreviewKey {
+            revision: pane.selection_revision,
+            mode: self.mode,
+            case_sensitive: self.case_sensitive,
+            generation: pane.generation,
+            context: pane.context,
+            unavailable: pane.pending.is_some() || pane.listing || pane.error.is_some(),
+            path: pane.path.clone(),
+            directory: pane.directory.as_ref().and_then(|e| e.identity.clone()),
+        };
+        let mut cache = self.preview_cache.borrow_mut();
+        if cache.as_ref().is_none_or(|cached| cached.key != key) {
+            *cache = Some(CachedPreview {
+                key,
+                result: self.preview(pane),
+            });
+        }
+        cache.as_ref().unwrap().result.clone()
+    }
+
     /// Revalidate immediately, then apply only this explicit visible-mark change.
     ///
     /// # Errors
@@ -173,6 +223,7 @@ impl PatternSelection {
         let preview = self.preview(pane)?;
         let matcher = self.matcher.as_ref().map_err(Clone::clone)?;
         pane.reset_range();
+        pane.selection_revision = pane.selection_revision.wrapping_add(1);
         for i in &pane.visible {
             let entry = &pane.entries[*i];
             let Some(identity) = self.scope.get(&entry.path) else {
@@ -202,5 +253,8 @@ fn selectable(pane: &Pane) -> impl Iterator<Item = &crate::fs::Entry> {
     pane.visible
         .iter()
         .map(|i| &pane.entries[*i])
-        .filter(|e| e.identity.as_ref().is_some_and(|id| id.object.is_some()))
+        .filter(|e| e.identity.is_some())
 }
+
+#[cfg(test)]
+mod tests;

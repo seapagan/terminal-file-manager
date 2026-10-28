@@ -5,13 +5,13 @@ use crate::{
     color::{Role, Theme},
 };
 use crossterm::event::KeyCode;
-use ratatui::{Frame, layout::Rect, widgets::Paragraph};
+use ratatui::{Frame, layout::Rect, style::Modifier, widgets::Paragraph};
 
 /// Exact rendered form target, shared by keyboard focus and mouse input.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PatternControl {
     Expression,
-    Mode,
+    Mode(PatternMode),
     Case,
     Apply(PatternOperation),
     Cancel,
@@ -30,19 +30,38 @@ pub struct PatternLayout {
 
 pub(super) fn layout(app: &App, area: Rect) -> Option<PatternLayout> {
     let state = app.pattern.as_ref()?;
-    let preview = state.preview(&app.panes[state.pane]);
-    let rows = rows(state);
-    let summary = summary(preview.as_ref().map_err(String::as_str));
+    let preview = state.cached_preview(&app.panes[state.pane]);
+    let rows = rows(state, area.width.saturating_sub(6).min(70));
+    let summary = summary_rows(preview.as_ref().map_err(String::as_str));
     let actions = actions(preview.is_ok());
-    let (shell, footer_rows) = measure(area, &rows, &summary, &actions);
+    let bound = app.panes[state.pane].entries.len();
+    let summary_budget = summary_rows(Ok(&crate::app::PatternPreview {
+        matches: bound,
+        visible: bound,
+        marked: bound,
+    }));
+    let (shell, footer_rows) = measure(area, &rows, &summary_budget, &actions);
     let rows: Vec<_> = rows
         .into_iter()
         .flat_map(|row| row.wrap(shell.body.width))
         .collect();
     let scroll_limit = shell.scroll_limit(rows.len());
     let scroll = state.scroll.min(scroll_limit);
-    let fields = fields(&rows, &shell, scroll);
-    let shell = guard_actions(shell, footer_rows, &fields);
+    let mut fields = fields(&rows, &shell, scroll);
+    let expression_row = rows
+        .iter()
+        .position(|row| row.field == Some(PatternControl::Expression));
+    if let Some(expression_row) = expression_row {
+        for (mut area, target) in controls(shell.body.width) {
+            let row = expression_row + 1 + usize::from(area.y);
+            if row >= scroll && row - scroll < usize::from(shell.body.height) {
+                area.x += shell.body.x;
+                area.y = shell.body.y + (row - scroll) as u16;
+                fields.push((area, target));
+            }
+        }
+    }
+    let shell = guard_actions(shell, footer_rows, rows.len(), &fields);
     Some(PatternLayout {
         shell,
         fields,
@@ -53,45 +72,75 @@ pub(super) fn layout(app: &App, area: Rect) -> Option<PatternLayout> {
     })
 }
 
-fn rows(state: &crate::app::PatternSelection) -> Vec<Row<PatternControl>> {
-    vec![
-        Row::field(
-            "Expression",
-            state.expression(),
-            PatternControl::Expression,
-            state.focus == 0,
-        ),
-        Row::field(
-            "Mode",
-            if state.mode == PatternMode::Wildcard {
-                "Wildcard"
-            } else {
-                "Regex"
-            },
-            PatternControl::Mode,
-            state.focus == 1,
-        ),
-        Row::field(
-            "Case sensitive",
-            if state.case_sensitive { "Yes" } else { "No" },
-            PatternControl::Case,
-            state.focus == 2,
-        ),
-        Row::plain("Wildcard: whole filename (* / ? bytes)."),
-        Row::plain("Regex: substring; ^ / $ anchor filename."),
-    ]
+fn rows(state: &crate::app::PatternSelection, width: u16) -> Vec<Row<PatternControl>> {
+    let mut rows = vec![Row::field(
+        "Pattern",
+        state.expression(),
+        PatternControl::Expression,
+        state.focus == 0,
+    )];
+    let controls = controls(width);
+    let count = controls.last().map_or(0, |(area, _)| area.y + 1);
+    rows.extend((0..count).map(|_| Row::plain("")));
+    let explanations = [
+        "* / ? bytes match whole filename; case folding is ASCII.",
+        "Substring; ^ / $ anchor filename; Unicode case folding.",
+    ];
+    let reserved = explanations
+        .iter()
+        .map(|text| Row::<PatternControl>::plain(*text).wrap(width).len())
+        .max()
+        .unwrap_or(0);
+    let active = usize::from(state.mode == PatternMode::Regex);
+    let explanation = Row::plain(explanations[active]).wrap(width);
+    let padding = reserved.saturating_sub(explanation.len());
+    rows.extend(explanation);
+    rows.extend((0..padding).map(|_| Row::plain("")));
+    rows.push(Row::plain("Native filename bytes; excluded marks stay."));
+    rows.push(Row::plain("While typing: Alt+letter activates controls"));
+    rows
+}
+
+fn controls(width: u16) -> Vec<(Rect, PatternControl)> {
+    let mut controls = Vec::new();
+    let (mut x, mut y) = (0, 0);
+    for (label, target) in [
+        ("W Wildcard", PatternControl::Mode(PatternMode::Wildcard)),
+        ("X Regex", PatternControl::Mode(PatternMode::Regex)),
+        ("S Case sensitive", PatternControl::Case),
+    ] {
+        let cells = modal::width(label) + 4;
+        if cells > width {
+            continue;
+        }
+        if x + cells > width {
+            x = 0;
+            y += 1;
+        }
+        controls.push((Rect::new(x, y, cells, 1), target));
+        x += cells + 2;
+    }
+    for row in 0..=y {
+        let used = controls
+            .iter()
+            .filter(|(r, _)| r.y == row)
+            .map(|(r, _)| r.right())
+            .max()
+            .unwrap_or(0);
+        for (area, _) in controls.iter_mut().filter(|(r, _)| r.y == row) {
+            area.x += width.saturating_sub(used) / 2;
+        }
+    }
+    controls
 }
 
 fn actions(ready: bool) -> Vec<Action<PatternControl>> {
     use PatternControl::*;
     [
-        ("Mark matches", Apply(PatternOperation::Mark)),
-        ("Unmark matches", Apply(PatternOperation::Unmark)),
-        (
-            "Replace visible marks with matches",
-            Apply(PatternOperation::Replace),
-        ),
-        ("Cancel", Cancel),
+        ("M Mark", Apply(PatternOperation::Mark)),
+        ("U Unmark", Apply(PatternOperation::Unmark)),
+        ("R Replace", Apply(PatternOperation::Replace)),
+        ("Esc Cancel", Cancel),
     ]
     .into_iter()
     .map(|(label, intent)| {
@@ -142,7 +191,13 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, layout: Option
         .enumerate()
     {
         frame.render_widget(
-            Paragraph::new(row.line(layout.shell.body.width, theme)),
+            Paragraph::new(row.line(layout.shell.body.width, theme)).style(
+                if row.field == Some(PatternControl::Expression) {
+                    theme.style(Role::Value).add_modifier(Modifier::UNDERLINED)
+                } else {
+                    theme.style(Role::Normal)
+                },
+            ),
             Rect::new(
                 layout.shell.body.x,
                 layout.shell.body.y + i as u16,
@@ -159,10 +214,49 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, layout: Option
         .map(|row| row.line(layout.shell.footer.width, theme))
         .collect();
     frame.render_widget(Paragraph::new(lines), layout.shell.footer);
-    modal::actions::render(frame, &layout.shell, theme, state.focus.checked_sub(3));
+    render_controls(frame, state, theme, layout);
+    modal::actions::render(frame, &layout.shell, theme, state.focus.checked_sub(4));
 }
 
-fn summary(preview: Result<&crate::app::PatternPreview, &str>) -> Vec<Row<PatternControl>> {
+fn render_controls(
+    frame: &mut Frame,
+    state: &crate::app::PatternSelection,
+    theme: &Theme,
+    layout: &PatternLayout,
+) {
+    for (area, target) in &layout.fields {
+        if *target == PatternControl::Expression {
+            continue;
+        }
+        let (label, selected, focused) = match target {
+            PatternControl::Mode(PatternMode::Wildcard) => (
+                "W Wildcard",
+                state.mode == PatternMode::Wildcard,
+                state.focus == 1,
+            ),
+            PatternControl::Mode(PatternMode::Regex) => (
+                "X Regex",
+                state.mode == PatternMode::Regex,
+                state.focus == 2,
+            ),
+            PatternControl::Case => ("S Case sensitive", state.case_sensitive, state.focus == 3),
+            _ => continue,
+        };
+        let mut style = theme.style(if selected { Role::Key } else { Role::Normal });
+        if selected {
+            style = style.add_modifier(Modifier::BOLD | Modifier::UNDERLINED);
+        }
+        if focused {
+            style = style.add_modifier(Modifier::REVERSED);
+        }
+        frame.render_widget(
+            Paragraph::new(format!("[{} {label}]", if selected { "✓" } else { " " })).style(style),
+            *area,
+        );
+    }
+}
+
+fn summary_rows(preview: Result<&crate::app::PatternPreview, &str>) -> Vec<Row<PatternControl>> {
     match preview {
         Ok(p) => vec![
             Row::plain(format!("Matches: {} / {} selectable", p.matches, p.visible)),
@@ -173,14 +267,16 @@ fn summary(preview: Result<&crate::app::PatternPreview, &str>) -> Vec<Row<Patter
                 ),
                 Role::Warning,
             ),
-            Row::plain("Excluded marks stay. Tab selects; Enter activates."),
+            Row::plain("Tab selects; Enter activates. Esc cancels."),
         ],
         Err(error) => vec![
             Row::styled(
                 error.lines().last().unwrap_or("Invalid pattern"),
                 Role::Error,
-            ),
-            Row::plain("Esc cancels without changing marks."),
+            )
+            .single_line(),
+            Row::plain(""),
+            Row::plain("Tab selects; Enter activates. Esc cancels."),
         ],
     }
 }
@@ -208,12 +304,20 @@ fn fields(
 fn guard_actions(
     mut shell: modal::Layout<PatternControl>,
     footer_rows: u16,
+    body_rows: usize,
     fields: &[(Rect, PatternControl)],
 ) -> modal::Layout<PatternControl> {
-    let ready = shell.footer.height == footer_rows
-        && fields
-            .iter()
-            .any(|(_, target)| *target == PatternControl::Expression);
+    let ready = shell.body.width >= 12
+        && usize::from(shell.body.height) >= body_rows
+        && shell.footer.height == footer_rows
+        && [
+            PatternControl::Expression,
+            PatternControl::Mode(PatternMode::Wildcard),
+            PatternControl::Mode(PatternMode::Regex),
+            PatternControl::Case,
+        ]
+        .iter()
+        .all(|target| fields.iter().any(|(_, field)| field == target));
     for region in &mut shell.actions {
         if matches!(region.action.intent, PatternControl::Apply(_)) {
             region.action.enabled &= ready;
@@ -228,13 +332,7 @@ fn measure(
     summary: &[Row<PatternControl>],
     actions: &[Action<PatternControl>],
 ) -> (modal::Layout<PatternControl>, u16) {
-    let content_width = rows
-        .iter()
-        .chain(summary)
-        .map(Row::width)
-        .max()
-        .unwrap_or(0)
-        .min(68);
+    let content_width = 70;
     // Bound the action group by content width; shared packing wraps whole buttons.
     let width = (content_width as u16 + 6).min(area.width);
     let bounds = Rect::new(

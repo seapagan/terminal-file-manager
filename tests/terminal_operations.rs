@@ -233,9 +233,9 @@ fn pattern_selection_alt_b_paste_mark_and_cancel_work_in_native_terminal() {
         &[
             ("pattern-ready.txt", "\x1bb"),
             ("Pattern selection", "\x1b[200~*\x1b[201~"),
-            ("Matches: 1 / 1 selectable", "\t\t\t\r"),
+            ("Matches: 1 / 1 selectable", "\r\r"),
             ("[*]", "\x1bb"),
-            ("Pattern selection", "\x1b[200~missing\x1b[201~\r\r"),
+            ("Pattern selection", "\x1b[200~missing\x1b[201~\x1b"),
             ("cancelled", "q"),
         ],
         true,
@@ -243,6 +243,32 @@ fn pattern_selection_alt_b_paste_mark_and_cancel_work_in_native_terminal() {
     assert!(transcript.contains("[*]"));
     assert_eq!(
         fs::read_to_string(root.path().join("pattern-ready.txt")).unwrap(),
+        "preserved"
+    );
+}
+
+#[test]
+fn pattern_alt_controls_and_literal_letters_cross_the_native_terminal_parser() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("wxsmurQfile.txt"), "preserved").unwrap();
+    let transcript = drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("wxsmurQfile.txt", "\x1bb"),
+            ("Pattern selection", "wxsmur?*.txt\x1bm"),
+            ("[*]", "\x1bb"),
+            ("Pattern selection", "\x1bx"),
+            ("Substring;", "\x1b"),
+            ("cancelled", "\x1bb"),
+            ("Pattern selection", "\x1b[200~*\x1b[201~"),
+            ("Matches: 1 / 1 selectable", "\x1bs\x1bw\x1bu"),
+            ("visible marks updated", "q"),
+        ],
+        false,
+    );
+    assert!(transcript.contains("[*]"));
+    assert_eq!(
+        fs::read_to_string(root.path().join("wxsmurQfile.txt")).unwrap(),
         "preserved"
     );
 }

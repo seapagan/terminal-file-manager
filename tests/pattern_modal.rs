@@ -121,16 +121,16 @@ fn measured_buttons_fields_counts_and_focus_match_keyboard_and_mouse() {
     }
     click(&mut c, PatternControl::Case);
     assert!(!c.app.pattern.as_ref().unwrap().case_sensitive);
-    click(&mut c, PatternControl::Mode);
+    click(&mut c, PatternControl::Mode(PatternMode::Regex));
     assert_eq!(c.app.pattern.as_ref().unwrap().mode, PatternMode::Regex);
-    click(&mut c, PatternControl::Mode);
+    click(&mut c, PatternControl::Mode(PatternMode::Wildcard));
     click(&mut c, PatternControl::Apply(PatternOperation::Mark));
     assert!(c.app.pattern.is_none());
     assert_eq!(c.app.panes[0].marks.len(), 2);
     assert!(c.app.panes[1].marks.is_empty());
     key(&mut c, "Alt+b");
     event(&mut c, Event::Paste("*.txt".into()), (100, 24));
-    for input in ["Tab", "Tab", "Tab", "Tab", "Enter"] {
+    for input in ["Tab", "Tab", "Tab", "Tab", "Tab", "Enter"] {
         key(&mut c, input);
     }
     assert!(c.app.panes[0].marks.is_empty());
@@ -225,7 +225,7 @@ fn resize_tiny_terminals_and_all_non_form_input_remain_isolated() {
 }
 
 #[test]
-fn enter_cancels_by_default_repeats_do_not_apply_and_ctrl_c_keeps_quit() {
+fn enter_twice_marks_repeats_do_not_apply_and_ctrl_c_keeps_quit() {
     let (_root, mut c) = loaded();
     key(&mut c, "Alt+b");
     event(&mut c, Event::Paste("*".into()), (100, 24));
@@ -242,7 +242,7 @@ fn enter_cancels_by_default_repeats_do_not_apply_and_ctrl_c_keeps_quit() {
     assert!(c.app.pattern.is_some());
     key(&mut c, "Enter");
     assert!(c.app.pattern.is_none());
-    assert!(c.app.panes[0].marks.is_empty());
+    assert_eq!(c.app.panes[0].marks.len(), 3);
     key(&mut c, "Alt+b");
     key(&mut c, "Ctrl+c");
     assert!(c.quit);
@@ -284,7 +284,7 @@ fn focused_action_uses_cursor_style_and_hidden_controls_cannot_apply() {
     let (_root, mut c) = loaded();
     key(&mut c, "Alt+b");
     event(&mut c, Event::Paste("*".into()), (100, 24));
-    for _ in 0..3 {
+    for _ in 0..4 {
         key(&mut c, "Tab");
     }
     let mut terminal = Terminal::new(TestBackend::new(100, 24)).unwrap();
@@ -348,3 +348,6 @@ fn release_and_modified_keys_do_not_dismiss_or_apply_the_form() {
     }
     assert!(c.app.panes[0].marks.is_empty());
 }
+
+#[path = "pattern_modal/refinement.rs"]
+mod refinement;

@@ -54,6 +54,32 @@ fn wildcard_regex_case_and_invalid_patterns_have_explicit_results() {
 }
 
 #[test]
+fn identities_without_object_ids_follow_manual_marking_and_revalidate() {
+    let (_root, mut app) = loaded();
+    let pane = &mut app.panes[0];
+    for entry in &mut pane.entries {
+        entry.identity.as_mut().unwrap().object = None;
+    }
+    pane.entries[0].identity = None;
+    pane.select_all();
+    let expected = pane.marks.clone();
+    pane.clear_visible();
+    let mut selection = PatternSelection::new(pane, 0);
+    selection.set_expression("*".into());
+    assert_eq!(selection.preview(pane).unwrap().matches, expected.len());
+    selection.apply(pane, PatternOperation::Mark).unwrap();
+    assert_eq!(pane.marks, expected);
+    let selected = *pane
+        .visible
+        .iter()
+        .find(|i| pane.entries[**i].identity.is_some())
+        .unwrap();
+    pane.entries[selected].identity.as_mut().unwrap().length += 1;
+    assert!(selection.apply(pane, PatternOperation::Replace).is_err());
+    assert_eq!(pane.marks, expected);
+}
+
+#[test]
 fn replace_and_unmark_preserve_excluded_marks_and_zero_never_marks_cursor() {
     let (_root, mut app) = loaded();
     let pane = &mut app.panes[0];
