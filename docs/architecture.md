@@ -374,7 +374,6 @@ responses when comparison context is hidden. A new visible conflict resets detai
 footers prioritise safety warnings. The filesystem engine and native identities
 remain unchanged.
 
-
 Copy/Move workers retain execution-time overlap and native-identity checks.
 Refusals distinguish the same output item, a source folder containing its
 output, and aliases of the same native item. Renamed outputs and Keep both keep

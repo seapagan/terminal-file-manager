@@ -31,7 +31,6 @@ fn unedited_native_destination_remains_visible_without_a_duplicate_path() {
     let target = root
         .path()
         .join(OsString::from_vec(b"destination\xff".to_vec()));
-    std::fs::create_dir(&target).unwrap();
     let file = root.path().join("file");
     std::fs::write(&file, b"data").unwrap();
     let mut app = dialog(Plan::paths(Operation::Copy, vec![file], Some(target.clone())).unwrap());

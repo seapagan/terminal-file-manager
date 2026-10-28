@@ -16,7 +16,10 @@ use terminal_file_manager::{
 };
 
 fn fixture() -> (tempfile::TempDir, App) {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempfile::Builder::new()
+        .prefix("tfm-long-native-temporary-directory-")
+        .tempdir()
+        .unwrap();
     let paths = files(root.path());
     let plan = Plan::paths(Operation::Trash, paths, None).unwrap();
     let record = Record {
@@ -119,12 +122,22 @@ fn evidence_toggle_is_reversible_and_keeps_each_receipt_and_full_source() {
         summary.operation_controls[0].area,
         evidence.operation_controls[0].area
     );
-    let mut text = String::new();
-    for scroll in 0..=evidence.operation_scroll_limit {
-        c.app.operations.scroll = scroll;
-        text.push_str(&draw(&c.app, 120, 40).0);
+    for (width, height) in [(40, 15), (80, 24), (120, 40)] {
+        let (_, geometry) = draw(&c.app, width, height);
+        let mut text = String::new();
+        for scroll in 0..=geometry.operation_scroll_limit {
+            c.app.operations.scroll = scroll;
+            text.push_str(&draw(&c.app, width, height).0);
+        }
+        let columns = geometry
+            .operation_controls
+            .iter()
+            .find_map(|control| {
+                matches!(control.target, OperationTarget::Job(_)).then_some(control.area.width)
+            })
+            .unwrap();
+        assert_receipts(&root, &text, columns);
     }
-    assert_receipts(&root, &text);
     click_toggle(&mut c, &evidence);
     assert!(!c.app.operations.jobs_evidence);
     assert_eq!(c.app.operations.scroll, 0);
@@ -276,20 +289,36 @@ fn summary_does_not_describe_links_as_regular_files_or_show_their_size() {
     assert!(!text.contains("1 files"));
 }
 
-fn assert_receipts(root: &tempfile::TempDir, text: &str) {
+fn assert_receipts(root: &tempfile::TempDir, text: &str, columns: u16) {
+    // Synthetic Linux receipts exercise presentation on every host, not native Trash.
     for i in 0..5 {
-        assert!(text.contains(&format!("unique-trash-{i}")));
-        assert!(text.contains(&format!("unique-info-{i}.trashinfo")));
-        assert!(text.contains(&format!("native validation record {i}")));
-        assert!(
-            text.contains(&ui::clean(
-                &root
-                    .path()
-                    .join(format!("file-{i}.txt"))
+        for line in [
+            format!(
+                "  Native Trash target: {}",
+                root.path().join(format!("unique-trash-{i}")).display()
+            ),
+            format!(
+                "  Recovery metadata: {}",
+                root.path()
+                    .join(format!("unique-info-{i}.trashinfo"))
                     .display()
-                    .to_string()
-            ))
-        );
+            ),
+            format!("  native validation record {i}"),
+            format!(
+                "  Source: {}",
+                root.path().join(format!("file-{i}.txt")).display()
+            ),
+        ] {
+            // Check every displayed cell of each full line, including wrapped paths.
+            let cells: Vec<_> = ui::clean(&line).chars().collect();
+            for chunk in cells.chunks(usize::from(columns)) {
+                let expected: String = chunk.iter().collect();
+                assert!(
+                    text.contains(&expected),
+                    "missing {expected:?} in {columns} columns"
+                );
+            }
+        }
     }
 }
 
