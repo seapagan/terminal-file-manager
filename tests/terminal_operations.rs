@@ -142,7 +142,7 @@ fn copy_and_move_replace_are_accessible_from_the_real_dual_pane_manager() {
         &[
             ("zzz-left-ready", "\t"),
             ("aaa-right-ready", "\x1b[Z\x1b[17~"),
-            ("Destination conflict", "r"),
+            ("File already exists", "r"),
             ("1 file moved", "q"),
         ],
         false,
@@ -157,7 +157,7 @@ fn permanent_delete_requires_separate_confirmation_and_enter_cancels() {
     fs::write(root.path().join("selected"), "owned").unwrap();
     drive(
         command(root.path(), root.path(), None),
-        &[("selected", "\x1bd"), ("Preview: 1 file", "\rq")],
+        &[("selected", "\x1bd"), ("1 file · 5 B", "\rq")],
         false,
     );
     assert_eq!(fs::read(root.path().join("selected")).unwrap(), b"owned");
@@ -165,10 +165,61 @@ fn permanent_delete_requires_separate_confirmation_and_enter_cancels() {
         command(root.path(), root.path(), None),
         &[
             ("selected", "\x1bd"),
-            ("Preview: 1 file", "D"),
+            ("1 file · 5 B", "D"),
             ("1 file permanently deleted", "q"),
         ],
         false,
     );
     assert!(!root.path().join("selected").exists());
+}
+
+#[test]
+fn completed_directory_delete_can_be_followed_by_a_real_create_dialog() {
+    let root = tempfile::tempdir().unwrap();
+    fs::create_dir(root.path().join("selected-directory")).unwrap();
+    fs::write(root.path().join("selected-directory/child"), "owned").unwrap();
+    fs::write(root.path().join("zzz-ready"), "retained").unwrap();
+    drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("zzz-ready", "\x1bd"),
+            ("1 file, 1 directory · 5 B", "D"),
+            ("permanently deleted", "\x1b[18~"),
+            ("Directory name:", "after-delete\r"),
+            ("after-delete/", "q"),
+        ],
+        false,
+    );
+    assert!(!root.path().join("selected-directory").exists());
+    assert!(root.path().join("after-delete").is_dir());
+    assert_eq!(
+        fs::read(root.path().join("zzz-ready")).unwrap(),
+        b"retained"
+    );
+}
+
+#[test]
+fn same_folder_batch_failure_explains_the_reason_before_evidence_in_a_real_terminal() {
+    for shortcut in ["\x1b[15~", "\x1b[17~"] {
+        let root = tempfile::tempdir().unwrap();
+        for name in ["first-owned", "second-owned"] {
+            fs::write(root.path().join(name), "retained").unwrap();
+        }
+        // Only the active pane is visible; a filename cannot signal readiness of Pane 2.
+        drive(
+            command(root.path(), root.path(), None),
+            &[
+                ("second-owned", "\x01"),
+                ("Selected: 2 visible", shortcut),
+                ("Enter Run", "\r"),
+                ("Source and destination are the same.", "\x1b[20~"),
+                ("2 failed: Source and destination are the same.", "e"),
+                ("Summary", "\x1b[20~q"),
+            ],
+            false,
+        );
+        for name in ["first-owned", "second-owned"] {
+            assert_eq!(fs::read(root.path().join(name)).unwrap(), b"retained");
+        }
+    }
 }

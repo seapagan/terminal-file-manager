@@ -1,5 +1,102 @@
 # Acceptance gates
 
+## PM3-01 local conflict clarity and failure feedback — 27 October 2026
+
+Apply-to-All uses a neutral On/Off label and modifies the actual submitted
+decision. Small terminals disable Replace/Newer when the measured comparison
+cannot fit. Special-object selections use neutral entry counts. Width regressions
+check the measured outer rectangle and rendered borders, including expansion,
+terminal limits, middle-elision and the stacked/column transition.
+
+Native fixtures cover same-folder Copy/Move, directory overlap, hard-link and
+parent aliases, native case handling and valid renamed/Keep both outputs.
+Rendered/input regressions cover immediate reasons, grouped exact causes, mixed
+counts, uncertainty, full Evidence, disabled decisions and safe defaults.
+The ignored controller records current commands, outcomes and disposable visual
+fixtures. PM3-01 remains Review pending physical visual acceptance.
+
+## PM3-01 local conflict comparison — 26 October 2026
+
+Conflict dialogs now compare Incoming with Existing using semantic label/value
+rows, one meaningful lexical root and relative, width-aware paths. Wide layouts
+use columns; narrow layouts stack and scroll. Compact UTC dates omit fractions;
+newer direction uses the full recorded timestamps and distinguishes sub-second
+differences. Default output omits object IDs. Skip starts selected, unavailable
+choices remain visible and inert, and arrows skip them. All Off/On retains
+current-job/type-pair scope; Enter and Esc keep their decision meanings.
+
+Final Linux native and instrumented suites passed **634 tests**, with two
+established child-entry skips, plus one doctest. Strict Clippy/maintainability,
+Rust docs/builds, xwin and independent security/workflow checks passed. Strict
+`verify`/`msrv` aggregates stopped at dirty-package guards; interim
+`cargo package --locked --allow-dirty` passed. Thirteen complexity advisories
+remain, including Rust attribution spans; no threshold/suppression changed.
+The ignored controller retains full evidence and fixture commands.
+
+The maintainer's previously staged polish remains unchanged. Conflict changes
+are local and unstaged. PM3-01 remains Review; physical visual acceptance and
+native macOS/Windows execution remain pending. No Git delivery or independent
+review occurred.
+
+## PM3-01 local Jobs and preview correction — 25 October 2026
+
+The local, uncommitted correction adds a 150 ms ASCII activity frame to pending
+Trash/Delete previews, compact Jobs summaries and an explicit E Evidence/Summary
+control. Jobs uses terminal-derived geometry with fixed history, safety and
+action slots. Five successful top-level Trash entries fit at 80×24 without detail
+scrolling. Source roots use shared component-aware elision; relative rows retain
+native type markers and sizes. Evidence retains full source paths, separate
+receipt targets, recovery records and recorded errors. Native identities stay in
+the authoritative plan/results.
+
+Deterministic tests verify all four spinner frames and boundary times, exactly
+one changed buffer cell per animation step, unchanged geometry/hit regions,
+and no animation after hiding, readiness, failure or cancellation. Jobs tests
+cover 40×15, 80×24, 120×40 and 300×100 layouts, state/action changes, selection,
+Summary/Evidence, scrolling, conflict Enter routing, foreign roots, invalid Unix
+filename bytes and terminal-control escaping. The existing large-evidence test
+still reaches its final record beyond 65,535 rows.
+
+Rust 1.95.0 Linux native and coverage suites passed **611 tests**, with the two
+established child entry points skipped and exercised through passing parents.
+The doctest, strict Clippy, maintainability, Rust docs/builds, xwin check/Clippy/
+build, dependency audit/deny, workflow/security and shell checks passed.
+`cargo make verify` stopped at strict dirty-tree package-list validation;
+`cargo make msrv` passed its non-package steps and stopped at strict packaging.
+Neither aggregate passed. The authorised interim
+`cargo package --locked --allow-dirty` passed. Ten Lizard advisories remain,
+including a new whole-file parsing misattribution in `jobs_presentation.rs`;
+its isolated toggle test measures 32 lines. No new production hotspot,
+dependency, suppression or QC-policy change was introduced.
+
+The ignored controller holds complete commands, logs and fixture instructions.
+Physical visual acceptance and native macOS/Windows execution remain pending.
+PM3-01 remains Review; this checkpoint includes no staging, commit or PR action.
+
+## PM3-01 shared modal source checkpoint — 25 October 2026
+
+Operation overlays and floating metadata use the same measured, padded shell
+and centred action geometry. Structured source/result rows retain lexical native
+operands, display useful common roots and keep right-aligned binary sizes whole.
+M2 controllers retain preview readiness, explicit T/D confirmation, conflict
+eligibility and the typed ACKNOWLEDGE/F10 incident-exit protocol. The metadata
+sidebar retains its docked layout, shared cache and field formatting. Popup
+keyboard input no longer marks, navigates or opens operations behind the overlay.
+
+New TestBackend and input regressions cover 20/40/80/120-cell layouts, tiny
+heights, Unicode/graphemes, escaped controls/bidi, fixed actions, centred hit
+regions, safe preset defaults, disabled actions, destructive/focused styling,
+metadata focus and successive open/resize/close frames. The Jobs stress fixture
+still reaches its final result beyond 65,535 rows using long diagnostics now
+that filenames truncate. Existing M2 safety and PTY lifecycle regressions remain.
+
+Local Linux native and instrumented suites passed 577 tests, with the two
+established child-entry skips. Linux xwin check, Clippy and build passed;
+this is compilation evidence, not native Windows execution. Native macOS/Windows
+and hosted acceptance remain pending at this source checkpoint. No manual visual
+smoke check or release rehearsal was performed. The ignored work controller
+records subsequent clean-tree and hosted evidence for the delivered commit.
+
 ## Windows manual-refresh decision — 25 October 2026
 
 Windows now requires explicit `r` refresh or navigation. It creates no directory
@@ -818,7 +915,8 @@ evidence. Hosted/native results are not implied by configuration files.
   fixtures from real native binary successes. Use platform-native fixture hashes;
   reject checksum errors before extraction, header inspection or execution.
 - Require stable tags, HTTPS remote transport, exact one-record/two-field/name
-  sidecars and exactly four root-level regular archive members. Reject unsafe
+  sidecars and exactly five root-level regular archive members (including
+  `THIRD_PARTY_NOTICES.md`). Reject unsafe
   names, duplicates, links and special types before extracting into owned staging.
 - Validate native executable architecture with bounded reads, then require exact
   successful `tfm --version`. Per the revised C2 decision, this is synchronous

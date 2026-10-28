@@ -23,6 +23,42 @@ pub struct Geometry {
     pub metadata_controls: Vec<super::MetadataControl>,
 }
 
+impl Geometry {
+    /// Eligibility from the same measured controls used for rendering and mouse input.
+    pub fn operation_enabled(&self, key: crossterm::event::KeyCode) -> bool {
+        self.operation_layout.as_ref().is_some_and(|layout| {
+            layout
+                .shell
+                .actions
+                .iter()
+                .any(|region| region.action.enabled && region.action.key == key)
+        })
+    }
+
+    pub(crate) fn operation_scroll_contains(&self, column: u16, row: u16) -> bool {
+        self.operation_layout
+            .as_ref()
+            .is_some_and(|layout| layout.body.contains((column, row).into()))
+    }
+
+    /// Modal actions use the shared shell's enabled hit test; field/job targets use
+    /// the visible rows measured in that same layout.
+    pub fn operation_target(&self, column: u16, row: u16) -> Option<super::OperationTarget> {
+        self.operation_layout
+            .as_ref()
+            .and_then(|layout| layout.shell.hit(column, row).copied())
+            .or_else(|| {
+                self.operation_controls
+                    .iter()
+                    .find(|control| {
+                        !matches!(control.target, super::OperationTarget::Key(_))
+                            && control.area.contains((column, row).into())
+                    })
+                    .map(|control| control.target)
+            })
+    }
+}
+
 /// Width-driven layout never depends on a directory's longest filename.
 pub fn geometry(app: &App, area: Rect) -> Geometry {
     let height = area.height.saturating_sub(2);

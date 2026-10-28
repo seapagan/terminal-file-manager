@@ -26,6 +26,7 @@ pub enum Role {
     InactiveCursor,
     ActivePane,
     Label,
+    Muted,
     Value,
     Key,
     Status,
@@ -103,6 +104,7 @@ impl Theme {
             Role::Header | Role::Link | Role::Label | Role::Key | Role::Hidden => {
                 Some(AnsiColor::Cyan)
             }
+            Role::Muted => Some(AnsiColor::BrightBlack),
             Role::Status => Some(AnsiColor::Green),
             Role::Error => Some(AnsiColor::Red),
             Role::Directory => Some(AnsiColor::Blue),
@@ -123,7 +125,9 @@ impl Theme {
             Role::Header | Role::Marked | Role::Label | Role::Key | Role::Error => {
                 style.add_modifier(Modifier::BOLD)
             }
-            Role::Ignored | Role::Hidden | Role::Disabled => style.add_modifier(Modifier::DIM),
+            Role::Ignored | Role::Hidden | Role::Disabled | Role::Muted => {
+                style.add_modifier(Modifier::DIM)
+            }
             _ => style,
         }
     }

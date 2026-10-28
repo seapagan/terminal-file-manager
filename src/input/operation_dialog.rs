@@ -6,7 +6,12 @@ use std::{
     path::{Component, PathBuf},
 };
 
-pub(super) fn handle(controller: &mut Controller, dialog: Dialog, event: &Event) -> Option<Dialog> {
+pub(super) fn handle(
+    controller: &mut Controller,
+    dialog: Dialog,
+    event: &Event,
+    geometry: &crate::ui::Geometry,
+) -> Option<Dialog> {
     match dialog {
         Dialog::Exit { save } => super::operation_exit::choices(controller, save, event),
         Dialog::IncidentExit { save, typed } => {
@@ -15,7 +20,7 @@ pub(super) fn handle(controller: &mut Controller, dialog: Dialog, event: &Event)
         Dialog::Operation(mut dialog) => {
             let keep = match event {
                 Event::Key(key) if key.kind == KeyEventKind::Press => {
-                    operation_key(controller, &mut dialog, *key)
+                    operation_key(controller, &mut dialog, *key, geometry)
                 }
                 Event::Paste(text) => {
                     append(controller, &mut dialog, text);
@@ -28,24 +33,21 @@ pub(super) fn handle(controller: &mut Controller, dialog: Dialog, event: &Event)
     }
 }
 
-fn operation_key(controller: &mut Controller, dialog: &mut OperationDialog, key: KeyEvent) -> bool {
+fn operation_key(
+    controller: &mut Controller,
+    dialog: &mut OperationDialog,
+    key: KeyEvent,
+    geometry: &crate::ui::Geometry,
+) -> bool {
     if matches!(key.code, KeyCode::Esc) {
         cancel_preview(controller, dialog);
         return false;
     }
-    if matches!(key.code, KeyCode::PageUp | KeyCode::PageDown) {
-        controller.app.operations.scroll = controller
-            .app
-            .operations
-            .scroll
-            .saturating_add_signed(if key.code == KeyCode::PageUp { -8 } else { 8 });
-        return true;
-    }
     if matches!(dialog.plan.operation, Operation::Delete | Operation::Trash) {
-        return destructive(controller, dialog, key.code);
+        return destructive(controller, dialog, key.code, geometry);
     }
     match key.code {
-        KeyCode::Enter => submit(controller, dialog),
+        KeyCode::Enter => submit(controller, dialog, geometry),
         KeyCode::F(2) if matches!(dialog.plan.operation, Operation::Copy | Operation::Move) => {
             dialog.options.checksum = !dialog.options.checksum;
             true
@@ -79,7 +81,12 @@ fn operation_key(controller: &mut Controller, dialog: &mut OperationDialog, key:
     }
 }
 
-fn destructive(controller: &mut Controller, dialog: &mut OperationDialog, key: KeyCode) -> bool {
+fn destructive(
+    controller: &mut Controller,
+    dialog: &mut OperationDialog,
+    key: KeyCode,
+    geometry: &crate::ui::Geometry,
+) -> bool {
     if key == KeyCode::Enter {
         cancel_preview(controller, dialog);
         return false;
@@ -91,11 +98,11 @@ fn destructive(controller: &mut Controller, dialog: &mut OperationDialog, key: K
     if !confirm {
         return true;
     }
-    if !dialog.ready {
+    if !dialog.ready || dialog.plan.preview.is_none() || dialog.error.is_some() {
         controller.app.status = "Recursive preview pending or failed; confirmation disabled".into();
         return true;
     }
-    submit(controller, dialog)
+    submit(controller, dialog, geometry)
 }
 
 pub(super) fn cancel_preview(controller: &mut Controller, dialog: &OperationDialog) {
@@ -110,7 +117,30 @@ pub(super) fn cancel_preview(controller: &mut Controller, dialog: &OperationDial
     controller.app.operations.scroll = 0;
 }
 
-fn submit(controller: &mut Controller, dialog: &mut OperationDialog) -> bool {
+fn submit(
+    controller: &mut Controller,
+    dialog: &mut OperationDialog,
+    geometry: &crate::ui::Geometry,
+) -> bool {
+    if dialog.plan.operation == Operation::Mkdir && !dialog.directory_name_valid() {
+        let message = "Enter one directory name without path separators, NUL, or dot components";
+        dialog.error = Some(message.into());
+        controller.app.status = message.into();
+        return true;
+    }
+    let approval = match dialog.plan.operation {
+        Operation::Delete => Some(KeyCode::Char('D')),
+        Operation::Trash => Some(KeyCode::Char('T')),
+        Operation::Mkdir => Some(KeyCode::Enter),
+        _ => None,
+    };
+    if (matches!(dialog.plan.operation, Operation::Delete | Operation::Trash)
+        && (!dialog.ready || dialog.plan.preview.is_none() || dialog.error.is_some()))
+        || approval.is_some_and(|key| !geometry.operation_enabled(key))
+    {
+        controller.app.status = "Approval disabled; check the form or enlarge the terminal".into();
+        return true;
+    }
     match prepare(controller, dialog) {
         Ok(true) => {
             let intent = dialog.retry_of.map_or_else(
@@ -179,7 +209,7 @@ fn apply_fields(dialog: &mut OperationDialog) -> io::Result<()> {
             }
         }
         Operation::Mkdir => {
-            dialog.plan.set_destination(typed_path(dialog)?);
+            dialog.plan.set_destination(dialog.base.join(&dialog.text));
         }
         Operation::Rename => {
             dialog.plan.set_destination(rename_target(dialog)?);

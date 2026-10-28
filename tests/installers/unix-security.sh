@@ -4,17 +4,22 @@
 # D2: valid-checksum archives must be rejected before candidate execution.
 archive_name=terminal-file-manager-$TEST_RELEASE_TAG-x86_64-unknown-linux-gnu.tar.gz
 cp "$release_dir/$archive_name" "$root/good.tar.gz"
-for attack in extra nested duplicate symlink hardlink fifo; do
+for attack in extra nested duplicate missing-notices renamed-notices duplicate-notices symlink hardlink fifo; do
     reset_env
     mkdir -p "$TFM_INSTALL_DIR"
     printf 'old tfm\n' >"$TFM_INSTALL_DIR/tfm"
-    set -- tfm LICENSE-MIT LICENSE-APACHE README.md
+    set -- tfm LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md README.md
     case "$attack" in
         extra) printf 'extra\n' >"$root/archive/extra"; set -- "$@" extra ;;
-        nested) mkdir -p "$root/archive/nested"; cp "$root/archive/tfm" "$root/archive/nested/tfm"; set -- nested/tfm LICENSE-MIT LICENSE-APACHE README.md ;;
+        nested) mkdir -p "$root/archive/nested"; cp "$root/archive/tfm" "$root/archive/nested/tfm"; set -- nested/tfm LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md README.md ;;
         duplicate) set -- "$@" tfm ;;
+        missing-notices) set -- tfm LICENSE-MIT LICENSE-APACHE README.md ;;
+        renamed-notices)
+            cp "$root/archive/THIRD_PARTY_NOTICES.md" "$root/archive/NOTICES.md"
+            set -- tfm LICENSE-MIT LICENSE-APACHE NOTICES.md README.md ;;
+        duplicate-notices) set -- "$@" THIRD_PARTY_NOTICES.md ;;
         symlink) mv "$root/archive/tfm" "$root/original"; ln -s "$root/outside" "$root/archive/tfm"; : ;;
-        hardlink) mv "$root/archive/tfm" "$root/original"; ln "$root/original" "$root/archive/tfm"; set -- LICENSE-MIT LICENSE-APACHE README.md tfm tfm ;;
+        hardlink) mv "$root/archive/tfm" "$root/original"; ln "$root/original" "$root/archive/tfm"; set -- LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md README.md tfm tfm ;;
         fifo) mv "$root/archive/tfm" "$root/original"; mkfifo "$root/archive/tfm"; : ;;
     esac
     printf 'outside sentinel\n' >"$root/outside"
@@ -94,7 +99,7 @@ for member in ./tfm ../outside "$root/outside"; do
     printf 'old tfm\n' >"$TFM_INSTALL_DIR/tfm"
     printf 'outside sentinel\n' >"$root/outside"
     "$REAL_TAR" -czPf "$release_dir/$archive_name" -C "$root/archive" \
-        "$member" LICENSE-MIT LICENSE-APACHE README.md
+        "$member" LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md README.md
     (cd "$release_dir" && "$REAL_SHA256SUM" "$archive_name" >"$archive_name.sha256")
     assert_fails 'unsafe archive path accepted'
     assert_old_binary
@@ -131,7 +136,7 @@ pass
 for member_type in 1 2 3 4 6; do
     reset_env
     "$REAL_TAR" --format=ustar -cf "$root/special.tar" -C "$root/archive" \
-        tfm LICENSE-MIT LICENSE-APACHE README.md
+        tfm LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md README.md
     printf '%s' "$member_type" | dd of="$root/special.tar" bs=1 seek=156 conv=notrunc 2>/dev/null
     printf '        ' | dd of="$root/special.tar" bs=1 seek=148 conv=notrunc 2>/dev/null
     sum=$(od -An -tu1 -N512 "$root/special.tar" | awk '{ for (i=1; i<=NF; i++) sum += $i } END { print sum }')
@@ -194,7 +199,7 @@ for mode in fresh replacement wrong-version nonzero script wrong-machine truncat
         truncated) printf '\177ELF' >"$root/archive/tfm" ;;
     esac
     if test "$mode" != fresh; then mkdir -p "$TFM_INSTALL_DIR"; printf 'old tfm\n' >"$TFM_INSTALL_DIR/tfm"; fi
-    "$REAL_TAR" -czf "$release_dir/$native_asset" -C "$root/archive" tfm LICENSE-MIT LICENSE-APACHE README.md
+    "$REAL_TAR" -czf "$release_dir/$native_asset" -C "$root/archive" tfm LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md README.md
     (cd "$release_dir" && "$REAL_SHA256SUM" "$native_asset" >"$native_asset.sha256")
     case "$mode" in
         fresh|replacement)

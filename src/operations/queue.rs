@@ -526,4 +526,4 @@ fn prepare(mut job: Submission) -> Update {
 }
 
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;

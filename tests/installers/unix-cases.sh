@@ -214,9 +214,9 @@ bad_archive=$root/bad-archive
 mkdir "$bad_archive"
 printf '#!/missing/interpreter\n' >"$bad_archive/tfm"
 chmod +x "$bad_archive/tfm"
-cp "$root/archive/README.md" "$root/archive/LICENSE-MIT" "$root/archive/LICENSE-APACHE" "$bad_archive/"
+cp "$root/archive/README.md" "$root/archive/THIRD_PARTY_NOTICES.md" "$root/archive/LICENSE-MIT" "$root/archive/LICENSE-APACHE" "$bad_archive/"
 archive=terminal-file-manager-$TEST_RELEASE_TAG-x86_64-unknown-linux-gnu.tar.gz
-"$REAL_TAR" -czf "$release_dir/$archive" -C "$bad_archive" tfm README.md LICENSE-MIT LICENSE-APACHE
+"$REAL_TAR" -czf "$release_dir/$archive" -C "$bad_archive" tfm README.md THIRD_PARTY_NOTICES.md LICENSE-MIT LICENSE-APACHE
 (cd "$release_dir" && "$REAL_SHA256SUM" "$archive" >"$archive.sha256")
 assert_fails 'unexecutable candidate succeeded'
 assert_output 'candidate failed --version validation'
@@ -224,7 +224,7 @@ assert_output 'temporary-directory execution restrictions (such as noexec) are a
 assert_output 'Try setting TMPDIR to an executable location.'
 assert_no_binary
 assert_tmp_cleaned
-"$REAL_TAR" -czf "$release_dir/$archive" -C "$root/archive" tfm README.md LICENSE-MIT LICENSE-APACHE
+"$REAL_TAR" -czf "$release_dir/$archive" -C "$root/archive" tfm README.md THIRD_PARTY_NOTICES.md LICENSE-MIT LICENSE-APACHE
 (cd "$release_dir" && "$REAL_SHA256SUM" "$archive" >"$archive.sha256")
 pass
 
@@ -458,7 +458,7 @@ cp "$release_dir/missing.tar.gz" "$release_dir/$archive"
 assert_fails 'archive without tfm succeeded'
 assert_output 'release archive is missing tfm'
 assert_no_binary
-"$REAL_TAR" -czf "$release_dir/$archive" -C "$root/archive" tfm README.md LICENSE-MIT LICENSE-APACHE
+"$REAL_TAR" -czf "$release_dir/$archive" -C "$root/archive" tfm README.md THIRD_PARTY_NOTICES.md LICENSE-MIT LICENSE-APACHE
 (cd "$release_dir" && "$REAL_SHA256SUM" "$archive" >"$archive.sha256")
 pass
 

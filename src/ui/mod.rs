@@ -7,7 +7,9 @@ mod layout;
 mod listing;
 mod measure;
 mod metadata;
+pub mod modal;
 mod operations;
+pub(crate) use operations::animate_preview;
 pub use operations::{OperationControl, OperationTarget};
 mod path_title;
 pub use metadata::MetadataControl;
@@ -24,6 +26,21 @@ use crate::{
 pub use layout::{Geometry, geometry};
 pub use measure::Measurements;
 use ratatui::{Frame, layout::Rect, widgets::Paragraph};
+
+/// Keep the details route visible after clipping an untrusted immediate status.
+fn status_text(text: &str, width: u16) -> String {
+    let clean = clean(text);
+    let Some(summary) = clean.strip_suffix(" — F9 details") else {
+        return clean;
+    };
+    if width < modal::width(" — F9 details") {
+        return modal::truncate("F9 details", width);
+    }
+    format!(
+        "{} — F9 details",
+        modal::truncate(summary, width.saturating_sub(modal::width(" — F9 details")))
+    )
+}
 
 /// Escape terminal controls and bidi formatting in every untrusted display string.
 pub fn clean(text: &str) -> String {
@@ -56,7 +73,8 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
         metadata::render(frame, app, area, theme, false);
     }
     frame.render_widget(
-        Paragraph::new(clean(&app.status)).style(theme.style(Role::Status)),
+        Paragraph::new(status_text(&app.status, geometry.status.width))
+            .style(theme.style(Role::Status)),
         geometry.status,
     );
     footer::render(frame, geometry.footer, &geometry.footer_controls, theme);

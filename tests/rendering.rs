@@ -404,7 +404,13 @@ fn metadata_popup_centres_bounds_and_clamps_scrolling_after_resize() {
                     })
                     .unwrap();
                 assert!(top > 0 && top < height / 2);
-                assert_eq!(buffer[(35, top)].symbol(), "┌");
+                let left = (0..width)
+                    .find(|&x| buffer[(x, top)].symbol() == "┌")
+                    .unwrap();
+                let right = (0..width)
+                    .rfind(|&x| buffer[(x, top)].symbol() == "┐")
+                    .unwrap();
+                assert!(left.abs_diff(width - 1 - right) <= 1);
                 let text = buffer
                     .content()
                     .iter()

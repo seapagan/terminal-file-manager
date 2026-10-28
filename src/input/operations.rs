@@ -7,7 +7,10 @@ use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, 
 
 pub(super) fn action(controller: &mut Controller, action: Action, geometry: &Geometry) -> bool {
     if action == Action::Jobs {
-        controller.app.operations.show_history = !controller.app.operations.show_history;
+        let state = &mut controller.app.operations;
+        state.show_history = !state.show_history;
+        state.jobs_evidence = false;
+        state.scroll = 0;
         return true;
     }
     let operation = match action {
@@ -27,11 +30,10 @@ pub(super) fn action(controller: &mut Controller, action: Action, geometry: &Geo
         _ => return false,
     };
     if let Err(error) = open(controller, action, operation, geometry) {
-        controller
+        controller.app.status = controller
             .app
             .operations
             .fail(error.to_string(), controller.app.now);
-        controller.app.status = "Operation not started — F9 details".into();
     }
     true
 }
@@ -205,8 +207,7 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
         return true;
     }
     if let Some(dialog) = controller.app.operations.dialog.take() {
-        controller.app.operations.dialog =
-            super::operation_dialog::handle(controller, dialog, event);
+        handle_dialog(controller, dialog, event, geometry);
         return true;
     }
     if controller.app.operations.waiting_exit.is_some() {
@@ -217,6 +218,17 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
         return false;
     }
     super::operation_jobs::handle(controller, event, geometry)
+}
+
+fn handle_dialog(controller: &mut Controller, dialog: Dialog, event: &Event, geometry: &Geometry) {
+    controller.app.operations.dialog =
+        super::operation_dialog::handle(controller, dialog, event, geometry);
+    if controller.app.operations.dialog.is_none()
+        && !controller.app.operations.show_history
+        && !controller.app.operations.conflicts.is_empty()
+    {
+        controller.app.operations.scroll = 0;
+    }
 }
 
 fn waiting(controller: &mut Controller, event: &Event, geometry: &Geometry) {
@@ -247,11 +259,17 @@ fn scroll(controller: &mut Controller, event: &Event, geometry: &Geometry) -> bo
             KeyCode::PageDown => 8,
             _ => return false,
         },
-        Event::Mouse(mouse) => match mouse.kind {
-            MouseEventKind::ScrollUp => -3,
-            MouseEventKind::ScrollDown => 3,
-            _ => return false,
-        },
+        Event::Mouse(mouse) => {
+            let delta = match mouse.kind {
+                MouseEventKind::ScrollUp => -3,
+                MouseEventKind::ScrollDown => 3,
+                _ => return false,
+            };
+            if !geometry.operation_scroll_contains(mouse.column, mouse.row) {
+                return true;
+            }
+            delta
+        }
         _ => return false,
     };
     state.scroll = state.scroll.saturating_add_signed(delta).min(limit);
@@ -279,12 +297,8 @@ fn modal_click(controller: &mut Controller, event: &Event, geometry: &Geometry) 
             || controller.app.operations.waiting_exit.is_some())
         && mouse.kind == MouseEventKind::Down(MouseButton::Left)
     {
-        if let Some(control) = geometry
-            .operation_controls
-            .iter()
-            .find(|control| control.area.contains((mouse.column, mouse.row).into()))
-        {
-            return activate_control(controller, control.target, geometry);
+        if let Some(target) = geometry.operation_target(mouse.column, mouse.row) {
+            return activate_control(controller, target, geometry);
         }
         return true;
     }

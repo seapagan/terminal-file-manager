@@ -188,10 +188,10 @@ args = [
 alias = "coverage-html"
 
 [tasks.verify-fast]
-description = "Run fast native Rust, documentation, build and package checks"
+description = "Run a fast native Rust, documentation and build development subset"
 dependencies = [
     "format", "check", "clippy", "test", "doctest", "doc", "build",
-    "release-build", "package-list", "package",
+    "release-build",
 ]
 
 [tasks.verify-common]
@@ -199,9 +199,27 @@ description = "Run platform-independent foundation verification"
 dependencies = [
     "python-format", "python-lint", "python-type", "complexity",
     "format", "check", "clippy", "maintainability", "test", "doctest", "doc", "build",
-    "release-build", "package-list", "package",
-    "msrv", "audit", "deny", "actions-lint", "zizmor", "coverage",
+    "release-build",
+    "audit", "deny", "actions-lint", "zizmor", "coverage",
 ]
+
+[tasks.verify-postcommit]
+description = "Run strict exact-MSRV and current-toolchain packaging checks on clean committed sources"
+script_runner = "@duckscript"
+script = '''
+git = which git
+missing_git = is_empty ${git}
+assert_false ${missing_git} "verify-postcommit cannot inspect checkout: git is unavailable"
+head = exec git rev-parse --verify HEAD
+assert_eq ${head.code} 0 "verify-postcommit cannot inspect checkout: no committed HEAD; ${head.stderr}"
+status = exec git status --porcelain=v1 --untracked-files=all --ignore-submodules=none
+assert_eq ${status.code} 0 "verify-postcommit cannot inspect checkout: ${status.stderr}"
+pending = trim ${status.stdout}
+clean = is_empty ${pending}
+assert_eq ${clean} true "verify-postcommit requires a clean committed checkout; commit or remove pending changes before running it"
+cm_run_task msrv
+cm_run_task package
+'''
 
 [tasks._xwin-prerequisites]
 private = true

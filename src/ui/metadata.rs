@@ -63,6 +63,8 @@ type Row = (Line<'static>, Option<Action>, u16);
 
 struct Layout {
     area: Rect,
+    inner: Rect,
+    shell: Option<super::modal::Layout<Action>>,
     lines: Vec<Line<'static>>,
     controls: Vec<MetadataControl>,
     scroll: u16,
@@ -71,23 +73,27 @@ struct Layout {
 
 pub(super) fn render(frame: &mut Frame, app: &App, bounds: Rect, theme: &Theme, floating: bool) {
     let layout = layout(app, bounds, theme, floating);
-    let area = layout.area;
-    frame.render_widget(Clear, area);
-    frame.render_widget(
-        Paragraph::new(layout.lines)
-            .scroll((layout.scroll, 0))
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(if floating {
-                        "Metadata — ↑/↓ or wheel"
-                    } else {
-                        "Metadata — wheel scrolls"
-                    })
-                    .border_style(theme.style(Role::Header)),
-            ),
-        area,
-    );
+    if let Some(shell) = &layout.shell {
+        super::modal::render_shell(frame, layout.area, "Metadata — ↑/↓ or wheel", theme);
+        frame.render_widget(
+            Paragraph::new(layout.lines).scroll((layout.scroll, 0)),
+            layout.inner,
+        );
+        super::modal::actions::render(frame, shell, theme, None);
+    } else {
+        frame.render_widget(Clear, layout.area);
+        frame.render_widget(
+            Paragraph::new(layout.lines)
+                .scroll((layout.scroll, 0))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Metadata — wheel scrolls")
+                        .border_style(theme.style(Role::Header)),
+                ),
+            layout.area,
+        );
+    }
 }
 
 fn fields(
@@ -281,24 +287,21 @@ fn layout(app: &App, bounds: Rect, theme: &Theme, floating: bool) -> Layout {
         theme,
         floating,
     );
-    let width = if floating {
-        bounds.width.saturating_sub(4).min(90)
+    let (shell, measured_rows) = if floating {
+        let (shell, rows) = popup_layout(&fields, bounds, theme, &app.details[app.active]);
+        (Some(shell), rows)
     } else {
-        bounds.width
+        (None, Vec::new())
     };
-    let rows = rows(&fields, width.saturating_sub(2), theme);
-    let area = if floating {
-        super::centered(
+    let (area, inner, rows) = if let Some(shell) = &shell {
+        (shell.outer, shell.body, measured_rows)
+    } else {
+        (
             bounds,
-            width,
-            u16::try_from(rows.len().saturating_add(2))
-                .unwrap_or(u16::MAX)
-                .min(bounds.height.saturating_sub(2)),
+            Block::default().borders(Borders::ALL).inner(bounds),
+            rows(&fields, bounds.width.saturating_sub(2), theme),
         )
-    } else {
-        bounds
     };
-    let inner = Block::default().borders(Borders::ALL).inner(area);
     let limit =
         u16::try_from(rows.len().saturating_sub(usize::from(inner.height))).unwrap_or(u16::MAX);
     let scroll = if floating {
@@ -308,14 +311,60 @@ fn layout(app: &App, bounds: Rect, theme: &Theme, floating: bool) -> Layout {
     }
     .min(limit);
     let offset = label_width(&fields, inner.width) as u16;
-    let controls = value_controls(&rows, inner, scroll, offset);
+    let mut controls = value_controls(&rows, inner, scroll, offset);
+    if let Some(shell) = &shell {
+        controls.extend(shell.actions.iter().map(|region| MetadataControl {
+            area: region.area,
+            action: region.action.intent,
+        }));
+    }
     Layout {
         area,
+        inner,
+        shell,
         lines: rows.into_iter().map(|(line, _, _)| line).collect(),
         controls,
         scroll,
         limit,
     }
+}
+
+fn popup_layout(
+    fields: &[Field],
+    bounds: Rect,
+    theme: &Theme,
+    detail: &Detail,
+) -> (super::modal::Layout<Action>, Vec<Row>) {
+    let mut measured_rows = Vec::new();
+    let shell = {
+        let actions = [super::modal::actions::Action::custom(
+            "Esc Close",
+            Action::Cancel,
+            crossterm::event::KeyCode::Esc,
+        )];
+        super::modal::Spec {
+            title: "Metadata — ↑/↓ or wheel",
+            content_width: label_width(fields, u16::MAX)
+                + fields
+                    .iter()
+                    .map(|field| field.value.width())
+                    .max()
+                    .unwrap_or(0),
+            pinned_rows: 0,
+            footer_rows: 0,
+            actions: &actions,
+        }
+        .measure(bounds, |width| {
+            measured_rows = rows(fields, width, theme);
+            if let Some(entry) = detail.entry.as_ref().filter(|_| detail.stale.is_none()) {
+                let row = super::modal::entry_row::<()>(entry, std::path::Path::new(&entry.name));
+                let row = row.wrap(width).remove(0).line(width, theme);
+                measured_rows.insert(0, (row, None, 0));
+            }
+            measured_rows.len()
+        })
+    };
+    (shell, measured_rows)
 }
 
 fn value_controls(rows: &[Row], inner: Rect, scroll: u16, offset: u16) -> Vec<MetadataControl> {
@@ -355,149 +404,4 @@ pub(super) fn controls(app: &App, bounds: Rect, floating: bool) -> Vec<MetadataC
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ui::text::wrap_value;
-    use colored_text::ColorLevel;
-
-    #[test]
-    fn wrapped_values_keep_graphemes_and_continue_under_value_column() {
-        let theme = Theme::new(ColorLevel::Ansi16);
-        let fields = vec![Field::plain(
-            "Path",
-            "界e\u{301}界e\u{301}界e\u{301}\u{1b}\n".into(),
-            &theme,
-        )];
-        let lines: Vec<_> = rows(&fields, 13, &theme)
-            .into_iter()
-            .map(|(line, _, _)| line)
-            .collect();
-        assert!(lines.len() > 1);
-        let mut restored = String::new();
-        for (index, line) in lines.iter().enumerate() {
-            assert!(line.width() <= 13);
-            assert_eq!(line.spans[0].width(), 6);
-            assert_eq!(line.spans[0].content.trim().is_empty(), index != 0);
-            for span in &line.spans[1..] {
-                assert!(!span.content.contains('\u{1b}'));
-                restored.push_str(&span.content);
-            }
-        }
-        assert_eq!(restored, "界e\u{301}界e\u{301}界e\u{301}\\u{1b}\\n");
-        assert!(
-            lines[0].spans[0]
-                .style
-                .add_modifier
-                .contains(ratatui::style::Modifier::BOLD)
-        );
-        assert_ne!(lines[0].spans[0].style.fg, lines[0].spans[1].style.fg);
-    }
-
-    #[test]
-    fn one_cell_values_do_not_overflow_or_split_combining_sequences() {
-        assert_eq!(wrap_value("界e\u{301}", 1), ["�", "e\u{301}"]);
-        assert_eq!(wrap_value("", 1), [""]);
-        assert_eq!(wrap_value("value", 0), [""]);
-    }
-    pub(super) fn metadata_text(app: &App, floating: bool) -> String {
-        use ratatui::{Terminal, backend::TestBackend};
-        let width = if floating { 180 } else { 48 };
-        let bounds = Rect::new(0, 0, width, 40);
-        let theme = Theme::new(ColorLevel::NoColor);
-        let area = layout(app, bounds, &theme, floating).area;
-        let mut terminal = Terminal::new(TestBackend::new(width, 40)).unwrap();
-        terminal
-            .draw(|frame| render(frame, app, bounds, &theme, floating))
-            .unwrap();
-        let buffer = terminal.backend().buffer();
-        // Rejoin wrapped metadata values without borders or continuation padding.
-        (area.y + 1..area.bottom() - 1)
-            .map(|y| {
-                (area.x + 1..area.right() - 1)
-                    .map(|x| buffer[(x, y)].symbol())
-                    .collect::<String>()
-                    .trim()
-                    .to_owned()
-            })
-            .collect()
-    }
-
-    #[test]
-    fn keys_help_describes_escape_for_the_rendered_metadata_view() {
-        use ratatui::{Terminal, backend::TestBackend};
-        let root = tempfile::tempdir().unwrap();
-        let mut app = App::new(root.path().into());
-        let theme = Theme::new(ColorLevel::NoColor);
-        for (floating, expected) in [
-            (false, "c: count/size on demand; Esc cancels the count"),
-            (true, "c: count/size on demand; Esc cancels/closes"),
-        ] {
-            for counting in [false, true] {
-                app.details[0].counting = counting;
-                let mut terminal = Terminal::new(TestBackend::new(100, 40)).unwrap();
-                terminal
-                    .draw(|frame| render(frame, &app, Rect::new(0, 0, 100, 40), &theme, floating))
-                    .unwrap();
-                let buffer = terminal.backend().buffer();
-                let row = (0..40)
-                    .map(|y| {
-                        (0..100)
-                            .map(|x| buffer[(x, y)].symbol())
-                            .collect::<String>()
-                    })
-                    .find(|row| row.contains("Keys:"))
-                    .expect("visible metadata Keys row");
-                assert_eq!(
-                    row.split("Keys:")
-                        .nth(1)
-                        .unwrap()
-                        .trim()
-                        .trim_end_matches('│')
-                        .trim(),
-                    expected
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn totals_views_distinguish_running_complete_incomplete_and_failed_results() {
-        for floating in [false, true] {
-            let root = tempfile::tempdir().unwrap();
-            let mut app = App::new(root.path().into());
-            app.details[0].entry = Some(crate::fs::inspect(root.path()));
-            app.details[0].path = Some(root.path().into());
-            app.popup = floating;
-            app.sidebar = !floating;
-            app.details[0].counting = true;
-            assert!(metadata_text(&app, floating).contains("Calculating totals"));
-            app.details[0].counting = false;
-            app.details[0].totals = Some(Ok(crate::fs::Totals {
-                files: 1,
-                directories: 2,
-                bytes: 3,
-                errors: vec![],
-            }));
-            let complete = metadata_text(&app, floating);
-            assert!(complete.contains("1 files, 2 directories, 3 B"));
-            assert!(!complete.contains("INCOMPLETE") && !complete.contains("Calculating totals"));
-            app.details[0]
-                .totals
-                .as_mut()
-                .unwrap()
-                .as_mut()
-                .unwrap()
-                .errors
-                .push("unreadable descendant".into());
-            let incomplete = metadata_text(&app, floating);
-            assert!(incomplete.contains("1 files, 2 directories, 3 B"));
-            assert!(
-                incomplete.contains("INCOMPLETE") && incomplete.contains("unreadable descendant")
-            );
-            app.details[0].totals = Some(Err("root unavailable".into()));
-            let failed = metadata_text(&app, floating);
-            assert!(failed.contains("root unavailable"));
-            assert!(!failed.contains("Descendants") && !failed.contains("INCOMPLETE"));
-        }
-    }
-}
+mod tests;

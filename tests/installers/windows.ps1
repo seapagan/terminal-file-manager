@@ -75,7 +75,7 @@ function Publish-Asset([string]$Mirror, [string]$Target, [byte[]]$Content) {
 function Build-ZipBytes([hashtable]$Files) {
     # Required isolated fixture construction, not an independently optional action.
     if ($Files.ContainsKey('tfm.exe')) {
-        foreach ($name in @('LICENSE-MIT', 'LICENSE-APACHE', 'README.md')) {
+        foreach ($name in @('LICENSE-MIT', 'LICENSE-APACHE', 'THIRD_PARTY_NOTICES.md', 'README.md')) {
             if (-not $Files.ContainsKey($name)) { $Files[$name] = [Text.Encoding]::ASCII.GetBytes($name) }
         }
     }

@@ -68,10 +68,7 @@ impl Controller {
                     super::view::key(self, key, geometry);
                     return Vec::new();
                 }
-                self.bindings
-                    .action(key)
-                    .filter(|action| key.kind == KeyEventKind::Press || action.repeatable())
-                    .map_or_else(Vec::new, |action| self.dispatch(action, geometry))
+                self.bound_key(key, geometry)
             }
             Event::Paste(text) if self.filter_before.is_some() => {
                 self.append_filter(&text);
@@ -84,6 +81,16 @@ impl Controller {
             }
             _ => Vec::new(),
         }
+    }
+
+    fn bound_key(&mut self, key: crossterm::event::KeyEvent, geometry: &Geometry) -> Vec<Request> {
+        self.bindings
+            .action(key)
+            .filter(|action| key.kind == KeyEventKind::Press || action.repeatable())
+            .filter(|action| {
+                !self.app.popup || super::metadata::accepts(self.preferred_action(*action))
+            })
+            .map_or_else(Vec::new, |action| self.dispatch(action, geometry))
     }
 
     pub(super) fn dispatch_action(&mut self, action: Action, geometry: &Geometry) -> Vec<Request> {
@@ -146,16 +153,6 @@ impl Controller {
 
     fn exit(&mut self, action: Action) {
         super::operations::exit(self, action == Action::SaveQuit);
-    }
-
-    fn preferred_action(&self, action: Action) -> Action {
-        if action != Action::Info {
-            return action;
-        }
-        match self.preferences.metadata_presentation {
-            crate::settings::MetadataPresentation::Sidebar => Action::ToggleSidebar,
-            crate::settings::MetadataPresentation::Popup => Action::Metadata,
-        }
     }
 
     fn movement(&mut self, action: Action, geometry: &Geometry) {
@@ -395,16 +392,27 @@ impl Controller {
         self.app.panes[*id].set_filter(query);
     }
 
-    fn overlay_mouse(&mut self, event: MouseEvent, geometry: &Geometry) -> bool {
+    fn metadata_click(&mut self, event: MouseEvent, geometry: &Geometry) -> bool {
         if event.kind == MouseEventKind::Down(MouseButton::Left)
             && let Some(control) = geometry
                 .metadata_controls
                 .iter()
                 .find(|control| control.area.contains((event.column, event.row).into()))
         {
+            if control.action == Action::Cancel {
+                self.cancel();
+                return true;
+            }
             if let Some(format) = &mut self.app.metadata_formats[usize::from(self.app.popup)] {
                 format.toggle(control.action);
             }
+            return true;
+        }
+        false
+    }
+
+    fn overlay_mouse(&mut self, event: MouseEvent, geometry: &Geometry) -> bool {
+        if self.metadata_click(event, geometry) {
             return true;
         }
         if self.app.profile_menu.is_some() {

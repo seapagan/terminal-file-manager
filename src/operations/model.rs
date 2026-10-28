@@ -34,6 +34,18 @@ pub struct OperationDialog {
     pub error: Option<String>,
 }
 
+impl OperationDialog {
+    /// Pure syntax check shared by the form and its submit guard; no filesystem reads.
+    pub fn directory_name_valid(&self) -> bool {
+        use std::path::{Component, Path};
+        let path = Path::new(&self.text);
+        !self.text.contains('\0')
+            && !self.text.contains(std::path::is_separator)
+            && path.components().count() == 1
+            && matches!(path.components().next(), Some(Component::Normal(_)))
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JobState {
     Queued,
@@ -48,6 +60,8 @@ pub enum JobState {
 }
 
 pub struct Job {
+    /// Derived by `finish`; unfinalized/synthetic jobs may leave this absent.
+    pub presentation: Option<super::JobSummary>,
     /// Cached by `finish`; rendering never clones a plan or scans recursive results.
     pub retry_eligible: bool,
     pub id: u64,
@@ -74,13 +88,19 @@ impl Job {
     }
     /// Only unknown entries with retained ownership evidence can be reconciled.
     pub fn can_reconcile(&self) -> bool {
-        !self.active() && self.record.as_ref().is_some_and(Record::reconcilable)
+        !self.active()
+            && self.presentation.as_ref().map_or_else(
+                || self.record.as_ref().is_some_and(Record::reconcilable),
+                |summary| summary.reconcilable,
+            )
     }
     pub fn finish(&mut self, record: Record, now: SystemTime) {
         self.retry_eligible = self.plan.retry_eligibility(&record).is_ok();
         self.finished.get_or_insert(now);
         self.state = finished_state(&record);
         self.record = Some(record);
+        self.presentation = None;
+        self.presentation = Some(super::JobSummary::new(self));
     }
 }
 
@@ -145,6 +165,10 @@ pub struct State {
     pub history: Vec<Job>,
     pub conflicts: VecDeque<PendingConflict>,
     pub show_history: bool,
+    /// Explicit forensic detail; each newly opened Jobs surface starts in Summary.
+    pub jobs_evidence: bool,
+    /// Monotonic animation frame; it carries no operation authority.
+    pub preview_frame: u8,
     pub cursor: usize,
     pub scroll: usize,
     pub waiting_exit: Option<bool>,
@@ -164,9 +188,12 @@ impl State {
     }
     /// Irreversible native incidents retain their records until actual exit.
     pub fn incidents(&self) -> bool {
-        self.history
-            .iter()
-            .any(|job| job.record.as_ref().is_some_and(Record::incident))
+        self.history.iter().any(|job| {
+            job.presentation.as_ref().map_or_else(
+                || job.record.as_ref().is_some_and(Record::incident),
+                |summary| summary.incident,
+            )
+        })
     }
     /// Ordinary uncertainty never receives the incident acknowledgement bypass.
     pub fn unknown(&self) -> bool {
@@ -180,10 +207,13 @@ impl State {
                     .any(|entry| entry.outcome == Outcome::OutcomeUnknown)
             })
     }
-    /// A rejected request has no worker job; preserve its evidence in the existing Jobs view.
-    pub fn fail(&mut self, detail: String, now: SystemTime) {
+    /// Retain the raw rejection in Jobs and return its immediate status with a details route.
+    pub fn fail(&mut self, detail: String, now: SystemTime) -> String {
+        let text = format!("Not started: {detail}");
+        let status = format!("{text} — F9 details");
+        self.notify(text, now, NoticeSeverity::Error);
         self.last_error = Some(detail);
-        self.notify("Operation not started".into(), now, NoticeSeverity::Error);
+        status
     }
     pub fn notify(&mut self, text: String, now: SystemTime, severity: NoticeSeverity) {
         self.notices
@@ -200,6 +230,21 @@ impl State {
 }
 
 pub(crate) fn summary(job: &Job) -> String {
+    let summary = counts_summary(job);
+    let Some(record) = job.record.as_ref().filter(|r| !r.incident()) else {
+        return summary;
+    };
+    let groups = record.failure_groups();
+    groups
+        .iter()
+        .find(|g| g.0 == Outcome::OutcomeUnknown)
+        .or_else(|| groups.first())
+        .map_or(summary.clone(), |(_, reason, _)| {
+            format!("{reason} — {summary}")
+        })
+}
+
+pub(crate) fn counts_summary(job: &Job) -> String {
     let Some(record) = &job.record else {
         return format!(
             "Job {}: {}",

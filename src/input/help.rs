@@ -128,7 +128,7 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
     (Attributes, "Edit supported permissions/attributes"),
     (
         Jobs,
-        "Queue, progress, result history, cancellation and retry",
+        "Jobs summary; E toggles evidence; cancellation and retry",
     ),
     (Path, "Unavailable until M5: path entry"),
     (Zoxide, "Reserved for zoxide (M5)"),

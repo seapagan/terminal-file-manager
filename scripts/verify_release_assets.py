@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import NoReturn, Protocol
 
 ROOT = Path(__file__).resolve().parents[1]
-DOCUMENTS = ("LICENSE-MIT", "LICENSE-APACHE", "README.md")
+DOCUMENTS = ("LICENSE-MIT", "LICENSE-APACHE", "THIRD_PARTY_NOTICES.md", "README.md")
 TARGETS = (
     "x86_64-unknown-linux-gnu",
     "x86_64-unknown-linux-musl",

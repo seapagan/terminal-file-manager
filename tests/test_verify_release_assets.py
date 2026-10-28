@@ -181,6 +181,46 @@ class ReleaseAssetsTests(unittest.TestCase):
                 self.check()
                 self.check(aggregate=True)
 
+    def test_notices_inventory_and_identity(self) -> None:
+        """Both archives require the exact notices bytes, also on foreign hosts."""
+        name = "THIRD_PARTY_NOTICES.md"
+        for self.target in assets.TARGETS:
+            self.payload = executable(self.target)
+            members = self.members()
+            notices = (name, (assets.ROOT / name).read_bytes())
+            complete = [entry for entry in members if entry[0] != name] + [notices]
+            self.write(complete)
+            self.check()
+            self.check(aggregate=True)
+            without = [entry for entry in complete if entry[0] != name]
+            for invalid in (
+                without,
+                [*without, (name, notices[1][:-1] + bytes([notices[1][-1] ^ 1]))],
+                [*without, ("NOTICES.md", notices[1])],
+                [*complete, notices],
+            ):
+                self.write(invalid)
+                for aggregate in (False, True):
+                    with (
+                        self.subTest(target=self.target, aggregate=aggregate),
+                        self.assertRaises(assets.AssetError),
+                    ):
+                        self.check(aggregate=aggregate)
+
+    def test_notices_duplicate_with_unchanged_member_count(self) -> None:
+        """Duplicate notices fail their own check, before the missing MIT licence."""
+        for self.target in assets.TARGETS:
+            self.payload = executable(self.target)
+            members = self.members()
+            notices = next(
+                entry for entry in members if entry[0] == "THIRD_PARTY_NOTICES.md"
+            )
+            duplicate = [entry for entry in members if entry[0] != "LICENSE-MIT"]
+            self.write([*duplicate, notices])
+            for aggregate in (False, True):
+                with self.assertRaisesRegex(assets.AssetError, "duplicate member"):
+                    self.check(aggregate=aggregate)
+
     def test_checksum_grammar(self) -> None:
         """Reject fields, aliases, encoding ambiguity and additional records."""
         self.write()

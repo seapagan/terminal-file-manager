@@ -6,13 +6,17 @@ use crossterm::event::KeyCode;
 use ratatui::{
     Frame,
     layout::Rect,
-    text::Line,
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Clear, Paragraph},
 };
 mod actions;
+mod conflict;
 mod content;
 mod jobs;
+mod jobs_layout;
+mod jobs_summary;
 mod layout;
+#[cfg(test)]
+mod layout_tests;
 pub(super) use layout::Layout;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -27,6 +31,9 @@ pub struct OperationControl {
     pub area: Rect,
     pub target: OperationTarget,
     pub label: &'static str,
+    /// Projected shell eligibility for geometry consumers and tests.
+    /// Activation uses the measured shell's hit/key policy, not this field.
+    pub enabled: bool,
 }
 
 pub(super) fn visible(app: &App) -> bool {
@@ -53,27 +60,8 @@ pub(super) fn geometry(
     controls.extend(jobs::controls(app, layout.list));
     let rows = &layout.rows;
     let scroll = app.operations.scroll.min(layout.limit(rows.len()));
-    for (offset, row) in rows
-        .iter()
-        .skip(scroll)
-        .take(usize::from(layout.body.height))
-        .enumerate()
-    {
-        if let Some(field) = row.field {
-            controls.push(OperationControl {
-                area: Rect::new(
-                    layout.body.x,
-                    layout.body.y + offset as u16,
-                    Line::raw(row.text.as_str())
-                        .width()
-                        .min(usize::from(layout.body.width)) as u16,
-                    1,
-                ),
-                target: OperationTarget::Field(field),
-                label: "",
-            });
-        }
-    }
+    controls.extend(field_controls(&layout.header, layout.shell.pinned, 0));
+    controls.extend(field_controls(rows, layout.body, scroll));
     let limit = layout.limit(rows.len());
     // Retain only the rows whose geometry was used for this frame's hitboxes.
     layout.rows = layout
@@ -90,30 +78,85 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, geometry: &sup
     let Some(layout) = &geometry.operation_layout else {
         return;
     };
-    frame.render_widget(Clear, layout.outer);
-    frame.render_widget(
-        Block::default()
-            .title(content::title(app))
-            .borders(Borders::ALL)
-            .border_style(theme.style(Role::ActivePane))
-            .style(theme.style(Role::Normal)),
+    super::modal::render_shell_with_title_role(
+        frame,
         layout.outer,
+        content::title(app),
+        theme,
+        content::title_role(app),
     );
     jobs::render(frame, app, theme, layout.list);
-    let text: Vec<_> = layout
-        .rows
-        .iter()
-        .map(|row| Line::styled(row.text.as_str(), theme.style(row.role)))
-        .collect();
-    frame.render_widget(Paragraph::new(text), layout.body);
-    for control in &geometry.operation_controls {
-        if matches!(control.target, OperationTarget::Key(_)) {
-            frame.render_widget(
-                Paragraph::new(format!("[{}]", control.label)).style(theme.style(Role::Key)),
-                control.area,
-            );
-        }
+    render_rows(frame, &layout.header, layout.shell.pinned, theme);
+    render_rows(frame, &layout.rows, layout.body, theme);
+    render_footer(frame, app, layout, theme);
+    if geometry.operation_scroll_limit > 0 && layout.shell.cue.height > 0 {
+        let total = geometry.operation_scroll_limit + usize::from(layout.body.height);
+        let start = app.operations.scroll.min(geometry.operation_scroll_limit);
+        let cue = if layout.rows.is_empty() {
+            format!("0/{total} · Resize")
+        } else {
+            format!(
+                "{}-{}/{total} · PgUp/PgDown",
+                start + 1,
+                start + layout.rows.len()
+            )
+        };
+        let area = layout.shell.cue;
+        frame.render_widget(
+            Paragraph::new(super::modal::truncate(&cue, area.width))
+                .style(theme.style(Role::Label)),
+            area,
+        );
     }
+    let selected = actions::focused(app).and_then(|key| {
+        layout
+            .shell
+            .actions
+            .iter()
+            .find(|region| region.action.intent == OperationTarget::Key(key))
+            .map(|region| region.index)
+    });
+    super::modal::actions::render(frame, &layout.shell, theme, selected);
+}
+
+fn render_footer(frame: &mut Frame, app: &App, layout: &Layout, theme: &Theme) {
+    let footer_start = if app.operations.dialog.is_none()
+        && (app.operations.show_history || !app.operations.conflicts.is_empty())
+    {
+        0
+    } else {
+        layout
+            .footer
+            .len()
+            .saturating_sub(usize::from(layout.shell.footer.height))
+    };
+    render_rows(
+        frame,
+        &layout.footer[footer_start..],
+        layout.shell.footer,
+        theme,
+    );
+}
+
+fn field_controls(rows: &[content::Row], area: Rect, scroll: usize) -> Vec<OperationControl> {
+    rows.iter()
+        .skip(scroll)
+        .take(usize::from(area.height))
+        .enumerate()
+        .filter_map(|(offset, row)| {
+            row.field.map(|field| OperationControl {
+                area: Rect::new(area.x, area.y + offset as u16, area.width, 1),
+                target: OperationTarget::Field(field),
+                label: "",
+                enabled: true,
+            })
+        })
+        .collect()
+}
+
+fn render_rows(frame: &mut Frame, rows: &[content::Row], area: Rect, theme: &Theme) {
+    let text: Vec<_> = rows.iter().map(|row| row.line(area.width, theme)).collect();
+    frame.render_widget(Paragraph::new(text), area);
 }
 
 fn notices(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
@@ -156,9 +199,24 @@ fn short_notice(notice: &crate::operations::Notice, width: u16) -> (String, Role
     let clean = super::clean(&notice.text);
     let summary = clean.strip_suffix(" — F9 details").unwrap_or(&clean);
     let text = format!("{label}: {summary}");
-    let summary = super::text::wrap_value(&text, usize::from(width.saturating_sub(13)).max(1))
-        .into_iter()
-        .next()
-        .unwrap_or_default();
-    (format!("{summary} — F9 details"), role)
+    (
+        super::status_text(&format!("{text} — F9 details"), width),
+        role,
+    )
+}
+
+/// The event loop calls this with monotonic elapsed time; only visible pending counts redraw.
+pub(crate) fn animate_preview(app: &mut App, elapsed: std::time::Duration) -> bool {
+    let pending = visible(app)
+        && matches!(&app.operations.dialog, Some(crate::operations::Dialog::Operation(d))
+            if matches!(d.plan.operation, crate::operations::Operation::Trash | crate::operations::Operation::Delete)
+                && d.plan.preview.is_none() && d.error.is_none());
+    if !pending {
+        app.operations.preview_frame = 0;
+        return false;
+    }
+    let frame = ((elapsed.as_millis() / 150) % 4) as u8;
+    let changed = frame != app.operations.preview_frame;
+    app.operations.preview_frame = frame;
+    changed
 }

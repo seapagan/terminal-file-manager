@@ -19,6 +19,7 @@ fn fixture() -> (tempfile::TempDir, Job, Record) {
         terminal_file_manager::operations::Decision::Skip
     });
     let job = Job {
+        presentation: None,
         retry_eligible: false,
         id: 1,
         plan,

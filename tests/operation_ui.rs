@@ -108,6 +108,7 @@ fn completed_jobs_show_readable_details_and_no_active_controls() {
     let mut app = App::new("/controlled".into());
     app.operations.show_history = true;
     app.operations.history.push(Job {
+        presentation: None,
         retry_eligible: true,
         id: 7,
         plan: Plan::mkdir("/controlled/new".into()),
@@ -133,7 +134,7 @@ fn completed_jobs_show_readable_details_and_no_active_controls() {
 }
 
 #[test]
-fn conflict_omits_unsafe_choices_and_formats_optional_metadata() {
+fn conflict_disables_unsafe_choices_and_formats_optional_metadata() {
     let root = tempfile::tempdir().unwrap();
     let source = root.path().join("file");
     let destination = root.path().join("directory");
@@ -157,14 +158,23 @@ fn conflict_omits_unsafe_choices_and_formats_optional_metadata() {
     assert!(text.contains("Newer disabled"));
     assert!(!text.contains("Some("));
     assert!(!text.contains("SystemTime"));
-    assert!(geometry.operation_controls.iter().all(|control| !matches!(
-        control.target,
-        ui::OperationTarget::Key(KeyCode::Char('r' | 'n'))
-    )));
+    for key in ['r', 'n'] {
+        let control = geometry
+            .operation_controls
+            .iter()
+            .find(|control| control.target == ui::OperationTarget::Key(KeyCode::Char(key)))
+            .unwrap();
+        assert!(!control.enabled);
+        assert_eq!(
+            geometry.operation_target(control.area.x, control.area.y),
+            None
+        );
+    }
 }
 
 fn completed_job(app: &App, id: u64) -> Job {
     Job {
+        presentation: None,
         retry_eligible: true,
         id,
         plan: Plan::mkdir(format!("/controlled/{id}").into()),
@@ -351,14 +361,20 @@ fn preview_failure_keeps_its_reason_and_never_claims_counting_or_success() {
     }
     let (text, geometry) = draw(&app, 120, 30, ColorLevel::NoColor);
     assert!(text.contains("Preview unavailable"));
-    assert!(text.contains("permission denied"));
+    let unframed: String = text
+        .chars()
+        .filter(|c| !c.is_whitespace() && !matches!(c, '│' | '─'))
+        .collect();
+    assert!(unframed.contains("Cannotinspectselectedpath:permissiondenied"));
     assert!(!text.contains("Counting recursively"));
     assert!(!text.contains("source left"));
     assert!(
         geometry
             .operation_controls
             .iter()
-            .filter(|control| matches!(control.target, ui::OperationTarget::Key(_)))
+            .filter(
+                |control| control.enabled && matches!(control.target, ui::OperationTarget::Key(_))
+            )
             .all(|control| control.target == ui::OperationTarget::Key(KeyCode::Enter))
     );
 }

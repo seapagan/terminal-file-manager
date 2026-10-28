@@ -217,6 +217,39 @@ reconcile an incident, retry a mutation or write a recovery file. Terminal
 restoration precedes navigation-session persistence. Job diagnostics remain
 session-local.
 
+`ui::modal` supplies the shared measured shell for operation dialogs and floating
+metadata. Content rows wrap prose and fields, while structured file/result rows
+truncate filenames and right-align indivisible sizes. Lexical common parents
+reduce repeated source paths without changing native operands. Standard action
+groups return typed intents with safe defaults; M2 controllers retain approval,
+preview, conflict and incident authorization. The docked metadata sidebar keeps
+its own layout and shares its existing fields and cache with the popup.
+
+File confirmations show selected roots, with type indicators and directory
+suffixes. Recursive Trash/Delete totals describe the completed worker preview;
+they do not expand the visible root list. Context and editable fields stay above
+the list, while errors, the permanent-delete warning and actions stay below it.
+PgUp/PgDown and wheel input over the list scroll its measured viewport. Short
+dialogs shrink to content; long lists normally use at most 75% of terminal
+height. Small terminals may exceed that height target to retain fixed controls.
+The shared shell centres its bounded height in the original usable terminal
+area. Scroll cues occupy a measured interior gap; a muted context divider
+collapses before it can remove the last operand row. Trash/Delete controls
+remain visible while previews run, but stay disabled until a completed preview,
+the required context/warnings and at least one readable operand row are visible.
+Mouse hit-testing and the submit guard use that same measured eligibility.
+Standard preview errors have a reserved layout budget to keep the controls
+stable through counting, success and failure. Unused space collapses before
+operand rows disappear; longer errors may need more room.
+Enlarge the terminal or cancel when approval is disabled.
+Editable values retain their normal style and show a caret at the editing end;
+long values scroll horizontally without changing the underlying input.
+Create directory accepts one native filename and disables Create for empty or
+invalid names. Its parent path uses the muted semantic role. Copy/Move align
+From/To values and describe the next SHA-256 toggle action in the F2 button.
+Detailed floating metadata retains the same available native sizes as the
+sidebar; a compact directory row's em dash denotes an uncomputed payload size.
+
 Operation dialogs size to wrapped content within terminal bounds. The renderer
 and input controller share exact button, field and job-row rectangles. Jobs use
 a bounded selection viewport and a separate details scroll position; completed
@@ -299,3 +332,56 @@ reasons without preventing unrelated basic browsing.
 
 M2 implements local operations on the M1 browsing foundation. M3–M8 add the
 remaining application contracts, including SSH sessions.
+
+Jobs uses a responsive viewport derived from terminal size, with fixed history,
+safety and action regions. Job selection, action eligibility and Summary/Evidence
+changes leave those rectangles fixed. Summary projects the frozen plan and
+record into top-level rows, one meaningful lexical source root and an applicable
+destination. It shares component-aware path elision with pane titles. Evidence
+retains per-entry outcomes, full source paths, unique native receipt targets and
+recovery metadata; display labels never become operation operands. Switching
+jobs or detail mode resets detail scroll. Each new Jobs opening starts in Summary.
+
+The browser requests animation redraws every 150 ms while a destructive preview
+is visible and pending. Monotonic elapsed time selects one of four ASCII frames;
+readiness, worker generations and destructive confirmation remain independent.
+Hidden, ready, failed and cancelled previews request no animation redraws.
+
+Jobs centres Evidence/Summary and Close in a stable primary action row. A second
+reserved band centres only eligible contextual controls, using the shared action
+packing and hit rectangles. At constrained sizes, those controls become
+informational shortcuts in the existing footer. Whole shortcut labels pack into
+at most the available two footer rows; an ellipsis marks omitted hints. Warnings
+retain their first row, including unknown-outcome retry/exit restrictions. The
+renderer creates no hit targets for shortcut hints or unused action-band space.
+
+Conflict dialogs present cached Incoming/Existing snapshots as side-by-side
+columns or stacked fields. One meaningful lexical root replaces repeated
+absolute paths. Comparison paths reuse component-aware title elision and share
+a grapheme-safe endpoint fallback for oversized final components; pane/Jobs
+formatting retains its existing policy. Semantic key/value rows create no input
+targets. UTC display omits fractional seconds, while newer direction compares
+the full frozen SystemTime values under the recorded availability contract.
+
+Replace/Newer controls remain visible but disabled when their existing guards
+reject them. Arrow navigation skips those choices; keyboard and mouse decisions
+still pass the existing input checks. Skip starts selected for each prompt.
+Apply-to-All uses a neutral, fixed-size On/Off control. The modifier wraps the
+actual submitted choice and retains current-job/type-pair scope. Replace and
+Newer require the measured filename/root and comparison rows to fit; both input
+routing and mouse eligibility enforce this guard. Skip and Cancel remain safe
+responses when comparison context is hidden. A new visible conflict resets detail scrolling; clipped conflict
+footers prioritise safety warnings. The filesystem engine and native identities
+remain unchanged.
+
+Copy/Move workers retain execution-time overlap and native-identity checks.
+Refusals distinguish the same output item, a source folder containing its
+output, and aliases of the same native item. Renamed outputs and Keep both keep
+their existing eligibility; the planner does not pre-reject an entire batch.
+Notifications show a recorded primary reason, prioritising uncertain outcomes,
+with the existing lifecycle-derived counts. Jobs Summary groups exact recorded
+(outcome, reason) pairs once with an affected count, before the operand rows.
+It preserves distinct causes and uncertainty restrictions. Evidence retains each
+full individual reason, native source/target spelling, receipts and recovery
+records. Mixed/special-object selection summaries use neutral entry counts;
+recursive preview accounting and lifecycle-derived job counts are unchanged.

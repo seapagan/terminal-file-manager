@@ -252,6 +252,7 @@ test "${TEST_CANDIDATE_EXIT:-0}" = 0 || exit "$TEST_CANDIDATE_EXIT"
 printf 'tfm %s\n' "${TEST_CANDIDATE_VERSION:-99.88.77}"
 EOF
 chmod +x "$root/archive/tfm"
+printf 'release notices\n' >"$root/archive/THIRD_PARTY_NOTICES.md"
 printf 'release readme\n' >"$root/archive/README.md"
 printf 'release licence\n' >"$root/archive/LICENSE-MIT"
 printf 'release licence\n' >"$root/archive/LICENSE-APACHE"
@@ -266,7 +267,7 @@ TEST_OLD_TAG=v$TEST_OLD_VERSION
 targets='x86_64-unknown-linux-gnu x86_64-unknown-linux-musl aarch64-unknown-linux-gnu aarch64-unknown-linux-musl x86_64-apple-darwin aarch64-apple-darwin'
 for target in $targets; do
     "$REAL_TAR" -czf "$release_dir/terminal-file-manager-$TEST_RELEASE_TAG-$target.tar.gz" \
-        -C "$root/archive" tfm README.md LICENSE-MIT LICENSE-APACHE
+        -C "$root/archive" tfm README.md THIRD_PARTY_NOTICES.md LICENSE-MIT LICENSE-APACHE
     (cd "$release_dir" && "$REAL_SHA256SUM" \
         "terminal-file-manager-$TEST_RELEASE_TAG-$target.tar.gz" \
         >"terminal-file-manager-$TEST_RELEASE_TAG-$target.tar.gz.sha256")

@@ -367,9 +367,9 @@ jobs:
           archive_root="$RUNNER_TEMP/tfm-release"
           mkdir -p "$archive_root"
           install -m 755 "target/$TARGET/release/tfm" "$archive_root/tfm"
-          cp LICENSE-MIT LICENSE-APACHE README.md "$archive_root/"
+          cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md README.md "$archive_root/"
           tar -czf "$ARCHIVE_NAME" -C "$archive_root" \
-            tfm LICENSE-MIT LICENSE-APACHE README.md
+            tfm LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md README.md
           if [ "$ASSET_KIND" = macos ]; then
             shasum -a 256 "$ARCHIVE_NAME" > "$ARCHIVE_NAME.sha256"
           else
@@ -383,7 +383,7 @@ jobs:
           $archiveRoot = Join-Path $env:RUNNER_TEMP 'tfm-release'
           New-Item -ItemType Directory -Path $archiveRoot -Force | Out-Null
           Copy-Item "target/$env:TARGET/release/tfm.exe" $archiveRoot
-          Copy-Item LICENSE-MIT, LICENSE-APACHE, README.md $archiveRoot
+          Copy-Item LICENSE-MIT, LICENSE-APACHE, THIRD_PARTY_NOTICES.md, README.md $archiveRoot
           Compress-Archive -Path (Join-Path $archiveRoot '*') -DestinationPath $env:ARCHIVE_NAME
           $hash = (Get-FileHash $env:ARCHIVE_NAME -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $env:ARCHIVE_NAME" | Set-Content -NoNewline "$env:ARCHIVE_NAME.sha256"

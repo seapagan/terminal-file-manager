@@ -102,8 +102,8 @@ fn reconciliation_without_evidence_keeps_the_original_quarantined_claims() {
 }
 
 // Drive the production scheduler at its claim handshake, before replying to the worker.
-struct Driver {
-    queue: Queue,
+pub(crate) struct Driver {
+    pub(crate) queue: Queue,
     submissions: mpsc::Receiver<Submission>,
     updates: mpsc::SyncSender<Update>,
     events: mpsc::SyncSender<Message>,
@@ -114,7 +114,7 @@ struct Driver {
 }
 
 impl Driver {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let (sender, submissions) = mpsc::sync_channel(64);
         let (updates, receiver) = mpsc::sync_channel(64);
         let (events, messages) = mpsc::sync_channel(8);
@@ -137,7 +137,7 @@ impl Driver {
         }
     }
 
-    fn pump(&mut self) {
+    pub(crate) fn pump(&mut self) {
         self.pending.extend(self.submissions.try_iter());
         pump(
             &mut self.pending,
@@ -149,7 +149,7 @@ impl Driver {
         );
     }
 
-    fn finish(&mut self, expected: u64) -> Record {
+    pub(crate) fn finish(&mut self, expected: u64) -> Record {
         let message = self.messages.recv_timeout(Duration::from_secs(5)).unwrap();
         assert!(
             matches!(&message, Message::Update(Update::Finished { id, .. }) if *id == expected)
@@ -174,7 +174,7 @@ impl Driver {
         }
     }
 
-    fn replace_claimed_payload(&mut self, held: &std::path::Path) -> std::path::PathBuf {
+    pub(crate) fn replace_claimed_payload(&mut self, held: &std::path::Path) -> std::path::PathBuf {
         let Message::Claim {
             id,
             root,

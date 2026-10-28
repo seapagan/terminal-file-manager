@@ -1,6 +1,9 @@
 use super::{OperationControl, OperationTarget, actions, content};
-use crate::app::App;
-use ratatui::{layout::Rect, text::Line};
+use crate::{
+    app::App,
+    ui::modal::{self, actions::Action},
+};
+use ratatui::layout::Rect;
 
 #[derive(Clone, Debug)]
 pub(in crate::ui) struct Layout {
@@ -8,126 +11,230 @@ pub(in crate::ui) struct Layout {
     pub body: Rect,
     pub list: Rect,
     pub buttons: Vec<OperationControl>,
+    pub shell: modal::Layout<OperationTarget>,
+    pub(super) header: Vec<content::Row>,
+    pub(super) footer: Vec<content::Row>,
     pub(super) rows: Vec<content::Row>,
 }
 
 impl Layout {
     pub fn new(app: &App, terminal: Rect) -> Self {
+        if app.operations.show_history && app.operations.dialog.is_none() {
+            return super::jobs_layout::layout(app, terminal);
+        }
+        if app.operations.dialog.is_none()
+            && let Some(layout) = super::conflict::layout(app, terminal)
+        {
+            return layout;
+        }
+        Self::dialog(app, terminal)
+    }
+
+    fn dialog(app: &App, terminal: Rect) -> Self {
         let rows = content::rows(app);
-        let width = desired_width(app, &rows).min(
-            terminal
-                .width
-                .saturating_sub(u16::from(terminal.width > 4) * 2),
+        let header = content::header(app);
+        let footer = content::footer(app);
+        let buttons = buttons(app, terminal.width);
+        let spec = modal::Spec {
+            title: content::title(app),
+            content_width: desired_width(&rows, terminal.width)
+                .max(desired_width(&header, terminal.width))
+                .max(footer_width(app, &footer, terminal.width))
+                .max(summary_width(app)),
+            pinned_rows: 0,
+            footer_rows: 0,
+            actions: &buttons,
+        };
+        let width = spec.measure(terminal, |_| 0).body.width;
+        let summary_visible = header
+            .first()
+            .is_none_or(|row| row.width() <= usize::from(width));
+        let mut header = content::wrapped(header, width);
+        let divider = add_divider(app, &rows, &mut header, width);
+        let footer = content::wrapped(footer, width);
+        let mut spec = modal::Spec {
+            pinned_rows: spec
+                .pinned_rows
+                .saturating_add(header.len().min(usize::from(u16::MAX)) as u16),
+            footer_rows: footer.len().min(usize::from(u16::MAX)) as u16,
+            ..spec
+        };
+        let wrapped = content::wrapped(rows, width);
+        let mut shell = spec.measure(terminal, |_| wrapped.len());
+        if divider && shell.body.height == 0 {
+            header.pop();
+            spec.pinned_rows = spec.pinned_rows.saturating_sub(1);
+            shell = spec.measure(terminal, |_| wrapped.len());
+        }
+        let complete =
+            shell.footer.height == spec.footer_rows && shell.pinned.height == spec.pinned_rows;
+        let title_visible = title_visible(app, shell.outer);
+        guard_approval(
+            app,
+            &mut shell,
+            &wrapped,
+            complete && summary_visible && title_visible,
         );
-        let padding = if width >= 8 { 2 } else { 1 };
-        let inner = width.saturating_sub(padding * 2);
-        let buttons = pack(app, inner);
-        let button_rows = buttons.last().map_or(0, |button| button.area.y + 1);
-        let rows = content::wrapped(rows, inner);
-        let list_rows = list_rows(app, terminal.height);
-        let height = ((rows.len().min(u16::MAX as usize) as u16)
-            .saturating_add(list_rows)
-            .saturating_add(button_rows)
-            .saturating_add(4))
-        .min(terminal.height.saturating_sub(2));
-        let available = Rect::new(
-            terminal.x,
-            terminal.y,
-            terminal.width,
-            terminal.height.saturating_sub(2),
-        );
-        let outer = super::super::centered(available, width, height);
-        let list = Rect::new(
-            outer.x + padding.min(width),
-            outer.y.saturating_add(1),
-            inner,
-            list_rows.min(height.saturating_sub(2)),
-        );
-        let content_top = list.bottom();
-        let button_top = outer
-            .bottom()
-            .saturating_sub(button_rows.saturating_add(1))
-            .max(content_top);
-        let body = Rect::new(
-            list.x,
-            content_top,
-            inner,
-            button_top.saturating_sub(content_top).saturating_sub(1),
-        );
+        Self::measured(app, shell, header, footer, wrapped)
+    }
+
+    pub(super) fn measured(
+        app: &App,
+        shell: modal::Layout<OperationTarget>,
+        header: Vec<content::Row>,
+        footer: Vec<content::Row>,
+        rows: Vec<content::Row>,
+    ) -> Self {
         Self {
-            outer,
-            body,
-            list,
-            buttons: position(buttons, list, button_top, outer),
+            outer: shell.outer,
+            body: shell.body,
+            list: history_area(app, &shell),
+            buttons: controls(&shell),
+            shell,
+            header,
+            footer,
             rows,
         }
     }
 
     pub fn limit(&self, rows: usize) -> usize {
-        rows.saturating_sub(usize::from(self.body.height))
+        self.shell.scroll_limit(rows)
     }
 }
 
-fn desired_width(app: &App, rows: &[content::Row]) -> u16 {
-    let mut longest = Line::raw(content::title(app)).width();
-    for row in rows {
-        longest = longest.max(Line::raw(super::super::clean(&row.text)).width());
-        if longest >= 84 {
-            return 88;
-        }
+fn footer_width(app: &App, rows: &[content::Row], width: u16) -> usize {
+    let measured = desired_width(rows, width);
+    let summary = summary_width(app);
+    if summary > 0 {
+        measured.min(summary)
+    } else {
+        measured
     }
-    longest.saturating_add(4).clamp(38, 88) as u16
 }
 
-fn pack(app: &App, width: u16) -> Vec<OperationControl> {
-    let mut controls = Vec::new();
-    let mut x: u16 = 0;
-    let mut y: u16 = 0;
-    for (label, key) in actions::buttons(app, width < 40) {
-        let length = label.len() as u16 + 2;
-        if length > width {
-            continue;
-        }
-        if x.saturating_add(length) > width {
-            x = 0;
-            y = y.saturating_add(1);
-        }
-        controls.push(OperationControl {
-            area: Rect::new(x, y, length, 1),
-            target: OperationTarget::Key(key),
-            label,
-        });
-        x += length + 1;
+fn add_divider(
+    app: &App,
+    rows: &[content::Row],
+    header: &mut Vec<content::Row>,
+    width: u16,
+) -> bool {
+    let divider = !rows.is_empty()
+        && matches!(
+            app.operations.dialog,
+            Some(crate::operations::Dialog::Operation(_))
+        );
+    if divider {
+        header.push(content::Row::styled(
+            "─".repeat(usize::from(width)),
+            crate::color::Role::Muted,
+        ));
     }
-    controls
+    divider
 }
 
-fn position(
-    buttons: Vec<OperationControl>,
-    list: Rect,
-    top: u16,
-    outer: Rect,
-) -> Vec<OperationControl> {
-    buttons
+fn guard_approval(
+    app: &App,
+    shell: &mut modal::Layout<OperationTarget>,
+    rows: &[content::Row],
+    complete: bool,
+) {
+    let start = app.operations.scroll.min(shell.scroll_limit(rows.len()));
+    let operands_visible = shell.body.height > 0
+        && rows
+            .iter()
+            .skip(start)
+            .take(usize::from(shell.body.height))
+            .any(|row| {
+                row.trailing
+                    .as_ref()
+                    .is_some_and(|size| shell.body.width >= modal::width(size).saturating_add(7))
+            });
+    for button in &mut shell.actions {
+        if matches!(
+            button.action.intent,
+            OperationTarget::Key(crossterm::event::KeyCode::Char('D' | 'T'))
+        ) {
+            button.action.enabled &= complete && operands_visible;
+        }
+    }
+}
+
+fn history_area(app: &App, shell: &modal::Layout<OperationTarget>) -> Rect {
+    if app.operations.show_history && app.operations.dialog.is_none() {
+        shell.pinned
+    } else {
+        Rect::default()
+    }
+}
+
+pub(super) fn buttons(app: &App, width: u16) -> Vec<Action<OperationTarget>> {
+    actions::buttons(app, width < 44)
         .into_iter()
-        .filter_map(|mut button| {
-            button.area.x += list.x;
-            button.area.y += top;
-            (button.area.bottom() < outer.bottom()
-                && button.area.right() <= outer.right().saturating_sub(1))
-            .then_some(button)
+        .map(|(label, key)| {
+            let mut action = Action::custom(label, OperationTarget::Key(key), key);
+            action.role = actions::role(app, key);
+            action.enabled = actions::enabled(app, key);
+            if key == crossterm::event::KeyCode::Char('a')
+                && app.operations.dialog.is_none()
+                && !app.operations.show_history
+            {
+                action.min_width =
+                    modal::width(label.trim_end_matches("On").trim_end_matches("Off")) + 3;
+                action.state = Some(if app.operations.conflicts.front().is_some_and(|c| c.all) {
+                    ("On", crate::color::Role::Status)
+                } else {
+                    ("Off", crate::color::Role::Disabled)
+                });
+            }
+            if key == crossterm::event::KeyCode::F(2) {
+                action.min_width = modal::width(if width < 44 {
+                    "F2 SHA-256 off"
+                } else {
+                    "F2 Disable SHA-256"
+                });
+            }
+            action
         })
         .collect()
 }
 
-fn list_rows(app: &App, height: u16) -> u16 {
-    if app.operations.show_history && app.operations.dialog.is_none() {
-        app.operations
-            .history
-            .len()
-            .min(5)
-            .min(usize::from(height / 4)) as u16
+fn controls(shell: &modal::Layout<OperationTarget>) -> Vec<OperationControl> {
+    shell
+        .actions
+        .iter()
+        .map(|button| OperationControl {
+            area: button.area,
+            target: button.action.intent,
+            label: button.action.label,
+            enabled: button.action.enabled,
+        })
+        .collect()
+}
+
+fn desired_width(rows: &[content::Row], terminal_width: u16) -> usize {
+    let mut widest = 0;
+    for row in rows {
+        widest = widest.max(row.width());
+        if widest >= usize::from(terminal_width) {
+            break;
+        }
+    }
+    widest
+}
+
+fn summary_width(app: &App) -> usize {
+    if matches!(&app.operations.dialog, Some(crate::operations::Dialog::Operation(dialog)) if matches!(dialog.plan.operation, crate::operations::Operation::Trash | crate::operations::Operation::Delete))
+    {
+        usize::from(modal::width(
+            "| Counting recursively… confirmation disabled",
+        ))
     } else {
         0
     }
+}
+
+fn title_visible(app: &App, outer: Rect) -> bool {
+    !matches!(&app.operations.dialog, Some(crate::operations::Dialog::Operation(d))
+        if d.plan.operation == crate::operations::Operation::Delete)
+        || (outer.height >= 3 && modal::width(content::title(app)) <= outer.width.saturating_sub(3))
 }

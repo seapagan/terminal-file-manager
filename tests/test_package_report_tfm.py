@@ -31,9 +31,14 @@ class TfmPackageTests(unittest.TestCase):
         write_archive(self.archive, self.required if files is None else files)
         return report.analyse_archive(self.archive, repository=self.repository)
 
-    def test_both_licenses_and_readme_are_required(self) -> None:
-        """Require both full licences and the public README."""
-        for required in ("LICENSE-APACHE", "LICENSE-MIT", "README.md"):
+    def test_licenses_notices_and_readme_are_required(self) -> None:
+        """Require both full licences, third-party notices and the public README."""
+        for required in (
+            "LICENSE-APACHE",
+            "LICENSE-MIT",
+            "THIRD_PARTY_NOTICES.md",
+            "README.md",
+        ):
             with self.subTest(required=required):
                 files = tuple(path for path in self.required if path != required)
                 self.assertEqual(self.analyse(files).missing_paths, (required,))
@@ -60,8 +65,8 @@ class TfmPackageTests(unittest.TestCase):
         result = self.analyse(self.required + forbidden)
         self.assertEqual(result.forbidden_paths, tuple(sorted(forbidden)))
 
-    def test_only_root_rust_tests_enter_dynamic_inventory(self) -> None:
-        """Git discovery omits development support and nested Rust fixtures."""
+    def test_only_tracked_rust_tests_enter_dynamic_inventory(self) -> None:
+        """Git discovery includes nested Rust modules and omits support files."""
         repository = self.root / "mixed-repository"
         initialise_repository(
             repository,
@@ -76,7 +81,7 @@ class TfmPackageTests(unittest.TestCase):
         )
         self.assertEqual(
             report.repository_distribution_paths(repository),
-            ("src/main.rs", "tests/cli.rs"),
+            ("src/main.rs", "tests/cli.rs", "tests/nested/a.rs"),
         )
 
     def test_real_size_ceiling_boundaries(self) -> None:

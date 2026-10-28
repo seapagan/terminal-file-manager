@@ -122,11 +122,25 @@ Operations use visible marks, or the cursor when no visible marks remain. With
 two panes, copy and move target the other pane: one entry starts immediately,
 while multiple entries ask for confirmation. Shift+F5/F6 or `C`/`M` bypass that
 routine confirmation. With one pane, choose the destination in the dialog.
-F2 in a transfer dialog enables SHA-256 verification.
+F2 in a transfer dialog toggles SHA-256 verification; its button describes the
+next action. PgUp/PgDown or the wheel over the source list scroll selected roots.
+An ASCII activity spinner runs while Trash/Delete counts recursively.
+Approval stays disabled until counting finishes and the dialog can
+show the selected objects and required safety context. Resize or cancel if needed.
 
-Conflicts default to Skip. Choose Replace, Keep both or Newer, and use All to
-repeat a choice within that job and type pair. Directories merge. In Jobs,
-select a job with Up/Down or the mouse. Available controls depend on its state:
+Conflicts compare Incoming with Existing and default to Skip. Newer replaces
+Existing only when Incoming has a later modified time. `A Apply to all` toggles
+whether the next chosen action also applies to matching conflicts in this job;
+`Esc` cancels the job. Unavailable choices stay disabled. Enlarge the terminal
+if the comparison cannot fit before replacing. Directories merge. In Jobs,
+select a job with Up/Down or the mouse. Jobs opens with a compact summary;
+`E` toggles full evidence, including recorded errors and individual Trash receipts.
+Failed operations show a reason in the status line. Jobs Summary groups repeated
+failure reasons with affected counts and keeps mixed outcomes visible.
+The viewport stays fixed while you select jobs or toggle evidence.
+At small terminal sizes, the Jobs footer lists eligible shortcuts when their
+buttons cannot fit; safety warnings take priority.
+Available controls depend on the job state:
 `C` requests cancellation, `R` retries incomplete work from scratch, and `X`
 rechecks an unknown outcome with retained evidence. Completed entries stay
 excluded from retries. PgUp/PgDown or the mouse wheel scroll details; results
@@ -169,6 +183,9 @@ Press `c` in a metadata view for an on-demand directory count and size. In the
 **sidebar**, Esc cancels an active count but does not close the sidebar. In the
 **popup**, Esc cancels the count or closes the popup.
 Counts are on-demand snapshots; press `c` again to update them.
+The floating popup keeps keyboard and mouse focus until you close it; pane
+selection and file-operation shortcuts stay inactive behind it. Its fixed
+**Esc Close** control remains available while the fields scroll.
 
 ## Saving and restoring sessions
 
@@ -242,23 +259,6 @@ diagnostics when needed.
 
 `tfm` is licensed under [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE).
 
-### Linux filesystem notification licence
-
-The `inotify` and `inotify-sys` dependencies carry this ISC notice, retained here
-for binary archives:
-
-```text
-Copyright (c) Hanno Braun and contributors
-
-Permission to use, copy, modify, and/or distribute this software for any purpose
-with or without fee is hereby granted, provided that the above copyright notice
-and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
-FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
-OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
-THIS SOFTWARE.
-```
+The Linux `inotify` and `inotify-sys` dependencies use ISC. See
+[third-party notices](THIRD_PARTY_NOTICES.md) for their terms and other non-base
+licences. Binary archives include this notices file alongside both TFM licences.

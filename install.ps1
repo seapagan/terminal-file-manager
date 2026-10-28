@@ -214,7 +214,7 @@ function Assert-Checksum([string]$Archive, [string]$Sidecar) {
 }
 
 function Assert-ZipMembers([object]$Zip) {
-    $allowed = @('tfm.exe', 'LICENSE-MIT', 'LICENSE-APACHE', 'README.md')
+    $allowed = @('tfm.exe', 'LICENSE-MIT', 'LICENSE-APACHE', 'THIRD_PARTY_NOTICES.md', 'README.md')
     $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach ($entry in $Zip.Entries) {
         if (-not ($allowed -ccontains $entry.FullName) -or -not $seen.Add($entry.FullName)) {
@@ -225,7 +225,7 @@ function Assert-ZipMembers([object]$Zip) {
         if ($unixType -notin 0, 32768 -or $windowsType) { Die -Message 'unsafe archive member types' }
     }
     if (-not $seen.Contains('tfm.exe')) { Die -Message 'release archive is missing tfm.exe' }
-    if ($seen.Count -ne 4) { Die -Message 'unsafe archive members' }
+    if ($seen.Count -ne 5) { Die -Message 'unsafe archive members' }
 }
 
 function Expand-SafeArchive([string]$Archive, [string]$Destination) {

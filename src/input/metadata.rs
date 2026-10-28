@@ -24,6 +24,19 @@ impl Controller {
             .sync_metadata_views(self.app.sidebar_visible(geometry.footer.width));
     }
 
+    pub(super) fn preferred_action(&self, action: Action) -> Action {
+        if action != Action::Info {
+            return action;
+        }
+        if self.app.popup {
+            return Action::Metadata;
+        }
+        match self.preferences.metadata_presentation {
+            crate::settings::MetadataPresentation::Sidebar => Action::ToggleSidebar,
+            crate::settings::MetadataPresentation::Popup => Action::Metadata,
+        }
+    }
+
     /// Keyboard and clickable controls share this dispatcher and availability policy.
     pub fn dispatch(&mut self, action: Action, geometry: &Geometry) -> Vec<Request> {
         self.sync_metadata(geometry);
@@ -31,4 +44,29 @@ impl Controller {
         self.sync_metadata(geometry);
         requests
     }
+}
+
+/// The floating metadata surface owns focus; only its controls and global exit remain active.
+pub(super) fn accepts(action: Action) -> bool {
+    matches!(
+        action,
+        Action::Up
+            | Action::Down
+            | Action::Home
+            | Action::End
+            | Action::PageUp
+            | Action::PageDown
+            | Action::Count
+            | Action::Cancel
+            | Action::Metadata
+            | Action::Info
+            | Action::Help
+            | Action::Quit
+            | Action::SaveQuit
+            | Action::Permissions
+            | Action::OwnerDisplay
+            | Action::FuzzyTimestamps
+            | Action::MetadataPresentation
+            | Action::Diagnostics
+    )
 }

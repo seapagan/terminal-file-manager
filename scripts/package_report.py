@@ -53,9 +53,9 @@ class ArchiveError(Exception):
 
 
 def distribution_path(path: str) -> bool:
-    """Identify tracked source files and intended root Rust integration tests."""
+    """Identify tracked source files and Rust integration tests at any depth."""
     return path.startswith("src/") or (
-        path.startswith("tests/") and path.count("/") == 1 and path.endswith(".rs")
+        path.startswith("tests/") and path.endswith(".rs")
     )
 
 
@@ -67,7 +67,11 @@ def forbidden_member(path: str, files: set[str], required: tuple[str, ...]) -> b
         return True
     if path in files:
         return path not in required
-    return not (path in {"src", "tests"} or path.startswith("src/"))
+    return not (
+        path == "src"
+        or path.startswith("src/")
+        or any(name.startswith(f"{path}/") for name in required)
+    )
 
 
 def tracked_distribution_path(entry: bytes) -> str:
@@ -104,7 +108,7 @@ def repository_distribution_paths(repository: Path) -> tuple[str, ...]:
         "-z",
         "--",
         "src",
-        ":(glob)tests/*.rs",
+        ":(glob)tests/**/*.rs",
     )
     try:
         # Controlled Git argv, no shell; reads the caller-selected repository index.

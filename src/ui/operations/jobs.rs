@@ -37,6 +37,7 @@ pub(super) fn controls(app: &App, area: Rect) -> Vec<OperationControl> {
             ),
             target: OperationTarget::Job(index),
             label: "",
+            enabled: true,
         })
         .collect()
 }
@@ -60,7 +61,7 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
                     },
                     job.id,
                     content::operation(job.plan.operation),
-                    state(job.state)
+                    phase(job)
                 ),
                 theme.style(if index == app.operations.cursor {
                     Role::Cursor
@@ -91,10 +92,16 @@ pub(super) fn details(app: &App) -> Vec<Row> {
             "Job {}: {} · {}",
             job.id,
             content::operation(job.plan.operation),
-            state(job.state)
+            phase(job)
         ),
         state_role(job.state),
     ));
+    if job.active() && job.record.is_some() {
+        rows.push(Row::styled(
+            "Previous result — retained during reconciliation",
+            Role::Warning,
+        ));
+    }
     rows.push(Row::plain(crate::operations::summary(job)));
     rows.extend(route(app, job));
     if let Some(Event::Progress {
@@ -112,10 +119,32 @@ pub(super) fn details(app: &App) -> Vec<Row> {
     }
     rows.extend(disabled(job));
     if let Some(record) = &job.record {
-        rows.push(Row::plain(format!("Observed bytes: {}", record.bytes())));
-        for entry in &record.entries {
-            rows.extend(result(entry));
-        }
+        rows.extend(results(record, &job.plan.operands));
+    }
+    rows
+}
+
+fn results(record: &crate::operations::Record, operands: &[crate::fs::Entry]) -> Vec<Row> {
+    let mut rows = Vec::new();
+    rows.push(Row::plain(format!("Observed bytes: {}", record.bytes())));
+    let root =
+        crate::ui::modal::common_root(record.entries.iter().map(|entry| entry.source.as_path()));
+    if let Some(root) = &root {
+        rows.push(Row::styled(
+            format!("Results from: {}", root.display()),
+            Role::Label,
+        ));
+    }
+    let operands: std::collections::HashMap<_, _> = operands
+        .iter()
+        .map(|entry| (entry.path.as_path(), entry))
+        .collect();
+    for entry in &record.entries {
+        rows.extend(result(
+            entry,
+            root.as_deref(),
+            operands.get(entry.source.as_path()).copied(),
+        ));
     }
     rows
 }
@@ -133,13 +162,17 @@ fn route(app: &App, job: &Job) -> Vec<Row> {
     if let Some(id) = job.retry_of {
         rows.push(Row::plain(format!("Retry of job {id}")));
     }
-    for source in &job.plan.operands {
-        rows.push(Row::plain(format!("Source: {}", source.path.display())));
+    rows.extend(content::sources(&job.plan.operands));
+    for operand in &job.plan.operands {
+        rows.push(Row::plain(format!(
+            "Planned source: {}",
+            native_path(&operand.path)
+        )));
     }
     if let Some(destination) = &job.plan.destination {
         rows.push(Row::plain(format!(
             "Destination: {}",
-            destination.display()
+            native_path(destination)
         )));
     }
     rows
@@ -173,21 +206,31 @@ fn disabled(job: &Job) -> Vec<Row> {
     Vec::new()
 }
 
-fn result(entry: &crate::operations::EntryResult) -> Vec<Row> {
+fn result(
+    entry: &crate::operations::EntryResult,
+    root: Option<&std::path::Path>,
+    operand: Option<&crate::fs::Entry>,
+) -> Vec<Row> {
     let role = match entry.outcome {
         Outcome::SafetyIncident | Outcome::Failed => Role::Error,
         Outcome::Changed | Outcome::OutcomeUnknown | Outcome::CopiedSourceRetained => Role::Warning,
         Outcome::Completed => Role::Status,
         _ => Role::Value,
     };
-    let mut rows = vec![Row::styled(
-        format!("{}: {}", outcome(entry.outcome), entry.source.display()),
-        role,
-    )];
+    let source = root
+        .and_then(|root| entry.source.strip_prefix(root).ok())
+        .unwrap_or(&entry.source);
+    let mut heading = result_heading(entry, source, operand);
+    heading.role = role;
+    let mut rows = vec![heading, Row::styled(outcome(entry.outcome), role)];
+    rows.push(Row::plain(format!(
+        "  Source: {}",
+        native_path(&entry.source)
+    )));
     if let Some(destination) = &entry.destination {
         rows.push(Row::plain(format!(
             "  Destination: {}",
-            destination.display()
+            native_path(destination)
         )));
     }
     rows.push(Row::plain(format!("  {}", entry.detail)));
@@ -200,24 +243,58 @@ fn result(entry: &crate::operations::EntryResult) -> Vec<Row> {
         .and_then(|evidence| evidence.staging_path())
     {
         rows.push(Row::styled(
-            format!("  Owned staging checkpoint: {}", path.display()),
+            format!("  Owned staging checkpoint: {}", native_path(path)),
             Role::Warning,
         ));
     }
     if let Some(trash) = &entry.trash {
-        rows.push(Row::plain(format!("  {}", trash.receipt.description())));
-        rows.push(Row::plain(format!("  Validated inventory: {} files, {} directories (not individual Trash acknowledgments)", trash.validated_files, trash.validated_directories)));
-        if let crate::operations::trash::Receipt::Linux(receipt) = &trash.receipt {
-            rows.push(Row::plain(format!(
-                "  Recovery metadata: {}",
-                receipt.info.display()
-            )));
-        }
+        rows.extend(trash_evidence(trash));
     }
     rows
 }
 
-fn state(state: JobState) -> &'static str {
+fn result_heading(
+    entry: &crate::operations::EntryResult,
+    source: &std::path::Path,
+    operand: Option<&crate::fs::Entry>,
+) -> Row {
+    let mut heading = operand.map_or_else(
+        || {
+            Row::file(
+                format!(
+                    "{}  {}{}",
+                    super::super::listing::type_indicator(entry.kind, false, false),
+                    source.display(),
+                    if entry.kind == crate::fs::EntryKind::Directory {
+                        "/"
+                    } else {
+                        ""
+                    }
+                ),
+                if entry.kind == crate::fs::EntryKind::File {
+                    crate::ui::modal::file_size(Some(entry.bytes))
+                } else {
+                    "—".into()
+                },
+            )
+        },
+        |operand| crate::ui::modal::entry_row(operand, source),
+    );
+    if entry.kind == crate::fs::EntryKind::File {
+        heading.trailing = Some(crate::ui::modal::file_size(Some(entry.bytes)));
+    }
+    heading
+}
+
+pub(super) fn phase(job: &Job) -> String {
+    if job.active() && job.record.is_some() {
+        format!("Reconciliation · {}", state(job.state))
+    } else {
+        state(job.state).into()
+    }
+}
+
+pub(super) fn state(state: JobState) -> &'static str {
     match state {
         JobState::Queued => "Queued",
         JobState::Running => "Running",
@@ -231,7 +308,7 @@ fn state(state: JobState) -> &'static str {
     }
 }
 
-fn state_role(state: JobState) -> Role {
+pub(super) fn state_role(state: JobState) -> Role {
     match state {
         JobState::Critical | JobState::Failed => Role::Error,
         JobState::Partial | JobState::Unknown => Role::Warning,
@@ -240,7 +317,7 @@ fn state_role(state: JobState) -> Role {
     }
 }
 
-fn outcome(outcome: Outcome) -> &'static str {
+pub(super) fn outcome(outcome: Outcome) -> &'static str {
     match outcome {
         Outcome::Completed => "Completed",
         Outcome::Skipped => "Skipped",
@@ -253,11 +330,80 @@ fn outcome(outcome: Outcome) -> &'static str {
     }
 }
 
-fn stage_name(stage: Stage) -> &'static str {
+pub(super) fn stage_name(stage: Stage) -> &'static str {
     match stage {
         Stage::Reading => "Reading",
         Stage::Verified => "Verified",
         Stage::Committed => "Committed",
         Stage::Removing => "Removing source",
     }
+}
+
+fn native_path(path: &std::path::Path) -> String {
+    path.to_str().map_or_else(
+        || format!("{:?} (escaped native path)", path.as_os_str()),
+        str::to_owned,
+    )
+}
+
+fn trash_evidence(trash: &crate::operations::TrashResult) -> Vec<Row> {
+    let mut rows = Vec::new();
+    rows.push(Row::plain(format!("  {}", trash.receipt.description())));
+    rows.push(Row::plain(format!(
+        "  Validated inventory: {} files, {} directories (not individual Trash acknowledgments)",
+        trash.validated_files, trash.validated_directories
+    )));
+    use crate::operations::trash::Receipt;
+    match &trash.receipt {
+        Receipt::Linux(receipt) => {
+            rows.push(Row::plain(format!(
+                "  Native Trash target: {}",
+                native_path(&receipt.path)
+            )));
+            rows.push(Row::plain(format!(
+                "  Recovery metadata: {}",
+                native_path(&receipt.info)
+            )));
+        }
+        Receipt::Mac { path: Some(path) } => {
+            rows.push(Row::plain(format!(
+                "  Native Trash target: {}",
+                native_path(path)
+            )));
+        }
+        Receipt::Windows {
+            parsing_name,
+            metadata,
+        } => {
+            rows.extend(windows_receipt(parsing_name.as_deref(), metadata));
+        }
+        Receipt::Mac { path: None } => {}
+    }
+    rows
+}
+
+fn windows_receipt(
+    parsing_name: Option<&[u16]>,
+    metadata: &crate::operations::trash::ShellMetadata,
+) -> Vec<Row> {
+    let mut rows = Vec::new();
+    for (label, value) in [
+        ("Shell parsing name", parsing_name),
+        ("Display name", metadata.display_name.as_deref()),
+        ("Deleted from", metadata.deleted_from.as_deref()),
+    ] {
+        if let Some(value) = value {
+            rows.push(Row::plain(format!(
+                "  {label}: {}",
+                String::from_utf16_lossy(value)
+            )));
+            rows.push(Row::plain(format!("  {label} (exact UTF-16): {value:?}")));
+        }
+    }
+    if let Some(time) = metadata.deletion_time {
+        rows.push(Row::plain(format!(
+            "  Deletion time (FILETIME ticks): {time}"
+        )));
+    }
+    rows
 }

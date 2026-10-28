@@ -109,6 +109,38 @@ fn preferred_metadata_presentation_keeps_both_direct_shortcuts() {
 }
 
 #[test]
+fn floating_metadata_close_keys_preserve_sidebar_and_modal_focus() {
+    use terminal_file_manager::settings::MetadataPresentation;
+    for preference in [MetadataPresentation::Sidebar, MetadataPresentation::Popup] {
+        for sidebar in [false, true] {
+            for close in ["F2", "Alt+Enter", "Esc"] {
+                let (_root, mut c) = controller();
+                c.preferences.metadata_presentation = preference;
+                c.app.sidebar = sidebar;
+                c.app.panes[0].sidebar = sidebar;
+                key(&mut c, "Alt+Enter");
+                assert!(c.app.popup);
+                let cursor = c.app.panes[0].cursor.clone();
+                for blocked in ["Tab", "Space", "F5", "F8", "Alt+i"] {
+                    key(&mut c, blocked);
+                    assert!(c.app.popup);
+                    assert_eq!(c.app.active, 0);
+                    assert_eq!(c.app.panes[0].cursor, cursor);
+                    assert!(c.app.panes[0].marks.is_empty());
+                    assert!(c.app.operations.dialog.is_none());
+                    assert!(c.app.operations.outbox.is_empty());
+                }
+                key(&mut c, close);
+                assert!(!c.app.popup, "{preference:?}: {close}");
+                assert_eq!(c.app.sidebar, sidebar);
+                assert_eq!(c.app.panes[0].sidebar, sidebar);
+                assert!(!c.preferences_changed);
+            }
+        }
+    }
+}
+
+#[test]
 fn help_lists_effective_bindings_and_centres_the_action_table() {
     use colored_text::ColorLevel;
     use ratatui::{Terminal, backend::TestBackend};

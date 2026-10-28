@@ -466,3 +466,6 @@ fn delete_retry_cannot_preview_or_authorize_a_replaced_original_root() {
         b"unfinished bytes"
     );
 }
+
+#[path = "reconciliation_summary_tests.rs"]
+mod reconciliation_summary_tests;

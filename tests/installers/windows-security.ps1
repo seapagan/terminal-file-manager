@@ -55,7 +55,7 @@ function Assert-InstallRejectionOrder {
     $release = Join-Path -Path $mirror -ChildPath 'download/v1.2.3'
     New-Item -ItemType Directory -Path $release -Force | Out-Null
     $archive = Join-Path -Path $release -ChildPath 'terminal-file-manager-v1.2.3-x86_64-pc-windows-msvc.zip'
-    $fixture = Build-MemberZip -Names @('tfm.exe', 'LICENSE-MIT', 'LICENSE-APACHE', 'README.md')
+    $fixture = Build-MemberZip -Names @('tfm.exe', 'LICENSE-MIT', 'LICENSE-APACHE', 'THIRD_PARTY_NOTICES.md', 'README.md')
     [IO.File]::Copy($fixture, $archive)
     $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
     $savedBase = $script:ReleasesBase
@@ -153,7 +153,7 @@ public static class TfmTlsFixture {
     $errorMessage = ''
     try { & $tlsAction } catch { $errorMessage = $_.Exception.InnerException.Message }
     Assert-Equal -Actual $errorMessage -Expected 'unrelated TLS error' -Reason 'unrelated TLS error swallowed'
-    $members = @('tfm.exe', 'LICENSE-MIT', 'LICENSE-APACHE', 'README.md')
+    $members = @('tfm.exe', 'LICENSE-MIT', 'LICENSE-APACHE', 'THIRD_PARTY_NOTICES.md', 'README.md')
     $archive = Build-MemberZip -Names $members
     $hash = (Get-FileHash -Path $archive -Algorithm SHA256).Hash
     $basename = [IO.Path]::GetFileName($archive)
@@ -175,7 +175,7 @@ public static class TfmTlsFixture {
     $outside = Join-Path -Path $securityRoot -ChildPath 'outside'
     [IO.File]::WriteAllText($outside, 'outside sentinel')
     foreach ($bad in @('extra', '../outside', '/outside', 'nested/tfm.exe', './tfm.exe',
-        'tfm.exe', 'TFM.EXE', 'tfm.exe:stream', 'tfm.exe.', '\outside', 'C:\outside', '\\server\share')) {
+        'tfm.exe', 'THIRD_PARTY_NOTICES.md', 'TFM.EXE', 'tfm.exe:stream', 'tfm.exe.', '\outside', 'C:\outside', '\\server\share')) {
         $archive = Build-MemberZip -Names ($members + $bad)
         $extracted = Join-Path -Path $securityRoot -ChildPath ([IO.Path]::GetRandomFileName())
         # Malicious archives have valid checksums; integrity is not structure.
@@ -190,6 +190,9 @@ public static class TfmTlsFixture {
         $archive = Build-MemberZip -Names $members -Attributes $attributes
         Assert-Rejected -Action { Expand-SafeArchive -Archive $archive -Destination (Join-Path -Path $securityRoot -ChildPath 'types') } -Reason 'archive type' -Expected 'unsafe archive member types'
     }
+    $renamed = @($members | ForEach-Object { if ($_ -eq 'THIRD_PARTY_NOTICES.md') { 'NOTICES.md' } else { $_ } })
+    $archive = Build-MemberZip -Names $renamed
+    Assert-Rejected -Action { Expand-SafeArchive -Archive $archive -Destination (Join-Path -Path $securityRoot -ChildPath 'renamed') } -Reason 'renamed notices' -Expected 'unsafe archive members'
     foreach ($omitted in $members) {
         $archive = Build-MemberZip -Names @($members | Where-Object -FilterScript { $_ -ne $omitted })
         Assert-Rejected -Action { Expand-SafeArchive -Archive $archive -Destination (Join-Path -Path $securityRoot -ChildPath 'missing') } -Reason 'missing member' -Expected 'unsafe archive members|release archive is missing tfm.exe'
