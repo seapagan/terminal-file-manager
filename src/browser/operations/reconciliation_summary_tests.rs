@@ -151,7 +151,13 @@ fn assert_final_reconciliation(
     payload: &Path,
 ) {
     let job = &controller.app.operations.history[0];
-    assert_eq!(job.state, JobState::Failed);
+    assert_eq!(
+        job.state,
+        JobState::Failed,
+        "Final record (including expected recovery identities and parent guards): {:#?}\nObserved identities: {:#?}",
+        job.record,
+        reconciliation_observations(root.path(), payload),
+    );
     assert!(!job.record.as_ref().unwrap().unresolved());
     assert!(job.can_retry());
     let text = draw(controller);
@@ -173,6 +179,20 @@ fn assert_final_reconciliation(
         fs::read(root.path().join("foreign-preserved")).unwrap(),
         b"foreign payload"
     );
+}
+
+fn reconciliation_observations(
+    root: &Path,
+    payload: &Path,
+) -> Vec<(std::path::PathBuf, crate::fs::Entry)> {
+    // Inspect only this fixture and the ancestors its recovery guards already validate.
+    std::iter::once(root.join("source"))
+        .chain(payload.ancestors().map(Path::to_owned))
+        .map(|path| {
+            let observed = fs::canonicalize(&path).unwrap_or(path.clone());
+            (path, crate::fs::inspect(&observed))
+        })
+        .collect()
 }
 
 fn draw(controller: &Controller) -> String {
