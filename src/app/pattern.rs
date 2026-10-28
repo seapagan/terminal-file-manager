@@ -225,27 +225,36 @@ impl PatternSelection {
         pane.reset_range();
         pane.selection_revision = pane.selection_revision.wrapping_add(1);
         for i in &pane.visible {
-            let entry = &pane.entries[*i];
-            let Some(identity) = self.scope.get(&entry.path) else {
-                continue;
-            };
-            let matched = matcher.is_match(entry.name.as_encoded_bytes());
-            match operation {
-                PatternOperation::Mark | PatternOperation::Replace if matched => {
-                    pane.marks
-                        .entry(entry.path.clone())
-                        .or_insert_with(|| identity.clone());
-                }
-                PatternOperation::Replace => {
-                    pane.marks.remove(&entry.path);
-                }
-                PatternOperation::Unmark if matched => {
-                    pane.marks.remove(&entry.path);
-                }
-                _ => {}
-            }
+            self.apply_entry(&pane.entries[*i], &mut pane.marks, matcher, operation);
         }
         Ok(preview)
+    }
+
+    fn apply_entry(
+        &self,
+        entry: &crate::fs::Entry,
+        marks: &mut HashMap<PathBuf, Identity>,
+        matcher: &regex::bytes::Regex,
+        operation: PatternOperation,
+    ) {
+        let Some(identity) = self.scope.get(&entry.path) else {
+            return;
+        };
+        let matched = matcher.is_match(entry.name.as_encoded_bytes());
+        match operation {
+            PatternOperation::Mark | PatternOperation::Replace if matched => {
+                marks
+                    .entry(entry.path.clone())
+                    .or_insert_with(|| identity.clone());
+            }
+            PatternOperation::Replace => {
+                marks.remove(&entry.path);
+            }
+            PatternOperation::Unmark if matched => {
+                marks.remove(&entry.path);
+            }
+            _ => {}
+        }
     }
 }
 

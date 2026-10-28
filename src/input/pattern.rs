@@ -21,12 +21,7 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
     }
     if controller.app.operations.dialog.is_some() || !controller.app.operations.conflicts.is_empty()
     {
-        controller.app.pattern = None;
-        if let Event::Resize(width, height) = event {
-            super::scroll::resize(controller, *width, *height);
-        }
-        // The event belonged to the pattern layer, never to a newly arrived approval.
-        return !interrupt(event);
+        return dismiss_for_priority(controller, event);
     }
     if interrupt(event) {
         controller.app.pattern = None;
@@ -44,6 +39,15 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
     true
 }
 
+fn dismiss_for_priority(controller: &mut Controller, event: &Event) -> bool {
+    controller.app.pattern = None;
+    if let Event::Resize(width, height) = event {
+        super::scroll::resize(controller, *width, *height);
+    }
+    // The event belonged to the pattern layer, never to a newly arrived approval.
+    !interrupt(event)
+}
+
 fn key_input(controller: &mut Controller, key: KeyEvent, geometry: &Geometry) {
     if ignored_key(key) {
         return;
@@ -59,6 +63,10 @@ fn key_input(controller: &mut Controller, key: KeyEvent, geometry: &Geometry) {
     if shortcut(controller, key, layout) || key.modifiers.contains(KeyModifiers::ALT) {
         return;
     }
+    route_key(controller, key, layout);
+}
+
+fn route_key(controller: &mut Controller, key: KeyEvent, layout: &crate::ui::PatternLayout) {
     match key.code {
         KeyCode::Tab | KeyCode::BackTab if key.kind == KeyEventKind::Press => {
             advance_focus(controller, key, layout)
