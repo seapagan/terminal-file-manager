@@ -208,8 +208,8 @@ workflow security and package checks remain ordinary CI responsibilities.
 
 Release archives are named `terminal-file-manager-vX.Y.Z-<target>.tar.gz` on
 Unix and `.zip` on Windows, each with an exact-name `.sha256` sidecar. Each
-archive contains four root-level regular files: `tfm` (or `tfm.exe`),
-`LICENSE-MIT`, `LICENSE-APACHE` and `README.md`.
+archive contains five root-level regular files: `tfm` (or `tfm.exe`),
+`LICENSE-MIT`, `LICENSE-APACHE`, `THIRD_PARTY_NOTICES.md` and `README.md`.
 
 The nonpublishing eight-target release rehearsal is **manual-only**. It checks
 binary architecture and ABI requirements, checksums, archive contents and

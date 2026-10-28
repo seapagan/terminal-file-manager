@@ -31,9 +31,14 @@ class TfmPackageTests(unittest.TestCase):
         write_archive(self.archive, self.required if files is None else files)
         return report.analyse_archive(self.archive, repository=self.repository)
 
-    def test_both_licenses_and_readme_are_required(self) -> None:
-        """Require both full licences and the public README."""
-        for required in ("LICENSE-APACHE", "LICENSE-MIT", "README.md"):
+    def test_licenses_notices_and_readme_are_required(self) -> None:
+        """Require both full licences, third-party notices and the public README."""
+        for required in (
+            "LICENSE-APACHE",
+            "LICENSE-MIT",
+            "THIRD_PARTY_NOTICES.md",
+            "README.md",
+        ):
             with self.subTest(required=required):
                 files = tuple(path for path in self.required if path != required)
                 self.assertEqual(self.analyse(files).missing_paths, (required,))

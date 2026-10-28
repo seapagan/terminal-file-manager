@@ -915,7 +915,8 @@ evidence. Hosted/native results are not implied by configuration files.
   fixtures from real native binary successes. Use platform-native fixture hashes;
   reject checksum errors before extraction, header inspection or execution.
 - Require stable tags, HTTPS remote transport, exact one-record/two-field/name
-  sidecars and exactly four root-level regular archive members. Reject unsafe
+  sidecars and exactly five root-level regular archive members (including
+  `THIRD_PARTY_NOTICES.md`). Reject unsafe
   names, duplicates, links and special types before extracting into owned staging.
 - Validate native executable architecture with bounded reads, then require exact
   successful `tfm --version`. Per the revised C2 decision, this is synchronous

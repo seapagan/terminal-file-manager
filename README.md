@@ -259,23 +259,6 @@ diagnostics when needed.
 
 `tfm` is licensed under [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE).
 
-### Linux filesystem notification licence
-
-The `inotify` and `inotify-sys` dependencies carry this ISC notice, retained here
-for binary archives:
-
-```text
-Copyright (c) Hanno Braun and contributors
-
-Permission to use, copy, modify, and/or distribute this software for any purpose
-with or without fee is hereby granted, provided that the above copyright notice
-and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
-FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
-OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
-THIS SOFTWARE.
-```
+The Linux `inotify` and `inotify-sys` dependencies use ISC. See
+[third-party notices](THIRD_PARTY_NOTICES.md) for their terms and other non-base
+licences. Binary archives include this notices file alongside both TFM licences.

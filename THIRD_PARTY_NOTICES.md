@@ -1,14 +1,15 @@
 # Third-party notices
 
-These notices retain dependency licence terms outside MIT and Apache-2.0 in
-TFM's resolved graph.
+These notices retain non-base third-party licence terms used by applicable
+TFM dependencies, outside TFM's MIT and Apache-2.0 licences.
 
-## Filesystem notifications
+## CC0-1.0
 
-Linux/macOS use `notify` (CC0-1.0) and `notify-types` (MIT OR Apache-2.0).
-Windows builds do not include them. They do not change TFM's own licence.
-Linux uses `inotify` and `inotify-sys`, which share the following ISC notice, also retained in
-README for binary archives:
+`notify` uses CC0-1.0. Attribution: the Notify contributors.
+
+## ISC
+
+`inotify` and `inotify-sys` share the following notice.
 
 ```text
 Copyright (c) Hanno Braun and contributors
@@ -26,31 +27,9 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ```
 
-## foldhash (Zlib)
+## Unicode-3.0
 
-```text
-Copyright (c) 2024 Orson Peters
-
-This software is provided 'as-is', without any express or implied warranty. In
-no event will the authors be held liable for any damages arising from the use of
-this software.
-
-Permission is granted to anyone to use this software for any purpose, including
-commercial applications, and to alter it and redistribute it freely, subject to
-the following restrictions:
-
-1. The origin of this software must not be misrepresented; you must not claim
-    that you wrote the original software. If you use this software in a product,
-    an acknowledgment in the product documentation would be appreciated but is
-    not required.
-
-2. Altered source versions must be plainly marked as such, and must not be
-    misrepresented as being the original software.
-
-3. This notice may not be removed or altered from any source distribution.
-```
-
-## unicode-ident (Unicode-3.0)
+`unicode-ident` includes the following Unicode terms.
 
 ```text
 UNICODE LICENSE V3
@@ -92,4 +71,30 @@ Except as contained in this notice, the name of a copyright holder shall
 not be used in advertising or otherwise to promote the sale, use or other
 dealings in these Data Files or Software without prior written
 authorization of the copyright holder.
+```
+
+## Zlib
+
+`foldhash` uses the following notice.
+
+```text
+Copyright (c) 2024 Orson Peters
+
+This software is provided 'as-is', without any express or implied warranty. In
+no event will the authors be held liable for any damages arising from the use of
+this software.
+
+Permission is granted to anyone to use this software for any purpose, including
+commercial applications, and to alter it and redistribute it freely, subject to
+the following restrictions:
+
+1. The origin of this software must not be misrepresented; you must not claim
+    that you wrote the original software. If you use this software in a product,
+    an acknowledgment in the product documentation would be appreciated but is
+    not required.
+
+2. Altered source versions must be plainly marked as such, and must not be
+    misrepresented as being the original software.
+
+3. This notice may not be removed or altered from any source distribution.
 ```

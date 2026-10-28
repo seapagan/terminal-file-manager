@@ -211,12 +211,12 @@ inspect_archive() {
     grep -Fxq tfm "$tmp_dir/names" || die 'release archive is missing tfm'
     awk '
         $0 != "tfm" && $0 != "LICENSE-MIT" && $0 != "LICENSE-APACHE" &&
-            $0 != "README.md" { bad = 1 }
+            $0 != "THIRD_PARTY_NOTICES.md" && $0 != "README.md" { bad = 1 }
         { if (seen[$0]++) bad = 1 }
-        END { exit !(NR == 4 && !bad) }
+        END { exit !(NR == 5 && !bad) }
     ' "$tmp_dir/names" || die 'unsafe archive members'
     awk 'substr($0, 1, 1) != "-" { bad = 1 }
-        END { exit !(NR == 4 && !bad) }' "$tmp_dir/types" ||
+        END { exit !(NR == 5 && !bad) }' "$tmp_dir/types" ||
         die 'unsafe archive member types'
 }
 

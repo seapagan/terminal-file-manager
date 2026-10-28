@@ -32,13 +32,13 @@ cp "$repo/install.sh" "$root/"
 cp "$repo/.github/workflows/release-rehearsal.yml" "$root/.github/workflows/"
 cp "$binary" "$root/target/$TARGET/release/tfm"
 install -m 755 "$binary" "$root/stage/tfm"
-cp "$repo/LICENSE-MIT" "$repo/LICENSE-APACHE" "$repo/README.md" "$root/stage/"
+cp "$repo/LICENSE-MIT" "$repo/LICENSE-APACHE" "$repo/README.md" "$repo/THIRD_PARTY_NOTICES.md" "$root/stage/"
 sed -n '/name: Install actual Unix release archive offline/,/name: Install actual Windows release archive (PowerShell 7)/p' \
     "$repo/.github/workflows/release-rehearsal.yml" |
     sed '1,/run: |/d; $d; s/^          //' >"$root/check.sh"
 test -s "$root/check.sh"
 cd "$root"
-tar -czf "$ARCHIVE_NAME" -C stage tfm LICENSE-MIT LICENSE-APACHE README.md
+tar -czf "$ARCHIVE_NAME" -C stage tfm LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md README.md
 case "$(uname -s)" in
     Linux) sha256sum "$ARCHIVE_NAME" >"$ARCHIVE_NAME.sha256" ;;
     Darwin) shasum -a 256 "$ARCHIVE_NAME" >"$ARCHIVE_NAME.sha256" ;;
