@@ -156,22 +156,20 @@ pub(super) fn reject_overlap(source: &Entry, destination: &Path) -> Result<()> {
     let source_path = super::locks::namespace(&source.path)?;
     let destination_path = super::locks::namespace(destination)?;
     if source_path == destination_path {
-        return Err(invalid(if source.path != destination {
-            "Source and destination refer to the same item."
-        } else if source.may_recurse() {
-            "Source and destination are the same folder."
-        } else {
-            "Source and destination are the same."
-        })
-        .into());
+        let reason = match (source.path == destination, source.may_recurse()) {
+            (false, _) => "Source and destination refer to the same item.",
+            (true, true) => "Source and destination are the same folder.",
+            (true, false) => "Source and destination are the same.",
+        };
+        return Err(invalid(reason).into());
     }
     if source.may_recurse() && destination_path.starts_with(&source_path) {
         return Err(invalid("Destination is inside the source folder.").into());
     }
+    let source_object = source.identity.as_ref().and_then(|id| id.object);
     if let Some(target) = existing(destination)?
-        && source.identity.as_ref().and_then(|id| id.object).is_some()
-        && source.identity.as_ref().and_then(|id| id.object)
-            == target.identity.as_ref().and_then(|id| id.object)
+        && source_object
+            .is_some_and(|object| target.identity.as_ref().and_then(|id| id.object) == Some(object))
     {
         return Err(invalid("Source and destination refer to the same item.").into());
     }
@@ -263,6 +261,26 @@ mod tests {
         let error = opened_object(&expected, &fs::File::open(other).unwrap()).unwrap_err();
         assert_eq!(error.outcome, Outcome::Changed);
         assert_eq!(fs::read(path).unwrap(), b"same");
+    }
+
+    #[test]
+    fn missing_native_identity_never_invents_an_alias_or_bypasses_namespace_checks() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("source");
+        let other = root.path().join("other");
+        fs::write(&path, "owned").unwrap();
+        fs::write(&other, "separate").unwrap();
+        let mut source = crate::fs::inspect(&path);
+        source.identity.as_mut().unwrap().object = None;
+        for identity in [source.identity.clone(), None] {
+            source.identity = identity;
+            reject_overlap(&source, &other).unwrap();
+            let failure = reject_overlap(&source, &path).unwrap_err();
+            assert_eq!(failure.outcome, Outcome::Failed);
+            assert_eq!(failure.detail, "Source and destination are the same.");
+        }
+        assert_eq!(fs::read(path).unwrap(), b"owned");
+        assert_eq!(fs::read(other).unwrap(), b"separate");
     }
 
     #[test]
