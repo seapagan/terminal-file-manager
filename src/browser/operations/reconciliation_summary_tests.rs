@@ -3,9 +3,28 @@ use crate::{color::Theme, operations::QueueTestDriver};
 use colored_text::ColorLevel;
 use ratatui::{Terminal, backend::TestBackend};
 
+fn controlled_source_plan(root: &Path) -> Plan {
+    let source = root.join("source");
+    let modified = std::time::UNIX_EPOCH + Duration::from_secs(2_000_000_000);
+    // Avoid APFS changing the staged payload's birth time when restoring its mtime.
+    fs::OpenOptions::new()
+        .write(true)
+        .open(&source)
+        .unwrap()
+        .set_modified(modified)
+        .unwrap();
+    let plan = Plan::paths(Operation::Copy, vec![source], Some(root.join("target"))).unwrap();
+    assert_eq!(
+        plan.operands[0].identity.as_ref().unwrap().modified,
+        Some(modified)
+    );
+    plan
+}
+
 #[test]
 fn queued_and_running_reconciliation_distinguishes_previous_results_until_finish() {
-    let (root, mut controller, _unused_queue, mut plan) = fixture();
+    let (root, mut controller, _unused_queue, _original_plan) = fixture();
+    let mut plan = controlled_source_plan(root.path());
     let target = root
         .path()
         .join("diagnostic-界e\u{301}".repeat(6))
