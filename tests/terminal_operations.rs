@@ -205,11 +205,12 @@ fn same_folder_batch_failure_explains_the_reason_before_evidence_in_a_real_termi
         for name in ["first-owned", "second-owned"] {
             fs::write(root.path().join(name), "retained").unwrap();
         }
-        let keys = format!("\x01{shortcut}");
+        // Only the active pane is visible; a filename cannot signal readiness of Pane 2.
         drive(
-            command(root.path(), root.path(), Some(root.path())),
+            command(root.path(), root.path(), None),
             &[
-                ("second-owned", &keys),
+                ("second-owned", "\x01"),
+                ("Selected: 2 visible", shortcut),
                 ("Enter Run", "\r"),
                 ("Source and destination are the same.", "\x1b[20~"),
                 ("2 failed: Source and destination are the same.", "e"),

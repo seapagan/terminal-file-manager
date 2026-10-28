@@ -5,7 +5,13 @@ use ratatui::{Terminal, backend::TestBackend};
 
 #[test]
 fn queued_and_running_reconciliation_distinguishes_previous_results_until_finish() {
-    let (root, mut controller, _unused_queue, plan) = fixture();
+    let (root, mut controller, _unused_queue, mut plan) = fixture();
+    let target = root
+        .path()
+        .join("diagnostic-界e\u{301}".repeat(6))
+        .join("nested");
+    fs::create_dir_all(&target).unwrap();
+    plan.set_destination(target);
     let mut driver = QueueTestDriver::new();
     let id = driver
         .queue
@@ -97,17 +103,46 @@ fn assert_previous_evidence(controller: &mut Controller, detail: &str) {
     assert!(controller.app.operations.jobs_evidence);
     let text = draw(controller);
     assert!(text.contains("Previous result"), "{text}");
+    let evidence = scroll_evidence(controller);
+    assert_rendered_evidence(controller, detail, &evidence);
+    key(controller, KeyCode::Char('e'));
+    assert!(!controller.app.operations.jobs_evidence);
+    assert_eq!(controller.app.operations.scroll, 0);
+}
+
+fn scroll_evidence(controller: &mut Controller) -> String {
     let geometry = crate::ui::geometry(&controller.app, Rect::new(0, 0, 160, 50));
     let mut evidence = String::new();
     for offset in 0..=geometry.operation_scroll_limit {
         controller.app.operations.scroll = offset;
-        evidence.push_str(&draw(controller));
+        // Screen padding, borders and row breaks are not part of the diagnostic.
+        evidence.extend(
+            draw(controller)
+                .chars()
+                .filter(|c| !c.is_whitespace() && *c != '│'),
+        );
     }
-    assert!(evidence.contains(detail), "{evidence}");
-    assert!(evidence.contains("Owned staging checkpoint"));
-    key(controller, KeyCode::Char('e'));
-    assert!(!controller.app.operations.jobs_evidence);
-    assert_eq!(controller.app.operations.scroll, 0);
+    evidence
+}
+
+fn assert_rendered_evidence(controller: &Controller, detail: &str, screens: &str) {
+    let entry = &controller.app.operations.history[0]
+        .record
+        .as_ref()
+        .unwrap()
+        .entries[0];
+    assert_eq!(entry.detail, detail);
+
+    let checkpoint = entry.recovery.as_ref().unwrap().staging_path().unwrap();
+    for token in [
+        "Cleanupunverified;stagingretainedat",
+        "Ownedobjectidentitychanged",
+        "Ownedstagingcheckpoint",
+        checkpoint.file_name().unwrap().to_str().unwrap(),
+        "diagnostic-界e\u{301}".repeat(6).as_str(),
+    ] {
+        assert!(screens.contains(token), "missing {token:?} in {screens}");
+    }
 }
 
 fn assert_final_reconciliation(
@@ -128,8 +163,7 @@ fn assert_final_reconciliation(
             .any(|row| row.contains("Failed") && row.contains("-  source"))
     );
     key(controller, KeyCode::Char('e'));
-    controller.app.operations.scroll = usize::MAX;
-    assert!(draw(controller).contains("Reconciled retained source"));
+    assert!(scroll_evidence(controller).contains("Reconciledretainedsource"));
     assert!(!payload.parent().unwrap().exists());
     assert_eq!(
         fs::read(root.path().join("source")).unwrap(),
