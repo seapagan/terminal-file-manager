@@ -16,6 +16,7 @@ pub struct Row<T> {
     pub field: Option<T>,
     /// An indivisible right-aligned value (for example a file size).
     pub trailing: Option<String>,
+    status: Option<String>,
     label: Option<String>,
     focused: bool,
     single_line: bool,
@@ -34,6 +35,7 @@ impl<T: Clone> Row<T> {
             role,
             field: None,
             trailing: None,
+            status: None,
             label: None,
             focused: false,
             single_line: false,
@@ -58,6 +60,7 @@ impl<T: Clone> Row<T> {
             role: Role::Value,
             field: Some(target),
             trailing: None,
+            status: None,
             label: Some(format!("{label}: ")),
             focused,
             single_line: false,
@@ -85,17 +88,28 @@ impl<T: Clone> Row<T> {
             role: Role::Value,
             field: None,
             trailing: Some(size),
+            status: None,
             label: None,
             focused: false,
             single_line: false,
         }
     }
 
+    /// Reserve a short textual outcome before truncating the filename or size.
+    pub fn file_status(mut self, status: &str) -> Self {
+        self.status = Some(super::super::clean(status));
+        self
+    }
+
     /// Intrinsic width in escaped display cells, including the column gap.
     pub fn width(&self) -> usize {
-        self.label
+        self.status
             .as_ref()
-            .map_or(0, |label| Line::raw(label).width())
+            .map_or(0, |status| usize::from(super::width(status)) + 1)
+            + self
+                .label
+                .as_ref()
+                .map_or(0, |label| Line::raw(label).width())
             + usize::from(self.focused)
             + Line::raw(super::super::clean(&self.text)).width()
             + self
@@ -141,6 +155,7 @@ impl<T: Clone> Row<T> {
                 role: self.role,
                 field: self.field.clone(),
                 trailing: None,
+                status: None,
                 label: None,
                 focused: false,
                 single_line: false,
@@ -188,6 +203,17 @@ impl<T: Clone> Row<T> {
                 Span::styled(self.text.clone(), style),
             ]);
         }
+        if let Some(status) = &self.status {
+            let prefix = super::truncate(&format!("{status} "), width);
+            let mut line = self.file_line(width.saturating_sub(super::width(&prefix)), theme);
+            line.spans
+                .insert(0, Span::styled(prefix, theme.style(self.role)));
+            return line;
+        }
+        self.file_line(width, theme)
+    }
+
+    fn file_line(&self, width: u16, theme: &Theme) -> Line<'static> {
         let Some(value) = &self.trailing else {
             let mut style = theme.style(self.role);
             if matches!(self.role, Role::Status) {

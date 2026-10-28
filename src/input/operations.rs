@@ -30,11 +30,10 @@ pub(super) fn action(controller: &mut Controller, action: Action, geometry: &Geo
         _ => return false,
     };
     if let Err(error) = open(controller, action, operation, geometry) {
-        controller
+        controller.app.status = controller
             .app
             .operations
             .fail(error.to_string(), controller.app.now);
-        controller.app.status = format!("Not started: {error} — F9 details");
     }
     true
 }

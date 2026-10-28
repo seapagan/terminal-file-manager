@@ -64,6 +64,7 @@ fn job(
     now: std::time::SystemTime,
 ) -> Job {
     Job {
+        presentation: None,
         id: id as u64,
         state,
         plan: plan.clone(),

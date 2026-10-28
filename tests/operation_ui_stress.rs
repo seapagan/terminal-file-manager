@@ -21,6 +21,26 @@ fn fixture() -> (tempfile::TempDir, App) {
     fs::create_dir(&source).unwrap();
     fs::create_dir(&target).unwrap();
     let plan = Plan::paths(Operation::Copy, vec![source.clone()], Some(target.clone())).unwrap();
+    let entries = result_entries(source, target);
+    let mut app = App::new(root.path().into());
+    app.operations.history.push(Job {
+        presentation: None,
+        retry_eligible: false,
+        id: 1,
+        plan,
+        options: Default::default(),
+        state: JobState::Completed,
+        record: Some(Record { entries }),
+        progress: None,
+        started: SystemTime::UNIX_EPOCH,
+        finished: Some(SystemTime::UNIX_EPOCH + Duration::from_secs(1)),
+        retry_of: None,
+    });
+    app.operations.show_history = true;
+    (root, app)
+}
+
+fn result_entries(source: std::path::PathBuf, target: std::path::PathBuf) -> Vec<EntryResult> {
     let long = "nested_segment_0123456789/".repeat(40);
     let mut entries: Vec<_> = (0..2500)
         .map(|index| EntryResult {
@@ -49,21 +69,7 @@ fn fixture() -> (tempfile::TempDir, App) {
         trash: None,
         detail: "LAST_RESULT_REACHED".into(),
     });
-    let mut app = App::new(root.path().into());
-    app.operations.history.push(Job {
-        retry_eligible: false,
-        id: 1,
-        plan,
-        options: Default::default(),
-        state: JobState::Completed,
-        record: Some(Record { entries }),
-        progress: None,
-        started: SystemTime::UNIX_EPOCH,
-        finished: Some(SystemTime::UNIX_EPOCH + Duration::from_secs(1)),
-        retry_of: None,
-    });
-    app.operations.show_history = true;
-    (root, app)
+    entries
 }
 
 fn draw(app: &App) -> String {

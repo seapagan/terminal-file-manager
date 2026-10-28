@@ -23,6 +23,7 @@ fn fixture(operation: Operation) -> (tempfile::TempDir, Plan) {
 
 fn job(plan: Plan, record: Record) -> Job {
     let mut job = Job {
+        presentation: None,
         retry_eligible: false,
         id: 1,
         plan,

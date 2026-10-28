@@ -108,6 +108,7 @@ fn completed_jobs_show_readable_details_and_no_active_controls() {
     let mut app = App::new("/controlled".into());
     app.operations.show_history = true;
     app.operations.history.push(Job {
+        presentation: None,
         retry_eligible: true,
         id: 7,
         plan: Plan::mkdir("/controlled/new".into()),
@@ -173,6 +174,7 @@ fn conflict_disables_unsafe_choices_and_formats_optional_metadata() {
 
 fn completed_job(app: &App, id: u64) -> Job {
     Job {
+        presentation: None,
         retry_eligible: true,
         id,
         plan: Plan::mkdir(format!("/controlled/{id}").into()),

@@ -50,6 +50,7 @@ fn fixture() -> (tempfile::TempDir, App) {
     };
     let mut app = App::new(root.path().into());
     app.operations.history.push(Job {
+        presentation: None,
         retry_eligible: false,
         id: 2,
         plan,

@@ -160,3 +160,40 @@ fn assert_transfer_text(buffer: &Buffer, enabled: bool) {
     }));
     assert!(!text.contains("Approved destination") && !text.contains("F2 toggles"));
 }
+
+#[test]
+fn invalid_create_renders_specific_feedback_and_recovers_after_editing() {
+    let mut c = Controller::new(
+        dialog_fixture::dialog(Plan::mkdir("/controlled".into())),
+        Bindings::new(&Default::default()).unwrap(),
+        Default::default(),
+    );
+    let g = ui::geometry(&c.app, Rect::new(0, 0, 120, 40));
+    for event in [
+        Event::Paste("nested/directory".into()),
+        Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
+    ] {
+        c.handle(event, &g, std::time::Duration::ZERO);
+    }
+    let (buffer, disabled) = draw(&c.app, ColorLevel::NoColor);
+    at(&buffer, "Enter one directory name");
+    assert!(!disabled.operation_enabled(KeyCode::Enter));
+    assert!(c.app.operations.outbox.is_empty());
+    for event in [
+        Event::Key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL)),
+        Event::Paste("資料".into()),
+    ] {
+        c.handle(event, &disabled, std::time::Duration::ZERO);
+    }
+    let (_, enabled) = draw(&c.app, ColorLevel::NoColor);
+    assert!(enabled.operation_enabled(KeyCode::Enter));
+    c.handle(
+        Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
+        &enabled,
+        std::time::Duration::ZERO,
+    );
+    assert!(c.app.operations.outbox.iter().any(
+        |intent| matches!(intent, Intent::Submit(plan, _) if plan.destination.as_deref()
+            == Some(std::path::Path::new("/controlled/資料")))
+    ));
+}

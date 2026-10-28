@@ -78,6 +78,7 @@ fn completed_job(app: &mut terminal_file_manager::app::App, previous: Operation)
     let mut completed = Plan::mkdir(app.panes[0].path.clone());
     completed.operation = previous;
     app.operations.history.push(Job {
+        presentation: None,
         retry_eligible: false,
         id: 1,
         plan: completed,

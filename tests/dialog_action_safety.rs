@@ -43,7 +43,16 @@ fn ready_flag_without_completed_preview_never_submits() {
 }
 #[test]
 fn empty_or_invalid_create_name_never_submits_on_enter_or_click() {
-    for text in ["", ".", "..", "bad/name", "bad\0name"] {
+    for text in [
+        "",
+        ".",
+        "..",
+        "bad/name",
+        "/absolute",
+        "name/",
+        "./name",
+        "bad\0name",
+    ] {
         let mut c = controller(Plan::mkdir("/controlled".into()));
         if let Some(Dialog::Operation(d)) = &mut c.app.operations.dialog {
             d.text = text.into();
@@ -66,6 +75,11 @@ fn empty_or_invalid_create_name_never_submits_on_enter_or_click() {
                 std::time::Duration::ZERO,
             );
         }
+        assert!(
+            c.app.status.contains("one directory name"),
+            "{}",
+            c.app.status
+        );
         assert!(c.app.operations.outbox.is_empty(), "{text:?}");
         assert!(c.app.operations.dialog.is_some());
     }

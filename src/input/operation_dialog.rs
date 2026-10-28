@@ -43,14 +43,6 @@ fn operation_key(
         cancel_preview(controller, dialog);
         return false;
     }
-    if matches!(key.code, KeyCode::PageUp | KeyCode::PageDown) {
-        controller.app.operations.scroll = controller
-            .app
-            .operations
-            .scroll
-            .saturating_add_signed(if key.code == KeyCode::PageUp { -8 } else { 8 });
-        return true;
-    }
     if matches!(dialog.plan.operation, Operation::Delete | Operation::Trash) {
         return destructive(controller, dialog, key.code, geometry);
     }
@@ -130,6 +122,12 @@ fn submit(
     dialog: &mut OperationDialog,
     geometry: &crate::ui::Geometry,
 ) -> bool {
+    if dialog.plan.operation == Operation::Mkdir && !dialog.directory_name_valid() {
+        let message = "Enter one directory name without path separators, NUL, or dot components";
+        dialog.error = Some(message.into());
+        controller.app.status = message.into();
+        return true;
+    }
     let approval = match dialog.plan.operation {
         Operation::Delete => Some(KeyCode::Char('D')),
         Operation::Trash => Some(KeyCode::Char('T')),
@@ -139,7 +137,6 @@ fn submit(
     if (matches!(dialog.plan.operation, Operation::Delete | Operation::Trash)
         && (!dialog.ready || dialog.plan.preview.is_none() || dialog.error.is_some()))
         || approval.is_some_and(|key| !geometry.operation_enabled(key))
-        || (dialog.plan.operation == Operation::Mkdir && !dialog.directory_name_valid())
     {
         controller.app.status = "Approval disabled; check the form or enlarge the terminal".into();
         return true;
@@ -212,7 +209,7 @@ fn apply_fields(dialog: &mut OperationDialog) -> io::Result<()> {
             }
         }
         Operation::Mkdir => {
-            dialog.plan.set_destination(typed_path(dialog)?);
+            dialog.plan.set_destination(dialog.base.join(&dialog.text));
         }
         Operation::Rename => {
             dialog.plan.set_destination(rename_target(dialog)?);

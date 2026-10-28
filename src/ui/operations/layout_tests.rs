@@ -140,6 +140,7 @@ fn jobs_app() -> App {
         (2, format!("/{}", "long/".repeat(80))),
     ] {
         app.operations.history.push(Job {
+            presentation: None,
             id,
             plan: Plan::mkdir(path.into()),
             options: Default::default(),

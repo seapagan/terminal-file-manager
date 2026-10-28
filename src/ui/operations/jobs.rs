@@ -61,7 +61,7 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
                     },
                     job.id,
                     content::operation(job.plan.operation),
-                    state(job.state)
+                    phase(job)
                 ),
                 theme.style(if index == app.operations.cursor {
                     Role::Cursor
@@ -92,10 +92,16 @@ pub(super) fn details(app: &App) -> Vec<Row> {
             "Job {}: {} · {}",
             job.id,
             content::operation(job.plan.operation),
-            state(job.state)
+            phase(job)
         ),
         state_role(job.state),
     ));
+    if job.active() && job.record.is_some() {
+        rows.push(Row::styled(
+            "Previous result — retained during reconciliation",
+            Role::Warning,
+        ));
+    }
     rows.push(Row::plain(crate::operations::summary(job)));
     rows.extend(route(app, job));
     if let Some(Event::Progress {
@@ -278,6 +284,14 @@ fn result_heading(
         heading.trailing = Some(crate::ui::modal::file_size(Some(entry.bytes)));
     }
     heading
+}
+
+pub(super) fn phase(job: &Job) -> String {
+    if job.active() && job.record.is_some() {
+        format!("Reconciliation · {}", state(job.state))
+    } else {
+        state(job.state).into()
+    }
 }
 
 pub(super) fn state(state: JobState) -> &'static str {

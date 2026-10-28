@@ -199,11 +199,10 @@ fn short_notice(notice: &crate::operations::Notice, width: u16) -> (String, Role
     let clean = super::clean(&notice.text);
     let summary = clean.strip_suffix(" — F9 details").unwrap_or(&clean);
     let text = format!("{label}: {summary}");
-    let summary = super::text::wrap_value(&text, usize::from(width.saturating_sub(13)).max(1))
-        .into_iter()
-        .next()
-        .unwrap_or_default();
-    (format!("{summary} — F9 details"), role)
+    (
+        super::status_text(&format!("{text} — F9 details"), width),
+        role,
+    )
 }
 
 /// The event loop calls this with monotonic elapsed time; only visible pending counts redraw.

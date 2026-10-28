@@ -1,7 +1,9 @@
 //! Local mutations share frozen operands and one path coordinator.
 mod execute;
+mod job_summary;
 mod locks;
 mod model;
+pub use job_summary::JobSummary;
 mod mounts;
 mod mutations;
 mod preview;
@@ -13,6 +15,8 @@ pub(crate) use model::{counts_summary, summary};
 pub use recovery::{Recovery, reconcile};
 mod queue;
 pub use preview::Preview;
+#[cfg(test)]
+pub(crate) use queue::tests::Driver as QueueTestDriver;
 pub use queue::{Queue, Update};
 mod plan;
 mod results;
