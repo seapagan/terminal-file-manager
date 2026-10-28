@@ -31,7 +31,8 @@ pub struct OperationControl {
     pub area: Rect,
     pub target: OperationTarget,
     pub label: &'static str,
-    /// False controls are visible but inert.
+    /// Projected shell eligibility for geometry consumers and tests.
+    /// Activation uses the measured shell's hit/key policy, not this field.
     pub enabled: bool,
 }
 

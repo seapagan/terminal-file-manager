@@ -133,33 +133,96 @@ fn destination_field(geometry: &ui::Geometry) -> Rect {
         .area
 }
 
+fn rendered_text(app: &terminal_file_manager::app::App, width: u16, height: u16) -> String {
+    let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+    terminal
+        .draw(|frame| {
+            ui::render(frame, app, &Theme::new(ColorLevel::NoColor));
+        })
+        .unwrap();
+    terminal
+        .backend()
+        .buffer()
+        .content
+        .iter()
+        .map(|c| c.symbol())
+        .collect()
+}
+
+fn assert_clipped_delete_blocked(
+    controller: &mut terminal_file_manager::input::Controller,
+    width: u16,
+    height: u16,
+) {
+    use crossterm::event::{
+        Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+    };
+    let geometry = ui::geometry(&controller.app, Rect::new(0, 0, width, height));
+    let approval = geometry
+        .operation_controls
+        .iter()
+        .find(|c| c.target == OperationTarget::Key(KeyCode::Char('D')));
+    let text = rendered_text(&controller.app, width, height);
+    assert!(!text.contains("PERMANENT DELETE — irreversible"), "{text}");
+    assert_eq!(
+        approval.is_some(),
+        width == 32,
+        "only the clipped-title case has a visible approval"
+    );
+    assert!(!geometry.operation_enabled(KeyCode::Char('D')));
+    assert!(approval.is_none_or(|c| !c.enabled));
+    let (column, row) = approval.map_or((width / 2, height.saturating_sub(1)), |c| {
+        (c.area.x, c.area.y)
+    });
+    assert_eq!(geometry.operation_target(column, row), None);
+    let attempts = [
+        Event::Key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::SHIFT)),
+        Event::Mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column,
+            row,
+            modifiers: KeyModifiers::NONE,
+        }),
+    ];
+    for event in attempts {
+        controller.handle(event, &geometry, std::time::Duration::ZERO);
+        assert!(controller.app.operations.dialog.is_some());
+        assert!(controller.app.operations.outbox.is_empty());
+    }
+}
+
 #[test]
 fn tiny_delete_never_accepts_a_hidden_title_or_invisible_action() {
-    use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-    use terminal_file_manager::input::{Bindings, Controller};
+    use terminal_file_manager::{
+        input::{Bindings, Controller},
+        operations::{Queue, Update},
+    };
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("file");
     std::fs::write(&path, b"data").unwrap();
-    let plan = Plan::paths(Operation::Delete, vec![path], None).unwrap();
+    let mut queue = Queue::new().unwrap();
+    queue
+        .preview(Plan::paths(Operation::Delete, vec![path.clone()], None).unwrap())
+        .unwrap();
+    let plan = loop {
+        if let Update::Preview { plan, .. } = queue.next(std::time::Duration::from_secs(5)).unwrap()
+        {
+            break *plan;
+        }
+    };
     let mut controller = Controller::new(
         dialog(plan),
         Bindings::new(&Default::default()).unwrap(),
         Default::default(),
     );
-    for height in [0, 1, 2, 5, 8] {
-        let geometry = ui::geometry(&controller.app, Rect::new(0, 0, 20, height));
-        assert!(
-            !geometry
-                .operation_controls
-                .iter()
-                .any(|c| c.enabled && c.target == OperationTarget::Key(KeyCode::Char('D')))
-        );
-        controller.handle(
-            Event::Key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::SHIFT)),
-            &geometry,
-            std::time::Duration::ZERO,
-        );
-        assert!(controller.app.operations.dialog.is_some());
-        assert!(controller.app.operations.outbox.is_empty());
+    assert!(
+        matches!(&controller.app.operations.dialog, Some(Dialog::Operation(d))
+        if d.ready && d.plan.preview.is_some() && d.error.is_none())
+    );
+    let full = ui::geometry(&controller.app, Rect::new(0, 0, 120, 40));
+    assert!(full.operation_enabled(crossterm::event::KeyCode::Char('D')));
+    for (width, height) in [(32, 40), (80, 0), (80, 1), (80, 2)] {
+        assert_clipped_delete_blocked(&mut controller, width, height);
+        assert_eq!(std::fs::read(&path).unwrap(), b"data");
     }
 }

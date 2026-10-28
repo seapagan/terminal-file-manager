@@ -41,7 +41,7 @@ impl Layout {
                 .max(desired_width(&header, terminal.width))
                 .max(footer_width(app, &footer, terminal.width))
                 .max(summary_width(app)),
-            pinned_rows: list_rows(app, terminal.height),
+            pinned_rows: 0,
             footer_rows: 0,
             actions: &buttons,
         };
@@ -220,18 +220,6 @@ fn desired_width(rows: &[content::Row], terminal_width: u16) -> usize {
         }
     }
     widest
-}
-
-fn list_rows(app: &App, height: u16) -> u16 {
-    if app.operations.show_history && app.operations.dialog.is_none() {
-        app.operations
-            .history
-            .len()
-            .min(5)
-            .min(usize::from(height / 4)) as u16
-    } else {
-        0
-    }
 }
 
 fn summary_width(app: &App) -> usize {

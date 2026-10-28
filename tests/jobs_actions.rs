@@ -193,6 +193,28 @@ fn assert_row(buttons: &[&ui::OperationControl], y: u16, g: &ui::Geometry, width
 }
 
 #[test]
+fn wide_jobs_show_full_context_labels_without_moving_primary_controls() {
+    let (_root, mut app) = fixture();
+    let (_, initial) = draw(&app, (120, 40), ColorLevel::NoColor);
+    for (index, label) in [(1, "C Cancel job"), (2, "R Retry incomplete")] {
+        app.operations.cursor = index;
+        let (terminal, geometry) = draw(&app, (120, 40), ColorLevel::NoColor);
+        let control = geometry
+            .operation_controls
+            .iter()
+            .find(|c| c.label == label)
+            .unwrap();
+        assert_eq!(line(&terminal, control.area).trim(), format!("[{label}]"));
+        for i in 0..2 {
+            assert_eq!(
+                geometry.operation_controls[i].area,
+                initial.operation_controls[i].area
+            );
+        }
+    }
+}
+
+#[test]
 fn narrow_jobs_show_eligible_shortcuts_inside_the_existing_footer() {
     let (_root, mut app) = fixture();
     for size in [(40, 15), (43, 18), (44, 17), (32, 14)] {

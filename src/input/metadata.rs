@@ -24,6 +24,19 @@ impl Controller {
             .sync_metadata_views(self.app.sidebar_visible(geometry.footer.width));
     }
 
+    pub(super) fn preferred_action(&self, action: Action) -> Action {
+        if action != Action::Info {
+            return action;
+        }
+        if self.app.popup {
+            return Action::Metadata;
+        }
+        match self.preferences.metadata_presentation {
+            crate::settings::MetadataPresentation::Sidebar => Action::ToggleSidebar,
+            crate::settings::MetadataPresentation::Popup => Action::Metadata,
+        }
+    }
+
     /// Keyboard and clickable controls share this dispatcher and availability policy.
     pub fn dispatch(&mut self, action: Action, geometry: &Geometry) -> Vec<Request> {
         self.sync_metadata(geometry);

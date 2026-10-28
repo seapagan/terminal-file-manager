@@ -155,16 +155,6 @@ impl Controller {
         super::operations::exit(self, action == Action::SaveQuit);
     }
 
-    fn preferred_action(&self, action: Action) -> Action {
-        if action != Action::Info {
-            return action;
-        }
-        match self.preferences.metadata_presentation {
-            crate::settings::MetadataPresentation::Sidebar => Action::ToggleSidebar,
-            crate::settings::MetadataPresentation::Popup => Action::Metadata,
-        }
-    }
-
     fn movement(&mut self, action: Action, geometry: &Geometry) {
         let height = page_height(geometry, self.app.active);
         if self.app.help || self.app.popup {

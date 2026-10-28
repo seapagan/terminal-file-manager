@@ -101,7 +101,7 @@ impl<T: Clone> Row<T> {
             + self
                 .trailing
                 .as_ref()
-                .map_or(0, |text| Line::raw(super::super::clean(text)).width() + 2)
+                .map_or(0, |text| Line::raw(super::super::clean(text)).width() + 1)
     }
 
     /// Prose/fields wrap; structured rows remain one row with filename truncation.

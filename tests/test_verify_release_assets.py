@@ -195,7 +195,7 @@ class ReleaseAssetsTests(unittest.TestCase):
             without = [entry for entry in complete if entry[0] != name]
             for invalid in (
                 without,
-                [*without, (name, notices[1] + b"modified")],
+                [*without, (name, notices[1][:-1] + bytes([notices[1][-1] ^ 1]))],
                 [*without, ("NOTICES.md", notices[1])],
                 [*complete, notices],
             ):
@@ -206,6 +206,20 @@ class ReleaseAssetsTests(unittest.TestCase):
                         self.assertRaises(assets.AssetError),
                     ):
                         self.check(aggregate=aggregate)
+
+    def test_notices_duplicate_with_unchanged_member_count(self) -> None:
+        """Duplicate notices fail their own check, before the missing MIT licence."""
+        for self.target in assets.TARGETS:
+            self.payload = executable(self.target)
+            members = self.members()
+            notices = next(
+                entry for entry in members if entry[0] == "THIRD_PARTY_NOTICES.md"
+            )
+            duplicate = [entry for entry in members if entry[0] != "LICENSE-MIT"]
+            self.write([*duplicate, notices])
+            for aggregate in (False, True):
+                with self.assertRaisesRegex(assets.AssetError, "duplicate member"):
+                    self.check(aggregate=aggregate)
 
     def test_checksum_grammar(self) -> None:
         """Reject fields, aliases, encoding ambiguity and additional records."""

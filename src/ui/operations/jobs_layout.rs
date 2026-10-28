@@ -7,7 +7,7 @@ pub(super) fn layout(app: &App, terminal: Rect) -> super::Layout {
     let outer = viewport(app, terminal);
     let height = outer.height;
     let narrow = terminal.height < 18 || terminal.width < 44 || app.operations.history.is_empty();
-    let actual = super::actions::buttons(app, true);
+    let actual = super::actions::buttons(app, narrow);
     let primary = actions(&actual[..2]);
     let context = actions(&actual[2..]);
     let spec = modal::Spec {

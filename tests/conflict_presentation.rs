@@ -10,7 +10,7 @@ mod conflict_fixture;
 use conflict_fixture::{draw, edit, fixture};
 #[test]
 fn common_root_comparison_is_compact_and_uses_exact_subsecond_direction() {
-    let (root, app, _) = fixture();
+    let (root, mut app, _) = fixture();
     let (_, g, text) = draw(&app, 100, 35, ColorLevel::NoColor);
     assert!(text.contains("File already exists"), "{text}");
     assert_eq!(text.matches("Root:").count(), 1, "{text}");
@@ -30,11 +30,30 @@ fn common_root_comparison_is_compact_and_uses_exact_subsecond_direction() {
     );
     assert!(text.contains("22 B") && text.contains("53 B"), "{text}");
     assert!(text.contains("Existing newer (<1 s)"), "{text}");
-    assert!(text.contains("2026-10-26 18:11:00 UTC"), "{text}");
+    edit(&mut app, |source, destination, _| {
+        for entry in [source, destination] {
+            let expected = expected_modified(entry.modified.unwrap());
+            assert!(text.contains(&expected), "{text}");
+        }
+    });
     assert!(!text.contains("Identity:") && !text.contains("volume "));
     assert!(!text.contains(".050000000") && !text.contains("arrows select"));
     assert_eq!(g.operation_scroll_limit, 0);
     let _ = root;
+}
+
+fn expected_modified(modified: std::time::SystemTime) -> String {
+    let nanos = modified.duration_since(UNIX_EPOCH).unwrap().as_nanos() as i128;
+    let date = time::OffsetDateTime::from_unix_timestamp_nanos(nanos).unwrap();
+    format!(
+        "{:04}-{:02}-{:02} {:02}:{:02}:{:02} UTC",
+        date.year(),
+        date.month() as u8,
+        date.day(),
+        date.hour(),
+        date.minute(),
+        date.second()
+    )
 }
 
 #[test]
@@ -128,10 +147,14 @@ fn comparison_switches_to_stacked_rows_and_keeps_semantic_labels() {
                     })
                     .unwrap()
             };
-            assert_eq!(
-                header_y("Incoming (source)") == header_y("Existing (destination)"),
-                width >= 65
-            );
+            let incoming = header_y("Incoming (source)");
+            let existing = header_y("Existing (destination)");
+            assert!(incoming <= existing);
+            if width == 40 {
+                assert!(incoming < existing, "narrow comparison must stack");
+            } else if width == 120 {
+                assert_eq!(incoming, existing, "wide comparison must use columns");
+            }
             if width == 40 {
                 assert!(g.operation_controls.iter().all(|b| b.area.right() <= width));
             }

@@ -223,6 +223,21 @@ fn file_rows_keep_units_whole_and_truncate_only_on_grapheme_boundaries() {
 }
 
 #[test]
+fn file_row_fits_its_exact_measured_width_with_one_cell_gap() {
+    let row = Row::<usize>::file("界e\u{301}.txt".into(), "1 KiB".into());
+    let required = Line::raw(&row.text).width() + 1 + Line::raw("1 KiB").width();
+    assert_eq!(row.width(), required);
+    let theme = Theme::new(colored_text::ColorLevel::NoColor);
+    assert_eq!(
+        row.line(required as u16, &theme).to_string(),
+        "界e\u{301}.txt 1 KiB"
+    );
+    let clipped = row.line(required as u16 - 1, &theme).to_string();
+    assert!(clipped.starts_with("界e\u{301}"));
+    assert!(clipped.ends_with("… 1 KiB"));
+}
+
+#[test]
 fn structured_content_escapes_controls_and_bidi_before_measuring_or_rendering() {
     let row = Row::<usize>::file("link/界e\u{301}\n\u{202e}\u{1b}".into(), "10 KiB".into());
     let wrapped = row.wrap(40);
