@@ -60,8 +60,8 @@ class TfmPackageTests(unittest.TestCase):
         result = self.analyse(self.required + forbidden)
         self.assertEqual(result.forbidden_paths, tuple(sorted(forbidden)))
 
-    def test_only_root_rust_tests_enter_dynamic_inventory(self) -> None:
-        """Git discovery omits development support and nested Rust fixtures."""
+    def test_only_tracked_rust_tests_enter_dynamic_inventory(self) -> None:
+        """Git discovery includes nested Rust modules and omits support files."""
         repository = self.root / "mixed-repository"
         initialise_repository(
             repository,
@@ -76,7 +76,7 @@ class TfmPackageTests(unittest.TestCase):
         )
         self.assertEqual(
             report.repository_distribution_paths(repository),
-            ("src/main.rs", "tests/cli.rs"),
+            ("src/main.rs", "tests/cli.rs", "tests/nested/a.rs"),
         )
 
     def test_real_size_ceiling_boundaries(self) -> None:

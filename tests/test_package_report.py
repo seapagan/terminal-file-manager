@@ -426,6 +426,85 @@ class RepositoryDistributionTests(unittest.TestCase):
             report.repository_distribution_paths(self.repository)
 
 
+class NestedPackageTests(unittest.TestCase):
+    """Analyse and enforce exact tracked nested-test inventories."""
+
+    def setUp(self) -> None:
+        """Create top-level, nested and deeply nested tracked Rust test files."""
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.repository = self.root / "repository"
+        self.modules = (
+            "tests/operation_controls/preview.rs",
+            "tests/metadata_controls/owner.rs",
+            "tests/deep/more/module.rs",
+        )
+        tracked = (*DEFAULT_DISTRIBUTION_PATHS, *self.modules)
+        initialise_repository(self.repository, tracked)
+        self.required = report.STATIC_REQUIRED_PATHS + tuple(sorted(tracked))
+
+    def enforce(
+        self, files: tuple[str, ...], directories: tuple[str, ...] = ()
+    ) -> tuple[report.PackageResult, int]:
+        """Analyse the archive, write the report and invoke real enforcement."""
+        archive = self.root / "package.crate"
+        write_archive(archive, files, directories=directories)
+        result = report.analyse_archive(archive, repository=self.repository)
+        structured, markdown = self.root / "report.json", self.root / "report.md"
+        report.write_outputs(result, structured, markdown)
+        with (
+            mock.patch.object(sys, "argv", [str(SCRIPT), "enforce", str(structured)]),
+            redirect_stderr(io.StringIO()),
+        ):
+            status = report.main()
+        return result, status
+
+    def test_tracked_nested_modules_and_ancestor_directories_pass(self) -> None:
+        """Recursive Git discovery includes root and deep modules exactly once."""
+        directories = (
+            "src",
+            "tests",
+            "tests/operation_controls",
+            "tests/metadata_controls",
+            "tests/deep",
+            "tests/deep/more",
+        )
+        result, status = self.enforce(self.required, directories)
+        self.assertEqual(status, 0)
+        self.assertEqual(result.required_paths, self.required)
+        self.assertEqual(result.forbidden_paths, ())
+        self.assertEqual(len(result.required_paths), len(set(result.required_paths)))
+        self.assertEqual(report.required_paths(self.repository), self.required)
+
+    def test_missing_tracked_nested_module_fails_policy(self) -> None:
+        """A missing tracked module must survive analysis as an enforced failure."""
+        for module in self.modules:
+            with self.subTest(module=module):
+                result, status = self.enforce(
+                    tuple(p for p in self.required if p != module)
+                )
+                self.assertEqual(status, 1)
+                self.assertEqual(result.missing_paths, (module,))
+
+    def test_untracked_nested_files_and_unexpected_directories_fail(self) -> None:
+        """Allow only required files and their exact test-directory ancestors."""
+        files = (
+            "tests/operation_controls/extra.rs",
+            "tests/deep/more/helper.py",
+            "tests/metadata_controls/notes.md",
+            "tests/local.rs",
+        )
+        directories = ("tests/unrelated", "tests/deep/unexpected")
+        for extra in files + directories:
+            with self.subTest(extra=extra):
+                members = self.required + ((extra,) if extra in files else ())
+                dirs = (extra,) if extra in directories else ()
+                result, status = self.enforce(members, dirs)
+                self.assertEqual(status, 1)
+                self.assertEqual(result.forbidden_paths, (extra,))
+
+
 class ArchiveDiscoveryTests(unittest.TestCase):
     """Exercise deterministic discovery of the just-built archive."""
 

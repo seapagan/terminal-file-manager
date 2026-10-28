@@ -18,9 +18,9 @@ utilities are excluded. Inspect the package with:
 cargo make package-list
 ```
 
-`cargo make package` validates the package. It requires clean packaged sources;
-`cargo package --locked --allow-dirty` is only an interim development check,
-not a replacement for the final verification gate.
+`cargo make package` validates the package. Both package commands require clean
+packaged sources. Any previous manual `--allow-dirty` evidence is interim only;
+it cannot replace the strict postcommit gate.
 
 ## Rust version and dependencies
 
@@ -83,8 +83,11 @@ corresponding tasks; missing prerequisites must not be treated as passing.
 
 | Command | Purpose |
 | --- | --- |
-| `cargo make verify-fast` | Native Rust formatting, checks, tests, doctests, docs, builds and package validation |
-| `cargo make verify` | Complete host-applicable development gate: Rust, MSRV, coverage, complexity, static support-code checks, dependency and workflow security, packaging and required cross-checks |
+| `cargo make verify-fast` | Smaller development subset: native Rust formatting, checks, strict Clippy, tests, doctests, docs and builds; no packaging/MSRV |
+| `cargo make verify` | Full host-applicable precommit development gate: Rust, coverage, complexity/maintainability, static support-code checks, dependency and workflow security, and required cross-checks including Linux xwin; no packaging/MSRV |
+| `cargo make verify-postcommit` | Full exact-MSRV checks including packaging, then strict current-toolchain packaging, on clean committed sources before push |
+| `cargo make package` | Strict current-toolchain package build and verification |
+| `cargo make package-list` | Optional strict package inventory diagnostic; does not compile or verify the crate |
 | `cargo make verify-infra` | Explicit tooling self-tests: Python checks/tests, installer and binary-verifier regressions, CI/release harness tests |
 | `cargo make test` | Native Rust tests through Nextest |
 | `cargo make doctest` | Independent Rust documentation tests |
@@ -102,6 +105,29 @@ Its preflight reports missing requirements before testing and distinguishes
 foreign-host suites as *not applicable*. All retained individual Make tasks
 remain available for focused work.
 
+Use these three invocations at the appropriate stage:
+
+```sh
+# Development, before every commit (dirty source allowed):
+cargo make verify
+
+# After committing, once the intended tracked tree and index are clean, before push:
+cargo make verify-postcommit
+
+# Optional package inventory diagnostic, when needed:
+cargo make package-list
+```
+
+`verify-postcommit` runs the full `msrv` task, including exact-MSRV packaging,
+and the separate `package` task with the active development compiler. Keep both
+compiler/package checks. It first checks Git for a committed HEAD and refuses
+staged, unstaged tracked or nonignored untracked changes before either task.
+Git inspection errors stop the gate; ignored local files may remain.
+The individual `msrv`, `msrv-version`, `package` and
+`package-list` commands remain available and strict. No aggregate requires
+`package-list`. CI continues to enforce its separate exact-MSRV and Source
+Package jobs, including the hosted package inventory policy.
+
 ### Linux Windows cross-verification
 
 **Full Linux `cargo make verify` always includes `cargo make verify-xwin`.**
@@ -114,7 +140,8 @@ rustup target add x86_64-pc-windows-msvc
 
 The task performs locked check, warning-denying Clippy and build validation for
 Windows MSVC. It does not execute Windows binaries or replace native Windows
-CI. On non-Linux hosts, run the appropriate native full gate and report that
+CI. Cross-builds also provide no native macOS execution proof. On non-Linux
+hosts, run the appropriate native full gate and report that
 Linux `xwin` verification has not been performed.
 
 ### Warnings and completion
@@ -125,6 +152,11 @@ other verification tools; investigate worthwhile findings rather than quietly
 ignoring them. Do not weaken gates or introduce suppressions simply to obtain
 green results. Run the full applicable `cargo make verify` gate before committing,
 and rerun it if relevant source, tests or configuration changes afterward.
+After the final relevant commit, require a clean tracked tree and index and run
+`cargo make verify-postcommit` before pushing. Rerun it after further commits.
+Neither `verify` alone nor `verify-fast` alone certifies readiness to push.
+Stop when a meaningful check fails; incomplete or interrupted checks are not
+passes. Inspect complexity and Codacy findings alongside other advisory output.
 
 ## Testing and coverage
 
