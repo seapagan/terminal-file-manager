@@ -113,7 +113,8 @@ fn shortcut(controller: &mut Controller, key: KeyEvent, layout: &crate::ui::Patt
         _ => return false,
     };
     if layout.targets().contains(&target) {
-        activate(controller, target);
+        let move_focus = matches!(target, PatternControl::Apply(_));
+        activate(controller, target, move_focus);
     }
     true
 }
@@ -150,7 +151,7 @@ fn enter(controller: &mut Controller, layout: &crate::ui::PatternLayout) {
         .into_iter()
         .find(|target| index(*target) == state.focus)
     {
-        activate(controller, target);
+        activate(controller, target, true);
     }
 }
 
@@ -169,7 +170,7 @@ fn edit(controller: &mut Controller, key: KeyEvent, layout: &crate::ui::PatternL
                 .into_iter()
                 .find(|target| index(*target) == state.focus)
             {
-                activate(controller, target);
+                activate(controller, target, true);
             }
         }
         _ => {}
@@ -188,9 +189,11 @@ fn append(controller: &mut Controller, text: &str) {
     state.set_expression(expression);
 }
 
-fn activate(controller: &mut Controller, target: PatternControl) {
+fn activate(controller: &mut Controller, target: PatternControl, move_focus: bool) {
     let mut state = controller.app.pattern.take().unwrap();
-    state.focus = index(target);
+    if move_focus {
+        state.focus = index(target);
+    }
     match target {
         PatternControl::Cancel => {
             controller.app.status = "Pattern selection cancelled".into();
@@ -265,7 +268,7 @@ fn mouse_input(
         }
         MouseEventKind::Down(MouseButton::Left) => {
             if let Some(target) = layout.hit(mouse.column, mouse.row) {
-                activate(controller, target);
+                activate(controller, target, true);
             }
         }
         _ => {}

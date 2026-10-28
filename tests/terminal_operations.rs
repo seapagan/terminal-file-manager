@@ -255,10 +255,10 @@ fn pattern_alt_controls_and_literal_letters_cross_the_native_terminal_parser() {
         command(root.path(), root.path(), None),
         &[
             ("wxsmurQfile.txt", "\x1bb"),
-            ("Pattern selection", "wxsmur?*.txt\x1bm"),
+            ("Pattern selection", "\x1bs\x1bx\x1bwwxsmur?*.txt\x1bm"),
             ("[*]", "\x1bb"),
             ("Pattern selection", "\x1bx"),
-            ("Substring;", "\x1b"),
+            ("Regex searches", "\x1b"),
             ("cancelled", "\x1bb"),
             ("Pattern selection", "\x1b[200~*\x1b[201~"),
             ("Matches: 1 / 1 selectable", "\x1bs\x1bw\x1bu"),

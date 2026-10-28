@@ -27,8 +27,8 @@ fn text_at(buffer: &Buffer, area: Rect) -> String {
 fn assert_control_cells(before: &Buffer, layout: &ui::PatternLayout, width: u16) {
     let wildcard = layout.fields[1].0;
     let regex = layout.fields[2].0;
-    assert_eq!(text_at(before, wildcard), "[✓ W Wildcard]");
-    assert_eq!(text_at(before, regex), "[  X Regex]");
+    assert_eq!(text_at(before, wildcard), "(●) W Wildcard");
+    assert_eq!(text_at(before, regex), "( ) X Regex");
     assert!(
         before[(wildcard.x, wildcard.y)]
             .modifier
@@ -98,8 +98,8 @@ fn selected_and_focused_controls_have_distinct_stable_monochrome_cells() {
                 );
                 changed.push(text_at(&buffer, regex));
             }
-            assert_eq!(changed[0], "[✓ X Regex]");
-            assert_eq!(changed[1], "[  X Regex]");
+            assert_eq!(changed[0], "(●) X Regex");
+            assert_eq!(changed[1], "( ) X Regex");
             assert_eq!(layout.hit(wildcard.x - 1, wildcard.y), None);
             assert!(
                 before[(layout.fields[0].0.x + 9, layout.fields[0].0.y)]
@@ -153,56 +153,60 @@ fn editor_letters_stay_literal_and_alt_controls_are_direct_deliberate_actions() 
 
 #[test]
 fn clipped_context_disables_keyboard_and_mouse_application_and_hover_is_inert() {
-    for width in [20, 40, 70, 80, 120] {
-        for height in [4, 8, 24] {
-            let (_root, mut c) = loaded();
-            key(&mut c, "Alt+b");
-            event(&mut c, Event::Paste("*".into()), (width, height));
-            let (buffer, layout) = frame(&c, width, height, ColorLevel::NoColor);
-            for region in &layout.shell.actions {
-                assert_eq!(
-                    text_at(&buffer, region.area),
-                    format!("[{}]", region.action.label)
-                );
-                if matches!(region.action.intent, PatternControl::Apply(_))
-                    && !region.action.enabled
-                {
-                    assert_eq!(layout.hit(region.area.x, region.area.y), None);
-                    event(
-                        &mut c,
-                        Event::Mouse(MouseEvent {
-                            kind: MouseEventKind::Down(MouseButton::Left),
-                            column: region.area.x,
-                            row: region.area.y,
-                            modifiers: KeyModifiers::NONE,
-                        }),
-                        (width, height),
-                    );
-                    event(
-                        &mut c,
-                        Event::Key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::ALT)),
-                        (width, height),
-                    );
-                    assert!(c.app.pattern.is_some());
-                    assert!(c.app.panes[0].marks.is_empty());
-                }
+    for level in [ColorLevel::NoColor, ColorLevel::TrueColor] {
+        for width in [20, 40, 70, 80, 120] {
+            for height in [4, 8, 24] {
+                assert_clipped_context(width, height, level);
             }
-            for (area, _) in &layout.fields {
-                event(
-                    &mut c,
-                    Event::Mouse(MouseEvent {
-                        kind: MouseEventKind::Moved,
-                        column: area.x,
-                        row: area.y,
-                        modifiers: KeyModifiers::NONE,
-                    }),
-                    (width, height),
-                );
-            }
-            assert_eq!(c.app.pattern.as_ref().unwrap().focus, 0);
+        }
+    }
+}
+
+fn assert_clipped_context(width: u16, height: u16, level: ColorLevel) {
+    let (_root, mut c) = loaded();
+    key(&mut c, "Alt+b");
+    event(&mut c, Event::Paste("*".into()), (width, height));
+    let (buffer, layout) = frame(&c, width, height, level);
+    for region in &layout.shell.actions {
+        assert_eq!(
+            text_at(&buffer, region.area),
+            format!("[{}]", region.action.label)
+        );
+        if matches!(region.action.intent, PatternControl::Apply(_)) && !region.action.enabled {
+            assert_eq!(layout.hit(region.area.x, region.area.y), None);
+            event(
+                &mut c,
+                Event::Mouse(MouseEvent {
+                    kind: MouseEventKind::Down(MouseButton::Left),
+                    column: region.area.x,
+                    row: region.area.y,
+                    modifiers: KeyModifiers::NONE,
+                }),
+                (width, height),
+            );
+            event(
+                &mut c,
+                Event::Key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::ALT)),
+                (width, height),
+            );
+            assert!(c.app.pattern.is_some());
             assert!(c.app.panes[0].marks.is_empty());
         }
     }
+    for (area, _) in &layout.fields {
+        event(
+            &mut c,
+            Event::Mouse(MouseEvent {
+                kind: MouseEventKind::Moved,
+                column: area.x,
+                row: area.y,
+                modifiers: KeyModifiers::NONE,
+            }),
+            (width, height),
+        );
+    }
+    assert_eq!(c.app.pattern.as_ref().unwrap().focus, 0);
+    assert!(c.app.panes[0].marks.is_empty());
 }
 
 #[test]
@@ -363,3 +367,6 @@ fn priority_transition_consumes_resize_release_and_dialog_approval_but_keeps_qui
     assert!(c.quit);
     assert!(c.app.pattern.is_none());
 }
+
+#[path = "polish.rs"]
+mod polish;

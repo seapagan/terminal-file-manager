@@ -98,16 +98,18 @@ last good view and reports the error; navigate out and reopen the directory to s
 
 Press **Alt+B** or click **Alt+B Mark** to mark filenames by pattern in the
 active pane. Click **W Wildcard**, **X Regex** or **S Case sensitive** to
-choose matching options. The checkmark shows the selected option; focus has a
-separate highlight. Type or paste into the underlined **Pattern** field.
+choose matching options. A filled radio button shows the selected mode;
+a checked box enables case sensitivity. Keyboard focus has a separate highlight.
+Type or paste into the underlined **Pattern** field.
 Enter from a valid expression focuses **M Mark**; a second Enter marks matches.
 Use **U Unmark** or **R Replace** for the other actions. Esc cancels without
 changing marks.
 
 While typing, **Alt+W/X/S/M/U/R** activates controls; plain letters stay in the
 expression. Outside the field, plain **W/X/S/M/U/R** also works. Tab changes
-focus; Enter/Space operates a focused mode or case control. All buttons support
-the mouse. Ctrl+C keeps its existing Quit behaviour.
+focus; W/X/S shortcuts keep focus where it is, so typing can continue after
+Alt+W/X/S. Enter/Space operates a focused mode or case control. All buttons
+support the mouse. Ctrl+C keeps its existing Quit behaviour.
 You can bind another key to `pattern-selection` in `[keybindings]` if your
 terminal or multiplexer reserves Alt+B.
 

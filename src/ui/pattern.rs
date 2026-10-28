@@ -53,7 +53,7 @@ pub(super) fn layout(app: &App, area: Rect) -> Option<PatternLayout> {
         .position(|row| row.field == Some(PatternControl::Expression));
     if let Some(expression_row) = expression_row {
         for (mut area, target) in controls(shell.body.width) {
-            let row = expression_row + 1 + usize::from(area.y);
+            let row = expression_row + 2 + usize::from(area.y);
             if row >= scroll && row - scroll < usize::from(shell.body.height) {
                 area.x += shell.body.x;
                 area.y = shell.body.y + (row - scroll) as u16;
@@ -73,18 +73,21 @@ pub(super) fn layout(app: &App, area: Rect) -> Option<PatternLayout> {
 }
 
 fn rows(state: &crate::app::PatternSelection, width: u16) -> Vec<Row<PatternControl>> {
-    let mut rows = vec![Row::field(
-        "Pattern",
-        state.expression(),
-        PatternControl::Expression,
-        state.focus == 0,
-    )];
+    let mut rows = vec![
+        Row::field(
+            "Pattern",
+            state.expression(),
+            PatternControl::Expression,
+            state.focus == 0,
+        ),
+        Row::plain(""),
+    ];
     let controls = controls(width);
     let count = controls.last().map_or(0, |(area, _)| area.y + 1);
     rows.extend((0..count).map(|_| Row::plain("")));
     let explanations = [
-        "* / ? bytes match whole filename; case folding is ASCII.",
-        "Substring; ^ / $ anchor filename; Unicode case folding.",
+        "Wildcard: * matches a sequence; ? matches one byte.",
+        "Regex searches within filenames; ^ / $ anchor the match.",
     ];
     let reserved = explanations
         .iter()
@@ -96,7 +99,6 @@ fn rows(state: &crate::app::PatternSelection, width: u16) -> Vec<Row<PatternCont
     let padding = reserved.saturating_sub(explanation.len());
     rows.extend(explanation);
     rows.extend((0..padding).map(|_| Row::plain("")));
-    rows.push(Row::plain("Native filename bytes; excluded marks stay."));
     rows.push(Row::plain("While typing: Alt+letter activates controls"));
     rows
 }
@@ -249,10 +251,20 @@ fn render_controls(
         if focused {
             style = style.add_modifier(Modifier::REVERSED);
         }
+        let marker = control_marker(*target, selected);
         frame.render_widget(
-            Paragraph::new(format!("[{} {label}]", if selected { "✓" } else { " " })).style(style),
+            Paragraph::new(format!("{marker} {label}")).style(style),
             *area,
         );
+    }
+}
+
+fn control_marker(target: PatternControl, selected: bool) -> &'static str {
+    match (target, selected) {
+        (PatternControl::Case, true) => "[x]",
+        (PatternControl::Case, false) => "[ ]",
+        (_, true) => "(●)",
+        (_, false) => "( )",
     }
 }
 
