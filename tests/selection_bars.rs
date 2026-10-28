@@ -153,3 +153,51 @@ fn assert_unselected(
         );
     }
 }
+
+#[test]
+fn marked_cursor_and_other_rows_keep_brackets_in_both_panes_and_all_colours() {
+    let (_root, mut app) = fixture();
+    app.dual = true;
+    for pane in &mut app.panes {
+        pane.select_all();
+    }
+    for level in [
+        ColorLevel::NoColor,
+        ColorLevel::Ansi16,
+        ColorLevel::Ansi256,
+        ColorLevel::TrueColor,
+    ] {
+        for active in 0..2 {
+            app.active = active;
+            let mut terminal = Terminal::new(TestBackend::new(160, 20)).unwrap();
+            let mut geometry = ui::geometry(&app, terminal.backend().buffer().area);
+            terminal
+                .draw(|frame| geometry = ui::render(frame, &app, &Theme::new(level)))
+                .unwrap();
+            for area in geometry.panes.into_iter().flatten() {
+                for y in area.y + 2..area.y + 4 {
+                    let marker: String = (area.x + 1..area.x + 4)
+                        .map(|x| terminal.backend().buffer()[(x, y)].symbol())
+                        .collect();
+                    assert_eq!(marker, "[*]", "{level:?} active={active}");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn narrow_marked_rows_retain_the_marker_before_filename() {
+    let (_root, mut app) = fixture();
+    app.panes[0].select_all();
+    let mut terminal = Terminal::new(TestBackend::new(7, 12)).unwrap();
+    terminal
+        .draw(|frame| {
+            ui::render(frame, &app, &Theme::new(ColorLevel::NoColor));
+        })
+        .unwrap();
+    let marker: String = (1..4)
+        .map(|x| terminal.backend().buffer()[(x, 2)].symbol())
+        .collect();
+    assert_eq!(marker, "[*]");
+}

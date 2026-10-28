@@ -66,6 +66,7 @@ These are the default bindings. You can customise them in `config.toml`.
 | Space / Insert | Toggle a mark / toggle a mark and advance |
 | Shift+Up / Shift+Down or Shift+click | Extend or shrink a marked range |
 | Ctrl+A / Ctrl+U | Mark all / clear marks in the visible listing |
+| Alt+B | Mark, unmark or replace visible marks by wildcard or regex |
 | `/` | Filter the current listing; Enter accepts, Esc cancels or clears |
 | `h` | Show or hide hidden entries |
 | `i` | Cycle Git-ignore display: dim, hide, off |
@@ -92,6 +93,31 @@ Large or slow directories, concurrent operations and unavailable mounts can
 extend refresh latency.
 If a directory disappears or another directory replaces it, TFM retains the
 last good view and reports the error; navigate out and reopen the directory to select the replacement.
+
+### Pattern selection
+
+Press **Alt+B** or click **Alt+B Mark** to mark filenames by pattern in the
+active pane. Choose Wildcard or Regex, edit the expression, and use Tab and
+Enter or the mouse to select **Mark matches**, **Unmark matches**, or
+**Replace visible marks with matches**. Enter from the expression focuses
+Cancel; Esc cancels without changing marks. Paste edits only the expression.
+You can bind another key to `pattern-selection` in `[keybindings]` if your
+terminal or multiplexer reserves Alt+B.
+
+Wildcards match the whole filename: `*.rs`, `file?.txt`, `[abc]*` and `{a,b}*`.
+Globset treats `?` as one byte and case-insensitive wildcards fold ASCII.
+Regex uses Rust's `regex` syntax and matches substrings; use `^` and `$` to
+anchor a filename, for example `^report.*\.txt$`. Regex supports Unicode case
+folding; `(?-u:...)` enables explicit byte matching for native non-UTF names.
+Both modes start case-sensitive. Matching uses native filename bytes, including
+Windows native encoding, without replacing invalid characters for selection.
+
+The live counts include directories and only visible selectable names, across
+the full listing. Hidden, ignored and filtered-out marks stay unchanged.
+Replace shows how many visible marks it replaces and can clear them when
+there are zero matches. Empty or invalid patterns cannot apply. If the visible
+names or identities change while the modal is open, cancel and reopen it.
+Enlarge the terminal when the expression, counts or action cannot fit.
 
 ### Information and exit
 

@@ -35,8 +35,10 @@ path = "src/main.rs"
 [dependencies]
 colored_text = "=0.6.0"
 crossterm = { version = "=0.29.0", default-features = false, features = ["bracketed-paste", "events", "windows"] }
+globset = "=0.4.21"
 ignore = "=0.4.33"
 ratatui = { version = "=0.30.2", default-features = false, features = ["crossterm_0_29", "layout-cache"] }
+regex = "=1.13.1"
 serde = { version = "=1.0.229", features = ["derive"] }
 toml = { version = "=1.1.8", default-features = false, features = ["parse", "serde", "display"] }
 tokio = { version = "=1.53.3", default-features = false, features = ["rt-multi-thread"] }

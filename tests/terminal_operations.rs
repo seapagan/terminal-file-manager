@@ -223,3 +223,27 @@ fn same_folder_batch_failure_explains_the_reason_before_evidence_in_a_real_termi
         }
     }
 }
+
+#[test]
+fn pattern_selection_alt_b_paste_mark_and_cancel_work_in_native_terminal() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("pattern-ready.txt"), "preserved").unwrap();
+    let transcript = drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("pattern-ready.txt", "\x1bb"),
+            ("Pattern selection", "\x1b[200~*.txt\x1b[201~"),
+            ("Matches: 1 / 1 selectable", "\t\t\t\r"),
+            ("visible marks updated", "\x1bb"),
+            ("Pattern selection", "\x1b[200~missing\x1b[201~"),
+            ("missing", "\x1b"),
+            ("cancelled", "q"),
+        ],
+        true,
+    );
+    assert!(transcript.contains("[*]"));
+    assert_eq!(
+        fs::read_to_string(root.path().join("pattern-ready.txt")).unwrap(),
+        "preserved"
+    );
+}

@@ -48,6 +48,9 @@ impl Controller {
         geometry: &Geometry,
         now: Duration,
     ) -> Vec<Request> {
+        if super::pattern::handle(self, &event, geometry) {
+            return Vec::new();
+        }
         if super::diagnostics::handle(self, &event, geometry) {
             return Vec::new();
         }
@@ -136,6 +139,7 @@ impl Controller {
             }
             Quit | SaveQuit => self.exit(action),
             Filter => self.begin_filter(),
+            PatternSelection => super::pattern::open(self),
             Count => return self.count(geometry),
             Cancel => self.cancel(),
             _ => {}

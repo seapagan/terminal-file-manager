@@ -10,6 +10,7 @@ mod operation_dialog;
 mod operation_exit;
 mod operation_jobs;
 mod operations;
+mod pattern;
 mod profiles;
 mod scroll;
 pub(crate) mod view;
@@ -65,6 +66,7 @@ pub enum Action {
     MarkNext,
     SelectAll,
     ClearVisible,
+    PatternSelection,
     Filter,
     Hidden,
     Ignore,

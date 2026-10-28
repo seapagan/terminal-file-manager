@@ -97,6 +97,10 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
     (SelectAll, "Mark all visible entries"),
     (ClearVisible, "Clear visible marks"),
     (
+        PatternSelection,
+        "Mark/unmark/replace visible names by pattern; wildcard * / ? (bytes) matches whole names, ASCII case folding; Rust regex matches Unicode substrings (^ / $ anchors); case sensitive by default",
+    ),
+    (
         Filter,
         "Edit live fuzzy filter; Enter accepts, Esc restores",
     ),

@@ -212,11 +212,10 @@ fn cells(
 ) -> Vec<Cell<'static>> {
     let columns = pane.columns.visible(width, &pane.measurements);
     let decorate = |base: Style| focus.map_or(base, |role| base.patch(theme.style(role)));
+    let mut cells = identity_cells(entry, pane, theme, width < 8, name_width, decorate, active);
     if width < 8 {
-        let mut cells = identity_cells(entry, pane, theme, focus, name_width, decorate, active);
-        return vec![cells.pop().expect("name cell")];
+        return cells;
     }
-    let mut cells = identity_cells(entry, pane, theme, focus, name_width, decorate, active);
     if columns.size {
         let (number, unit) = super::measure::parts(entry, pane.human_sizes);
         cells.push(
@@ -251,7 +250,7 @@ fn identity_cells(
     entry: &Entry,
     pane: &Pane,
     theme: &Theme,
-    focus: Option<Role>,
+    compact: bool,
     name_width: u16,
     decorate: impl Fn(Style) -> Style,
     active: bool,
@@ -265,12 +264,18 @@ fn identity_cells(
         },
     );
     let marked = pane.marks.contains_key(&entry.path);
-    let marker = match (focus, marked) {
-        (Some(Role::Cursor | Role::InactiveCursor), true) => " * ",
-        (_, true) => "[*]",
-        _ => "   ",
-    };
-    let name = super::measure::name(entry, name_width);
+    let marker = if marked { "[*]" } else { "   " };
+    let name = super::measure::name(
+        entry,
+        name_width.saturating_sub(if compact && marked { 3 } else { 0 }),
+    );
+    if compact {
+        let mut spans = vec![Span::styled(name, name_style)];
+        if marked {
+            spans.insert(0, Span::styled(marker, decorate(theme.style(Role::Marked))));
+        }
+        return vec![Cell::from(Line::from(spans))];
+    }
     vec![
         Cell::from(marker).style(decorate(theme.style(if marked {
             Role::Marked

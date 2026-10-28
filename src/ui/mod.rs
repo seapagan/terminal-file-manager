@@ -13,8 +13,10 @@ pub(crate) use operations::animate_preview;
 pub use operations::{OperationControl, OperationTarget};
 mod path_title;
 pub use metadata::MetadataControl;
+mod pattern;
 mod policy;
 mod profiles;
+pub use pattern::{PatternControl, PatternLayout};
 pub(crate) use profiles::hit as profile_hit;
 mod summary;
 mod text;
@@ -94,6 +96,7 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     if let Some(lines) = diagnostics {
         diagnostics::render(frame, app, theme, &mut geometry, lines);
     }
+    pattern::render(frame, app, theme, geometry.pattern.as_ref());
     operations::render(frame, app, theme, &geometry);
     geometry
 }
