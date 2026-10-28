@@ -15,7 +15,7 @@ include = [
   "README.md",
   "THIRD_PARTY_NOTICES.md",
   "src/**",
-  "tests/*.rs",
+  "tests/**/*.rs",
 ]
 
 [package.metadata.binstall]
