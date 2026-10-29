@@ -274,24 +274,42 @@ fn pattern_alt_controls_and_literal_letters_cross_the_native_terminal_parser() {
 }
 
 #[test]
-fn pattern_overlong_bracketed_paste_requires_correction_before_native_apply() {
+fn pattern_overlong_native_input_requires_correction_before_apply() {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("overlong-ready.txt"), "preserved").unwrap();
-    let paste = format!("\x1b[200~{}[\x1b[201~", "a".repeat(20_000));
-    let transcript = drive(
-        command(root.path(), root.path(), None),
-        &[
-            ("overlong-ready.txt", "\x1bb"),
-            ("Pattern selection", &paste),
-            ("4096 bytes", "\x1bm\x1bu\x1br\r\x7f*\r\r"),
-            ("[*]", "q"),
-        ],
-        false,
-    );
+    let paste = overlong_pattern_input();
+    #[cfg(not(windows))]
+    let recovery = "\x1bm\x1bu\x1br\r\x7f*\r\r";
+    #[cfg(windows)]
+    let recovery = "\x1bm\x1bu\x1br\r\x1b";
+    let mut steps = vec![
+        ("overlong-ready.txt", "\x1bb"),
+        ("Pattern selection", paste.as_str()),
+        ("4096 bytes", recovery),
+    ];
+    #[cfg(windows)]
+    steps.extend([("cancelled", "\x1bb"), ("Pattern selection", "*\r\r")]);
+    steps.push(("[*]", "q"));
+    let transcript = drive(command(root.path(), root.path(), None), &steps, false);
     assert!(transcript.contains("Backspace to correct"));
     assert!(transcript.contains("[*]"));
     assert_eq!(
         fs::read(root.path().join("overlong-ready.txt")).unwrap(),
         b"preserved"
     );
+}
+
+#[cfg(not(windows))]
+fn overlong_pattern_input() -> String {
+    format!("\x1b[200~{}[\x1b[201~", "a".repeat(20_000))
+}
+
+#[cfg(windows)]
+fn overlong_pattern_input() -> String {
+    // ConPTY supplies Win32 keys, not Paste; alternate keys avoid repeat coalescing.
+    "界語"
+        .repeat(683)
+        .chars()
+        .map(|c| format!("\x1b[0;0;{};1;0;1_", u32::from(c)))
+        .collect()
 }
