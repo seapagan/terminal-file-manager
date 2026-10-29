@@ -62,7 +62,6 @@ impl Pane {
 
     /// Shift-click uses the same sorted/filtered working set as keyboard ranges.
     pub fn select_range_to(&mut self, path: PathBuf, height: usize) {
-        self.selection_revision = self.selection_revision.wrapping_add(1);
         let Some(target) = self
             .visible
             .iter()
@@ -70,6 +69,7 @@ impl Pane {
         else {
             return;
         };
+        self.selection_revision = self.selection_revision.wrapping_add(1);
         if self.range.is_none() {
             self.anchor_range();
         }

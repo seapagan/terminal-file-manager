@@ -1,7 +1,7 @@
 use super::*;
 use ratatui::{buffer::Buffer, style::Modifier};
 
-fn frame(
+pub(super) fn frame(
     c: &Controller,
     width: u16,
     height: u16,
@@ -18,43 +18,42 @@ fn frame(
     )
 }
 
-fn text_at(buffer: &Buffer, area: Rect) -> String {
+pub(super) fn text_at(buffer: &Buffer, area: Rect) -> String {
     (area.x..area.right())
         .map(|x| buffer[(x, area.y)].symbol())
         .collect()
 }
 
-fn assert_control_cells(before: &Buffer, layout: &ui::PatternLayout, width: u16) {
+fn assert_control_cells(buffer: &Buffer, layout: &ui::PatternLayout) {
     let wildcard = layout.fields[1].0;
     let regex = layout.fields[2].0;
-    assert_eq!(text_at(before, wildcard), "(●) W Wildcard");
-    assert_eq!(text_at(before, regex), "( ) X Regex");
-    assert!(
-        before[(wildcard.x, wildcard.y)]
-            .modifier
-            .contains(Modifier::BOLD | Modifier::UNDERLINED)
-    );
-    assert!(
-        !before[(wildcard.x, wildcard.y)]
-            .modifier
-            .contains(Modifier::REVERSED)
-    );
-    assert!(
-        before[(regex.x, regex.y)]
-            .modifier
-            .contains(Modifier::REVERSED)
-    );
-    assert!(
-        !before[(regex.x, regex.y)]
-            .modifier
-            .contains(Modifier::UNDERLINED)
-    );
-    assert_eq!(layout.shell.outer.width, width.min(76) - 2);
-    assert_eq!(wildcard.width, 14);
-    assert_eq!(regex, Rect::new(wildcard.right() + 2, wildcard.y, 11, 1));
+    assert_eq!(text_at(buffer, wildcard), "(●) W Wildcard");
+    assert_eq!(text_at(buffer, regex), "( ) X Regex");
+    for (i, (area, _)) in layout.fields.iter().enumerate() {
+        assert!(layout.shell.body.contains((area.x, area.y).into()));
+        assert!(area.right() <= layout.shell.body.right());
+        for (other, _) in layout.fields.iter().skip(i + 1) {
+            assert!(area.intersection(*other).is_empty());
+        }
+    }
+}
+
+fn assert_stable_layout(before: &ui::PatternLayout, after: &ui::PatternLayout) {
+    assert_eq!(before.fields, after.fields);
+    assert_eq!(before.shell.outer, after.shell.outer);
     assert_eq!(
-        layout.fields[3].0,
-        Rect::new(regex.right() + 2, regex.y, 20, 1)
+        before
+            .shell
+            .actions
+            .iter()
+            .map(|r| r.area)
+            .collect::<Vec<_>>(),
+        after
+            .shell
+            .actions
+            .iter()
+            .map(|r| r.area)
+            .collect::<Vec<_>>()
     );
 }
 
@@ -73,39 +72,31 @@ fn selected_and_focused_controls_have_distinct_stable_monochrome_cells() {
             key(&mut c, "Tab");
             key(&mut c, "Tab");
             let (before, layout) = frame(&c, width, 24, level);
-            assert_control_cells(&before, &layout, width);
+            assert_control_cells(&before, &layout);
+            key(&mut c, "Shift+Tab");
+            let (focused, _) = frame(&c, width, 24, level);
+            for field in [1, 2] {
+                let area = layout.fields[field].0;
+                assert_eq!(text_at(&before, area), text_at(&focused, area));
+                assert_ne!(
+                    before[(area.x, area.y)].style(),
+                    focused[(area.x, area.y)].style()
+                );
+            }
+            key(&mut c, "Tab");
             let wildcard = layout.fields[1].0;
             let regex = layout.fields[2].0;
             let mut changed = Vec::new();
             for input in ["Enter", "w", "x", "s", "Space", "Tab"] {
                 key(&mut c, input);
                 let (buffer, after) = frame(&c, width, 24, level);
-                assert_eq!(after.fields, layout.fields);
-                assert_eq!(after.shell.outer, layout.shell.outer);
-                assert_eq!(
-                    after
-                        .shell
-                        .actions
-                        .iter()
-                        .map(|r| r.area)
-                        .collect::<Vec<_>>(),
-                    layout
-                        .shell
-                        .actions
-                        .iter()
-                        .map(|r| r.area)
-                        .collect::<Vec<_>>()
-                );
+                assert_stable_layout(&layout, &after);
                 changed.push(text_at(&buffer, regex));
             }
             assert_eq!(changed[0], "(●) X Regex");
             assert_eq!(changed[1], "( ) X Regex");
             assert_eq!(layout.hit(wildcard.x - 1, wildcard.y), None);
-            assert!(
-                before[(layout.fields[0].0.x + 9, layout.fields[0].0.y)]
-                    .modifier
-                    .contains(Modifier::UNDERLINED)
-            );
+            assert!(!text_at(&before, layout.fields[0].0).contains('▏'));
         }
     }
 }
@@ -279,22 +270,7 @@ fn mode_case_and_validation_never_move_visible_control_rectangles() {
             c.app.pattern.as_mut().unwrap().set_mode(mode);
             c.app.pattern.as_mut().unwrap().toggle_case();
             let (_, after) = frame(&c, width, 30, ColorLevel::NoColor);
-            assert_eq!(before.fields, after.fields, "width {width}, {mode:?}");
-            assert_eq!(before.shell.outer, after.shell.outer);
-            assert_eq!(
-                before
-                    .shell
-                    .actions
-                    .iter()
-                    .map(|r| r.area)
-                    .collect::<Vec<_>>(),
-                after
-                    .shell
-                    .actions
-                    .iter()
-                    .map(|r| r.area)
-                    .collect::<Vec<_>>()
-            );
+            assert_stable_layout(&before, &after);
         }
     }
 }

@@ -192,13 +192,14 @@ fn sort_and_unchanged_refresh_preserve_captured_identities_and_range_ownership()
         .unwrap();
     let marks = app.panes[0].marks.clone();
     assert_eq!(marks.len(), 3);
-    app.panes[0].extend_range(1, 10);
-    app.panes[0].extend_range(-1, 10);
-    assert!(
-        marks
-            .iter()
-            .all(|(p, id)| app.panes[0].marks.get(p) == Some(id))
-    );
+    let pane = &mut app.panes[0];
+    pane.cursor = Some(pane.path.join("alpha.txt"));
+    pane.anchor_range();
+    pane.select_range_to(pane.path.join("keep.log"), 10);
+    assert!(pane.marks.contains_key(&pane.path.join("keep.log")));
+    assert!(pane.marks.len() > marks.len());
+    pane.select_range_to(pane.path.join("alpha.txt"), 10);
+    assert_eq!(pane.marks, marks);
 }
 
 #[test]
@@ -317,6 +318,18 @@ fn ignored_marks_survive_visible_replace_and_unavailable_names_are_not_selectabl
     let (_root, mut app) = loaded();
     let pane = &mut app.panes[0];
     pane.select_all();
+    let original = pane.marks.clone();
+    let unavailable = pane.path.join("alpha.txt");
+    let ignored = pane.path.join("keep.log");
+    assert_eq!(
+        pane.entries
+            .iter()
+            .find(|e| e.path == unavailable)
+            .unwrap()
+            .identity
+            .as_ref(),
+        original.get(&unavailable)
+    );
     pane.entries
         .iter_mut()
         .find(|e| e.name == "keep.log")
@@ -330,11 +343,25 @@ fn ignored_marks_survive_visible_replace_and_unavailable_names_are_not_selectabl
     pane.ignore = IgnoreMode::Hide;
     pane.refilter();
     let mut selection = PatternSelection::new(pane, 0);
-    selection.set_expression("none".into());
+    selection.set_expression("λ.txt".into());
     assert_eq!(selection.preview(pane).unwrap().visible, 3);
+    assert_eq!(selection.preview(pane).unwrap().matches, 1);
     selection.apply(pane, PatternOperation::Replace).unwrap();
-    assert!(pane.marks.contains_key(&pane.path.join("keep.log")));
-    assert!(!pane.marks.contains_key(&pane.path.join("λ.txt")));
+    for path in [&unavailable, &ignored, &pane.path.join("λ.txt")] {
+        assert_eq!(pane.marks.get(path), original.get(path));
+        assert!(pane.marks.contains_key(path));
+    }
+    assert_eq!(pane.marks.len(), 3);
+    assert!(!pane.marks.contains_key(&pane.path.join("BETA.TXT")));
+    assert!(!pane.marks.contains_key(&pane.path.join("folder.txt")));
+    assert!(
+        pane.entries
+            .iter()
+            .find(|e| e.path == unavailable)
+            .unwrap()
+            .identity
+            .is_none()
+    );
 }
 
 #[test]

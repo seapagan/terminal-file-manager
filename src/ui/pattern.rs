@@ -40,7 +40,7 @@ pub(super) fn layout(app: &App, area: Rect) -> Option<PatternLayout> {
         visible: bound,
         marked: bound,
     }));
-    let (shell, footer_rows) = measure(area, &rows, &summary_budget, &actions);
+    let shell = measure(area, &rows, &summary_budget, &actions);
     let rows: Vec<_> = rows
         .into_iter()
         .flat_map(|row| row.wrap(shell.body.width))
@@ -61,7 +61,7 @@ pub(super) fn layout(app: &App, area: Rect) -> Option<PatternLayout> {
             }
         }
     }
-    let shell = guard_actions(shell, footer_rows, rows.len(), &fields);
+    let shell = guard_actions(shell, &summary, &fields);
     Some(PatternLayout {
         shell,
         fields,
@@ -193,13 +193,8 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, layout: Option
         .enumerate()
     {
         frame.render_widget(
-            Paragraph::new(row.line(layout.shell.body.width, theme)).style(
-                if row.field == Some(PatternControl::Expression) {
-                    theme.style(Role::Value).add_modifier(Modifier::UNDERLINED)
-                } else {
-                    theme.style(Role::Normal)
-                },
-            ),
+            Paragraph::new(row.line(layout.shell.body.width, theme))
+                .style(theme.style(Role::Normal)),
             Rect::new(
                 layout.shell.body.x,
                 layout.shell.body.y + i as u16,
@@ -315,13 +310,10 @@ fn fields(
 
 fn guard_actions(
     mut shell: modal::Layout<PatternControl>,
-    footer_rows: u16,
-    body_rows: usize,
+    summary: &[Row<PatternControl>],
     fields: &[(Rect, PatternControl)],
 ) -> modal::Layout<PatternControl> {
     let ready = shell.body.width >= 12
-        && usize::from(shell.body.height) >= body_rows
-        && shell.footer.height == footer_rows
         && [
             PatternControl::Expression,
             PatternControl::Mode(PatternMode::Wildcard),
@@ -331,8 +323,20 @@ fn guard_actions(
         .iter()
         .all(|target| fields.iter().any(|(_, field)| field == target));
     for region in &mut shell.actions {
-        if matches!(region.action.intent, PatternControl::Apply(_)) {
-            region.action.enabled &= ready;
+        if let PatternControl::Apply(operation) = region.action.intent {
+            // Replace additionally needs its complete consequence, not the usage hint.
+            let required = if operation == PatternOperation::Replace {
+                2
+            } else {
+                1
+            };
+            let context_rows = summary
+                .iter()
+                .take(required)
+                .cloned()
+                .flat_map(|row| row.wrap(shell.footer.width))
+                .count();
+            region.action.enabled &= ready && context_rows <= usize::from(shell.footer.height);
         }
     }
     shell
@@ -343,7 +347,7 @@ fn measure(
     rows: &[Row<PatternControl>],
     summary: &[Row<PatternControl>],
     actions: &[Action<PatternControl>],
-) -> (modal::Layout<PatternControl>, u16) {
+) -> modal::Layout<PatternControl> {
     let content_width = 70;
     // Bound the action group by content width; shared packing wraps whole buttons.
     let width = (content_width as u16 + 6).min(area.width);
@@ -359,7 +363,7 @@ fn measure(
         .flat_map(|row| row.wrap(width.saturating_sub(6)))
         .count()
         .min(usize::from(u16::MAX)) as u16;
-    let shell = modal::Spec {
+    modal::Spec {
         title: "Pattern selection",
         content_width,
         pinned_rows: 0,
@@ -368,6 +372,5 @@ fn measure(
     }
     .measure(bounds, |width| {
         rows.iter().cloned().flat_map(|row| row.wrap(width)).count()
-    });
-    (shell, footer_rows)
+    })
 }

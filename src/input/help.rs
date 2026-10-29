@@ -98,7 +98,7 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
     (ClearVisible, "Clear visible marks"),
     (
         PatternSelection,
-        "Mark/unmark/replace visible names by pattern; wildcard * / ? (bytes) matches whole names, ASCII case folding; Rust regex matches Unicode substrings (^ / $ anchors); case sensitive by default. W Wildcard / X Regex / S Case sensitive / M Mark / U Unmark / R Replace; while typing use Alt+letter; Enter focuses Mark, then applies; Esc cancels",
+        "Mark, unmark or replace visible marks by wildcard or regex pattern",
     ),
     (
         Filter,

@@ -80,3 +80,33 @@ fn preview_invalidates_for_expression_mode_sort_refresh_and_live_apply() {
     assert_eq!(state.preview_scans.get(), cached + 1);
     assert!(app.panes[0].marks.is_empty());
 }
+
+#[test]
+fn invalid_range_target_preserves_revision_and_cache_but_real_ranges_invalidate() {
+    let (_root, mut app) = loaded();
+    let state = app.pattern.take().unwrap();
+    let pane = &mut app.panes[0];
+    assert_eq!(state.cached_preview(pane).unwrap().marked, 0);
+    let revision = pane.selection_revision;
+    let cursor = pane.cursor.clone();
+    pane.select_range_to(pane.path.join("nonexistent"), 10);
+    assert_eq!(pane.selection_revision, revision);
+    assert_eq!(pane.cursor, cursor);
+    assert!(pane.marks.is_empty());
+    assert_eq!(state.cached_preview(pane).unwrap().marked, 0);
+    assert_eq!(state.preview_scans.get(), 1);
+    let target = pane.entries[pane.visible[1]].path.clone();
+    pane.select_range_to(target, 10);
+    assert_ne!(pane.selection_revision, revision);
+    assert_eq!(state.cached_preview(pane).unwrap().marked, 2);
+    assert_eq!(state.preview_scans.get(), 2);
+    let revision = pane.selection_revision;
+    pane.select_range_to(pane.path.join("nonexistent"), 10);
+    assert_eq!(pane.selection_revision, revision);
+    assert_eq!(state.cached_preview(pane).unwrap().marked, 2);
+    assert_eq!(state.preview_scans.get(), 2);
+    pane.extend_range(-1, 10);
+    assert_ne!(pane.selection_revision, revision);
+    assert_eq!(state.cached_preview(pane).unwrap().marked, 1);
+    assert_eq!(state.preview_scans.get(), 3);
+}

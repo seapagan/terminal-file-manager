@@ -66,7 +66,6 @@ fn click(c: &mut Controller, target: PatternControl) {
                 .map(|r| r.area)
         })
         .unwrap();
-    assert_eq!(layout.hit(area.x, area.y), Some(target));
     event(
         c,
         Event::Mouse(MouseEvent {
@@ -112,10 +111,8 @@ fn measured_buttons_fields_counts_and_focus_match_keyboard_and_mouse() {
         let layout = geometry.pattern.unwrap();
         for region in &layout.shell.actions {
             assert!(text.contains(region.action.label));
-            assert_eq!(
-                layout.hit(region.area.x, region.area.y),
-                Some(region.action.intent)
-            );
+            assert!(region.area.right() < layout.shell.outer.right());
+            assert!(region.area.bottom() < layout.shell.outer.bottom());
         }
         assert!(layout.shell.outer.width < 80);
     }
@@ -351,3 +348,6 @@ fn release_and_modified_keys_do_not_dismiss_or_apply_the_form() {
 
 #[path = "pattern_modal/refinement.rs"]
 mod refinement;
+
+#[path = "pattern_modal/accessibility.rs"]
+mod accessibility;

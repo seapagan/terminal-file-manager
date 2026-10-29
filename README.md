@@ -114,12 +114,12 @@ You can bind another key to `pattern-selection` in `[keybindings]` if your
 terminal or multiplexer reserves Alt+B.
 
 Wildcards match the whole filename: `*.rs`, `file?.txt`, `[abc]*` and `{a,b}*`.
-Globset treats `?` as one byte and case-insensitive wildcards fold ASCII.
-Regex uses Rust's `regex` syntax and matches substrings; use `^` and `$` to
+`?` matches one byte; case-insensitive wildcards ignore ASCII case.
+Regex matches substrings; use `^` and `$` to
 anchor a filename, for example `^report.*\.txt$`. Regex supports Unicode case
-folding; `(?-u:...)` enables explicit byte matching for native non-UTF names.
-Both modes start case-sensitive. Matching uses native filename bytes, including
-Windows native encoding, without replacing invalid characters for selection.
+folding. Both modes start case-sensitive. Matching uses native filenames,
+including names with invalid Unicode; displayed replacement characters never
+stand in for the original name when selecting entries.
 
 The live counts include directories and only visible selectable names, across
 the full listing. Hidden, ignored and filtered-out marks stay unchanged.
