@@ -7,15 +7,7 @@ use crate::{
 use crossterm::event::KeyCode;
 use ratatui::{Frame, layout::Rect, style::Modifier, widgets::Paragraph};
 
-/// Exact rendered form target, shared by keyboard focus and mouse input.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PatternControl {
-    Expression,
-    Mode(PatternMode),
-    Case,
-    Apply(PatternOperation),
-    Cancel,
-}
+pub use crate::app::PatternControl;
 
 /// One measured layout for drawing, input eligibility and hit testing.
 #[derive(Clone, Debug)]
@@ -32,7 +24,10 @@ pub(super) fn layout(app: &App, area: Rect) -> Option<PatternLayout> {
     let state = app.pattern.as_ref()?;
     let preview = state.cached_preview(&app.panes[state.pane]);
     let rows = rows(state, area.width.saturating_sub(6).min(70));
-    let summary = summary_rows(preview.as_ref().map_err(String::as_str));
+    let mut summary = summary_rows(preview.as_ref().map_err(String::as_str));
+    if let Some(feedback) = &state.feedback {
+        summary[2] = Row::styled(feedback, Role::Warning).single_line();
+    }
     let actions = actions(preview.is_ok());
     let bound = app.panes[state.pane].entries.len();
     let summary_budget = summary_rows(Ok(&crate::app::PatternPreview {
@@ -78,7 +73,7 @@ fn rows(state: &crate::app::PatternSelection, width: u16) -> Vec<Row<PatternCont
             "Pattern",
             state.expression(),
             PatternControl::Expression,
-            state.focus == 0,
+            state.focus == PatternControl::Expression,
         ),
         Row::plain(""),
     ];
@@ -99,7 +94,20 @@ fn rows(state: &crate::app::PatternSelection, width: u16) -> Vec<Row<PatternCont
     let padding = reserved.saturating_sub(explanation.len());
     rows.extend(explanation);
     rows.extend((0..padding).map(|_| Row::plain("")));
-    rows.push(Row::plain("While typing: Alt+letter activates controls"));
+    let hints = [
+        "While typing: Alt+letter activates controls",
+        "Outside input: M/U/R apply; click Pattern to type",
+    ];
+    let hint = usize::from(state.focus != PatternControl::Expression);
+    let reserved = hints
+        .iter()
+        .map(|text| Row::<PatternControl>::plain(*text).wrap(width).len())
+        .max()
+        .unwrap_or(0);
+    let hint = Row::plain(hints[hint]).wrap(width);
+    let padding = reserved.saturating_sub(hint.len());
+    rows.extend(hint);
+    rows.extend((0..padding).map(|_| Row::plain("")));
     rows
 }
 
@@ -212,7 +220,16 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, layout: Option
         .collect();
     frame.render_widget(Paragraph::new(lines), layout.shell.footer);
     render_controls(frame, state, theme, layout);
-    modal::actions::render(frame, &layout.shell, theme, state.focus.checked_sub(4));
+    modal::actions::render(
+        frame,
+        &layout.shell,
+        theme,
+        layout
+            .shell
+            .actions
+            .iter()
+            .position(|r| r.action.intent == state.focus && r.action.enabled),
+    );
 }
 
 fn render_controls(
@@ -229,14 +246,18 @@ fn render_controls(
             PatternControl::Mode(PatternMode::Wildcard) => (
                 "W Wildcard",
                 state.mode == PatternMode::Wildcard,
-                state.focus == 1,
+                state.focus == *target,
             ),
             PatternControl::Mode(PatternMode::Regex) => (
                 "X Regex",
                 state.mode == PatternMode::Regex,
-                state.focus == 2,
+                state.focus == *target,
             ),
-            PatternControl::Case => ("S Case sensitive", state.case_sensitive, state.focus == 3),
+            PatternControl::Case => (
+                "S Case sensitive",
+                state.case_sensitive,
+                state.focus == *target,
+            ),
             _ => continue,
         };
         let mut style = theme.style(if selected { Role::Key } else { Role::Normal });

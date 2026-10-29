@@ -196,7 +196,10 @@ fn assert_clipped_context(width: u16, height: u16, level: ColorLevel) {
             (width, height),
         );
     }
-    assert_eq!(c.app.pattern.as_ref().unwrap().focus, 0);
+    assert_eq!(
+        c.app.pattern.as_ref().unwrap().focus,
+        PatternControl::Expression
+    );
     assert!(c.app.panes[0].marks.is_empty());
 }
 
@@ -242,7 +245,10 @@ fn preferred_width_and_enter_twice_mark_without_accidental_application() {
     let (_root, mut c) = loaded();
     key(&mut c, "Alt+b");
     key(&mut c, "Enter");
-    assert_eq!(c.app.pattern.as_ref().unwrap().focus, 0);
+    assert_eq!(
+        c.app.pattern.as_ref().unwrap().focus,
+        PatternControl::Expression
+    );
     event(&mut c, Event::Paste("*".into()), (100, 24));
     for width in [80, 120] {
         let (_, geometry) = rendered(&c, width, 24, ColorLevel::NoColor);

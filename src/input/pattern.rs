@@ -27,13 +27,30 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
         controller.app.pattern = None;
         return false;
     }
+    if let Some(layout) = &geometry.pattern {
+        reconcile_focus(controller, layout);
+    }
     match event {
         Event::Key(key) => key_input(controller, *key, geometry),
-        Event::Paste(text) if controller.app.pattern.as_ref().unwrap().focus == 0 => {
+        Event::Paste(text)
+            if controller.app.pattern.as_ref().unwrap().focus == PatternControl::Expression
+                && geometry.pattern.as_ref().is_some_and(|layout| {
+                    layout.targets().contains(&PatternControl::Expression)
+                }) =>
+        {
             append(controller, text)
         }
         Event::Mouse(mouse) => mouse_input(controller, *mouse, geometry),
-        Event::Resize(width, height) => super::scroll::resize(controller, *width, *height),
+        Event::Resize(width, height) => {
+            super::scroll::resize(controller, *width, *height);
+            let geometry = crate::ui::geometry(
+                &controller.app,
+                ratatui::layout::Rect::new(0, 0, *width, *height),
+            );
+            if let Some(layout) = &geometry.pattern {
+                reconcile_focus(controller, layout);
+            }
+        }
         _ => {}
     }
     true
@@ -73,12 +90,11 @@ fn route_key(controller: &mut Controller, key: KeyEvent, layout: &crate::ui::Pat
         }
         KeyCode::Enter if key.kind == KeyEventKind::Press => enter(controller, layout),
         KeyCode::PageUp | KeyCode::PageDown => {
-            let state = controller.app.pattern.as_mut().unwrap();
-            state.scroll = state
-                .scroll
-                .min(layout.scroll_limit)
-                .saturating_add_signed(if key.code == KeyCode::PageUp { -3 } else { 3 })
-                .min(layout.scroll_limit);
+            scroll(
+                controller,
+                layout,
+                if key.code == KeyCode::PageUp { -3 } else { 3 },
+            );
         }
         _ => edit(controller, key, layout),
     }
@@ -95,7 +111,7 @@ fn ignored_key(key: KeyEvent) -> bool {
 fn shortcut(controller: &mut Controller, key: KeyEvent, layout: &crate::ui::PatternLayout) -> bool {
     use crate::app::PatternOperation::*;
     if key.kind != KeyEventKind::Press
-        || (controller.app.pattern.as_ref().unwrap().focus == 0
+        || (controller.app.pattern.as_ref().unwrap().focus == PatternControl::Expression
             && !key.modifiers.contains(KeyModifiers::ALT))
     {
         return false;
@@ -124,7 +140,7 @@ fn advance_focus(controller: &mut Controller, key: KeyEvent, layout: &crate::ui:
     let targets = layout.targets();
     let current = targets
         .iter()
-        .position(|target| index(*target) == state.focus)
+        .position(|target| *target == state.focus)
         .unwrap_or(0);
     let delta = if key.code == KeyCode::BackTab || key.modifiers.contains(KeyModifiers::SHIFT) {
         -1
@@ -133,23 +149,33 @@ fn advance_focus(controller: &mut Controller, key: KeyEvent, layout: &crate::ui:
     };
     if !targets.is_empty() {
         state.focus =
-            index(targets[(current as isize + delta).rem_euclid(targets.len() as isize) as usize]);
+            targets[(current as isize + delta).rem_euclid(targets.len() as isize) as usize];
     }
 }
 
 fn enter(controller: &mut Controller, layout: &crate::ui::PatternLayout) {
     let state = controller.app.pattern.as_mut().unwrap();
-    if state.focus == 0 {
+    if state.focus == PatternControl::Expression {
         if layout
             .targets()
             .contains(&PatternControl::Apply(crate::app::PatternOperation::Mark))
         {
-            state.focus = 4;
+            state.feedback = None;
+            state.focus = PatternControl::Apply(crate::app::PatternOperation::Mark);
+        } else {
+            let reason = state
+                .preview(&controller.app.panes[state.pane])
+                .err()
+                .unwrap_or_else(|| {
+                    "Show the pattern and counts; scroll up or enlarge terminal".into()
+                });
+            state.feedback = Some(reason.clone());
+            controller.app.status = reason;
         }
     } else if let Some(target) = layout
         .targets()
         .into_iter()
-        .find(|target| index(*target) == state.focus)
+        .find(|target| *target == state.focus)
     {
         activate(controller, target, true);
     }
@@ -158,17 +184,25 @@ fn enter(controller: &mut Controller, layout: &crate::ui::PatternLayout) {
 fn edit(controller: &mut Controller, key: KeyEvent, layout: &crate::ui::PatternLayout) {
     let state = controller.app.pattern.as_mut().unwrap();
     match key.code {
-        KeyCode::Backspace if state.focus == 0 => {
+        KeyCode::Backspace
+            if state.focus == PatternControl::Expression
+                && layout.targets().contains(&PatternControl::Expression) =>
+        {
             let mut text = state.expression().to_owned();
             text.pop();
             state.set_expression(text);
         }
-        KeyCode::Char(c) if state.focus == 0 => append(controller, &c.to_string()),
+        KeyCode::Char(c)
+            if state.focus == PatternControl::Expression
+                && layout.targets().contains(&PatternControl::Expression) =>
+        {
+            append(controller, &c.to_string())
+        }
         KeyCode::Char(' ') if key.kind == KeyEventKind::Press => {
             if let Some(target @ (PatternControl::Mode(_) | PatternControl::Case)) = layout
                 .targets()
                 .into_iter()
-                .find(|target| index(*target) == state.focus)
+                .find(|target| *target == state.focus)
             {
                 activate(controller, target, true);
             }
@@ -178,21 +212,13 @@ fn edit(controller: &mut Controller, key: KeyEvent, layout: &crate::ui::PatternL
 }
 
 fn append(controller: &mut Controller, text: &str) {
-    let state = controller.app.pattern.as_mut().unwrap();
-    let mut expression = state.expression().to_owned();
-    for c in text.chars().filter(|c| !c.is_control()) {
-        if expression.len() + c.len_utf8() > 4096 {
-            break;
-        }
-        expression.push(c);
-    }
-    state.set_expression(expression);
+    controller.app.pattern.as_mut().unwrap().append(text);
 }
 
 fn activate(controller: &mut Controller, target: PatternControl, move_focus: bool) {
     let mut state = controller.app.pattern.take().unwrap();
     if move_focus {
-        state.focus = index(target);
+        state.focus = target;
     }
     match target {
         PatternControl::Cancel => {
@@ -218,17 +244,25 @@ fn activate(controller: &mut Controller, target: PatternControl, move_focus: boo
     controller.app.pattern = Some(state);
 }
 
-fn index(target: PatternControl) -> usize {
-    use crate::app::PatternOperation::*;
-    match target {
-        PatternControl::Expression => 0,
-        PatternControl::Mode(PatternMode::Wildcard) => 1,
-        PatternControl::Mode(PatternMode::Regex) => 2,
-        PatternControl::Case => 3,
-        PatternControl::Apply(Mark) => 4,
-        PatternControl::Apply(Unmark) => 5,
-        PatternControl::Apply(Replace) => 6,
-        PatternControl::Cancel => 7,
+fn reconcile_focus(controller: &mut Controller, layout: &crate::ui::PatternLayout) {
+    let state = controller.app.pattern.as_mut().unwrap();
+    state.scroll = state.scroll.min(layout.scroll_limit);
+    if !layout.targets().contains(&state.focus) {
+        // Hidden fields never receive edits; Expression is a safe dormant fallback.
+        state.focus = PatternControl::Expression;
+    }
+}
+
+fn scroll(controller: &mut Controller, layout: &crate::ui::PatternLayout, delta: isize) {
+    let state = controller.app.pattern.as_mut().unwrap();
+    state.scroll = state
+        .scroll
+        .min(layout.scroll_limit)
+        .saturating_add_signed(delta)
+        .min(layout.scroll_limit);
+    let geometry = crate::ui::geometry(&controller.app, layout.shell.outer);
+    if let Some(layout) = &geometry.pattern {
+        reconcile_focus(controller, layout);
     }
 }
 
@@ -255,16 +289,15 @@ fn mouse_input(
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
             if layout.shell.body.contains((mouse.column, mouse.row).into()) =>
         {
-            let state = controller.app.pattern.as_mut().unwrap();
-            state.scroll = state
-                .scroll
-                .min(layout.scroll_limit)
-                .saturating_add_signed(if mouse.kind == MouseEventKind::ScrollUp {
+            scroll(
+                controller,
+                layout,
+                if mouse.kind == MouseEventKind::ScrollUp {
                     -1
                 } else {
                     1
-                })
-                .min(layout.scroll_limit);
+                },
+            );
         }
         MouseEventKind::Down(MouseButton::Left) => {
             if let Some(target) = layout.hit(mouse.column, mouse.row) {

@@ -272,3 +272,26 @@ fn pattern_alt_controls_and_literal_letters_cross_the_native_terminal_parser() {
         "preserved"
     );
 }
+
+#[test]
+fn pattern_overlong_bracketed_paste_requires_correction_before_native_apply() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("overlong-ready.txt"), "preserved").unwrap();
+    let paste = format!("\x1b[200~{}[\x1b[201~", "a".repeat(20_000));
+    let transcript = drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("overlong-ready.txt", "\x1bb"),
+            ("Pattern selection", &paste),
+            ("4096 bytes", "\x1bm\x1bu\x1br\r\x7f*\r\r"),
+            ("[*]", "q"),
+        ],
+        false,
+    );
+    assert!(transcript.contains("Backspace to correct"));
+    assert!(transcript.contains("[*]"));
+    assert_eq!(
+        fs::read(root.path().join("overlong-ready.txt")).unwrap(),
+        b"preserved"
+    );
+}

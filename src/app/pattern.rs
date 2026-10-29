@@ -40,6 +40,16 @@ pub enum PatternOperation {
     Replace,
 }
 
+/// Exact form target shared by model focus, keyboard and mouse input.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PatternControl {
+    Expression,
+    Mode(PatternMode),
+    Case,
+    Apply(PatternOperation),
+    Cancel,
+}
+
 /// Live counts from the same validated scope used by Apply.
 #[derive(Clone, Copy, Debug)]
 pub struct PatternPreview {
@@ -51,8 +61,10 @@ pub struct PatternPreview {
 /// Session-only form with a frozen native working set and cached compiled matcher.
 pub struct PatternSelection {
     pub pane: usize,
-    /// Zero is the expression; subsequent indices are rendered controls.
-    pub focus: usize,
+    /// Deliberate editor or control focus.
+    pub focus: PatternControl,
+    pub feedback: Option<String>,
+    rejected_edit: bool,
     pub scroll: usize,
     pub mode: PatternMode,
     pub case_sensitive: bool,
@@ -72,7 +84,9 @@ impl PatternSelection {
     pub fn new(pane: &Pane, id: usize) -> Self {
         Self {
             pane: id,
-            focus: 0,
+            focus: PatternControl::Expression,
+            feedback: None,
+            rejected_edit: false,
             scroll: 0,
             mode: PatternMode::Wildcard,
             case_sensitive: true,
@@ -98,13 +112,42 @@ impl PatternSelection {
     /// Compile only when edited, with bounded regex allocation and parser limits.
     pub fn set_expression(&mut self, text: String) {
         self.preview_cache.get_mut().take();
+        self.feedback = None;
+        if text.len() > 4096 {
+            self.reject_edit();
+            return;
+        }
+        self.rejected_edit = false;
         self.expression = text;
+        self.matcher = self.compile();
+    }
+
+    /// Append a complete edit or reject it without retaining any prefix.
+    pub fn append(&mut self, text: &str) {
+        if self.rejected_edit {
+            return;
+        }
+        let mut expression = self.expression.clone();
+        for c in text.chars().filter(|c| !c.is_control()) {
+            if expression.len() + c.len_utf8() > 4096 {
+                self.reject_edit();
+                return;
+            }
+            expression.push(c);
+        }
+        self.set_expression(expression);
+    }
+
+    fn reject_edit(&mut self) {
+        self.rejected_edit = true;
+        self.preview_cache.get_mut().take();
         self.matcher = self.compile();
     }
 
     /// Change syntax without changing the approved working set.
     pub fn set_mode(&mut self, mode: PatternMode) {
         self.preview_cache.get_mut().take();
+        self.feedback = None;
         self.mode = mode;
         self.matcher = self.compile();
     }
@@ -112,11 +155,15 @@ impl PatternSelection {
     /// Matching starts case-sensitive on every open.
     pub fn toggle_case(&mut self) {
         self.preview_cache.get_mut().take();
+        self.feedback = None;
         self.case_sensitive = !self.case_sensitive;
         self.matcher = self.compile();
     }
 
     fn compile(&self) -> Result<regex::bytes::Regex, String> {
+        if self.rejected_edit {
+            return Err("Edit exceeds 4096 bytes; Backspace to correct or Esc to cancel".into());
+        }
         if self.expression.is_empty() {
             return Err("Enter a non-empty pattern".into());
         }
@@ -220,12 +267,27 @@ impl PatternSelection {
         pane: &mut Pane,
         operation: PatternOperation,
     ) -> Result<PatternPreview, String> {
-        let preview = self.preview(pane)?;
+        // Validate the entire live scope before changing even the first mark.
+        self.validate(pane)?;
         let matcher = self.matcher.as_ref().map_err(Clone::clone)?;
+        let mut preview = PatternPreview {
+            matches: 0,
+            visible: self.scope.len(),
+            marked: self
+                .scope
+                .keys()
+                .filter(|path| pane.marks.contains_key(*path))
+                .count(),
+        };
         pane.reset_range();
         pane.selection_revision = pane.selection_revision.wrapping_add(1);
         for i in &pane.visible {
-            self.apply_entry(&pane.entries[*i], &mut pane.marks, matcher, operation);
+            let entry = &pane.entries[*i];
+            if self.scope.contains_key(&entry.path) {
+                let matched = matcher.is_match(entry.name.as_encoded_bytes());
+                preview.matches += usize::from(matched);
+                self.apply_entry(entry, &mut pane.marks, matched, operation);
+            }
         }
         Ok(preview)
     }
@@ -234,13 +296,12 @@ impl PatternSelection {
         &self,
         entry: &crate::fs::Entry,
         marks: &mut HashMap<PathBuf, Identity>,
-        matcher: &regex::bytes::Regex,
+        matched: bool,
         operation: PatternOperation,
     ) {
         let Some(identity) = self.scope.get(&entry.path) else {
             return;
         };
-        let matched = matcher.is_match(entry.name.as_encoded_bytes());
         match operation {
             PatternOperation::Mark | PatternOperation::Replace if matched => {
                 marks

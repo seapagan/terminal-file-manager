@@ -8,7 +8,11 @@ fn setting_shortcuts_preserve_expression_caret_and_subsequent_typing_and_paste()
     event(&mut c, Event::Paste(expected.clone()), (100, 24));
     for shortcut in ["Alt+x", "Alt+w", "Alt+s"] {
         key(&mut c, shortcut);
-        assert_eq!(c.app.pattern.as_ref().unwrap().focus, 0, "{shortcut}");
+        assert_eq!(
+            c.app.pattern.as_ref().unwrap().focus,
+            PatternControl::Expression,
+            "{shortcut}"
+        );
         key(&mut c, "w");
         event(&mut c, Event::Paste(".txt".into()), (100, 24));
         expected.push_str("w.txt");
@@ -26,7 +30,15 @@ fn setting_shortcuts_preserve_every_noneditor_focus_including_actions() {
     let (_root, mut c) = loaded();
     key(&mut c, "Alt+b");
     event(&mut c, Event::Paste("alpha".into()), (100, 24));
-    for focus in 1..=7 {
+    for focus in [
+        PatternControl::Mode(PatternMode::Wildcard),
+        PatternControl::Mode(PatternMode::Regex),
+        PatternControl::Case,
+        PatternControl::Apply(PatternOperation::Mark),
+        PatternControl::Apply(PatternOperation::Unmark),
+        PatternControl::Apply(PatternOperation::Replace),
+        PatternControl::Cancel,
+    ] {
         key(&mut c, "Tab");
         assert_eq!(c.app.pattern.as_ref().unwrap().focus, focus);
         for shortcut in ["x", "s", "w", "Alt+x", "Alt+s", "Alt+w"] {
@@ -66,16 +78,22 @@ fn clicked_and_tabbed_settings_keep_deliberate_focus_and_activate_with_space_or_
     key(&mut c, "Alt+b");
     event(&mut c, Event::Paste("alpha".into()), (100, 24));
     click(&mut c, PatternControl::Mode(PatternMode::Wildcard));
-    assert_eq!(c.app.pattern.as_ref().unwrap().focus, 1);
+    assert_eq!(
+        c.app.pattern.as_ref().unwrap().focus,
+        PatternControl::Mode(PatternMode::Wildcard)
+    );
     key(&mut c, "Tab");
     key(&mut c, "Space");
-    assert_eq!(c.app.pattern.as_ref().unwrap().focus, 2);
+    assert_eq!(
+        c.app.pattern.as_ref().unwrap().focus,
+        PatternControl::Mode(PatternMode::Regex)
+    );
     assert_eq!(c.app.pattern.as_ref().unwrap().mode, PatternMode::Regex);
     key(&mut c, "Tab");
     for input in ["Space", "Enter"] {
         key(&mut c, input);
         let state = c.app.pattern.as_ref().unwrap();
-        assert_eq!(state.focus, 3);
+        assert_eq!(state.focus, PatternControl::Case);
         assert_eq!(state.case_sensitive, input == "Enter");
         let (buffer, layout) = frame(&c, 100, 24, ColorLevel::NoColor);
         assert_eq!(
@@ -94,12 +112,16 @@ fn clicked_and_tabbed_settings_keep_deliberate_focus_and_activate_with_space_or_
         assert_eq!(text_at(&buffer, layout.fields[1].0), "( ) W Wildcard");
         assert_eq!(text_at(&buffer, layout.fields[2].0), "(●) X Regex");
     }
-    click(&mut c, PatternControl::Case);
+    assert_case_repeats_ignored(&mut c);
+}
+
+fn assert_case_repeats_ignored(c: &mut Controller) {
+    click(c, PatternControl::Case);
     assert!(!c.app.pattern.as_ref().unwrap().case_sensitive);
-    assert_eq!(c.app.pattern.as_ref().unwrap().focus, 3);
+    assert_eq!(c.app.pattern.as_ref().unwrap().focus, PatternControl::Case);
     for kind in [KeyEventKind::Release, KeyEventKind::Repeat] {
         event(
-            &mut c,
+            c,
             Event::Key(KeyEvent::new_with_kind(
                 KeyCode::Char(' '),
                 KeyModifiers::NONE,

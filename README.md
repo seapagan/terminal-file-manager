@@ -100,15 +100,16 @@ Press **Alt+B** or click **Alt+B Mark** to mark filenames by pattern in the
 active pane. Click **W Wildcard**, **X Regex** or **S Case sensitive** to
 choose matching options. A filled radio button shows the selected mode;
 a checked box enables case sensitivity. Keyboard focus has a separate highlight.
-Type or paste into the underlined **Pattern** field.
+Type or paste into the **Pattern** field; its caret shows editing focus.
 Enter from a valid expression focuses **M Mark**; a second Enter marks matches.
 Use **U Unmark** or **R Replace** for the other actions. Esc cancels without
 changing marks.
 
 While typing, **Alt+W/X/S/M/U/R** activates controls; plain letters stay in the
-expression. Outside the field, plain **W/X/S/M/U/R** also works. Tab changes
-focus; W/X/S shortcuts keep focus where it is, so typing can continue after
-Alt+W/X/S. Enter/Space operates a focused mode or case control. All buttons
+expression. Outside the field, plain **W/X/S/M/U/R** also works. Tab and clicks on
+settings change focus. After a settings click, M/U/R applies
+the pattern; click **Pattern** to resume typing. W/X/S shortcuts keep focus
+where it is, so typing can continue after Alt+W/X/S. Enter/Space operates a focused mode or case control. All buttons
 support the mouse. Ctrl+C keeps its existing Quit behaviour.
 You can bind another key to `pattern-selection` in `[keybindings]` if your
 terminal or multiplexer reserves Alt+B.
@@ -119,7 +120,11 @@ Regex matches substrings; use `^` and `$` to
 anchor a filename, for example `^report.*\.txt$`. Regex supports Unicode case
 folding. Both modes start case-sensitive. Matching uses native filenames,
 including names with invalid Unicode; displayed replacement characters never
-stand in for the original name when selecting entries.
+stand in for the original name when selecting entries. Regex can match a valid
+substring within a name containing invalid Unicode; Unicode `.` cannot consume
+an invalid sequence. An anchored whole-name expression can therefore exclude
+that name while a wildcard includes it. Explicit regex byte mode (`(?-u:...)`)
+can match those sequences.
 
 The live counts include directories and only visible selectable names, across
 the full listing. Hidden, ignored and filtered-out marks stay unchanged.
@@ -127,6 +132,9 @@ Replace shows how many visible marks it replaces and can clear them when
 there are zero matches. Empty or invalid patterns cannot apply. If the visible
 names or identities change while the modal is open, cancel and reopen it.
 Enlarge the terminal when the expression, counts or action cannot fit.
+Expressions are limited to 4,096 bytes. An edit exceeding that limit is rejected
+in full and disables all Apply actions. Press Backspace in the Pattern field
+to correct the retained expression, or Esc to cancel.
 
 ### Information and exit
 

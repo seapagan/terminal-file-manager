@@ -77,7 +77,7 @@ fn preview_invalidates_for_expression_mode_sort_refresh_and_live_apply() {
             .apply(&mut app.panes[0], PatternOperation::Mark)
             .is_err()
     );
-    assert_eq!(state.preview_scans.get(), cached + 1);
+    assert_eq!(state.preview_scans.get(), cached);
     assert!(app.panes[0].marks.is_empty());
 }
 

@@ -274,6 +274,18 @@ fn native_invalid_bytes_are_distinct_from_lossy_display_names() {
     selection.apply(pane, PatternOperation::Mark).unwrap();
     assert!(pane.marks.contains_key(&root.path().join(&native)));
     selection.set_mode(PatternMode::Regex);
+    for (expression, expected) in [
+        ("txt$", 5),
+        ("^bad-.*\\.txt$", 1),
+        ("^(?-u:bad-.*\\.txt)$", 2),
+    ] {
+        selection.set_expression(expression.into());
+        assert_eq!(
+            selection.preview(pane).unwrap().matches,
+            expected,
+            "{expression}"
+        );
+    }
     selection.set_expression(r"(?-u:\xFF)".into());
     assert_eq!(selection.preview(pane).unwrap().matches, 1);
 }
@@ -310,6 +322,15 @@ fn windows_native_surrogate_names_never_match_replacement_display_text() {
     selection.set_expression("b*.txt".into());
     selection.apply(pane, PatternOperation::Mark).unwrap();
     assert!(pane.marks.contains_key(&root.path().join(&native)));
+    selection.set_mode(PatternMode::Regex);
+    for (expression, expected) in [("^b", 1), ("^b.*\\.txt$", 0), ("^(?-u:b.*\\.txt)$", 1)] {
+        selection.set_expression(expression.into());
+        assert_eq!(
+            selection.preview(pane).unwrap().matches,
+            expected,
+            "{expression}"
+        );
+    }
 }
 
 #[test]
@@ -393,4 +414,63 @@ fn native_replacement_at_the_same_filename_cannot_receive_a_frozen_mark() {
             .is_err()
     );
     assert!(app.panes[0].marks.is_empty());
+}
+
+#[test]
+fn wildcard_ascii_case_and_regex_unicode_case_remain_distinct() {
+    let (_root, mut app) = loaded();
+    let pane = &mut app.panes[0];
+    let mut selection = PatternSelection::new(pane, 0);
+    selection.toggle_case();
+    for (mode, expression, expected) in [
+        (PatternMode::Wildcard, "beta.txt", 1),
+        (PatternMode::Wildcard, "Λ.txt", 0),
+        (PatternMode::Wildcard, "λ.txt", 1),
+        (PatternMode::Regex, "^Λ\\.txt$", 1),
+        (PatternMode::Regex, "^beta\\.txt$", 1),
+    ] {
+        selection.set_mode(mode);
+        selection.set_expression(expression.into());
+        assert_eq!(
+            selection.preview(pane).unwrap().matches,
+            expected,
+            "{mode:?} {expression}"
+        );
+    }
+}
+
+#[test]
+fn apply_revalidates_last_identity_before_any_mark_or_range_change() {
+    let (_root, mut app) = loaded();
+    let pane = &mut app.panes[0];
+    pane.select_all();
+    let original = pane.marks.clone();
+    let mut selection = PatternSelection::new(pane, 0);
+    selection.set_expression("*".into());
+    assert!(selection.preview(pane).is_ok());
+    let last = *pane.visible.last().unwrap();
+    pane.entries[last].identity.as_mut().unwrap().object = Some((u64::MAX, u64::MAX));
+    for operation in [
+        PatternOperation::Mark,
+        PatternOperation::Unmark,
+        PatternOperation::Replace,
+    ] {
+        assert!(selection.apply(pane, operation).is_err());
+        assert_eq!(pane.marks, original);
+    }
+}
+
+#[test]
+fn direct_overlong_edits_reject_atomically_and_mode_changes_cannot_clear_error() {
+    let (_root, app) = loaded();
+    let pane = &app.panes[0];
+    let mut selection = PatternSelection::new(pane, 0);
+    selection.set_expression("*".into());
+    selection.set_expression("a".repeat(4097));
+    assert_eq!(selection.expression(), "*");
+    selection.set_mode(PatternMode::Regex);
+    selection.toggle_case();
+    assert!(selection.preview(pane).unwrap_err().contains("Backspace"));
+    selection.set_expression("alpha".into());
+    assert_eq!(selection.preview(pane).unwrap().matches, 1);
 }

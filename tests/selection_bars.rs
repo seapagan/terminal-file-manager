@@ -201,3 +201,57 @@ fn narrow_marked_rows_retain_the_marker_before_filename() {
         .collect();
     assert_eq!(marker, "[*]");
 }
+
+#[test]
+fn compact_zero_to_twelve_columns_clip_markers_and_graphemes_inside_borders() {
+    let (_root, mut app) = fixture();
+    for name in ["a", "界é", "e\u{301}界"] {
+        for pane in &mut app.panes {
+            pane.entries[0].name = name.into();
+        }
+        for marked in [false, true] {
+            if marked {
+                app.panes[0].select_all();
+            } else {
+                app.panes[0].clear_visible();
+            }
+            for active in [0, 1] {
+                app.active = active;
+                for width in 0..=12 {
+                    let mut terminal = Terminal::new(TestBackend::new(width, 12)).unwrap();
+                    let mut geometry = ui::geometry(&app, terminal.backend().buffer().area);
+                    terminal
+                        .draw(|frame| {
+                            geometry = ui::render(frame, &app, &Theme::new(ColorLevel::NoColor))
+                        })
+                        .unwrap();
+                    let buffer = terminal.backend().buffer();
+                    if let Some(area) = geometry.panes[0] {
+                        assert_compact_row(buffer, area, marked);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn assert_compact_row(buffer: &ratatui::buffer::Buffer, area: ratatui::layout::Rect, marked: bool) {
+    if area.width < 2 {
+        return;
+    }
+    let y = area.y + 2;
+    assert_eq!(buffer[(area.x, y)].symbol(), "│");
+    assert_eq!(buffer[(area.right() - 1, y)].symbol(), "│");
+    let available = area.width.saturating_sub(2);
+    if marked {
+        let marker: String = (area.x + 1..area.x + 1 + available.min(3))
+            .map(|x| buffer[(x, y)].symbol())
+            .collect();
+        assert_eq!(marker, "[*]"[..usize::from(available.min(3))]);
+    } else if available >= 3 {
+        let row: String = (area.x + 1..area.right() - 1)
+            .map(|x| buffer[(x, y)].symbol())
+            .collect();
+        assert!(!row.contains("[*]"));
+    }
+}

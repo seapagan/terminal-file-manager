@@ -6,7 +6,9 @@ mod pattern;
 mod selection;
 use crate::fs::{Entry, Snapshot, Totals};
 pub use pane::{IgnoreMode, Pane, SelectionCounts};
-pub use pattern::{PatternMode, PatternOperation, PatternPreview, PatternSelection};
+pub use pattern::{
+    PatternControl, PatternMode, PatternOperation, PatternPreview, PatternSelection,
+};
 use std::path::PathBuf;
 
 /// A bounded worker request carries identity independently of display text.

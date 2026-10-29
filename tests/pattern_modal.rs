@@ -351,3 +351,6 @@ mod refinement;
 
 #[path = "pattern_modal/accessibility.rs"]
 mod accessibility;
+
+#[path = "pattern_modal/review.rs"]
+mod review;
