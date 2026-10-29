@@ -32,28 +32,34 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
     }
     match event {
         Event::Key(key) => key_input(controller, *key, geometry),
-        Event::Paste(text)
-            if controller.app.pattern.as_ref().unwrap().focus == PatternControl::Expression
-                && geometry.pattern.as_ref().is_some_and(|layout| {
-                    layout.targets().contains(&PatternControl::Expression)
-                }) =>
-        {
-            append(controller, text)
-        }
+        Event::Paste(text) => paste(controller, text, geometry),
         Event::Mouse(mouse) => mouse_input(controller, *mouse, geometry),
-        Event::Resize(width, height) => {
-            super::scroll::resize(controller, *width, *height);
-            let geometry = crate::ui::geometry(
-                &controller.app,
-                ratatui::layout::Rect::new(0, 0, *width, *height),
-            );
-            if let Some(layout) = &geometry.pattern {
-                reconcile_focus(controller, layout);
-            }
-        }
+        Event::Resize(width, height) => resize(controller, *width, *height),
         _ => {}
     }
     true
+}
+
+fn paste(controller: &mut Controller, text: &str, geometry: &Geometry) {
+    if controller.app.pattern.as_ref().unwrap().focus == PatternControl::Expression
+        && geometry
+            .pattern
+            .as_ref()
+            .is_some_and(|layout| layout.targets().contains(&PatternControl::Expression))
+    {
+        append(controller, text);
+    }
+}
+
+fn resize(controller: &mut Controller, width: u16, height: u16) {
+    super::scroll::resize(controller, width, height);
+    let geometry = crate::ui::geometry(
+        &controller.app,
+        ratatui::layout::Rect::new(0, 0, width, height),
+    );
+    if let Some(layout) = &geometry.pattern {
+        reconcile_focus(controller, layout);
+    }
 }
 
 fn dismiss_for_priority(controller: &mut Controller, event: &Event) -> bool {
