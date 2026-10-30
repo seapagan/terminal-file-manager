@@ -34,7 +34,15 @@ fn at(buffer: &Buffer, text: &str) -> (u16, u16) {
 }
 #[test]
 fn create_requires_a_valid_name_without_stealing_field_focus() {
-    let app = dialog_fixture::dialog(Plan::mkdir("/controlled".into()));
+    for plan in [
+        Plan::mkdir("/controlled".into()),
+        Plan::create_file("/controlled".into()),
+    ] {
+        assert_create_form(plan);
+    }
+}
+fn assert_create_form(plan: Plan) {
+    let app = dialog_fixture::dialog(plan);
     let mut c = Controller::new(
         app,
         Bindings::new(&Default::default()).unwrap(),

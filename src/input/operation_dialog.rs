@@ -122,8 +122,12 @@ fn submit(
     dialog: &mut OperationDialog,
     geometry: &crate::ui::Geometry,
 ) -> bool {
-    if dialog.plan.operation == Operation::Mkdir && !dialog.directory_name_valid() {
-        let message = "Enter one directory name without path separators, NUL, or dot components";
+    if dialog.plan.operation.creates_entry() && !dialog.directory_name_valid() {
+        let message = if dialog.plan.operation == Operation::CreateFile {
+            "Enter one file name without path separators, NUL, or dot components"
+        } else {
+            "Enter one directory name without path separators, NUL, or dot components"
+        };
         dialog.error = Some(message.into());
         controller.app.status = message.into();
         return true;
@@ -131,7 +135,7 @@ fn submit(
     let approval = match dialog.plan.operation {
         Operation::Delete => Some(KeyCode::Char('D')),
         Operation::Trash => Some(KeyCode::Char('T')),
-        Operation::Mkdir => Some(KeyCode::Enter),
+        Operation::Mkdir | Operation::CreateFile => Some(KeyCode::Enter),
         _ => None,
     };
     if (matches!(dialog.plan.operation, Operation::Delete | Operation::Trash)
@@ -161,7 +165,7 @@ fn submit(
 }
 
 fn prepare(controller: &mut Controller, dialog: &mut OperationDialog) -> io::Result<bool> {
-    if dialog.track_scope && dialog.plan.operation != Operation::Mkdir {
+    if dialog.track_scope && !dialog.plan.operation.creates_entry() {
         let fresh = Plan::capture(
             &controller.app.panes[dialog.pane],
             dialog.plan.operation,
@@ -208,7 +212,7 @@ fn apply_fields(dialog: &mut OperationDialog) -> io::Result<()> {
                 dialog.plan.incoming_name = Some(dialog.incoming.clone().into());
             }
         }
-        Operation::Mkdir => {
+        Operation::Mkdir | Operation::CreateFile => {
             dialog.plan.set_destination(dialog.base.join(&dialog.text));
         }
         Operation::Rename => {

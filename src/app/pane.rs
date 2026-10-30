@@ -72,6 +72,7 @@ pub struct Pane {
     pub(crate) refresh_pending: bool,
     pub(crate) context: u64,
     pub(super) selection_revision: u64,
+    pub(super) creation: Option<super::creation::CreationFocus>,
     pub error: Option<String>,
     pub warnings: Vec<String>,
     pub(super) range: Option<super::selection::RangeSelection>,
@@ -139,6 +140,7 @@ impl Pane {
             refresh_pending: false,
             context: 0,
             selection_revision: 0,
+            creation: None,
             error: None,
             warnings: Vec::new(),
             range: None,
@@ -154,6 +156,7 @@ impl Pane {
     pub(super) fn install(&mut self, snapshot: Snapshot) {
         let previous_index = self.cursor_index().unwrap_or(0);
         let continuous = self.accepts_refresh(&snapshot);
+        let creation = self.take_creation(continuous);
         let range = self.range.take().filter(|_| continuous);
         if !continuous {
             self.marks.clear();
@@ -196,6 +199,7 @@ impl Pane {
             self.range = range;
             self.reconcile_range();
         }
+        self.restore_creation(creation);
     }
 
     fn reconcile_marks(&mut self) {

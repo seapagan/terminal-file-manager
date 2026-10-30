@@ -38,6 +38,7 @@ impl Pane {
 
     /// Ordinary movement/click starts a new gesture at this pane's native cursor.
     pub fn anchor_range(&mut self) {
+        self.selection_revision = self.selection_revision.wrapping_add(1);
         let identity = self
             .current()
             .filter(|entry| entry.error.is_none())

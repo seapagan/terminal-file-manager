@@ -25,6 +25,7 @@ pub(super) fn controls(area: Rect) -> Vec<FooterControl> {
         ("F5 Copy", Action::Copy),
         ("F6 Move", Action::Move),
         ("F7 Mkdir", Action::Mkdir),
+        ("New file", Action::CreateFile),
         ("F8 Trash", Action::Trash),
         ("F9 Jobs", Action::Jobs),
         ("Alt+Enter Info", Action::Metadata),

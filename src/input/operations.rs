@@ -17,6 +17,7 @@ pub(super) fn action(controller: &mut Controller, action: Action, geometry: &Geo
         Action::Copy | Action::CopyQuick => Operation::Copy,
         Action::Move | Action::MoveQuick => Operation::Move,
         Action::Mkdir => Operation::Mkdir,
+        Action::CreateFile => Operation::CreateFile,
         Action::Rename => Operation::Rename,
         Action::Trash => Operation::Trash,
         Action::Delete => Operation::Delete,
@@ -49,6 +50,8 @@ fn open(
     let destination = initial_destination(controller, operation);
     let mut plan = if operation == Operation::Mkdir {
         Plan::mkdir(base.clone())
+    } else if operation == Operation::CreateFile {
+        Plan::create_file(base.clone())
     } else {
         Plan::capture(&controller.app.panes[pane], operation, destination.clone())?
     };
@@ -107,7 +110,9 @@ fn initial_destination(
     let pane = controller.app.active;
     match operation {
         Operation::Copy | Operation::Move => Some(controller.app.panes[1 - pane].path.clone()),
-        Operation::Mkdir | Operation::Rename => Some(controller.app.panes[pane].path.clone()),
+        Operation::Mkdir | Operation::CreateFile | Operation::Rename => {
+            Some(controller.app.panes[pane].path.clone())
+        }
         _ => None,
     }
 }
@@ -125,7 +130,9 @@ fn capture_target(
         {
             plan.capture_destination(&controller.app.panes[1 - pane])?;
         }
-        Operation::Mkdir => plan.capture_destination(&controller.app.panes[pane])?,
+        Operation::Mkdir | Operation::CreateFile => {
+            plan.capture_destination(&controller.app.panes[pane])?
+        }
         _ => {}
     }
     Ok(())
@@ -177,7 +184,7 @@ fn validate_single(plan: &Plan) -> std::io::Result<()> {
 
 fn initial_text(plan: &Plan, target: &std::path::Path) -> String {
     match plan.operation {
-        Operation::Mkdir => String::new(),
+        Operation::Mkdir | Operation::CreateFile => String::new(),
         Operation::Rename => plan.operands[0]
             .name
             .to_str()

@@ -117,6 +117,30 @@ fn mkdir_runs_from_the_real_dialog_and_restores_the_terminal() {
 }
 
 #[test]
+fn create_file_shortcuts_cross_the_native_terminal_parser_and_restore_the_terminal() {
+    for shortcut in ["\x1b[18;2~", "\x1bn"] {
+        let root = tempfile::tempdir().unwrap();
+        fs::write(root.path().join("sentinel"), "preserved").unwrap();
+        drive(
+            command(root.path(), root.path(), None),
+            &[
+                ("sentinel", shortcut),
+                ("Create empty file", "created-empty\r"),
+                ("1 file created", "q"),
+            ],
+            true,
+        );
+        let metadata = fs::symlink_metadata(root.path().join("created-empty")).unwrap();
+        assert!(metadata.is_file());
+        assert_eq!(metadata.len(), 0);
+        assert_eq!(
+            fs::read(root.path().join("sentinel")).unwrap(),
+            b"preserved"
+        );
+    }
+}
+
+#[test]
 fn copy_and_move_replace_are_accessible_from_the_real_dual_pane_manager() {
     let root = tempfile::tempdir().unwrap();
     let left = root.path().join("left");

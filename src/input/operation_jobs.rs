@@ -17,6 +17,12 @@ impl Controller {
         options: crate::operations::Options,
         retry_of: Option<u64>,
     ) {
+        if plan.operation == crate::operations::Operation::CreateFile
+            && retry_of.is_none()
+            && let Some(path) = &plan.destination
+        {
+            self.app.panes[self.app.active].track_creation(id, path.clone());
+        }
         self.app.operations.history.push(Job {
             presentation: None,
             retry_eligible: false,
@@ -132,6 +138,10 @@ impl Controller {
                 _ => crate::operations::NoticeSeverity::Warning,
             };
             let incident = job.state == JobState::Critical;
+            let success = job.state == JobState::Completed;
+            for pane in &mut self.app.panes {
+                pane.finish_creation(id, success);
+            }
             if !incident {
                 self.app
                     .operations

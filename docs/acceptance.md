@@ -1590,3 +1590,16 @@ subtotal was 134.90 ms; the removed scan measured 69.21 ms in the revised
 fixture. These figures exclude coordinator acquisition, native recycling and
 fixture creation; the final filesystem walk remains mandatory. No watcher,
 shared modal framework, dependency or additional security exception was added.
+
+
+## PM3-03: Create empty file
+
+CreateFile regressions cover zero-byte regular files, Unicode input, file/directory
+and symlink collisions, permission errors, invalid names and cancellation.
+Buffer/input tests exercise the shared Create Directory form, semantic colours,
+monochrome focus, small terminals, clickable controls and configurable shortcuts.
+Native terminal tests exercise Shift+F7 and Alt+N through PTY/ConPTY.
+Refresh tests protect the originating pane, newer cursor/selection/navigation
+changes and hidden-file visibility. Windows-only tests cover device names,
+stream syntax and invalid native names. Platform results belong to the final
+commit and CI evidence; Linux cross-builds do not establish Windows runtime proof.

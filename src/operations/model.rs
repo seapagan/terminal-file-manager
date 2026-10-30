@@ -37,6 +37,9 @@ pub struct OperationDialog {
 impl OperationDialog {
     /// Pure syntax check shared by the form and its submit guard; no filesystem reads.
     pub fn directory_name_valid(&self) -> bool {
+        if self.plan.operation == super::Operation::CreateFile {
+            return super::plan::valid_file_name(std::ffi::OsStr::new(&self.text));
+        }
         use std::path::{Component, Path};
         let path = Path::new(&self.text);
         !self.text.contains('\0')
@@ -293,7 +296,7 @@ fn completed(job: &Job, record: &Record) -> String {
     let verb = match job.plan.operation {
         Copy => "copied",
         Move => "moved",
-        Mkdir => "created",
+        Mkdir | CreateFile => "created",
         Rename => "renamed",
         Trash => "trashed",
         Delete => "permanently deleted",

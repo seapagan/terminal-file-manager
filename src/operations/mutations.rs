@@ -23,7 +23,7 @@ pub(super) fn execute(
     if let Err(error) = validate_preview(plan, cancel) {
         return super::queue::unsuccessful(plan, error.outcome, &error.detail);
     }
-    if plan.operation == Operation::Mkdir {
+    if plan.operation.creates_entry() {
         if let Some(destination) = &plan.destination {
             let source = crate::fs::inspect(destination.parent().unwrap_or(destination));
             apply(&source, plan, cancel, notify, &mut record, 0);
@@ -94,8 +94,8 @@ fn perform(
     if depth > 128 {
         return Err(io::Error::other("Maximum mutation depth reached").into());
     }
-    if plan.operation == Operation::Mkdir {
-        return mkdir(plan, result);
+    if plan.operation.creates_entry() {
+        return create_entry(plan, result);
     }
     let parents = Parents::capture(&source.path)?;
     safety::revalidate(source, true)?;
@@ -109,16 +109,24 @@ fn perform(
     }
 }
 
-fn mkdir(plan: &Plan, result: &mut EntryResult) -> Result<()> {
+fn create_entry(plan: &Plan, result: &mut EntryResult) -> Result<()> {
     let destination = plan
         .destination
         .as_ref()
-        .ok_or_else(|| io::Error::other("Directory name required"))?;
+        .ok_or_else(|| io::Error::other("Creation destination required"))?;
     let parents = Parents::capture(destination)?;
     parents.validate()?;
-    fs::create_dir(destination)?;
-    result.kind = EntryKind::Directory;
-    result.created_directory = true;
+    if plan.operation == Operation::CreateFile {
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(destination)?;
+        result.kind = EntryKind::File;
+    } else {
+        fs::create_dir(destination)?;
+        result.kind = EntryKind::Directory;
+        result.created_directory = true;
+    }
     Ok(())
 }
 

@@ -10,6 +10,7 @@ pub enum Operation {
     Copy,
     Move,
     Mkdir,
+    CreateFile,
     Rename,
     Permissions(u32),
     ReadOnly(bool),
@@ -32,7 +33,21 @@ pub struct Plan {
     retained_directories: Vec<super::Recovery>,
 }
 
+impl Operation {
+    pub(crate) fn creates_entry(self) -> bool {
+        matches!(self, Self::Mkdir | Self::CreateFile)
+    }
+}
+
 impl Plan {
+    /// Empty-file intent is independent of the visible cursor and marks.
+    pub fn create_file(destination: PathBuf) -> Self {
+        Self {
+            operation: Operation::CreateFile,
+            ..Self::mkdir(destination)
+        }
+    }
+
     /// Create-directory intent is independent of the visible cursor and marks.
     pub fn mkdir(destination: PathBuf) -> Self {
         Self {
@@ -129,7 +144,7 @@ impl Plan {
     /// Unknown outcomes require reconciliation. Fully completed jobs have nothing to retry.
     pub fn retry(&self, record: &super::Record) -> io::Result<Self> {
         self.retry_eligibility(record)?;
-        if self.operation == Operation::Mkdir {
+        if self.operation.creates_entry() {
             return Ok(self.clone());
         }
         let mut retry = self.clone();
@@ -162,13 +177,13 @@ impl Plan {
         if record.unresolved() {
             return Err(invalid("Outcome unknown; reconcile before retry"));
         }
-        if self.operation == Operation::Mkdir {
+        if self.operation.creates_entry() {
             if record
                 .entries
                 .iter()
                 .any(|entry| entry.outcome == super::Outcome::Completed)
             {
-                return Err(invalid("No incomplete directory creation to retry"));
+                return Err(invalid("No incomplete creation to retry"));
             }
             return Ok(());
         }
@@ -238,6 +253,15 @@ impl Plan {
     }
 
     pub(super) fn validate_directories(&self) -> super::safety::Result<()> {
+        if self.operation == Operation::CreateFile
+            && !self
+                .destination
+                .as_ref()
+                .and_then(|path| path.file_name())
+                .is_some_and(valid_file_name)
+        {
+            return Err(invalid("Enter one valid native file name").into());
+        }
         for evidence in &self.retained_directories {
             evidence.validate_directory()?;
         }
@@ -263,6 +287,48 @@ impl Plan {
         }
         Ok(())
     }
+}
+
+pub(crate) fn valid_file_name(name: &std::ffi::OsStr) -> bool {
+    use std::path::{Component, Path};
+    let path = Path::new(name);
+    if name.as_encoded_bytes().contains(&0)
+        || path.components().count() != 1
+        || !matches!(path.components().next(), Some(Component::Normal(_)))
+        || name
+            .to_str()
+            .is_some_and(|text| text.contains(std::path::is_separator))
+    {
+        return false;
+    }
+    #[cfg(windows)]
+    {
+        let Some(text) = name.to_str() else {
+            return false;
+        };
+        if text.ends_with(['.', ' ']) || text.chars().any(|c| c < ' ' || "<>:\"|?*".contains(c)) {
+            return false;
+        }
+        let stem = text
+            .split('.')
+            .next()
+            .unwrap_or("")
+            .trim_end()
+            .to_ascii_uppercase();
+        if matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+            || ["COM", "LPT"].iter().any(|prefix| {
+                stem.strip_prefix(prefix).is_some_and(|suffix| {
+                    matches!(
+                        suffix,
+                        "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
+                    )
+                })
+            })
+        {
+            return false;
+        }
+    }
+    true
 }
 
 #[derive(Clone, Debug)]
