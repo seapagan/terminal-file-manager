@@ -253,7 +253,7 @@ fn configured_binding_and_mouse_footer_open_the_same_form() {
     key(&mut c, "F11");
     assert!(c.app.pattern.is_some());
     key(&mut c, "Esc");
-    let geometry = ui::geometry(&c.app, Rect::new(0, 0, 100, 24));
+    let geometry = ui::geometry(&c.app, Rect::new(0, 0, 120, 24));
     let control = geometry
         .footer_controls
         .iter()

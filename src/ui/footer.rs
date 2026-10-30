@@ -25,16 +25,16 @@ pub(super) fn controls(area: Rect) -> Vec<FooterControl> {
         ("F5 Copy", Action::Copy),
         ("F6 Move", Action::Move),
         ("F7 Mkdir", Action::Mkdir),
-        ("New file", Action::CreateFile),
+        ("Alt+N New file", Action::CreateFile),
         ("F8 Trash", Action::Trash),
         ("F9 Jobs", Action::Jobs),
         ("Alt+Enter Info", Action::Metadata),
         ("q Quit", Action::Quit),
         ("Alt+B Mark", Action::PatternSelection),
-        ("Alt-P Panes", Action::TogglePanes),
+        ("Alt+P Panes", Action::TogglePanes),
         ("V View", Action::ViewOptions),
         ("/ Filter", Action::Filter),
-        ("Alt-V Profiles", Action::ViewProfiles),
+        ("Alt+V Profiles", Action::ViewProfiles),
     ] {
         let width = label.len() as u16;
         if u32::from(x) + u32::from(width) > u32::from(area.right()) {

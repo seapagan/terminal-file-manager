@@ -98,7 +98,7 @@ fn footer_info_uses_the_popup_binding_and_fits_whole_controls_in_both_layouts() 
         Some(Action::ToggleSidebar)
     );
     for dual in [false, true] {
-        for width in [1, 20, 60, 80, 120] {
+        for width in [1, 20, 60, 80, 84, 85, 120] {
             let mut app = App::new(".".into());
             app.dual = dual;
             let buffer = draw(&app, width, ColorLevel::NoColor);
@@ -112,7 +112,7 @@ fn footer_info_uses_the_popup_binding_and_fits_whole_controls_in_both_layouts() 
                 .footer_controls
                 .iter()
                 .find(|c| c.action == Action::Metadata);
-            if width >= 80 {
+            if width >= 85 {
                 let info = info.unwrap();
                 assert_eq!(info.label, "Alt+Enter Info");
                 let value: String = (info.area.x..info.area.right())
@@ -120,6 +120,8 @@ fn footer_info_uses_the_popup_binding_and_fits_whole_controls_in_both_layouts() 
                     .collect();
                 assert_eq!(value, info.label);
                 click_info(app, &g, info);
+            } else {
+                assert!(info.is_none());
             }
             assert!(
                 g.footer_controls

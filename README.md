@@ -163,8 +163,8 @@ to correct the retained expression, or Esc to cancel.
 | F9 / Alt+J | Jobs, progress and retained results |
 
 Create a file or directory in the active pane with one name, independently of
-the cursor or marks. Existing entries are preserved. Click **New file** in the
-footer, or use Alt+N if your terminal does not deliver Shift+F7.
+the cursor or marks. Existing entries are preserved. Click **Alt+N New file** in
+the footer, or use Alt+N if your terminal does not deliver Shift+F7.
 
 Other operations use visible marks, or the cursor when no visible marks remain. With
 two panes, copy and move target the other pane: one entry starts immediately,

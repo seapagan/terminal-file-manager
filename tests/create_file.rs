@@ -260,12 +260,56 @@ fn configured_keys_and_footer_click_use_the_same_create_file_action() {
         .iter()
         .find(|control| control.action == Action::CreateFile)
         .unwrap();
-    let event = mouse(control.area);
+    assert_eq!(control.label, "Alt+N New file");
+    let event = mouse(Rect::new(control.area.right() - 1, control.area.y, 1, 1));
     c.handle(event, &g, Duration::ZERO);
     assert!(c.app.operations.dialog.is_some());
     key(&mut c, "Esc");
     key(&mut c, "Shift+F7");
     assert!(c.app.help && c.app.operations.dialog.is_none());
+}
+
+#[test]
+fn footer_shortcuts_fit_without_partial_labels_and_use_help_notation() {
+    use ratatui::{Terminal, backend::TestBackend};
+    use terminal_file_manager::{color::Theme, input::Action};
+    let (_root, c) = loaded();
+    let theme = Theme::new(colored_text::ColorLevel::TrueColor);
+    for (width, new_file_visible) in [(49, false), (50, true), (180, true)] {
+        let mut terminal = Terminal::new(TestBackend::new(width, 24)).unwrap();
+        terminal
+            .draw(|f| {
+                ui::render(f, &c.app, &theme);
+            })
+            .unwrap();
+        let g = ui::geometry(&c.app, Rect::new(0, 0, width, 24));
+        assert_eq!(
+            g.footer_controls
+                .iter()
+                .any(|c| c.action == Action::CreateFile),
+            new_file_visible
+        );
+        for control in &g.footer_controls {
+            assert!(control.area.right() <= width);
+            let (key, _) = control.label.split_once(' ').unwrap();
+            assert!(
+                c.app
+                    .help_rows
+                    .iter()
+                    .any(|(keys, _)| keys.split(" / ").any(|binding| binding == key))
+            );
+            let buffer = terminal.backend().buffer();
+            let rendered: String = (control.area.x..control.area.right())
+                .map(|x| buffer[(x, control.area.y)].symbol())
+                .collect();
+            assert_eq!(rendered, control.label);
+        }
+        assert!(
+            g.footer_controls
+                .windows(2)
+                .all(|pair| pair[0].area.right() + 2 == pair[1].area.x)
+        );
+    }
 }
 
 fn mouse(area: Rect) -> Event {
