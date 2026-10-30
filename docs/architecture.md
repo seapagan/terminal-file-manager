@@ -120,6 +120,23 @@ configuration data.
 Viewer/editor, mutation and navigation integrations explain their later milestone
 instead of silently falling back to a subprocess.
 
+### Implemented pattern selection
+
+`app::PatternSelection` captures the active pane's visible selectable native
+names and identities, including directories. Its shared modal edits wildcard
+or regex expressions independently of the fuzzy listing filter. Matching uses
+native filename bytes rather than display text. Rendering caches preview counts;
+Apply independently revalidates the captured directory and complete visible
+identity set before changing any marks. Mark and Unmark affect matching entries;
+Replace changes only the captured visible working set and preserves excluded marks.
+
+An edit exceeding 4,096 bytes is rejected atomically and blocks all Apply routes
+until deliberate correction or cancellation. Rendering, focus, mouse targets and
+keyboard eligibility share measured modal geometry. Input stays within the active
+form; a higher-priority operation/conflict transition consumes its triggering
+event, and Ctrl+C retains Quit. Marked rows retain `[*]` independently of cursor
+and focus styling.
+
 ## Planned application contracts
 
 ### M2 operation engine

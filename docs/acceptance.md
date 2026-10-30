@@ -1,5 +1,35 @@
 # Acceptance gates
 
+## PM3-02 accepted and merged — 30 October 2026
+
+[PR #6](https://github.com/seapagan/terminal-file-manager/pull/6) merged at
+19:38:40 UTC as
+[`e65b9bec`](https://github.com/seapagan/terminal-file-manager/commit/e65b9bec45bc1c4900578cffd6135f4f35a7cddd).
+The final reviewed feature head was GPG-signed/Signed-off-by
+[`f6055f4`](https://github.com/seapagan/terminal-file-manager/commit/f6055f4ce066e2584c9d158f97c5a81d2d5e73bf).
+Pattern selection and the consistent `[*]` marked-row cue are accepted.
+
+The maintainer confirms three independent serial cold AI reviews: Codex,
+DeepSeek, then Claude/GLM, with agreed findings corrected or dispositioned.
+These were external review sessions, not formal GitHub review approvals.
+The maintainer visually and functionally accepted the remediated feature on
+Linux. Windows and macOS acceptance rests on native automated tests; neither
+received manual visual acceptance.
+
+[Final feature-head Rust CI](https://github.com/seapagan/terminal-file-manager/actions/runs/41112374378)
+passed 725 Linux, 702 macOS and 671 Windows tests, with 2/2/3 established skips
+respectively, plus a doctest on each host. Both short Windows ConPTY smoke tests,
+Linux/macOS bracketed-paste recovery, cross-platform model/controller rejection
+of oversized edits, exact MSRV 1.95.0 and combined coverage passed. All five
+feature-head workflows and 19 checks passed. The final test-only correction
+separated the 4,096-byte contract from the excessive Windows key replay.
+
+Fourteen function-NLOC advisories remain; `shortcut` has a confirmed parser span
+misattribution. Other advisories retain their existing dispositions. Node and
+Codacy JGit reporting warnings remain nonblocking. The earlier macOS watcher
+failure passed at the final head without a watcher change; its cause remains
+unresolved. Earlier checkpoints below retain their historical status.
+
 ## PM3-01 local conflict clarity and failure feedback — 27 October 2026
 
 Apply-to-All uses a neutral On/Off label and modifies the actual submitted
