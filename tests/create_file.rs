@@ -123,8 +123,12 @@ fn install(c: &mut Controller, request: terminal_file_manager::app::Request) {
 }
 
 #[test]
-fn refresh_before_completion_preserves_creation_intent_but_hidden_files_stay_hidden() {
-    for (name, filter) in [("new", ""), (".hidden", ""), ("filtered", "wanted")] {
+fn creation_highlight_survives_refresh_and_respects_native_visibility() {
+    for (name, filter, visible) in [
+        ("new", "", true),
+        (".hidden", "", cfg!(windows)),
+        ("filtered", "wanted", false),
+    ] {
         let (root, mut c) = loaded();
         c.app.panes[0].set_filter(filter.into());
         let plan = submit(&mut c, name);
@@ -134,7 +138,7 @@ fn refresh_before_completion_preserves_creation_intent_but_hidden_files_stay_hid
         assert!(root.path().join(name).is_file());
         assert_eq!(
             c.app.panes[0].cursor,
-            (name == "new").then(|| root.path().join(name))
+            visible.then(|| root.path().join(name))
         );
     }
 }
@@ -166,7 +170,7 @@ fn cancellation_and_collisions_never_select_a_new_file() {
 
 #[test]
 fn invalid_names_and_escape_never_submit_or_mutate() {
-    for name in ["", ".", "..", "nested/file", "file/", "\0"] {
+    for name in ["", ".", "..", "nested/file", "file/", "file/.", "\0"] {
         let (root, mut c) = loaded();
         key(&mut c, "Alt+n");
         let g = ui::geometry(&c.app, Rect::new(0, 0, 120, 30));

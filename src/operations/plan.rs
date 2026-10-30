@@ -290,15 +290,9 @@ impl Plan {
 }
 
 pub(crate) fn valid_file_name(name: &std::ffi::OsStr) -> bool {
-    use std::path::{Component, Path};
+    use std::path::Path;
     let path = Path::new(name);
-    if name.as_encoded_bytes().contains(&0)
-        || path.components().count() != 1
-        || !matches!(path.components().next(), Some(Component::Normal(_)))
-        || name
-            .to_str()
-            .is_some_and(|text| text.contains(std::path::is_separator))
-    {
+    if name.as_encoded_bytes().contains(&0) || path.file_name() != Some(name) {
         return false;
     }
     #[cfg(windows)]

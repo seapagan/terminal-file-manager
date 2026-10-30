@@ -1591,7 +1591,6 @@ fixture. These figures exclude coordinator acquisition, native recycling and
 fixture creation; the final filesystem walk remains mandatory. No watcher,
 shared modal framework, dependency or additional security exception was added.
 
-
 ## PM3-03: Create empty file
 
 CreateFile regressions cover zero-byte regular files, Unicode input, file/directory
