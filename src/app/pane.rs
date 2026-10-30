@@ -71,6 +71,7 @@ pub struct Pane {
     pub(crate) listing: bool,
     pub(crate) refresh_pending: bool,
     pub(crate) context: u64,
+    pub(super) selection_revision: u64,
     pub error: Option<String>,
     pub warnings: Vec<String>,
     pub(super) range: Option<super::selection::RangeSelection>,
@@ -137,6 +138,7 @@ impl Pane {
             listing: true,
             refresh_pending: false,
             context: 0,
+            selection_revision: 0,
             error: None,
             warnings: Vec::new(),
             range: None,
@@ -227,6 +229,7 @@ impl Pane {
     }
 
     fn refilter_at(&mut self, previous_index: usize) {
+        self.selection_revision = self.selection_revision.wrapping_add(1);
         self.visible = self
             .entries
             .iter()
@@ -316,6 +319,7 @@ impl Pane {
 
     /// Toggle the cursor's stable native mark.
     pub fn toggle_mark(&mut self) {
+        self.selection_revision = self.selection_revision.wrapping_add(1);
         self.reset_range();
         if let Some((path, identity)) = self
             .current()
@@ -329,6 +333,7 @@ impl Pane {
 
     /// Mark only the current visible working set.
     pub fn select_all(&mut self) {
+        self.selection_revision = self.selection_revision.wrapping_add(1);
         self.reset_range();
         for i in &self.visible {
             let entry = &self.entries[*i];
@@ -340,6 +345,7 @@ impl Pane {
 
     /// Clear visible marks; hidden and filtered marks remain in state.
     pub fn clear_visible(&mut self) {
+        self.selection_revision = self.selection_revision.wrapping_add(1);
         self.reset_range();
         for i in &self.visible {
             self.marks.remove(&self.entries[*i].path);

@@ -59,8 +59,9 @@ fn cursors_override_directory_size_time_permission_and_mark_spans() {
             let buffer = terminal.backend().buffer();
             for id in 0..2 {
                 let left = 1 + id * 120;
-                assert_eq!(buffer[(left, 2)].symbol(), " ");
+                assert_eq!(buffer[(left, 2)].symbol(), "[");
                 assert_eq!(buffer[(left + 1, 2)].symbol(), "*");
+                assert_eq!(buffer[(left + 2, 2)].symbol(), "]");
                 for x in left..left + 118 {
                     assert_cursor(&buffer[(x, 2)], level, id as usize == active);
                 }

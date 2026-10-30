@@ -29,6 +29,7 @@ pub(super) fn controls(area: Rect) -> Vec<FooterControl> {
         ("F9 Jobs", Action::Jobs),
         ("Alt+Enter Info", Action::Metadata),
         ("q Quit", Action::Quit),
+        ("Alt+B Mark", Action::PatternSelection),
         ("Alt-P Panes", Action::TogglePanes),
         ("V View", Action::ViewOptions),
         ("/ Filter", Action::Filter),

@@ -97,6 +97,10 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
     (SelectAll, "Mark all visible entries"),
     (ClearVisible, "Clear visible marks"),
     (
+        PatternSelection,
+        "Mark, unmark or replace visible marks by wildcard or regex pattern",
+    ),
+    (
         Filter,
         "Edit live fuzzy filter; Enter accepts, Esc restores",
     ),

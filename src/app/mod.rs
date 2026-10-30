@@ -2,9 +2,13 @@
 mod metadata;
 mod pane;
 pub use metadata::MetadataFormat;
+mod pattern;
 mod selection;
 use crate::fs::{Entry, Snapshot, Totals};
 pub use pane::{IgnoreMode, Pane, SelectionCounts};
+pub use pattern::{
+    PatternControl, PatternMode, PatternOperation, PatternPreview, PatternSelection,
+};
 use std::path::PathBuf;
 
 /// A bounded worker request carries identity independently of display text.
@@ -50,6 +54,7 @@ pub struct App {
     pub sidebar_left: bool,
     pub popup: bool,
     pub help: bool,
+    pub pattern: Option<PatternSelection>,
     pub diagnostics: bool,
     pub diagnostics_scroll: u16,
     pub view_menu: Option<usize>,
@@ -81,6 +86,7 @@ impl App {
             sidebar_left: false,
             popup: false,
             help: false,
+            pattern: None,
             diagnostics: false,
             diagnostics_scroll: 0,
             view_menu: None,

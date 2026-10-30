@@ -223,3 +223,75 @@ fn same_folder_batch_failure_explains_the_reason_before_evidence_in_a_real_termi
         }
     }
 }
+
+#[test]
+fn pattern_selection_alt_b_paste_mark_and_cancel_work_in_native_terminal() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("pattern-ready.txt"), "preserved").unwrap();
+    let transcript = drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("pattern-ready.txt", "\x1bb"),
+            ("Pattern selection", "\x1b[200~*\x1b[201~"),
+            ("Matches: 1 / 1 selectable", "\r\r"),
+            ("[*]", "\x1bb"),
+            ("Pattern selection", "\x1b[200~missing\x1b[201~\x1b"),
+            ("cancelled", "q"),
+        ],
+        true,
+    );
+    assert!(transcript.contains("[*]"));
+    assert_eq!(
+        fs::read_to_string(root.path().join("pattern-ready.txt")).unwrap(),
+        "preserved"
+    );
+}
+
+#[test]
+fn pattern_alt_controls_and_literal_letters_cross_the_native_terminal_parser() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("wxsmurQfile.txt"), "preserved").unwrap();
+    let transcript = drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("wxsmurQfile.txt", "\x1bb"),
+            ("Pattern selection", "\x1bs\x1bx\x1bwwxsmur?*.txt\x1bm"),
+            ("[*]", "\x1bb"),
+            ("Pattern selection", "\x1bx"),
+            ("Regex searches", "\x1b"),
+            ("cancelled", "\x1bb"),
+            ("Pattern selection", "\x1b[200~*\x1b[201~"),
+            ("Matches: 1 / 1 selectable", "\x1bs\x1bw\x1bu"),
+            ("visible marks updated", "q"),
+        ],
+        false,
+    );
+    assert!(transcript.contains("[*]"));
+    assert_eq!(
+        fs::read_to_string(root.path().join("wxsmurQfile.txt")).unwrap(),
+        "preserved"
+    );
+}
+
+#[test]
+#[cfg(not(windows))]
+fn pattern_overlong_native_input_requires_correction_before_apply() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("overlong-ready.txt"), "preserved").unwrap();
+    // ConPTY key delivery is covered by the short native pattern tests above.
+    let paste = format!("\x1b[200~{}[\x1b[201~", "a".repeat(20_000));
+    let recovery = "\x1bm\x1bu\x1br\r\x7f*\r\r";
+    let steps = [
+        ("overlong-ready.txt", "\x1bb"),
+        ("Pattern selection", paste.as_str()),
+        ("4096 bytes", recovery),
+        ("[*]", "q"),
+    ];
+    let transcript = drive(command(root.path(), root.path(), None), &steps, false);
+    assert!(transcript.contains("Backspace to correct"));
+    assert!(transcript.contains("[*]"));
+    assert_eq!(
+        fs::read(root.path().join("overlong-ready.txt")).unwrap(),
+        b"preserved"
+    );
+}

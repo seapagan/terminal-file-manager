@@ -69,6 +69,7 @@ impl Pane {
         else {
             return;
         };
+        self.selection_revision = self.selection_revision.wrapping_add(1);
         if self.range.is_none() {
             self.anchor_range();
         }
