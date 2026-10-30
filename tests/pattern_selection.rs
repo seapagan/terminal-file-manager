@@ -462,8 +462,10 @@ fn apply_revalidates_last_identity_before_any_mark_or_range_change() {
 
 #[test]
 fn direct_overlong_edits_reject_atomically_and_mode_changes_cannot_clear_error() {
-    let (_root, app) = loaded();
-    let pane = &app.panes[0];
+    let (_root, mut app) = loaded();
+    let pane = &mut app.panes[0];
+    pane.select_all();
+    let marks = pane.marks.clone();
     let mut selection = PatternSelection::new(pane, 0);
     selection.set_expression("*".into());
     selection.set_expression("a".repeat(4097));
@@ -471,6 +473,14 @@ fn direct_overlong_edits_reject_atomically_and_mode_changes_cannot_clear_error()
     selection.set_mode(PatternMode::Regex);
     selection.toggle_case();
     assert!(selection.preview(pane).unwrap_err().contains("Backspace"));
+    for operation in [
+        PatternOperation::Mark,
+        PatternOperation::Unmark,
+        PatternOperation::Replace,
+    ] {
+        assert!(selection.apply(pane, operation).is_err());
+        assert_eq!(pane.marks, marks);
+    }
     selection.set_expression("alpha".into());
     assert_eq!(selection.preview(pane).unwrap().matches, 1);
 }

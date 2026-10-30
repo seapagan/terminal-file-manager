@@ -274,38 +274,19 @@ fn pattern_alt_controls_and_literal_letters_cross_the_native_terminal_parser() {
 }
 
 #[test]
+#[cfg(not(windows))]
 fn pattern_overlong_native_input_requires_correction_before_apply() {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("overlong-ready.txt"), "preserved").unwrap();
-    let paste = overlong_pattern_input();
-    #[cfg(not(windows))]
+    // ConPTY key delivery is covered by the short native pattern tests above.
+    let paste = format!("\x1b[200~{}[\x1b[201~", "a".repeat(20_000));
     let recovery = "\x1bm\x1bu\x1br\r\x7f*\r\r";
-    #[cfg(windows)]
-    let recovery = concat!(
-        "\x1b[0;0;109;1;2;1_", // Alt+M
-        "\x1b[0;0;117;1;2;1_", // Alt+U
-        "\x1b[0;0;114;1;2;1_", // Alt+R
-        "\x1b[13;0;13;1;0;1_", // Enter
-        "\x1b[27;0;27;1;0;1_", // Esc
-    );
-    let mut steps = vec![
+    let steps = [
         ("overlong-ready.txt", "\x1bb"),
         ("Pattern selection", paste.as_str()),
         ("4096 bytes", recovery),
+        ("[*]", "q"),
     ];
-    #[cfg(windows)]
-    steps.extend([
-        ("cancelled", "\x1b[0;0;98;1;2;1_"), // Alt+B
-        (
-            "Pattern selection",
-            concat!(
-                "\x1b[0;0;42;1;0;1_",  // *
-                "\x1b[13;0;13;1;0;1_", // Enter twice
-                "\x1b[13;0;13;1;0;1_",
-            ),
-        ),
-    ]);
-    steps.push(("[*]", "q"));
     let transcript = drive(command(root.path(), root.path(), None), &steps, false);
     assert!(transcript.contains("Backspace to correct"));
     assert!(transcript.contains("[*]"));
@@ -313,19 +294,4 @@ fn pattern_overlong_native_input_requires_correction_before_apply() {
         fs::read(root.path().join("overlong-ready.txt")).unwrap(),
         b"preserved"
     );
-}
-
-#[cfg(not(windows))]
-fn overlong_pattern_input() -> String {
-    format!("\x1b[200~{}[\x1b[201~", "a".repeat(20_000))
-}
-
-#[cfg(windows)]
-fn overlong_pattern_input() -> String {
-    // ConPTY supplies Win32 keys, not Paste; alternate keys avoid repeat coalescing.
-    "界語"
-        .repeat(683)
-        .chars()
-        .map(|c| format!("\x1b[0;0;{};1;0;1_", u32::from(c)))
-        .collect()
 }

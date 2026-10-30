@@ -79,13 +79,26 @@ fn multibyte_and_large_paste_rejections_block_all_apply_routes_and_settings() {
 #[test]
 fn repeated_typing_at_byte_limit_never_reuses_valid_prefix() {
     let (_root, mut c) = loaded();
+    c.app.panes[0].select_all();
+    let marks = c.app.panes[0].marks.clone();
     key(&mut c, "Alt+b");
     event(&mut c, Event::Paste("?".repeat(4094)), (100, 24));
     key(&mut c, "é");
     let accepted = c.app.pattern.as_ref().unwrap().expression().to_owned();
     assert_eq!(accepted.len(), 4096);
-    for input in ["x", "x", "é", "Alt+m"] {
+    for input in ["x", "x", "é", "Alt+m", "Alt+u", "Alt+r", "Enter", "Enter"] {
         key(&mut c, input);
+        assert!(c.app.pattern.is_some());
+        assert_eq!(c.app.panes[0].marks, marks);
+    }
+    for operation in [
+        PatternOperation::Mark,
+        PatternOperation::Unmark,
+        PatternOperation::Replace,
+    ] {
+        click(&mut c, PatternControl::Apply(operation));
+        assert!(c.app.pattern.is_some());
+        assert_eq!(c.app.panes[0].marks, marks);
     }
     assert_eq!(c.app.pattern.as_ref().unwrap().expression(), accepted);
     assert!(
