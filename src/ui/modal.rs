@@ -112,9 +112,6 @@ fn render_with_help(
         let title_area = Rect::new(area.x + 2, area.y, width(&shown), 1);
         frame.render_widget(Paragraph::new(shown).style(theme.style(role)), title_area);
     }
-    if let Some(help) = help {
-        frame.render_widget(Paragraph::new(" "), Rect::new(help.right(), help.y, 1, 1));
-    }
     for (area, label) in [(help, "[?]"), (close, "[×]")] {
         let Some(area) = area else { continue };
         frame.render_widget(

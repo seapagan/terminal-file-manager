@@ -84,6 +84,13 @@ fn check_header(width: u16, level: ColorLevel, title: &str) {
         if let Some(help) = layout.help {
             assert_eq!(shown(b, help), "[?]");
             assert_eq!(close.x, help.right() + 1);
+            assert_eq!(shown(b, Rect::new(help.x, help.y, 7, 1)), "[?]─[×]");
+            assert_eq!(
+                &b[(help.right(), help.y)],
+                &b[(layout.outer.x + 1, layout.outer.y)]
+            );
+            assert!(!help.contains((help.right(), help.y).into()));
+            assert!(!close.contains((help.right(), help.y).into()));
             assert!(!help.intersects(close));
         }
     } else {
@@ -246,7 +253,7 @@ fn conflict_close_sends_only_the_existing_cancel_decision() {
     let (_root, mut app, response) = conflict_fixture::fixture();
     conflict_fixture::edit(&mut app, |_, _, newer| *newer = false);
     let (_, _, text) = conflict_fixture::draw(&app, 120, 32, ColorLevel::NoColor);
-    assert!(text.contains("[?] [×]"));
+    assert!(text.contains("[?]─[×]"));
     let mut c = controller(app);
     close(&mut c);
     assert!(matches!(

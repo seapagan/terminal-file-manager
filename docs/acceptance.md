@@ -1712,7 +1712,7 @@ Unicode/backtick shortcuts, semantic key styles and case-sensitive safety text.
 Parent focus/state restoration and the 80-column Info contract retain their
 existing behavioural tests. Help descriptions avoid internal milestone labels.
 
-Shared close-control regressions check exact `[?] [×]` cells, Unicode titles,
+Shared close-control regressions check exact `[?]─[×]` cells, Unicode titles,
 colour/monochrome and narrow bounds. Clicks follow Esc for operation preview
 cleanup, creation cancellation, conflict cancellation, Jobs, metadata and safe
 exit. Context and picker close retain their parent and its state. Adjacent and

@@ -438,7 +438,7 @@ in either order within a description. Input routing consumes
 picker events before browser and operation handlers.
 
 The shared modal shell measures a safe title-border close control and an optional
-Help control, displayed as `[?] [×]`. A close click enters the owning layer
+Help control, displayed as `[?]─[×]`. A close click enters the owning layer
 through its existing Esc route, including preview cleanup and safe exit. Controls
 that cannot fit beside the full title stay hidden without resizing the shell.
 The default ? and F1 bindings open the same Help: the main document from the
