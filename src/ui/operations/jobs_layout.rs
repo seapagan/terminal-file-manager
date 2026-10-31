@@ -12,6 +12,7 @@ pub(super) fn layout(app: &App, terminal: Rect) -> super::Layout {
     let context = actions(&actual[2..]);
     let spec = modal::Spec {
         title: content::title(app),
+        help: true,
         content_width: 0,
         pinned_rows: 3.min(height / 5),
         footer_rows: 2.min(height / 5),
@@ -77,7 +78,7 @@ fn actions(
         .map(|&(label, key)| {
             let mut action = Action::custom(label, OperationTarget::Key(key), key);
             if key == crossterm::event::KeyCode::Char('e') {
-                action.min_width = modal::width("E Evidence");
+                action.min_width = modal::width("e Evidence");
             }
             action
         })
@@ -87,7 +88,7 @@ fn actions(
 fn context_width(actions: &[crate::ui::modal::actions::Action<OperationTarget>]) -> u16 {
     actions
         .iter()
-        .map(|a| crate::ui::modal::width(a.label).saturating_add(3))
+        .map(|a| crate::ui::modal::width(&a.label).saturating_add(3))
         .fold(0u16, u16::saturating_add)
         .saturating_sub(1)
 }

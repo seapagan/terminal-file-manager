@@ -20,6 +20,8 @@ use ratatui::{
 pub struct Spec<'a, T> {
     /// Sanitized display title.
     pub title: &'a str,
+    /// Offer contextual Help; the title reservation is part of measurement.
+    pub help: bool,
     /// Intrinsic content width in display cells.
     pub content_width: usize,
     /// Fixed rows above the scrollable body (for example a Jobs selector).
@@ -55,6 +57,45 @@ pub fn render_shell_with_title_role(
     theme: &Theme,
     role: Role,
 ) {
+    render_with_help(
+        frame,
+        area,
+        title,
+        theme,
+        role,
+        None,
+        close_area(area, title),
+    );
+}
+
+/// Draw the optional Help control from the original measured parent geometry.
+pub fn render_measured<T>(
+    frame: &mut Frame,
+    layout: &Layout<T>,
+    title: &str,
+    theme: &Theme,
+    role: Role,
+) {
+    render_with_help(
+        frame,
+        layout.outer,
+        title,
+        theme,
+        role,
+        layout.help,
+        layout.close,
+    );
+}
+
+fn render_with_help(
+    frame: &mut Frame,
+    area: Rect,
+    title: &str,
+    theme: &Theme,
+    role: Role,
+    help: Option<Rect>,
+    close: Option<Rect>,
+) {
     frame.render_widget(Clear, area);
     frame.render_widget(
         Block::default()
@@ -64,8 +105,37 @@ pub fn render_shell_with_title_role(
         area,
     );
     if area.height > 0 && area.width > 3 {
-        let shown = truncate(title, area.width - 3);
+        let available = help.or(close).map_or(area.width - 3, |control| {
+            control.x.saturating_sub(area.x + 3)
+        });
+        let shown = truncate(title, available);
         let title_area = Rect::new(area.x + 2, area.y, width(&shown), 1);
         frame.render_widget(Paragraph::new(shown).style(theme.style(role)), title_area);
     }
+    if let Some(help) = help {
+        frame.render_widget(Paragraph::new(" "), Rect::new(help.right(), help.y, 1, 1));
+    }
+    for (area, label) in [(help, "[?]"), (close, "[×]")] {
+        let Some(area) = area else { continue };
+        frame.render_widget(
+            Paragraph::new(label).style(
+                theme
+                    .style(Role::Key)
+                    .add_modifier(ratatui::style::Modifier::UNDERLINED),
+            ),
+            area,
+        );
+    }
+}
+
+/// Narrow shells retain their title and F1 access without an overlapping control.
+pub fn help_area(outer: Rect, title: &str, enabled: bool) -> Option<Rect> {
+    (enabled && outer.height > 0 && width(title).saturating_add(11) <= outer.width)
+        .then(|| Rect::new(outer.right() - 8, outer.y, 3, 1))
+}
+
+/// Keep the full title and border intact when a close control cannot fit.
+pub fn close_area(outer: Rect, title: &str) -> Option<Rect> {
+    (outer.height > 0 && width(title).saturating_add(7) <= outer.width)
+        .then(|| Rect::new(outer.right() - 4, outer.y, 3, 1))
 }

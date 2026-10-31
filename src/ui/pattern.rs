@@ -96,7 +96,7 @@ fn rows(state: &crate::app::PatternSelection, width: u16) -> Vec<Row<PatternCont
     rows.extend((0..padding).map(|_| Row::plain("")));
     let hints = [
         "While typing: Alt+letter activates controls",
-        "Outside input: M/U/R apply; click Pattern to type",
+        "Outside input: m/u/r apply; click Pattern to type",
     ];
     let hint = usize::from(state.focus != PatternControl::Expression);
     let reserved = hints
@@ -115,9 +115,9 @@ fn controls(width: u16) -> Vec<(Rect, PatternControl)> {
     let mut controls = Vec::new();
     let (mut x, mut y) = (0, 0);
     for (label, target) in [
-        ("W Wildcard", PatternControl::Mode(PatternMode::Wildcard)),
-        ("X Regex", PatternControl::Mode(PatternMode::Regex)),
-        ("S Case sensitive", PatternControl::Case),
+        ("w Wildcard", PatternControl::Mode(PatternMode::Wildcard)),
+        ("x Regex", PatternControl::Mode(PatternMode::Regex)),
+        ("s Case sensitive", PatternControl::Case),
     ] {
         let cells = modal::width(label) + 4;
         if cells > width {
@@ -147,9 +147,9 @@ fn controls(width: u16) -> Vec<(Rect, PatternControl)> {
 fn actions(ready: bool) -> Vec<Action<PatternControl>> {
     use PatternControl::*;
     [
-        ("M Mark", Apply(PatternOperation::Mark)),
-        ("U Unmark", Apply(PatternOperation::Unmark)),
-        ("R Replace", Apply(PatternOperation::Replace)),
+        ("m Mark", Apply(PatternOperation::Mark)),
+        ("u Unmark", Apply(PatternOperation::Unmark)),
+        ("r Replace", Apply(PatternOperation::Replace)),
         ("Esc Cancel", Cancel),
     ]
     .into_iter()
@@ -192,7 +192,13 @@ impl PatternLayout {
 pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, layout: Option<&PatternLayout>) {
     let Some(layout) = layout else { return };
     let state = app.pattern.as_ref().unwrap();
-    modal::render_shell(frame, layout.shell.outer, "Pattern selection", theme);
+    modal::render_measured(
+        frame,
+        &layout.shell,
+        "Pattern selection",
+        theme,
+        Role::Header,
+    );
     for (i, row) in layout
         .rows
         .iter()
@@ -244,17 +250,17 @@ fn render_controls(
         }
         let (label, selected, focused) = match target {
             PatternControl::Mode(PatternMode::Wildcard) => (
-                "W Wildcard",
+                "w Wildcard",
                 state.mode == PatternMode::Wildcard,
                 state.focus == *target,
             ),
             PatternControl::Mode(PatternMode::Regex) => (
-                "X Regex",
+                "x Regex",
                 state.mode == PatternMode::Regex,
                 state.focus == *target,
             ),
             PatternControl::Case => (
-                "S Case sensitive",
+                "s Case sensitive",
                 state.case_sensitive,
                 state.focus == *target,
             ),
@@ -386,6 +392,7 @@ fn measure(
         .min(usize::from(u16::MAX)) as u16;
     modal::Spec {
         title: "Pattern selection",
+        help: true,
         content_width,
         pinned_rows: 0,
         footer_rows,

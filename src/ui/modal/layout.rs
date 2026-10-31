@@ -17,6 +17,10 @@ pub struct ActionRegion<T> {
 pub struct Layout<T> {
     /// Bordered shell.
     pub outer: Rect,
+    /// Optional title-border control; F1 remains available when it cannot fit.
+    pub help: Option<Rect>,
+    /// Safe close title control; consumers route it through their existing Esc handler.
+    pub close: Option<Rect>,
     /// Fixed leading region.
     pub pinned: Rect,
     /// Scrollable body, excluding padding and controls.
@@ -68,6 +72,8 @@ impl<T: Clone> Layout<T> {
         position(&mut actions, pinned.x, action_top);
         actions.retain(|a| a.area.bottom() <= bottom && a.area.right() <= outer.right());
         Self {
+            help: super::help_area(outer, spec.title, spec.help),
+            close: super::close_area(outer, spec.title),
             outer,
             pinned,
             body,
@@ -97,6 +103,8 @@ impl<T: Clone> Layout<T> {
         position(&mut actions, pinned.x, action_top);
         actions.retain(|a| a.area.bottom() <= bottom && a.area.right() <= outer.right());
         Self {
+            help: super::help_area(outer, spec.title, spec.help),
+            close: super::close_area(outer, spec.title),
             outer,
             pinned,
             body,
@@ -159,7 +167,7 @@ fn pack<T: Clone>(actions: &[Action<T>], available: u16) -> Vec<ActionRegion<T>>
     let mut regions = Vec::new();
     let (mut x, mut y) = (0u16, 0u16);
     for (index, action) in actions.iter().enumerate() {
-        let length = width(action.label).max(action.min_width).saturating_add(2);
+        let length = width(&action.label).max(action.min_width).saturating_add(2);
         if length > available {
             continue;
         }
@@ -199,14 +207,14 @@ fn measured_width<T>(spec: &Spec<'_, T>, terminal_width: u16) -> u16 {
     let action_width = spec
         .actions
         .iter()
-        .map(|a| usize::from(width(a.label).max(a.min_width)) + 3)
+        .map(|a| usize::from(width(&a.label).max(a.min_width)) + 3)
         .sum::<usize>()
         .saturating_sub(1);
     let desired = spec
         .content_width
         .max(action_width)
         .saturating_add(4)
-        .max(usize::from(width(spec.title)).saturating_add(3));
+        .max(usize::from(width(spec.title)).saturating_add(3 + if spec.help { 8 } else { 0 }));
     let max_width = terminal_width.saturating_sub(u16::from(terminal_width > 4) * 2);
     desired.min(usize::from(max_width)) as u16
 }

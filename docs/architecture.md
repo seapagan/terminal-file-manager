@@ -420,3 +420,46 @@ It preserves distinct causes and uncertainty restrictions. Evidence retains each
 full individual reason, native source/target spelling, receipts and recovery
 records. Mixed/special-object selection summaries use neutral entry counts;
 recursive preview accounting and lifecycle-derived job counts are unchanged.
+
+## Categorised Help
+
+Help groups the effective action keymap into one document. Measured wrapped rows
+supply section/action anchors, scrolling bounds and landing highlights. The
+shared modal shell contains the temporary fuzzy jump picker; it keeps the main
+document and its scroll position. Search ranks title/action matches before keys
+and bounded word abbreviations, retaining document order for ties. Fuzzy matches
+start at a word boundary and keep at least half the spanned letters; separate
+fields cannot combine scattered letters into a result. Phrase words may appear
+in either order within a description. Input routing consumes
+picker events before browser and operation handlers.
+
+The shared modal shell measures a safe title-border close control and an optional
+Help control, displayed as `[?] [×]`. A close click enters the owning layer
+through its existing Esc route, including preview cleanup and safe exit. Controls
+that cannot fit beside the full title stay hidden without resizing the shell.
+The default ? and F1 bindings open the same Help: the main document from the
+file manager and contextual Help in applicable dialogs. Printable characters
+remain literal in text fields; F1 supplies Help there and in narrow shells. Context Help stores
+only its topic and scroll; the parent retains its fields, focus, selection and
+geometry. Its read-only input layer consumes events before the parent, while
+the existing exact Ctrl+c safe-exit route remains available. Fixed dialog keys
+use lowercase labels for case-insensitive controls; uppercase-only destructive
+confirmation keeps its existing restrictions.
+
+Effective shortcut hints share the same preferred-alias lookup as the footer.
+Metadata count/cancel/refresh hints, its measured Close action and Jobs detail
+routes follow configured bindings. Shared modal actions own their display labels
+so runtime key text uses the same measurement and hit regions as fixed controls.
+
+Help section headings use the dedicated SectionHeader role: light cyan
+(`#89dceb`) resolved for the terminal, bold, and underlined in monochrome.
+Create dialogs present the parent as a Label/Value row. Informational progress, search feedback and reasons
+for unavailable actions use readable text roles; disabled controls retain the
+Disabled role. Other theme roles and operation eligibility remain unchanged.
+
+The jump picker gives sections one selectable row and commands a title with a
+separate shortcut/category line. Its plain query field and separator sit outside
+result hit regions. Measured result heights keep the selected entry in view.
+Context Help carries literal shortcut fragments through Help-local word wrapping
+and semantic Key styling. Long tokens fall back to existing grapheme-safe cell
+wrapping; metadata and other shared text renderers keep their existing rules.

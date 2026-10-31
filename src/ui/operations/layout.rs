@@ -7,7 +7,6 @@ use ratatui::layout::Rect;
 
 #[derive(Clone, Debug)]
 pub(in crate::ui) struct Layout {
-    pub outer: Rect,
     pub body: Rect,
     pub list: Rect,
     pub buttons: Vec<OperationControl>,
@@ -37,6 +36,7 @@ impl Layout {
         let buttons = buttons(app, terminal.width);
         let spec = modal::Spec {
             title: content::title(app),
+            help: true,
             content_width: desired_width(&rows, terminal.width)
                 .max(desired_width(&header, terminal.width))
                 .max(footer_width(app, &footer, terminal.width))
@@ -86,7 +86,6 @@ impl Layout {
         rows: Vec<content::Row>,
     ) -> Self {
         Self {
-            outer: shell.outer,
             body: shell.body,
             list: history_area(app, &shell),
             buttons: controls(&shell),
@@ -205,7 +204,7 @@ fn controls(shell: &modal::Layout<OperationTarget>) -> Vec<OperationControl> {
         .map(|button| OperationControl {
             area: button.area,
             target: button.action.intent,
-            label: button.action.label,
+            label: button.action.label.clone(),
             enabled: button.action.enabled,
         })
         .collect()

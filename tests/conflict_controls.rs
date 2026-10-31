@@ -115,7 +115,7 @@ fn apply_all_mouse_and_keyboard_toggle_and_cancel_stays_job_cancel() {
     assert!(
         draw(&c.app, 80, 25, ColorLevel::NoColor)
             .2
-            .contains("A Apply to all: On")
+            .contains("a Apply to all: On")
     );
     key(&mut c, &g, KeyCode::Char('A'));
     assert!(!c.app.operations.conflicts.front().unwrap().all);
@@ -297,7 +297,7 @@ fn apply_all_label_is_neutral_and_state_has_its_own_style() {
         for _ in 0..5 {
             for (state, role) in [("Off", Role::Disabled), ("On", Role::Status)] {
                 let (terminal, g, text) = draw(&c.app, 100, 40, level);
-                assert!(text.contains(&format!("A Apply to all: {state}")), "{text}");
+                assert!(text.contains(&format!("a Apply to all: {state}")), "{text}");
                 let control = g
                     .operation_controls
                     .iter()

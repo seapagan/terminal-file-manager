@@ -219,6 +219,7 @@ const CONSOLE_PROBES: &[(&str, &str)] = &[
     ("PROBE-UNSUPPORTED-CSI-ALTERNATE", "\u{1b}[49:167;2u"),
     ("PROBE-UNSUPPORTED-CSI-LETTER", "\u{1b}[120;2u"),
     ("PROBE-RAW-SECTION", "§"),
+    ("PROBE-RAW-ESC-ESC-Q", "\x1b\x1bq"),
 ];
 
 fn console_steps(mode: &str) -> Vec<(&'static str, String)> {
@@ -255,6 +256,8 @@ fn windows_console_probe() {
                 assert_eq!(keys[0].code, KeyCode::Char(['?', '§', 'X'][index]));
                 assert_eq!(keys[0].modifiers, KeyModifiers::SHIFT);
                 assert_eq!(bindings.action(keys[0]), Some(Action::Quit));
+            } else if *label == "PROBE-RAW-ESC-ESC-Q" {
+                assert_batched_escape_dispatch(&keys);
             } else if *label == "PROBE-RAW-SECTION" {
                 assert_raw_section_dispatch(&keys);
             } else {
@@ -270,6 +273,19 @@ fn windows_console_probe() {
     .unwrap();
     assert!(!crossterm::terminal::is_raw_mode_enabled().unwrap());
     println!("RESTORATION-CHECK-PASSED");
+}
+
+// ConPTY interprets this VT byte batch as Alt+q, not independent Esc presses.
+// Keep the original failure's transport proof separate from Help's layer tests.
+#[cfg(windows)]
+fn assert_batched_escape_dispatch(keys: &[crossterm::event::KeyEvent]) {
+    use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
+    let presses: Vec<_> = keys
+        .iter()
+        .filter(|key| key.kind == KeyEventKind::Press)
+        .map(|key| (key.code, key.modifiers))
+        .collect();
+    assert_eq!(presses, [(KeyCode::Char('q'), KeyModifiers::ALT)]);
 }
 
 #[cfg(windows)]

@@ -1,3 +1,33 @@
+mod context;
+mod context_text;
+pub(super) use context::handle as context_handle;
+pub use context::{ContextHelp, HelpTopic};
+pub use context_text::{HelpFragment, HelpParagraph};
+mod controller;
+pub(super) use controller::handle;
+mod search;
+mod sections;
+pub use search::{HelpHit, HelpPicker, HelpTarget, help_hits};
+pub use sections::HelpSection;
+
+/// Effective bindings and their action identity, shared by Help and shortcut hints.
+#[derive(Clone, Debug)]
+pub struct HelpEntry {
+    pub action: super::Action,
+    pub keys: String,
+    pub description: &'static str,
+}
+
+impl HelpEntry {
+    /// Keep a familiar alias when still bound, otherwise use the shortest effective label.
+    pub fn preferred_key(&self, preferred: &str) -> Option<&str> {
+        let keys = || self.keys.split(" / ").filter(|key| !key.is_empty());
+        keys()
+            .find(|key| *key == preferred)
+            .or_else(|| keys().min_by_key(|key| ratatui::text::Line::raw(*key).width()))
+    }
+}
+
 use super::Action;
 use crossterm::event::{KeyCode, KeyModifiers};
 
@@ -21,6 +51,11 @@ pub(super) fn accepts(action: Action) -> bool {
 }
 
 pub(super) fn key_name(code: KeyCode, modifiers: KeyModifiers) -> String {
+    let mut modifiers = modifiers;
+    let uppercase = matches!(code, KeyCode::Char(c) if c.is_uppercase());
+    if uppercase {
+        modifiers.insert(KeyModifiers::SHIFT);
+    }
     let mut name = String::new();
     for (flag, text) in [
         (KeyModifiers::CONTROL, "Ctrl+"),
@@ -33,7 +68,7 @@ pub(super) fn key_name(code: KeyCode, modifiers: KeyModifiers) -> String {
     }
     name.push_str(&match code {
         KeyCode::Char(' ') => "Space".into(),
-        KeyCode::Char(c) if !modifiers.is_empty() => c.to_uppercase().to_string(),
+        KeyCode::Char(c) if uppercase => c.to_lowercase().collect(),
         KeyCode::Char(c) => c.to_string(),
         KeyCode::F(n) => format!("F{n}"),
         _ => format!("{code:?}"),
@@ -52,18 +87,15 @@ use Action::*;
 const DESCRIPTIONS: &[(Action, &str)] = &[
     (ViewOptions, "View options"),
     (ViewProfiles, "Select or save a named view profile"),
-    (HumanSizes, "Toggle human sizes"),
-    (FuzzyTimestamps, "Toggle fuzzy timestamps"),
+    (HumanSizes, "Show rounded or exact sizes"),
+    (FuzzyTimestamps, "Show relative or exact dates"),
     (Permissions, "Cycle permission display"),
     (ColumnSize, "Toggle size column"),
     (ColumnModified, "Toggle date column"),
     (ColumnAttributes, "Toggle attribute column"),
     (OwnerDisplay, "Toggle owner/group names or numeric IDs"),
     (ColumnOwner, "Toggle owner column"),
-    (
-        MetadataPresentation,
-        "Cycle preferred metadata presentation",
-    ),
+    (MetadataPresentation, "Choose how to show file information"),
     (Up, "Move cursor up"),
     (Down, "Move cursor down"),
     (ExtendUp, "Extend marked range up"),
@@ -72,25 +104,28 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
     (End, "Last entry"),
     (PageUp, "Previous page"),
     (PageDown, "Next page"),
-    (Enter, "Enter directory; files never launch"),
+    (Enter, "Open a directory; files are not launched"),
     (Parent, "Parent directory"),
     (Back, "Back in pane history"),
     (Forward, "Forward in pane history"),
-    (SaveQuit, "Save navigation session and quit"),
-    (Quit, "Quit without saving a navigation session"),
-    (Help, "Toggle help"),
+    (SaveQuit, "Save pane locations and quit"),
+    (Quit, "Quit without saving pane locations"),
+    (Help, "Help"),
     (Diagnostics, "Toggle read-only diagnostics"),
     (DiagnosticsUp, "Scroll diagnostics up"),
     (DiagnosticsDown, "Scroll diagnostics down"),
     (TogglePanes, "Toggle one/two panes"),
-    (FocusPane, "Focus other visible pane"),
-    (Maximise, "Temporarily maximise active pane / restore split"),
+    (FocusPane, "Switch to the other pane"),
+    (Maximise, "Maximise this pane or restore the split"),
     (SplitLeft, "Move pane divider left"),
     (SplitRight, "Move pane divider right"),
-    (ToggleSidebar, "Toggle metadata sidebar (wide single pane)"),
-    (Metadata, "Toggle metadata popup"),
-    (Info, "Toggle preferred metadata presentation"),
-    (Count, "Count directory descendants (cancellable)"),
+    (
+        ToggleSidebar,
+        "Show file information sidebar (wide single pane)",
+    ),
+    (Metadata, "Show or hide file information"),
+    (Info, "Show file information in your chosen view"),
+    (Count, "Count folder contents; cancel to stop"),
     (Cancel, "Close overlay, cancel count or clear filter"),
     (Mark, "Toggle mark"),
     (MarkNext, "Toggle mark and move down"),
@@ -98,11 +133,11 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
     (ClearVisible, "Clear visible marks"),
     (
         PatternSelection,
-        "Mark, unmark or replace visible marks by wildcard or regex pattern",
+        "Mark, unmark or replace visible marks (wildcard or regex)",
     ),
     (
         Filter,
-        "Edit live fuzzy filter; Enter accepts, Esc restores",
+        "Filter names; Enter keeps it, Esc restores the old filter",
     ),
     (
         Hidden,
@@ -113,30 +148,33 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
     (Sort, "Cycle sort order"),
     (Reverse, "Reverse sort direction"),
     (Group, "Cycle directory grouping First/Last/Mixed"),
-    (Viewer, "Unavailable until M6: viewer"),
-    (Editor, "Unavailable until M6: editor"),
-    (Copy, "Copy visible selection (smart confirmation)"),
-    (Move, "Move visible selection (smart confirmation)"),
+    (Viewer, "File viewer (not available yet)"),
+    (Editor, "File editor (not available yet)"),
+    (Copy, "Copy the visible selection"),
+    (Move, "Move the visible selection"),
     (
         CopyQuick,
-        "Copy; bypass routine dual-pane multi-selection confirmation",
+        "With two panes, copy without the selection prompt",
     ),
     (
         MoveQuick,
-        "Move; bypass routine dual-pane multi-selection confirmation",
+        "With two panes, move without the selection prompt",
     ),
     (Mkdir, "Create directory"),
     (CreateFile, "Create empty file"),
-    (Trash, "Preview and move selection to native Trash"),
-    (Delete, "Preview and explicitly confirm permanent deletion"),
+    (Trash, "Preview and move selection to Trash"),
+    (Delete, "Preview and confirm permanent deletion"),
     (Rename, "Rename one visible entry"),
-    (Attributes, "Edit supported permissions/attributes"),
+    (Attributes, "Change permissions or read-only settings"),
+    (Jobs, "View jobs, cancel work or retry unfinished items"),
+    (Path, "Type a path (not available yet)"),
+    (Zoxide, "Jump with zoxide (not available yet)"),
     (
-        Jobs,
-        "Jobs summary; E toggles evidence; cancellation and retry",
+        OppositeZoxide,
+        "Open a zoxide location in the other pane (not available yet)",
     ),
-    (Path, "Unavailable until M5: path entry"),
-    (Zoxide, "Reserved for zoxide (M5)"),
-    (OppositeZoxide, "Reserved for opposite-pane zoxide (M5)"),
-    (ExitDirectory, "Unavailable until M5: shell handoff"),
+    (
+        ExitDirectory,
+        "Return to this folder in your shell (not available yet)",
+    ),
 ];

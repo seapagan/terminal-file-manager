@@ -110,7 +110,7 @@ fn measured_buttons_fields_counts_and_focus_match_keyboard_and_mouse() {
         assert!(text.contains("Replace: 0 visible marks -> 2 matches"));
         let layout = geometry.pattern.unwrap();
         for region in &layout.shell.actions {
-            assert!(text.contains(region.action.label));
+            assert!(text.contains(&region.action.label));
             assert!(region.area.right() < layout.shell.outer.right());
             assert!(region.area.bottom() < layout.shell.outer.bottom());
         }
@@ -271,7 +271,7 @@ fn configured_binding_and_mouse_footer_open_the_same_form() {
         c.app
             .help_rows
             .iter()
-            .any(|(keys, description)| keys.contains("F11") && description.contains("pattern"))
+            .any(|entry| entry.keys.contains("F11") && entry.action == Action::PatternSelection)
     );
 }
 

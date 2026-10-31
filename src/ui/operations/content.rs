@@ -65,13 +65,17 @@ pub(super) fn rows(app: &App) -> Vec<Row> {
 fn incident(app: &App, typed: &str) -> Vec<Row> {
     let mut rows = vec![
         Row::styled(
-            "CRITICAL: the OS reported permanent deletion during F8 Trash.",
+            format!(
+                "CRITICAL: the OS reported permanent deletion during {} Trash.",
+                app.shortcut(crate::input::Action::Trash, "F8")
+            ),
             Role::Error,
         ),
         Row::plain("This is irreversible. Acknowledgment does not restore deleted data."),
-        Row::plain(
-            "Jobs evidence is session only and is lost on exit. Record the F9 details first.",
-        ),
+        Row::plain(format!(
+            "Jobs evidence is session only and is lost on exit. Record the {} details first.",
+            app.shortcut(crate::input::Action::Jobs, "F9")
+        )),
         Row::plain("Enter or Esc: Stay. Type ACKNOWLEDGE manually, then press F10 to exit."),
         Row::field("Acknowledgment", typed, 0, true),
     ];
@@ -148,10 +152,7 @@ pub(super) fn header(app: &App) -> Vec<Row> {
 fn form(dialog: &OperationDialog) -> Vec<Row> {
     let mut rows = Vec::new();
     if dialog.plan.operation.creates_entry() {
-        rows.push(Row::styled(
-            format!("Parent: {}", dialog.base.display()),
-            Role::Muted,
-        ));
+        rows.push(Row::key_value("Parent", dialog.base.display().to_string()));
         rows.push(Row::plain(""));
     }
     rows.extend(rename_notice(dialog));
@@ -256,7 +257,7 @@ fn rename_notice(dialog: &OperationDialog) -> Vec<Row> {
     if dialog.plan.operation == Operation::Rename && dialog.plan.operands[0].name.to_str().is_none()
     {
         rows.push(Row::styled(
-            "Original name is escaped for display. Ctrl+A and type a replacement; Esc cancels.",
+            "Original name is escaped for display. Ctrl+a and type a replacement; Esc cancels.",
             Role::Warning,
         ));
     }
@@ -346,7 +347,7 @@ fn destructive(dialog: &OperationDialog, frame: u8) -> Vec<Row> {
             if dialog.plan.preview.is_some() {
                 Role::Status
             } else {
-                Role::Disabled
+                Role::Label
             },
         )
         .single_line(),

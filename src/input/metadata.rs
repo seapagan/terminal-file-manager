@@ -7,13 +7,20 @@ use std::time::Duration;
 impl Controller {
     /// Normalize terminal input. Clock/geometry are explicit deterministic inputs.
     pub fn handle(&mut self, event: Event, geometry: &Geometry, now: Duration) -> Vec<Request> {
+        let event = close_event(event, geometry.modal_close);
         self.sync_metadata(geometry);
         let width = if let Event::Resize(width, _) = event {
             width
         } else {
             geometry.footer.width
         };
-        let requests = self.handle_event(event, geometry, now);
+        let requests = if super::help::context_handle(self, &event, geometry)
+            || super::help::handle(self, &event, geometry)
+        {
+            Vec::new()
+        } else {
+            self.handle_event(event, geometry, now)
+        };
         self.app
             .sync_metadata_views(self.app.sidebar_visible(width));
         requests
@@ -69,4 +76,16 @@ pub(super) fn accepts(action: Action) -> bool {
             | Action::MetadataPresentation
             | Action::Diagnostics
     )
+}
+
+// Reuse the owning layer's cancellation, cleanup and event-isolation policy.
+fn close_event(event: Event, close: Option<ratatui::layout::Rect>) -> Event {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind};
+    if matches!(&event, Event::Mouse(mouse) if mouse.kind == MouseEventKind::Down(MouseButton::Left)
+        && close.is_some_and(|area| area.contains((mouse.column, mouse.row).into())))
+    {
+        Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE))
+    } else {
+        event
+    }
 }

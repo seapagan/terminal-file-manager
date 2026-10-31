@@ -319,3 +319,70 @@ fn pattern_overlong_native_input_requires_correction_before_apply() {
         b"preserved"
     );
 }
+
+#[test]
+fn searchable_help_jumps_and_layers_escape_in_a_native_terminal() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("help-sentinel"), b"preserved").unwrap();
+    drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("help-sentinel", "?"),
+            ("Navigation", "/"),
+            ("Jump to section or search commands", "trash"),
+            ("Preview and move selection", "\r"),
+            ("Preview and move selection", "/"),
+            // A raw Esc Esc q batch is ambiguous to ConPTY (Alt+q).
+            // Observe each restored layer before sending the next key.
+            ("Jump to section or search commands", "\x1b"),
+            ("cancel work or retry unfinished items", "\x1b"),
+            ("help-sentinel", "q"),
+        ],
+        true,
+    );
+    assert_eq!(
+        fs::read(root.path().join("help-sentinel")).unwrap(),
+        b"preserved"
+    );
+}
+
+#[test]
+fn context_f1_and_literal_question_marks_cross_the_native_terminal_parser() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("ok"), b"preserved").unwrap();
+    drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("ok", "\x1bb"),
+            ("Pattern selection", "?\x1bOP"),
+            ("Pattern Help", "\r\x1bm\x1b"),
+            ("selects; Enter activates. Esc cancels.", "?\x1bm"),
+            ("[*]", "q"),
+        ],
+        false,
+    );
+    assert_eq!(fs::read(root.path().join("ok")).unwrap(), b"preserved");
+}
+
+#[test]
+fn help_synonyms_choose_document_and_context_in_a_native_terminal() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("help-keys-sentinel"), b"preserved").unwrap();
+    drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("help-keys-sentinel", "\x1bOP"),
+            ("Navigation", "\x1b"),
+            ("help-keys-sentinel", "\x1bb"),
+            ("Pattern selection", "\t?"),
+            ("Pattern Help", "\x1b"),
+            ("selects; Enter activates. Esc cancels.", "\x1b"),
+            ("cancelled", "q"),
+        ],
+        false,
+    );
+    assert_eq!(
+        fs::read(root.path().join("help-keys-sentinel")).unwrap(),
+        b"preserved"
+    );
+}

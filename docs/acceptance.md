@@ -1667,3 +1667,60 @@ legitimate device-like names, stream syntax and rendered error feedback, includi
 panic; root execution skips the denial case. Pattern navigation tests preserve
 the preview cache. See the accepted/merged checkpoint above for final native
 platform results; Linux cross-builds do not establish Windows runtime proof.
+
+## PM3-04: Help document and jump picker
+
+Focused tests cover the seven sections, every effective action, wrapped anchors,
+stable fuzzy ranking, configured keys, empty/no-result queries, keyboard/mouse
+jumps, inner-first Esc and pane/operation isolation. TestBackend checks cover
+1/12/20/40/80/120-column bounds, resize clamping, title/result hit regions,
+landing highlights and colour/monochrome styles. The native PTY/ConPTY scenario
+opens Help, searches Trash, jumps and closes both layers without changing its
+owned sentinel. Each Esc waits for the restored document or pane before the
+next key. A native Windows event probe checks ConPTY interpretation of the
+original raw Esc/Esc/q batch; controller tests retain independent Esc presses,
+Alt+q isolation and ignored release events. Platform execution results belong
+to the delivery checkpoint;
+xwin alone does not establish Windows runtime behaviour.
+
+Context Help regressions cover F1 and exact title-button cells/hit regions,
+Unicode titles, optional controls, 1/20/40/80/120-column layouts, short terminals,
+colour depths and monochrome. Parent restoration tests retain pattern text,
+mode, case, focus and scroll; operation fields/action geometry; conflict choice
+and Apply to all; Jobs evidence/scroll; and metadata scroll. Help blocks paste,
+Enter, shortcuts and clicks from reaching parent operations. Configured metadata
+keys appear in contextual text; exact Ctrl+c retains safe-exit routing. Native
+terminal input covers F1, literal question marks and resumed pattern editing.
+
+Configured-binding rendering also covers metadata count/cancel hints, the Close
+control, startup Jobs hints and failure-detail routes. The regression reassigns
+c, Esc, F9 and Alt+j and checks the actual F11/F6/F1 labels in TestBackend cells.
+Default labels and existing narrow-terminal safety tests remain in force.
+
+Readability regressions inspect TestBackend cells in colour and monochrome:
+Help headings use a distinct light cyan or bold underline in monochrome,
+retain that style through scrolling and landing-highlight expiry, and keep
+Header/Key/Value styles unchanged. Create File/Directory parent labels
+and paths retain their hierarchy, and search/preview/job/conflict explanations
+remain readable. Existing disabled-action and narrow-terminal hit tests retain
+their safety assertions, including the complete 80-column Alt+Enter Info control.
+
+Help polish regressions cover compact section rows, command-detail click targets,
+query/result separation, narrow result geometry and Unicode query cursor bounds.
+Context prose tests check word boundaries, wide/combining graphemes, configured
+Unicode/backtick shortcuts, semantic key styles and case-sensitive safety text.
+Parent focus/state restoration and the 80-column Info contract retain their
+existing behavioural tests. Help descriptions avoid internal milestone labels.
+
+Shared close-control regressions check exact `[?] [×]` cells, Unicode titles,
+colour/monochrome and narrow bounds. Clicks follow Esc for operation preview
+cleanup, creation cancellation, conflict cancellation, Jobs, metadata and safe
+exit. Context and picker close retain their parent and its state. Adjacent and
+non-left clicks cannot submit or dismiss a form; the Help Jump control has a
+separate hit region.
+
+Unified Help-key regressions check the `? / F1` shortcut column, main Help
+synonyms, contextual topics, parent focus restoration and literal question marks
+in pattern, operation and incident text fields. Repeated/released or modified
+function keys cannot open another layer. A native PTY/ConPTY scenario opens the
+main document with F1 and contextual Help with ? from a non-editor control.

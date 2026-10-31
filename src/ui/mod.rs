@@ -3,6 +3,7 @@ mod diagnostics;
 mod footer;
 mod help;
 pub use footer::FooterControl;
+pub use help::{HelpLayout, context::ContextLayout};
 mod layout;
 mod listing;
 mod measure;
@@ -30,17 +31,26 @@ pub use measure::Measurements;
 use ratatui::{Frame, layout::Rect, widgets::Paragraph};
 
 /// Keep the details route visible after clipping an untrusted immediate status.
-fn status_text(text: &str, width: u16) -> String {
+fn status_text(app: &App, text: &str, width: u16) -> String {
+    if text == crate::app::WELCOME {
+        return format!(
+            "Local files — {} for help, {} for jobs",
+            app.shortcut(crate::input::Action::Help, "?"),
+            app.shortcut_hint(crate::input::Action::Jobs, "F9")
+        );
+    }
     let clean = clean(text);
     let Some(summary) = clean.strip_suffix(" — F9 details") else {
         return clean;
     };
-    if width < modal::width(" — F9 details") {
-        return modal::truncate("F9 details", width);
+    let details = format!("{} details", app.shortcut(crate::input::Action::Jobs, "F9"));
+    let suffix = format!(" — {details}");
+    if width < modal::width(&suffix) {
+        return modal::truncate(&details, width);
     }
     format!(
-        "{} — F9 details",
-        modal::truncate(summary, width.saturating_sub(modal::width(" — F9 details")))
+        "{}{suffix}",
+        modal::truncate(summary, width.saturating_sub(modal::width(&suffix)))
     )
 }
 
@@ -75,7 +85,7 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
         metadata::render(frame, app, area, theme, false);
     }
     frame.render_widget(
-        Paragraph::new(status_text(&app.status, geometry.status.width))
+        Paragraph::new(status_text(app, &app.status, geometry.status.width))
             .style(theme.style(Role::Status)),
         geometry.status,
     );
@@ -83,8 +93,8 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     if app.popup {
         metadata::render(frame, app, frame.area(), theme, true);
     }
-    if app.help {
-        help::render(frame, app, theme);
+    if let Some(layout) = &geometry.help {
+        help::render(frame, app, theme, layout);
     }
     if let Some(area) = geometry.menu {
         if app.view_menu.is_some() {
@@ -98,6 +108,7 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     }
     pattern::render(frame, app, theme, geometry.pattern.as_ref());
     operations::render(frame, app, theme, &geometry);
+    help::context::render(frame, app, theme, geometry.context_help.as_ref());
     geometry
 }
 

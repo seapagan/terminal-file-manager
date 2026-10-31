@@ -12,6 +12,8 @@ pub use pattern::{
 };
 use std::path::PathBuf;
 
+pub(crate) const WELCOME: &str = "Local files — ? for help, F9 / Alt+j for jobs";
+
 /// A bounded worker request carries identity independently of display text.
 #[derive(Clone, Debug)]
 pub struct Request {
@@ -55,6 +57,9 @@ pub struct App {
     pub sidebar_left: bool,
     pub popup: bool,
     pub help: bool,
+    pub context_help: Option<crate::input::ContextHelp>,
+    pub help_picker: Option<crate::input::HelpPicker>,
+    pub help_landing: Option<(crate::input::HelpTarget, std::time::SystemTime)>,
     pub pattern: Option<PatternSelection>,
     pub diagnostics: bool,
     pub diagnostics_scroll: u16,
@@ -64,7 +69,7 @@ pub struct App {
     pub profile_name: Option<String>,
     pub profile_names: Vec<String>,
     pub metadata_presentation: crate::settings::MetadataPresentation,
-    pub help_rows: Vec<(String, String)>,
+    pub help_rows: Vec<crate::input::HelpEntry>,
     pub overlay_scroll: u16,
     pub metadata_scroll: u16,
     pub metadata_formats: [Option<MetadataFormat>; 2],
@@ -87,6 +92,9 @@ impl App {
             sidebar_left: false,
             popup: false,
             help: false,
+            context_help: None,
+            help_picker: None,
+            help_landing: None,
             pattern: None,
             diagnostics: false,
             diagnostics_scroll: 0,
@@ -98,14 +106,35 @@ impl App {
             metadata_presentation: crate::settings::MetadataPresentation::default(),
             help_rows: crate::input::Bindings::new(&Default::default())
                 .expect("default bindings")
-                .help_rows(),
+                .help_entries(),
             overlay_scroll: 0,
             metadata_scroll: 0,
             metadata_formats: [None; 2],
-            status: "Local files — ? for help, F9 / Alt+J for jobs".into(),
+            status: WELCOME.into(),
             now: std::time::SystemTime::now(),
             details: std::array::from_fn(|_| Detail::default()),
         }
+    }
+
+    /// Current display label for a browser action, independent of its input routing.
+    pub fn shortcut(&self, action: crate::input::Action, preferred: &str) -> &str {
+        self.help_rows
+            .iter()
+            .find(|entry| entry.action == action)
+            .and_then(|entry| entry.preferred_key(preferred))
+            .unwrap_or("Unbound")
+    }
+
+    /// Full effective hint with the familiar alias first, preserving default status text.
+    pub fn shortcut_hint(&self, action: crate::input::Action, preferred: &str) -> String {
+        let Some(entry) = self.help_rows.iter().find(|entry| entry.action == action) else {
+            return "Unbound".into();
+        };
+        let first = entry.preferred_key(preferred).unwrap_or("Unbound");
+        std::iter::once(first)
+            .chain(entry.keys.split(" / ").filter(|key| *key != first))
+            .collect::<Vec<_>>()
+            .join(" / ")
     }
 
     /// Effective width never changes the user's requested layout.

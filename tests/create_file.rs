@@ -282,7 +282,7 @@ fn configured_keys_and_footer_click_use_the_same_create_file_action() {
         bindings
             .help_rows()
             .iter()
-            .any(|(keys, label)| keys.contains("Ctrl+N") && label == "Create empty file")
+            .any(|(keys, label)| keys.contains("Ctrl+n") && label == "Create empty file")
     );
     let mut c = Controller::new(c.app, bindings, Default::default());
     key(&mut c, "Ctrl+n");
@@ -294,7 +294,7 @@ fn configured_keys_and_footer_click_use_the_same_create_file_action() {
         .iter()
         .find(|control| control.action == Action::CreateFile)
         .unwrap();
-    assert_eq!(control.label, "Alt+N File");
+    assert_eq!(control.label, "Alt+n File");
     let event = mouse(Rect::new(control.area.right() - 1, control.area.y, 1, 1));
     c.handle(event, &g, Duration::ZERO);
     assert!(c.app.operations.dialog.is_some());
@@ -330,7 +330,7 @@ fn footer_shortcuts_fit_without_partial_labels_and_use_help_notation() {
                 c.app
                     .help_rows
                     .iter()
-                    .any(|(keys, _)| keys.split(" / ").any(|binding| binding == key))
+                    .any(|entry| entry.keys.split(" / ").any(|binding| binding == key))
             );
             let buffer = terminal.backend().buffer();
             let rendered: String = (control.area.x..control.area.right())

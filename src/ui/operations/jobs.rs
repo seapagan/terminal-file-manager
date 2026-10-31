@@ -36,7 +36,7 @@ pub(super) fn controls(app: &App, area: Rect) -> Vec<OperationControl> {
                 1,
             ),
             target: OperationTarget::Job(index),
-            label: "",
+            label: String::new(),
             enabled: true,
         })
         .collect()
@@ -76,7 +76,7 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
 
 pub(super) fn details(app: &App) -> Vec<Row> {
     let mut rows = vec![Row::styled(
-        "Up/Down selects · PgUp/PgDown scroll details · evidence is session only",
+        "Up/Down selects · PageUp/PageDown scroll details · evidence is session only",
         Role::Label,
     )];
     if let Some(error) = &app.operations.last_error {
@@ -182,7 +182,7 @@ fn disabled(job: &Job) -> Vec<Row> {
     if job.active() {
         return vec![Row::styled(
             "Retry and reconciliation wait for worker acknowledgment.",
-            Role::Disabled,
+            Role::Value,
         )];
     }
     if job.state == JobState::Critical {
@@ -200,7 +200,7 @@ fn disabled(job: &Job) -> Vec<Row> {
     if !job.can_retry() && !job.can_reconcile() {
         return vec![Row::styled(
             "Retry unavailable: no incomplete operands remain.",
-            Role::Disabled,
+            Role::Value,
         )];
     }
     Vec::new()

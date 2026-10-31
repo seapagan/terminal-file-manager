@@ -156,18 +156,18 @@ fn rendered_labels_define_hits_and_gaps_borders_and_outside_are_inert() {
     let (buffer, layout) = frame(&c, 70, 17, ColorLevel::NoColor);
     for (label, target) in [
         (
-            "(●) W Wildcard",
+            "(●) w Wildcard",
             PatternControl::Mode(PatternMode::Wildcard),
         ),
-        ("( ) X Regex", PatternControl::Mode(PatternMode::Regex)),
-        ("[x] S Case sensitive", PatternControl::Case),
-        ("[M Mark]", PatternControl::Apply(PatternOperation::Mark)),
+        ("( ) x Regex", PatternControl::Mode(PatternMode::Regex)),
+        ("[x] s Case sensitive", PatternControl::Case),
+        ("[m Mark]", PatternControl::Apply(PatternOperation::Mark)),
         (
-            "[U Unmark]",
+            "[u Unmark]",
             PatternControl::Apply(PatternOperation::Unmark),
         ),
         (
-            "[R Replace]",
+            "[r Replace]",
             PatternControl::Apply(PatternOperation::Replace),
         ),
     ] {

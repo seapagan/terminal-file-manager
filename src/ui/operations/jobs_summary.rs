@@ -15,27 +15,27 @@ pub(super) fn safety(app: &App) -> Vec<Row> {
     let (message, action) = match job.state {
         JobState::Critical => (
             "CRITICAL: stop and report",
-            "E evidence; acknowledgment cannot restore data",
+            "e Evidence; acknowledgment cannot restore data",
         ),
         JobState::Unknown => (
             "UNKNOWN: safe exit/retry blocked",
-            "Inspect E evidence; exit remains blocked",
+            "Inspect e Evidence; exit remains blocked",
         ),
         JobState::Partial => (
             "Partial result; sources may remain",
-            "E evidence: inspect incomplete work before retry",
+            "e Evidence: inspect incomplete work before retry",
         ),
         JobState::Failed => (
             "Failed entries",
-            "E evidence: correct the cause before retry",
+            "e Evidence: correct the cause before retry",
         ),
-        JobState::Skipped => ("Skipped entries", "E evidence: inspect before retry"),
+        JobState::Skipped => ("Skipped entries", "e Evidence: inspect before retry"),
         JobState::Cancelled => (
             "Cancelled; some work may have completed",
-            "E evidence: inspect results and retained sources",
+            "e Evidence: inspect results and retained sources",
         ),
         _ => (
-            "Up/Down jobs · PgUp/PgDown details",
+            "Up/Down jobs · PageUp/PageDown details",
             "evidence is session only",
         ),
     };
@@ -77,7 +77,7 @@ pub(super) fn summary(app: &App, width: u16) -> Vec<Row> {
 fn result_rows(job: &Job, summary: &crate::operations::JobSummary) -> Vec<Row> {
     if job.active() && job.record.is_some() {
         return vec![Row::styled(
-            format!("Previous result (E Evidence): {}", summary.counts),
+            format!("Previous result (e Evidence): {}", summary.counts),
             Role::Warning,
         )];
     }
@@ -99,7 +99,7 @@ fn result_rows(job: &Job, summary: &crate::operations::JobSummary) -> Vec<Row> {
     if summary.omitted_groups > 0 {
         rows.push(
             Row::styled(
-                format!("{} more cause groups — E Evidence", summary.omitted_groups),
+                format!("{} more cause groups — e Evidence", summary.omitted_groups),
                 Role::Warning,
             )
             .single_line(),
@@ -212,7 +212,7 @@ pub(super) fn footer(
             .get(app.operations.cursor)
             .is_some_and(|job| job.state == JobState::Unknown)
     {
-        rows[0].text = "UNKNOWN: no R/exit".into();
+        rows[0].text = "UNKNOWN: no r/exit".into();
     }
     if hidden.is_empty() {
         return super::content::wrapped(rows, width);
