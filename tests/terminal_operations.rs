@@ -335,7 +335,7 @@ fn searchable_help_jumps_and_layers_escape_in_a_native_terminal() {
             // A raw Esc Esc q batch is ambiguous to ConPTY (Alt+q).
             // Observe each restored layer before sending the next key.
             ("Jump to section or search commands", "\x1b"),
-            ("name one visible entry", "\x1b"),
+            ("cancel work or retry unfinished items", "\x1b"),
             ("help-sentinel", "q"),
         ],
         true,

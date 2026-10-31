@@ -427,7 +427,10 @@ Help groups the effective action keymap into one document. Measured wrapped rows
 supply section/action anchors, scrolling bounds and landing highlights. The
 shared modal shell contains the temporary fuzzy jump picker; it keeps the main
 document and its scroll position. Search ranks title/action matches before keys
-and fuzzy descriptions, retaining document order for ties. Input routing consumes
+and bounded word abbreviations, retaining document order for ties. Fuzzy matches
+start at a word boundary and keep at least half the spanned letters; separate
+fields cannot combine scattered letters into a result. Phrase words may appear
+in either order within a description. Input routing consumes
 picker events before browser and operation handlers.
 
 Shared modal specifications opt into a measured title-border Help control.
