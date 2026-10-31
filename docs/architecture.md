@@ -437,7 +437,9 @@ The shared modal shell measures a safe title-border close control and an optiona
 Help control, displayed as `[?] [×]`. A close click enters the owning layer
 through its existing Esc route, including preview cleanup and safe exit. Controls
 that cannot fit beside the full title stay hidden without resizing the shell.
-Narrow shells keep their title and the F1 keyboard route. Context Help stores
+The default ? and F1 bindings open the same Help: the main document from the
+file manager and contextual Help in applicable dialogs. Printable characters
+remain literal in text fields; F1 supplies Help there and in narrow shells. Context Help stores
 only its topic and scroll; the parent retains its fields, focus, selection and
 geometry. Its read-only input layer consumes events before the parent, while
 the existing exact Ctrl+c safe-exit route remains available. Fixed dialog keys

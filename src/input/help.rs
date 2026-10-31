@@ -110,7 +110,7 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
     (Forward, "Forward in pane history"),
     (SaveQuit, "Save pane locations and quit"),
     (Quit, "Quit without saving pane locations"),
-    (Help, "Help; F1 explains an open dialog"),
+    (Help, "Help"),
     (Diagnostics, "Toggle read-only diagnostics"),
     (DiagnosticsUp, "Scroll diagnostics up"),
     (DiagnosticsDown, "Scroll diagnostics down"),

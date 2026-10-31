@@ -1718,3 +1718,9 @@ cleanup, creation cancellation, conflict cancellation, Jobs, metadata and safe
 exit. Context and picker close retain their parent and its state. Adjacent and
 non-left clicks cannot submit or dismiss a form; the Help Jump control has a
 separate hit region.
+
+Unified Help-key regressions check the `? / F1` shortcut column, main Help
+synonyms, contextual topics, parent focus restoration and literal question marks
+in pattern, operation and incident text fields. Repeated/released or modified
+function keys cannot open another layer. A native PTY/ConPTY scenario opens the
+main document with F1 and contextual Help with ? from a non-editor control.

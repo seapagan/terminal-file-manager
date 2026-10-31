@@ -363,3 +363,26 @@ fn context_f1_and_literal_question_marks_cross_the_native_terminal_parser() {
     );
     assert_eq!(fs::read(root.path().join("ok")).unwrap(), b"preserved");
 }
+
+#[test]
+fn help_synonyms_choose_document_and_context_in_a_native_terminal() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("help-keys-sentinel"), b"preserved").unwrap();
+    drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("help-keys-sentinel", "\x1bOP"),
+            ("Navigation", "\x1b"),
+            ("help-keys-sentinel", "\x1bb"),
+            ("Pattern selection", "\t?"),
+            ("Pattern Help", "\x1b"),
+            ("selects; Enter activates. Esc cancels.", "\x1b"),
+            ("cancelled", "q"),
+        ],
+        false,
+    );
+    assert_eq!(
+        fs::read(root.path().join("help-keys-sentinel")).unwrap(),
+        b"preserved"
+    );
+}

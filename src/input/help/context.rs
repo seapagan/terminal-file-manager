@@ -5,7 +5,9 @@ use crate::{
     operations::{Dialog, Operation},
     ui::Geometry,
 };
-use crossterm::event::{Event, KeyCode, KeyEventKind, MouseButton, MouseEventKind};
+use crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HelpTopic {
@@ -99,9 +101,7 @@ pub(in crate::input) fn handle(c: &mut Controller, event: &Event, geometry: &Geo
         return false;
     };
     let open = match event {
-        Event::Key(key) => {
-            key.kind == KeyEventKind::Press && key.code == KeyCode::F(1) && key.modifiers.is_empty()
-        }
+        Event::Key(key) => opens_with_key(c, *key, topic),
         Event::Mouse(mouse) => {
             mouse.kind == MouseEventKind::Down(MouseButton::Left)
                 && geometry
@@ -114,6 +114,37 @@ pub(in crate::input) fn handle(c: &mut Controller, event: &Event, geometry: &Geo
         c.app.context_help = Some(ContextHelp { topic, scroll: 0 });
     }
     open
+}
+
+fn opens_with_key(c: &Controller, key: KeyEvent, topic: HelpTopic) -> bool {
+    if key.kind != KeyEventKind::Press {
+        return false;
+    }
+    if key.code == KeyCode::F(1) && key.modifiers.is_empty() {
+        return true;
+    }
+    if c.bindings.action(key) != Some(crate::input::Action::Help) {
+        return false;
+    }
+    let printable = matches!(key.code, KeyCode::Char(_))
+        && !key
+            .modifiers
+            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT);
+    !printable || !editing(&c.app, topic)
+}
+
+fn editing(app: &App, topic: HelpTopic) -> bool {
+    match topic {
+        HelpTopic::Pattern => app
+            .pattern
+            .as_ref()
+            .is_some_and(|state| state.focus == crate::ui::PatternControl::Expression),
+        HelpTopic::Operation(operation) => {
+            !matches!(operation, Operation::Delete | Operation::Trash)
+        }
+        HelpTopic::Incident => true,
+        _ => false,
+    }
 }
 
 fn overlay(c: &mut Controller, event: &Event, geometry: &Geometry) {

@@ -39,7 +39,7 @@ room for both.
 
 Use the arrow keys (or `j`/`k`) to navigate, Enter to enter a directory and
 Backspace to go up. With a mouse, click to focus, double-click a directory to
-enter it, and use the wheel to scroll. Press `?` to see the shortcuts currently
+enter it, and use the wheel to scroll. Press `?` or F1 to see the shortcuts currently
 configured in your installation.
 
 ## Keyboard shortcuts
@@ -258,14 +258,14 @@ owner = false
 "Ctrl+f" = "filter"
 ```
 
-Press `?` for one scrollable Help document, grouped by task. Press `/` in Help
+Press `?` or F1 for one scrollable Help document, grouped by task. Press `/` in Help
 or click **Jump** to find a section or search commands and their effective
 shortcuts. Use the arrows and Enter, or click a result, to jump to its entry.
 Esc closes the picker first, then Help.
 
-In a dialog, press F1 or click **?** in its title for contextual Help. Esc
-returns to the same dialog, field and selection. You can still type `?` in a
-Wildcard or Regex expression.
+In a dialog, press `?` or F1, or click **?** in its title, for contextual Help.
+While editing a text field, `?` stays literal; use F1 for Help. Esc returns to
+the same dialog, field and selection. Click **×** to cancel or close a dialog.
 
 Custom bindings override the defaults, and `?` displays the effective
 shortcuts. For punctuation keys, use the character produced rather than a

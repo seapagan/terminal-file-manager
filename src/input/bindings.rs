@@ -166,6 +166,7 @@ const DEFAULT_BINDINGS: &[(&str, Action)] = &[
     ("F10", Quit),
     ("Ctrl+c", Quit),
     ("?", Help),
+    ("F1", Help),
     ("F12", Diagnostics),
     ("Alt+PageUp", DiagnosticsUp),
     ("Alt+PageDown", DiagnosticsDown),
