@@ -198,6 +198,10 @@ fn assert_invalid_create_feedback(plan: Plan, name: &str, message: &str) {
     ] {
         c.handle(event, &g, std::time::Duration::ZERO);
     }
+    let Some(Dialog::Operation(dialog)) = &c.app.operations.dialog else {
+        panic!("invalid name must keep the creation dialog open");
+    };
+    assert_eq!(dialog.error.as_deref(), Some(message), "{name}");
     let (buffer, disabled) = draw(&c.app, ColorLevel::NoColor);
     at(&buffer, message);
     assert!(!disabled.operation_enabled(KeyCode::Enter));

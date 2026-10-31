@@ -293,11 +293,6 @@ impl Plan {
 }
 
 pub(crate) fn file_name_error(name: &std::ffi::OsStr) -> Option<&'static str> {
-    use std::path::Path;
-    let path = Path::new(name);
-    if name.as_encoded_bytes().contains(&0) || path.file_name() != Some(name) {
-        return Some("Enter one file name without path separators, NUL, or dot components");
-    }
     #[cfg(windows)]
     {
         let Some(text) = name.to_str() else {
@@ -333,6 +328,10 @@ pub(crate) fn file_name_error(name: &std::ffi::OsStr) -> Option<&'static str> {
         {
             return Some("Choose another file name; this is a reserved Windows device name");
         }
+    }
+    let path = std::path::Path::new(name);
+    if name.as_encoded_bytes().contains(&0) || path.file_name() != Some(name) {
+        return Some("Enter one file name without path separators, NUL, or dot components");
     }
     None
 }
