@@ -15,19 +15,27 @@ impl Action {
     }
 }
 
-fn metadata(action: Action) -> (usize, HelpSection, &'static str) {
-    COMMANDS
-        .iter()
-        .enumerate()
-        .find_map(|(priority, (candidate, section, description))| {
-            (*candidate == action).then_some((priority, *section, *description))
-        })
-        .expect("every action has Help metadata")
+// The same rows produce the table and match: a new Action without metadata is a compile error.
+macro_rules! define_commands {
+    ($(($action:path, $section:expr, $description:literal $(,)?)),* $(,)?) => {
+        const COMMANDS: &[(Action, HelpSection, &str)] = &[
+            $(($action, $section, $description)),*
+        ];
+
+        fn metadata(action: Action) -> (usize, HelpSection, &'static str) {
+            let (section, description) = match action {
+                $($action => ($section, $description)),*
+            };
+            let priority = COMMANDS.iter()
+                .position(|(candidate, _, _)| *candidate == action)
+                .expect("the exhaustive match and table share the same rows");
+            (priority, section, description)
+        }
+    };
 }
 
-// Row position is display priority: common commands precede specialised/unavailable ones.
-// Bindings stay in the effective keymap; enum order has no presentation meaning.
-const COMMANDS: &[(Action, HelpSection, &str)] = &[
+// Row position is display priority; bindings remain in the effective keymap.
+define_commands! {
     (Action::Up, HelpSection::Navigation, "Move cursor up"),
     (Action::Down, HelpSection::Navigation, "Move cursor down"),
     (
@@ -316,7 +324,7 @@ const COMMANDS: &[(Action, HelpSection, &str)] = &[
         HelpSection::Application,
         "Scroll diagnostics down",
     ),
-];
+}
 
 #[cfg(test)]
 mod tests {
@@ -327,5 +335,12 @@ mod tests {
             .map(|(action, _, _)| action)
             .collect();
         assert_eq!(actions.len(), super::COMMANDS.len());
+    }
+
+    #[test]
+    fn lookup_preserves_each_rows_priority_section_and_description() {
+        for (priority, (action, section, description)) in super::COMMANDS.iter().enumerate() {
+            assert_eq!(super::metadata(*action), (priority, *section, *description));
+        }
     }
 }

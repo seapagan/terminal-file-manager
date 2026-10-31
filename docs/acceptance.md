@@ -1729,4 +1729,6 @@ Help ordering regressions place Refresh in Navigation and unavailable Viewer/Edi
 last in Views & Metadata. They cover practical order across all seven sections,
 configured bindings (including otherwise unbound view controls), deterministic
 search ties, and rendered jumps to moved actions at 20/40/80/120 columns without
-dispatching those actions. A metadata uniqueness check rejects duplicate command rows.
+dispatching those actions. Metadata checks reject duplicate rows and verify lookup
+fields/priority. An exhaustive match generated from the same rows rejects missing
+Actions at compile time.
