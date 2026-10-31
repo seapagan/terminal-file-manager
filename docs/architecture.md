@@ -433,7 +433,10 @@ fields cannot combine scattered letters into a result. Phrase words may appear
 in either order within a description. Input routing consumes
 picker events before browser and operation handlers.
 
-Shared modal specifications opt into a measured title-border Help control.
+The shared modal shell measures a safe title-border close control and an optional
+Help control, displayed as `[?] [×]`. A close click enters the owning layer
+through its existing Esc route, including preview cleanup and safe exit. Controls
+that cannot fit beside the full title stay hidden without resizing the shell.
 Narrow shells keep their title and the F1 keyboard route. Context Help stores
 only its topic and scroll; the parent retains its fields, focus, selection and
 geometry. Its read-only input layer consumes events before the parent, while

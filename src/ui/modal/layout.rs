@@ -19,6 +19,8 @@ pub struct Layout<T> {
     pub outer: Rect,
     /// Optional title-border control; F1 remains available when it cannot fit.
     pub help: Option<Rect>,
+    /// Safe close title control; consumers route it through their existing Esc handler.
+    pub close: Option<Rect>,
     /// Fixed leading region.
     pub pinned: Rect,
     /// Scrollable body, excluding padding and controls.
@@ -71,6 +73,7 @@ impl<T: Clone> Layout<T> {
         actions.retain(|a| a.area.bottom() <= bottom && a.area.right() <= outer.right());
         Self {
             help: super::help_area(outer, spec.title, spec.help),
+            close: super::close_area(outer, spec.title),
             outer,
             pinned,
             body,
@@ -101,6 +104,7 @@ impl<T: Clone> Layout<T> {
         actions.retain(|a| a.area.bottom() <= bottom && a.area.right() <= outer.right());
         Self {
             help: super::help_area(outer, spec.title, spec.help),
+            close: super::close_area(outer, spec.title),
             outer,
             pinned,
             body,

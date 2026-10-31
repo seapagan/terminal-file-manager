@@ -6,6 +6,7 @@ use ratatui::layout::Rect;
 pub struct Geometry {
     pub context_help: Option<super::ContextLayout>,
     pub context_control: Option<Rect>,
+    pub modal_close: Option<Rect>,
     pub help: Option<super::help::HelpLayout>,
     pub pattern: Option<super::PatternLayout>,
     pub(super) operation_layout: Option<super::operations::Layout>,
@@ -89,6 +90,7 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
         geometry.panes[app.active] = Some(body);
     }
     scroll_limits(app, &mut geometry, area);
+    geometry.modal_close = close_control(app, area, &geometry);
     geometry
 }
 
@@ -100,6 +102,7 @@ fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
     Geometry {
         context_help: super::help::context::layout(app, area),
         context_control,
+        modal_close: None,
         help: super::help::layout(app, area),
         pattern,
         operation_layout,
@@ -205,4 +208,28 @@ fn context_control(
         return layout.shell.help;
     }
     pattern.and_then(|layout| layout.shell.help)
+}
+
+fn close_control(app: &App, area: Rect, geometry: &Geometry) -> Option<Rect> {
+    if let Some(layout) = &geometry.context_help {
+        return layout.shell.close;
+    }
+    if let Some(layout) = &geometry.operation_layout {
+        return layout.shell.close;
+    }
+    if let Some(layout) = &geometry.pattern {
+        return layout.shell.close;
+    }
+    if app.diagnostics || geometry.menu.is_some() {
+        return None;
+    }
+    if let Some(layout) = &geometry.help {
+        return layout
+            .picker
+            .as_ref()
+            .map_or(layout.close, |picker| picker.shell.close);
+    }
+    app.popup
+        .then(|| super::metadata::close_control(app, area))
+        .flatten()
 }

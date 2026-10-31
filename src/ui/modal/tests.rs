@@ -407,7 +407,7 @@ fn assert_help_header(title: &str, width: u16, level: colored_text::ColorLevel) 
         let text: String = (area.x..area.right())
             .map(|x| buffer[(x, area.y)].symbol())
             .collect();
-        assert_eq!(text, "[? F1]");
+        assert_eq!(text, "[?]");
         assert!(
             buffer[(area.x, area.y)]
                 .modifier

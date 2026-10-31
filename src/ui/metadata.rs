@@ -422,3 +422,14 @@ fn keys_help(app: &App, floating: bool) -> String {
         }
     )
 }
+
+pub(super) fn close_control(app: &App, bounds: Rect) -> Option<Rect> {
+    layout(
+        app,
+        bounds,
+        &Theme::new(colored_text::ColorLevel::NoColor),
+        true,
+    )
+    .shell
+    .and_then(|shell| shell.close)
+}

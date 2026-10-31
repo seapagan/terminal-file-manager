@@ -28,6 +28,7 @@ pub struct HelpLayout {
     pub outer: Rect,
     pub body: Rect,
     pub search: Option<Rect>,
+    pub close: Option<Rect>,
     pub anchors: Vec<(HelpTarget, u16)>,
     pub scroll_limit: u16,
     pub picker: Option<picker::PickerLayout>,
@@ -56,7 +57,7 @@ pub(super) fn layout(app: &App, bounds: Rect) -> Option<HelpLayout> {
         width.saturating_sub(2),
         height.saturating_sub(2),
     );
-    let search = (width >= 33 && height > 0).then(|| Rect::new(outer.right() - 10, outer.y, 8, 1));
+    let search = (width >= 33 && height > 0).then(|| Rect::new(outer.right() - 13, outer.y, 8, 1));
     let scroll_limit = rows
         .len()
         .saturating_sub(usize::from(body.height))
@@ -65,6 +66,7 @@ pub(super) fn layout(app: &App, bounds: Rect) -> Option<HelpLayout> {
         outer,
         body,
         search,
+        close: super::modal::close_area(outer, "Help — Esc closes"),
         anchors,
         scroll_limit,
         picker: picker::layout(app, bounds),
