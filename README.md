@@ -2,7 +2,7 @@
 
 `tfm` is a keyboard-first terminal file manager for Linux, macOS and Windows.
 Browse local directories in one or two panes, sort and filter files, mark entries,
-and inspect detailed file information — all without leaving the terminal.
+and inspect file information without leaving the terminal.
 
 Copy, move, rename and organise local files from the browser. SSH/SFTP, file
 viewing and editing remain planned. Enter navigates into directories; it does
@@ -32,7 +32,7 @@ tfm /path/to/left /path/to/right # Start with two different locations
 tfm --help                       # See command-line options
 ```
 
-A single directory argument is used for both panes. You can switch between one
+A single directory argument sets both pane locations. You can switch between one
 and two visible panes at any time; each pane keeps its own directory and view
 settings. On a narrow terminal, `tfm` shows the active pane until there is
 room for both.
@@ -74,67 +74,37 @@ These are the default bindings. You can customise them in `config.toml`.
 | `r` | Refresh the directory |
 | `V` / Alt+V | View options / view profiles |
 
-Linux and macOS refresh local directories automatically, including the hidden
-pane. External changes update the listing while preserving the cursor and
-surviving marks. Press `r` to refresh manually on every platform.
-If native notifications fail, automatic refresh slows to a maximum 30-second
-interval while TFM retries the watcher. Press `r` for an immediate refresh.
+Linux and macOS refresh local directories, including the hidden pane, while
+preserving the cursor and surviving marks. **On Windows, press `r` to see
+external changes.** You can use `r` on any platform to refresh the listing.
 
-**Windows requires `r` to refresh.** Native directory watches blocked ancestor
-renames, and two-second polling proved expensive in large directories. Manual
-refresh avoids persistent watcher handles and idle enumeration. Windows panes,
-including hidden panes, retain their last listing until deliberate refresh or
-navigation.
-
-Linux and macOS also reconcile each pane every 30 seconds to catch missed
-notifications. If native watching fails, TFM warns once and refreshes periodically
-while retrying. These automatic recovery checks apply to Linux and macOS.
-Large or slow directories, concurrent operations and unavailable mounts can
-extend refresh latency.
-If a directory disappears or another directory replaces it, TFM retains the
-last good view and reports the error; navigate out and reopen the directory to select the replacement.
+If automatic refresh fails on Linux or macOS, `tfm` reports the problem and
+retries. Slow directories and unavailable mounts can delay updates. If a
+directory disappears or another directory replaces it, reopen the directory;
+`tfm` keeps the last good listing and reports the error.
 
 ### Pattern selection
 
-Press **Alt+B** or click **Alt+B Mark** to mark filenames by pattern in the
-active pane. Click **W Wildcard**, **X Regex** or **S Case sensitive** to
-choose matching options. A filled radio button shows the selected mode;
-a checked box enables case sensitivity. Keyboard focus has a separate highlight.
-Type or paste into the **Pattern** field; its caret shows editing focus.
-Enter from a valid expression focuses **M Mark**; a second Enter marks matches.
-Use **U Unmark** or **R Replace** for the other actions. Esc cancels without
+Press **Alt+B** or click **Alt+B Mark** to mark filenames by wildcard or regex.
+Type a pattern, choose **Wildcard**, **Regex** and **Case sensitive** options,
+then use **Mark**, **Unmark** or **Replace**. With a valid pattern, Enter from
+the Pattern field moves to Mark; a second Enter applies it. Esc cancels without
 changing marks.
 
-While typing, **Alt+W/X/S/M/U/R** activates controls; plain letters stay in the
-expression. Outside the field, plain **W/X/S/M/U/R** also works. Tab and clicks on
-settings change focus. After a settings click, M/U/R applies
-the pattern; click **Pattern** to resume typing. W/X/S shortcuts keep focus
-where it is, so typing can continue after Alt+W/X/S. Enter/Space operates a focused mode or case control. All buttons
-support the mouse. Ctrl+C keeps its existing Quit behaviour.
-You can bind another key to `pattern-selection` in `[keybindings]` if your
-terminal or multiplexer reserves Alt+B.
+Tab or click to move between controls. Use **Alt+W/X/S** to change matching
+options while typing, and **Alt+M/U/R** to mark, unmark or replace. Outside the
+Pattern field, the control letters also work without Alt. You can assign
+another shortcut to `pattern-selection` in `[bindings]`.
 
-Wildcards match the whole filename: `*.rs`, `file?.txt`, `[abc]*` and `{a,b}*`.
-`?` matches one byte; case-insensitive wildcards ignore ASCII case.
-Regex matches substrings; use `^` and `$` to
-anchor a filename, for example `^report.*\.txt$`. Regex supports Unicode case
-folding. Both modes start case-sensitive. Matching uses native filenames,
-including names with invalid Unicode; displayed replacement characters never
-stand in for the original name when selecting entries. Regex can match a valid
-substring within a name containing invalid Unicode; Unicode `.` cannot consume
-an invalid sequence. An anchored whole-name expression can therefore exclude
-that name while a wildcard includes it. Explicit regex byte mode (`(?-u:...)`)
-can match those sequences.
+Wildcards match the whole filename, for example `*.rs`, `file?.txt` or `[abc]*`.
+Regex matches substrings; use anchors such as `^report.*\.txt$` to match a whole
+name. Matching starts case-sensitive in both modes.
 
-The live counts include directories and only visible selectable names, across
-the full listing. Hidden, ignored and filtered-out marks stay unchanged.
-Replace shows how many visible marks it replaces and can clear them when
-there are zero matches. Empty or invalid patterns cannot apply. If the visible
-names or identities change while the modal is open, cancel and reopen it.
-Enlarge the terminal when the expression, counts or action cannot fit.
-Expressions are limited to 4,096 bytes. An edit exceeding that limit is rejected
-in full and disables all Apply actions. Press Backspace in the Pattern field
-to correct the retained expression, or Esc to cancel.
+The preview counts matches across the visible listing, including directories.
+Hidden, ignored and filtered-out marks stay unchanged. **Replace can clear
+visible marks even when the pattern matches nothing.** Empty or invalid patterns
+cannot apply. If the listing changes while the dialog is open, reopen it to
+review the new matches. Enlarge the terminal if the controls cannot fit.
 
 ### Information and exit
 
@@ -162,57 +132,55 @@ to correct the retained expression, or Esc to cancel.
 | Shift+F8 / Alt+D | Preview permanent deletion; Enter cancels |
 | F9 / Alt+J | Jobs, progress and retained results |
 
-Create a file or directory in the active pane with one name, independently of
-the cursor or marks. Existing entries are preserved. Click **Alt+N File** in
-the footer, or use Alt+N if your terminal does not deliver Shift+F7.
+Create a file or directory in the active pane by entering one name. Existing
+entries stay intact. Press **Shift+F7** or **Alt+N** to create an empty file,
+or click **Alt+N File** in the footer. `tfm` selects the new file if it is visible
+and you have not moved the cursor or changed the selection or directory in the
+meantime.
 
-Other operations use visible marks, or the cursor when no visible marks remain. With
-two panes, copy and move target the other pane: one entry starts immediately,
+Other operations use visible marks, or the cursor when no visible marks remain.
+With two panes, copy and move target the other pane: one entry starts at once,
 while multiple entries ask for confirmation. Shift+F5/F6 or `C`/`M` bypass that
-routine confirmation. With one pane, choose the destination in the dialog.
-F2 in a transfer dialog toggles SHA-256 verification; its button describes the
-next action. PgUp/PgDown or the wheel over the source list scroll selected roots.
-An ASCII activity spinner runs while Trash/Delete counts recursively.
-Approval stays disabled until counting finishes and the dialog can
-show the selected objects and required safety context. Resize or cancel if needed.
+confirmation. With one pane, choose the destination in the dialog. F2 in a
+transfer dialog toggles SHA-256 verification.
+
+Trash and permanent deletion show a preview before confirmation. Wait for
+counting to finish and review the selection. Enlarge the terminal if the preview
+cannot fit. **Enter cancels permanent deletion.**
 
 Conflicts compare Incoming with Existing and default to Skip. Newer replaces
-Existing only when Incoming has a later modified time. `A Apply to all` toggles
-whether the next chosen action also applies to matching conflicts in this job;
-`Esc` cancels the job. Unavailable choices stay disabled. Enlarge the terminal
-if the comparison cannot fit before replacing. Directories merge. In Jobs,
-select a job with Up/Down or the mouse. Jobs opens with a compact summary;
-`E` toggles full evidence, including recorded errors and individual Trash receipts.
-Failed operations show a reason in the status line. Jobs Summary groups repeated
-failure reasons with affected counts and keeps mixed outcomes visible.
-The viewport stays fixed while you select jobs or toggle evidence.
-At small terminal sizes, the Jobs footer lists eligible shortcuts when their
-buttons cannot fit; safety warnings take priority.
-Available controls depend on the job state:
-`C` requests cancellation, `R` retries incomplete work from scratch, and `X`
-rechecks an unknown outcome with retained evidence. Completed entries stay
-excluded from retries. PgUp/PgDown or the mouse wheel scroll details; results
-and error evidence remain in Jobs after success, warning and error notices expire.
+Existing only when Incoming has a later modification time. `A Apply to all`
+applies your next choice to matching conflicts in the job; Esc cancels the job.
+Directories merge. Enlarge the terminal if the comparison cannot fit.
+
+Press F9 to inspect jobs and errors. Select a job with Up/Down or the mouse;
+PgUp/PgDown or the wheel scrolls its details. Jobs opens in Summary; `E` toggles
+Evidence.
+Available actions depend on the job's state:
+
+- `C` requests cancellation.
+- `R` retries incomplete work, leaving completed entries untouched.
+- `X Reconcile` rechecks an eligible unknown outcome.
+
+**An unknown outcome blocks retries and normal safe exit until reconciled.**
+Critical irreversible Trash incidents require the separate acknowledgement below.
+
+Results stay in Jobs for the current session. `Q` saves navigation, not job
+history. On quit, choose Return, Wait, or Cancel safely; `tfm` waits for active
+operations and cleanup.
 
 Trash can fail where the native facility cannot preserve the selected object.
-Linux uses home Trash or a validated Trash on the source volume; it never copies
-and deletes across filesystems to emulate Trash. Permanent
-deletion requires its own confirmation and never serves as a fallback. On quit, choose Return, Wait, or
-Cancel safely; `tfm` waits for workers and cleanup. An unknown outcome blocks
-retry and safe exit until reconciliation.
+Permanent deletion requires separate confirmation; `tfm` does not use it as a
+fallback. If the OS reports permanent deletion during a Trash request, Jobs shows
+a critical incident. Acknowledgement cannot restore the data. After all workers
+stop, type `ACKNOWLEDGE` and press F10 in the exit dialog. Enter or Esc keeps
+`tfm` open.
 
-If the OS reports permanent deletion during a Trash request, TFM retains a
-critical incident in Jobs. This is irreversible; acknowledgement cannot restore
-the data. After all workers stop, quitting offers a separate acknowledgement:
-type `ACKNOWLEDGE`, then press F10. Enter or Esc keeps TFM open. Ordinary unknown
-outcomes cannot use this exit path. Job diagnostics exist only for the current
-session; `Q` saves navigation, not job history.
-
-Hidden entries are excluded by default. Use `h` or the View menu to change
+`tfm` hides hidden entries by default. Use `h` or the View menu to change
 between **Hidden: Hide** and **Hidden: Show**. A small `h` beside an entry's type
-marks it as hidden. Git-ignored entries are dimmed by default; choose `hide`
-or `off` if you prefer. Marks on entries hidden by a filter or visibility option
-are retained, but those entries remain outside the visible selection.
+marks it as hidden. `tfm` dims Git-ignored entries by default; choose `hide`
+or `off` if you prefer. It retains marks on entries hidden by a filter or
+visibility option; operations use the visible selection.
 
 ## Views and metadata
 
@@ -231,9 +199,7 @@ Press `c` in a metadata view for an on-demand directory count and size. In the
 **sidebar**, Esc cancels an active count but does not close the sidebar. In the
 **popup**, Esc cancels the count or closes the popup.
 Counts are on-demand snapshots; press `c` again to update them.
-The floating popup keeps keyboard and mouse focus until you close it; pane
-selection and file-operation shortcuts stay inactive behind it. Its fixed
-**Esc Close** control remains available while the fields scroll.
+Close the floating popup with Esc before navigating or starting a file operation.
 
 ## Saving and restoring sessions
 
@@ -254,7 +220,7 @@ To save a session without opening the interface:
 tfm --save-session -2 /path/to/left /path/to/right
 ```
 
-Marks, filters and back/forward navigation history are kept only for the current
+`tfm` keeps marks, filters and back/forward navigation history for the current
 run.
 
 ## Configuration
@@ -298,15 +264,13 @@ reliably distinguished by terminals.
 Set `NO_COLOR` to disable colours. Press F12 to inspect the terminal colour
 diagnostics when needed.
 
-## Project documentation
+## Contributing and licence
 
-- [Contributing and development checks](CONTRIBUTING.md)
-- [Architecture](docs/architecture.md) and [acceptance status](docs/acceptance.md)
-- [Planned work](TODO.md) and [security reporting](SECURITY.md)
-- [Source attribution](docs/provenance.md) and [third-party notices](THIRD_PARTY_NOTICES.md)
+See [Contributing](CONTRIBUTING.md) for development instructions and
+[security reporting](SECURITY.md) to report a vulnerability. Explore the
+[architecture](docs/architecture.md), [acceptance record](docs/acceptance.md)
+and [planned work](TODO.md) for more project detail.
 
 `tfm` is licensed under [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE).
-
-The Linux `inotify` and `inotify-sys` dependencies use ISC. See
-[third-party notices](THIRD_PARTY_NOTICES.md) for their terms and other non-base
-licences. Binary archives include this notices file alongside both TFM licences.
+See [third-party notices](THIRD_PARTY_NOTICES.md) for dependency licences and
+[source attribution](docs/provenance.md) for adapted code.

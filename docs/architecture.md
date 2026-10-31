@@ -263,12 +263,25 @@ Editable values retain their normal style and show a caret at the editing end;
 long values scroll horizontally without changing the underlying input.
 Create directory and Create empty file share the same form, field editor,
 measured geometry and controls. Both disable Create for empty or invalid names;
-the parent path uses the muted semantic role. CreateFile uses the existing
-operation plan, directory guard, coordinator and Jobs results, with native
-exclusive creation preserving collisions. A per-pane cursor intent waits for
-success and a subsequent listing; navigation or newer cursor/selection changes
-discard it. Listing visibility rules still apply. Copy/Move align
-From/To values and describe the next SHA-256 toggle action in the F2 button.
+the parent path uses the muted semantic role. Shared `name_valid()` and
+`name_error()` methods supply form eligibility and submit feedback while retaining
+distinct directory and native file-name rules. Windows file-name feedback
+identifies reserved device names, prohibited characters and trailing dots/spaces
+before generic path checks, including drive-like input such as `a:b`.
+
+CreateFile uses the existing operation plan, directory guard, coordinator and
+Jobs results, with native exclusive creation preserving collisions. The plan
+captures the dialog's originating pane and retains it through Jobs retries;
+registration does not redirect focus to whichever pane is active. A per-pane
+cursor intent waits for success and a subsequent listing. Ordinary refresh
+failures retain it, and completion during an older scan schedules a deferred
+refresh. Navigation or newer cursor/selection changes discard the intent;
+listing visibility rules still apply. The footer retains its existing layout
+with compact `F7 Dir` and `Alt+N File` labels; `Alt+Enter Info` remains visible
+and clickable at 80 columns.
+
+Copy/Move align From/To values and describe the next SHA-256 toggle action in
+the F2 button.
 Detailed floating metadata retains the same available native sizes as the
 sidebar; a compact directory row's em dash denotes an uncomputed payload size.
 

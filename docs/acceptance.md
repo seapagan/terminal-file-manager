@@ -1,5 +1,64 @@
 # Acceptance gates
 
+## PM3-03 accepted and merged — 31 October 2026
+
+The maintainer merged [PR #7](https://github.com/seapagan/terminal-file-manager/pull/7)
+at 07:49:24 UTC as
+[`35ad78d`](https://github.com/seapagan/terminal-file-manager/commit/35ad78dcd03b595741e9bf3e4582b87efd961eb5).
+The final feature head was GPG-signed/Signed-off-by
+[`709e8a0`](https://github.com/seapagan/terminal-file-manager/commit/709e8a0220a5fc00d34aecd7fa13e9731ab31323).
+Local empty-file creation is complete. PM3-04 Help is ready for a separate
+assignment; this closeout does not authorise implementation.
+
+Independent external AI cold reviews ran in sequence: **Codex → DeepSeek →
+Claude**. Codex returned zero findings. DeepSeek identified two minor focus defects:
+a failed ordinary refresh lost pending creation focus, and successful Create File
+retries omitted focus registration. Both received fixes and regressions. Claude's
+third review findings were validated and dispositioned; confirmed fixes shipped,
+while investigation found no behavioural defect warranting the proposed
+creation-state or revision-counter refactors. These reviews were not formal
+GitHub approval records.
+
+The maintainer tested Create File on Linux, accepted its functionality and modal
+appearance/behaviour, inspected and accepted the compact footer, then authorised
+and completed the merge after remediation and green checks. Linux received
+maintainer functional and visual acceptance. macOS and Windows received native
+automated verification without manual visual acceptance.
+
+[Final feature-head Rust CI](https://github.com/seapagan/terminal-file-manager/actions/runs/41181351150)
+passed on all three native hosts:
+
+| Host | Tests passed | Established skips |
+| --- | --- | --- |
+| Linux | 746 | 2 |
+| macOS | 723 | 2 |
+| Windows | 693 | 3 |
+
+Each host passed one doctest. Exact MSRV, combined coverage and all five
+feature-head workflows passed; all 19 PR checks passed, including Codacy static
+analysis, diff coverage and coverage variation. The final Linux
+`RUSTUP_TOOLCHAIN=1.95.0 cargo make verify` passed in 99.53s, including coverage
+and mandatory xwin check/Clippy/build. Clean `cargo make verify-postcommit`
+passed in 52.33s, including the full Rust 1.95.0 MSRV gate and strict packages
+under Rust 1.95.0 and 1.99.0. These results belong to the feature head, not a
+new verification run on the merge commit or this documentation edit.
+
+Review corrections restored 80-column Info rendering and click dispatch, clear
+Windows filename errors and originating-pane focus on Jobs retries. Native
+Windows tests proved that `CLOCK$`, `COM0`, `LPT0` and console-name extensions
+create regular files; bare `CONIN$` and `CONOUT$` are rejected. Permission-denial
+tests now skip root and restore permissions during unwinding. Actual root
+execution was unavailable because sudo required authentication. Investigations
+of creation-state ordering and the shared revision found no behavioural defect;
+regressions cover deferred refresh and pattern-preview caching without a refactor.
+
+Fourteen baseline complexity advisories remain, along with inherited Node
+DEP0005 and Codacy JGit reporting warnings. The unchanged Windows metadata-viewport
+test failed on an intermediate head and passed on the final head; its intermittent
+cause remains unresolved; no diagnosis or fix is claimed. The Linux acceptance
+above comes from the maintainer's confirmation, not an inference from CI or the
+merge. Earlier checkpoints below retain their historical status.
+
 ## PM3-02 accepted and merged — 30 October 2026
 
 [PR #6](https://github.com/seapagan/terminal-file-manager/pull/6) merged at
@@ -1599,6 +1658,12 @@ Buffer/input tests exercise the shared Create Directory form, semantic colours,
 monochrome focus, small terminals, clickable controls and configurable shortcuts.
 Native terminal tests exercise Shift+F7 and Alt+N through PTY/ConPTY.
 Refresh tests protect the originating pane, newer cursor/selection/navigation
-changes and hidden-file visibility. Windows-only tests cover device names,
-stream syntax and invalid native names. Platform results belong to the final
-commit and CI evidence; Linux cross-builds do not establish Windows runtime proof.
+changes, failed refresh recovery, completion during an older scan and hidden-file
+visibility. Jobs retry tests switch the active pane before registering the retry
+and protect both panes' cursors. Footer regressions retain the original 80-column
+Info and 100-column Mark contracts. Windows-only tests cover reserved names,
+legitimate device-like names, stream syntax and rendered error feedback, including
+`a:b`. Unix permission tests protect denial without mutation and restoration on
+panic; root execution skips the denial case. Pattern navigation tests preserve
+the preview cache. See the accepted/merged checkpoint above for final native
+platform results; Linux cross-builds do not establish Windows runtime proof.
