@@ -259,3 +259,36 @@ fn conflict_close_sends_only_the_existing_cancel_decision() {
 
 mod conflict_fixture;
 mod dialog_fixture;
+
+#[test]
+fn metadata_title_close_uses_cancel_even_when_escape_is_rebound() {
+    use terminal_file_manager::input::Action;
+    for action in [Action::Help, Action::Quit, Action::Delete] {
+        let bindings = Bindings::new(&[("Esc".into(), action)].into()).unwrap();
+        let mut c = Controller::new(
+            App::new("owned-close-fixture".into()),
+            bindings,
+            Default::default(),
+        );
+        key(&mut c, "Alt+Enter");
+        close(&mut c);
+        assert!(!c.app.popup);
+        assert!(!c.app.help && c.app.context_help.is_none());
+        assert!(!c.quit && !c.save_session);
+        assert!(c.app.operations.dialog.is_none() && c.app.operations.outbox.is_empty());
+    }
+}
+
+#[test]
+fn close_above_metadata_dismisses_only_the_topmost_help_layer() {
+    let mut c = controller(App::new("owned-close-fixture".into()));
+    key(&mut c, "Alt+Enter");
+    key(&mut c, "F1");
+    close(&mut c);
+    assert!(c.app.popup && c.app.context_help.is_none());
+    c.app.help = true;
+    close(&mut c);
+    assert!(c.app.popup && !c.app.help);
+    close(&mut c);
+    assert!(!c.app.popup && !c.quit);
+}

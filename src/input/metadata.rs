@@ -1,13 +1,24 @@
 //! Metadata view lifetimes follow visible surfaces and active pane focus.
 use super::{Action, Controller};
-use crate::{app::Request, ui::Geometry};
-use crossterm::event::Event;
+use crate::{
+    app::{App, Request},
+    ui::Geometry,
+};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind};
 use std::time::Duration;
 
 impl Controller {
     /// Normalize terminal input. Clock/geometry are explicit deterministic inputs.
     pub fn handle(&mut self, event: Event, geometry: &Geometry, now: Duration) -> Vec<Request> {
-        let event = close_event(event, geometry.modal_close);
+        let closing = close_hit(&event, geometry.modal_close);
+        if closing && metadata_owns_close(&self.app, geometry) {
+            return self.dispatch(Action::Cancel, geometry);
+        }
+        let event = if closing {
+            Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE))
+        } else {
+            event
+        };
         self.sync_metadata(geometry);
         let width = if let Event::Resize(width, _) = event {
             width
@@ -78,14 +89,15 @@ pub(super) fn accepts(action: Action) -> bool {
     )
 }
 
-// Reuse the owning layer's cancellation, cleanup and event-isolation policy.
-fn close_event(event: Event, close: Option<ratatui::layout::Rect>) -> Event {
-    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind};
-    if matches!(&event, Event::Mouse(mouse) if mouse.kind == MouseEventKind::Down(MouseButton::Left)
+// Metadata's Close action bypasses configurable Esc, just like its existing footer button.
+fn metadata_owns_close(app: &App, geometry: &Geometry) -> bool {
+    app.popup
+        && geometry.context_help.is_none()
+        && geometry.help.is_none()
+        && geometry.pattern.is_none()
+}
+
+fn close_hit(event: &Event, close: Option<ratatui::layout::Rect>) -> bool {
+    matches!(event, Event::Mouse(mouse) if mouse.kind == MouseEventKind::Down(MouseButton::Left)
         && close.is_some_and(|area| area.contains((mouse.column, mouse.row).into())))
-    {
-        Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE))
-    } else {
-        event
-    }
 }
