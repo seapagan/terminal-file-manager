@@ -29,7 +29,7 @@ pub(super) fn focused(app: &App) -> Option<KeyCode> {
         {
             Some(KeyCode::Enter)
         }
-        Some(Dialog::Operation(dialog)) if dialog.plan.operation == Operation::Mkdir => {
+        Some(Dialog::Operation(dialog)) if dialog.plan.operation.creates_entry() => {
             Some(KeyCode::Enter)
         }
         None if !app.operations.show_history => app.operations.conflicts.front().map(|conflict| {
@@ -92,7 +92,7 @@ fn operation(dialog: &crate::operations::OperationDialog, narrow: bool) -> Vec<B
             let mut buttons = vec![
                 ("Esc Cancel", KeyCode::Esc),
                 (
-                    if operation == Operation::Mkdir {
+                    if operation.creates_entry() {
                         "Enter Create"
                     } else {
                         "Enter Run"
@@ -204,7 +204,7 @@ pub(super) fn enabled(app: &App, key: KeyCode) -> bool {
         (Operation::Trash | Operation::Delete, KeyCode::Char('T' | 'D')) => {
             dialog.ready && dialog.plan.preview.is_some() && dialog.error.is_none()
         }
-        (Operation::Mkdir, KeyCode::Enter) => dialog.directory_name_valid(),
+        (Operation::Mkdir | Operation::CreateFile, KeyCode::Enter) => dialog.name_valid(),
         _ => true,
     }
 }

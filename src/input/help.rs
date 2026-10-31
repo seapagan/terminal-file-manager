@@ -126,6 +126,7 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
         "Move; bypass routine dual-pane multi-selection confirmation",
     ),
     (Mkdir, "Create directory"),
+    (CreateFile, "Create empty file"),
     (Trash, "Preview and move selection to native Trash"),
     (Delete, "Preview and explicitly confirm permanent deletion"),
     (Rename, "Rename one visible entry"),

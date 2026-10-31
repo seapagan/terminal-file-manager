@@ -36,13 +36,22 @@ pub struct OperationDialog {
 
 impl OperationDialog {
     /// Pure syntax check shared by the form and its submit guard; no filesystem reads.
-    pub fn directory_name_valid(&self) -> bool {
+    pub fn name_valid(&self) -> bool {
+        self.name_error().is_none()
+    }
+
+    pub fn name_error(&self) -> Option<&'static str> {
+        if self.plan.operation == super::Operation::CreateFile {
+            return super::plan::file_name_error(std::ffi::OsStr::new(&self.text));
+        }
         use std::path::{Component, Path};
         let path = Path::new(&self.text);
-        !self.text.contains('\0')
+        let valid = !self.text.contains('\0')
             && !self.text.contains(std::path::is_separator)
             && path.components().count() == 1
-            && matches!(path.components().next(), Some(Component::Normal(_)))
+            && matches!(path.components().next(), Some(Component::Normal(_)));
+        (!valid)
+            .then_some("Enter one directory name without path separators, NUL, or dot components")
     }
 }
 
@@ -293,7 +302,7 @@ fn completed(job: &Job, record: &Record) -> String {
     let verb = match job.plan.operation {
         Copy => "copied",
         Move => "moved",
-        Mkdir => "created",
+        Mkdir | CreateFile => "created",
         Rename => "renamed",
         Trash => "trashed",
         Delete => "permanently deleted",

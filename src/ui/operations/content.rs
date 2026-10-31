@@ -33,6 +33,7 @@ pub(super) fn operation(operation: Operation) -> &'static str {
         Operation::Move => "Move",
         Operation::Rename => "Rename",
         Operation::Mkdir => "Create directory",
+        Operation::CreateFile => "Create empty file",
         Operation::Permissions(_) => "Change permissions",
         Operation::ReadOnly(_) => "Change read-only attribute",
         Operation::Trash => "Move to Trash",
@@ -118,7 +119,7 @@ pub(super) fn header(app: &App) -> Vec<Row> {
         return Vec::new();
     };
     let mut rows = Vec::new();
-    if dialog.plan.operation != Operation::Mkdir {
+    if !dialog.plan.operation.creates_entry() {
         rows.extend(
             if matches!(dialog.plan.operation, Operation::Delete | Operation::Trash) {
                 destructive(dialog, app.operations.preview_frame)
@@ -146,7 +147,7 @@ pub(super) fn header(app: &App) -> Vec<Row> {
 
 fn form(dialog: &OperationDialog) -> Vec<Row> {
     let mut rows = Vec::new();
-    if dialog.plan.operation == Operation::Mkdir {
+    if dialog.plan.operation.creates_entry() {
         rows.push(Row::styled(
             format!("Parent: {}", dialog.base.display()),
             Role::Muted,
@@ -283,6 +284,7 @@ fn dialog_error(dialog: &OperationDialog) -> Vec<Row> {
 fn field_label(operation: Operation) -> &'static str {
     match operation {
         Operation::Mkdir => "Directory name",
+        Operation::CreateFile => "File name",
         Operation::Rename => "New name",
         Operation::Permissions(_) => "Permissions (octal)",
         Operation::ReadOnly(_) => "Read-only (true/false)",

@@ -98,7 +98,7 @@ fn footer_info_uses_the_popup_binding_and_fits_whole_controls_in_both_layouts() 
         Some(Action::ToggleSidebar)
     );
     for dual in [false, true] {
-        for width in [1, 20, 60, 80, 120] {
+        for width in [1, 20, 60, 80, 84, 85, 120] {
             let mut app = App::new(".".into());
             app.dual = dual;
             let buffer = draw(&app, width, ColorLevel::NoColor);

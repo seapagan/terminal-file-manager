@@ -10,6 +10,7 @@ pub enum Operation {
     Copy,
     Move,
     Mkdir,
+    CreateFile,
     Rename,
     Permissions(u32),
     ReadOnly(bool),
@@ -21,6 +22,7 @@ pub enum Operation {
 #[derive(Clone, Debug)]
 pub struct Plan {
     pub operation: Operation,
+    pub(crate) originating_pane: Option<usize>,
     pub operands: Vec<Entry>,
     pub destination: Option<PathBuf>,
     pub incoming_name: Option<std::ffi::OsString>,
@@ -32,11 +34,26 @@ pub struct Plan {
     retained_directories: Vec<super::Recovery>,
 }
 
+impl Operation {
+    pub(crate) fn creates_entry(self) -> bool {
+        matches!(self, Self::Mkdir | Self::CreateFile)
+    }
+}
+
 impl Plan {
+    /// Empty-file intent is independent of the visible cursor and marks.
+    pub fn create_file(destination: PathBuf) -> Self {
+        Self {
+            operation: Operation::CreateFile,
+            ..Self::mkdir(destination)
+        }
+    }
+
     /// Create-directory intent is independent of the visible cursor and marks.
     pub fn mkdir(destination: PathBuf) -> Self {
         Self {
             operation: Operation::Mkdir,
+            originating_pane: None,
             operands: Vec::new(),
             destination: Some(destination),
             incoming_name: None,
@@ -111,6 +128,7 @@ impl Plan {
         }
         Ok(Self {
             operation,
+            originating_pane: None,
             operands,
             destination,
             incoming_name: None,
@@ -129,7 +147,7 @@ impl Plan {
     /// Unknown outcomes require reconciliation. Fully completed jobs have nothing to retry.
     pub fn retry(&self, record: &super::Record) -> io::Result<Self> {
         self.retry_eligibility(record)?;
-        if self.operation == Operation::Mkdir {
+        if self.operation.creates_entry() {
             return Ok(self.clone());
         }
         let mut retry = self.clone();
@@ -162,13 +180,13 @@ impl Plan {
         if record.unresolved() {
             return Err(invalid("Outcome unknown; reconcile before retry"));
         }
-        if self.operation == Operation::Mkdir {
+        if self.operation.creates_entry() {
             if record
                 .entries
                 .iter()
                 .any(|entry| entry.outcome == super::Outcome::Completed)
             {
-                return Err(invalid("No incomplete directory creation to retry"));
+                return Err(invalid("No incomplete creation to retry"));
             }
             return Ok(());
         }
@@ -238,6 +256,15 @@ impl Plan {
     }
 
     pub(super) fn validate_directories(&self) -> super::safety::Result<()> {
+        if self.operation == Operation::CreateFile
+            && self
+                .destination
+                .as_ref()
+                .and_then(|path| path.file_name())
+                .is_none_or(|name| file_name_error(name).is_some())
+        {
+            return Err(invalid("Enter one valid native file name").into());
+        }
         for evidence in &self.retained_directories {
             evidence.validate_directory()?;
         }
@@ -263,6 +290,50 @@ impl Plan {
         }
         Ok(())
     }
+}
+
+pub(crate) fn file_name_error(name: &std::ffi::OsStr) -> Option<&'static str> {
+    #[cfg(windows)]
+    {
+        let Some(text) = name.to_str() else {
+            return Some("Enter a valid Unicode file name on Windows");
+        };
+        if text.ends_with(['.', ' ']) {
+            return Some("Windows file names cannot end with a dot or space");
+        }
+        if text.chars().any(|c| c < ' ' || "<>:\"|?*".contains(c)) {
+            return Some("Windows file names cannot contain control characters or < > : \" | ? *");
+        }
+        if ["CONIN$", "CONOUT$"]
+            .iter()
+            .any(|name| text.eq_ignore_ascii_case(name))
+        {
+            return Some("Choose another file name; this is a reserved Windows device name");
+        }
+        let stem = text
+            .split('.')
+            .next()
+            .unwrap_or("")
+            .trim_end()
+            .to_ascii_uppercase();
+        if matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+            || ["COM", "LPT"].iter().any(|prefix| {
+                stem.strip_prefix(prefix).is_some_and(|suffix| {
+                    matches!(
+                        suffix,
+                        "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
+                    )
+                })
+            })
+        {
+            return Some("Choose another file name; this is a reserved Windows device name");
+        }
+    }
+    let path = std::path::Path::new(name);
+    if name.as_encoded_bytes().contains(&0) || path.file_name() != Some(name) {
+        return Some("Enter one file name without path separators, NUL, or dot components");
+    }
+    None
 }
 
 #[derive(Clone, Debug)]

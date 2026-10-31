@@ -261,8 +261,13 @@ operand rows disappear; longer errors may need more room.
 Enlarge the terminal or cancel when approval is disabled.
 Editable values retain their normal style and show a caret at the editing end;
 long values scroll horizontally without changing the underlying input.
-Create directory accepts one native filename and disables Create for empty or
-invalid names. Its parent path uses the muted semantic role. Copy/Move align
+Create directory and Create empty file share the same form, field editor,
+measured geometry and controls. Both disable Create for empty or invalid names;
+the parent path uses the muted semantic role. CreateFile uses the existing
+operation plan, directory guard, coordinator and Jobs results, with native
+exclusive creation preserving collisions. A per-pane cursor intent waits for
+success and a subsequent listing; navigation or newer cursor/selection changes
+discard it. Listing visibility rules still apply. Copy/Move align
 From/To values and describe the next SHA-256 toggle action in the F2 button.
 Detailed floating metadata retains the same available native sizes as the
 sidebar; a compact directory row's em dash denotes an uncomputed payload size.

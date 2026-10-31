@@ -187,6 +187,8 @@ const DEFAULT_BINDINGS: &[(&str, Action)] = &[
     ("F5", Copy),
     ("F6", Move),
     ("F7", Mkdir),
+    ("Shift+F7", CreateFile),
+    ("Alt+n", CreateFile),
     ("F8", Trash),
     ("Alt+c", Copy),
     ("Alt+x", Move),

@@ -3,6 +3,9 @@ use crate::{color::Theme, operations::QueueTestDriver};
 use colored_text::ColorLevel;
 use ratatui::{Terminal, backend::TestBackend};
 
+#[path = "creation_tests.rs"]
+mod creation_tests;
+
 fn controlled_source_plan(root: &Path) -> Plan {
     let source = root.join("source");
     let modified = std::time::UNIX_EPOCH + Duration::from_secs(2_000_000_000);

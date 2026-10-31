@@ -34,7 +34,15 @@ fn at(buffer: &Buffer, text: &str) -> (u16, u16) {
 }
 #[test]
 fn create_requires_a_valid_name_without_stealing_field_focus() {
-    let app = dialog_fixture::dialog(Plan::mkdir("/controlled".into()));
+    for plan in [
+        Plan::mkdir("/controlled".into()),
+        Plan::create_file("/controlled".into()),
+    ] {
+        assert_create_form(plan);
+    }
+}
+fn assert_create_form(plan: Plan) {
+    let app = dialog_fixture::dialog(plan);
     let mut c = Controller::new(
         app,
         Bindings::new(&Default::default()).unwrap(),
@@ -163,20 +171,39 @@ fn assert_transfer_text(buffer: &Buffer, enabled: bool) {
 
 #[test]
 fn invalid_create_renders_specific_feedback_and_recovers_after_editing() {
+    for (plan, message) in [
+        (
+            Plan::mkdir("/controlled".into()),
+            "Enter one directory name without path separators, NUL, or dot components",
+        ),
+        (
+            Plan::create_file("/controlled".into()),
+            "Enter one file name without path separators, NUL, or dot components",
+        ),
+    ] {
+        assert_invalid_create_feedback(plan, "nested/directory", message);
+    }
+}
+
+fn assert_invalid_create_feedback(plan: Plan, name: &str, message: &str) {
     let mut c = Controller::new(
-        dialog_fixture::dialog(Plan::mkdir("/controlled".into())),
+        dialog_fixture::dialog(plan),
         Bindings::new(&Default::default()).unwrap(),
         Default::default(),
     );
     let g = ui::geometry(&c.app, Rect::new(0, 0, 120, 40));
     for event in [
-        Event::Paste("nested/directory".into()),
+        Event::Paste(name.into()),
         Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
     ] {
         c.handle(event, &g, std::time::Duration::ZERO);
     }
+    let Some(Dialog::Operation(dialog)) = &c.app.operations.dialog else {
+        panic!("invalid name must keep the creation dialog open");
+    };
+    assert_eq!(dialog.error.as_deref(), Some(message), "{name}");
     let (buffer, disabled) = draw(&c.app, ColorLevel::NoColor);
-    at(&buffer, "Enter one directory name");
+    at(&buffer, message);
     assert!(!disabled.operation_enabled(KeyCode::Enter));
     assert!(c.app.operations.outbox.is_empty());
     for event in [
@@ -196,4 +223,29 @@ fn invalid_create_renders_specific_feedback_and_recovers_after_editing() {
         |intent| matches!(intent, Intent::Submit(plan, _) if plan.destination.as_deref()
             == Some(std::path::Path::new("/controlled/資料")))
     ));
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_create_feedback_explains_reserved_names_and_invalid_characters() {
+    for (name, message) in [
+        (
+            "CON",
+            "Choose another file name; this is a reserved Windows device name",
+        ),
+        (
+            "CONIN$",
+            "Choose another file name; this is a reserved Windows device name",
+        ),
+        (
+            "a:b",
+            "Windows file names cannot contain control characters or < > : \" | ? *",
+        ),
+        (
+            "trailing.",
+            "Windows file names cannot end with a dot or space",
+        ),
+    ] {
+        assert_invalid_create_feedback(Plan::create_file("/controlled".into()), name, message);
+    }
 }

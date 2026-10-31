@@ -79,6 +79,7 @@ pub enum Action {
     Copy,
     Move,
     Mkdir,
+    CreateFile,
     Trash,
     Delete,
     Rename,

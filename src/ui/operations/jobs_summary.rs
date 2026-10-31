@@ -180,7 +180,7 @@ fn completed_verb(operation: crate::operations::Operation) -> &'static str {
         Copy => "copied",
         Move => "moved",
         Rename => "renamed",
-        Mkdir => "created",
+        Mkdir | CreateFile => "created",
         _ => "updated",
     }
 }

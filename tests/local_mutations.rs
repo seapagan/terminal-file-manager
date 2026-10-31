@@ -1,6 +1,77 @@
 use std::fs;
 use terminal_file_manager::operations::{Decision, Operation, Options, Outcome, Plan, execute};
 
+#[test]
+fn create_file_preserves_colliding_files_directories_and_missing_parents() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("file"), "preserved").unwrap();
+    fs::create_dir(root.path().join("directory")).unwrap();
+    fs::write(root.path().join("directory/child"), "child").unwrap();
+    for name in ["file", "directory", "missing/file"] {
+        let plan = Plan::create_file(root.path().join(name));
+        let record = execute(&plan, Options::default(), &false.into(), |_| {
+            Decision::Replace
+        });
+        assert_eq!(record.entries[0].outcome, Outcome::Failed);
+        assert!(!record.entries[0].detail.is_empty());
+        assert_eq!(record.completed_files(), 0);
+    }
+    assert_eq!(fs::read(root.path().join("file")).unwrap(), b"preserved");
+    assert_eq!(
+        fs::read(root.path().join("directory/child")).unwrap(),
+        b"child"
+    );
+    assert!(!root.path().join("missing").exists());
+}
+
+#[test]
+fn create_file_refuses_live_and_dangling_symlink_collisions() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("target"), "preserved").unwrap();
+    for target in ["target", "missing"] {
+        let link = root.path().join(format!("link-{target}"));
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(target, &link).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_file(target, &link).unwrap();
+        let record = execute(
+            &Plan::create_file(link.clone()),
+            Options::default(),
+            &false.into(),
+            |_| Decision::Replace,
+        );
+        assert_eq!(record.entries[0].outcome, Outcome::Failed);
+        assert_eq!(fs::read_link(link).unwrap(), std::path::Path::new(target));
+    }
+    assert_eq!(fs::read(root.path().join("target")).unwrap(), b"preserved");
+    assert!(!root.path().join("missing").exists());
+}
+
+#[test]
+#[cfg(unix)]
+fn create_file_permission_denied_creates_nothing() {
+    use std::os::unix::fs::PermissionsExt;
+    if nix::unistd::geteuid().is_root() {
+        eprintln!("Skipped: root bypasses directory write permissions");
+        return;
+    }
+    let root = tempfile::tempdir().unwrap();
+    let restore = RestorePermissions(
+        root.path().into(),
+        fs::metadata(root.path()).unwrap().permissions(),
+    );
+    fs::set_permissions(root.path(), fs::Permissions::from_mode(0o500)).unwrap();
+    let record = execute(
+        &Plan::create_file(root.path().join("new")),
+        Options::default(),
+        &false.into(),
+        |_| Decision::Skip,
+    );
+    assert_eq!(record.entries[0].outcome, Outcome::Failed);
+    assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
+    drop(restore);
+}
+
 #[cfg(unix)]
 fn unreadable_attribute_results() -> Vec<(Outcome, u32, u32)> {
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
@@ -183,5 +254,35 @@ fn mode_changes_use_frozen_identity_and_reject_replacement_links() {
             .permissions()
             .mode(),
         before
+    );
+}
+
+#[cfg(unix)]
+struct RestorePermissions(std::path::PathBuf, fs::Permissions);
+
+#[cfg(unix)]
+impl Drop for RestorePermissions {
+    fn drop(&mut self) {
+        if let Err(error) = fs::set_permissions(&self.0, self.1.clone()) {
+            eprintln!("Failed to restore {}: {error}", self.0.display());
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn create_file_permission_fixture_restores_permissions_on_panic() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let before = fs::metadata(root.path()).unwrap().permissions();
+    let result = std::panic::catch_unwind(|| {
+        let _restore = RestorePermissions(root.path().into(), before.clone());
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o500)).unwrap();
+        panic!("simulate an assertion failure before restoration");
+    });
+    assert!(result.is_err());
+    assert_eq!(
+        fs::metadata(root.path()).unwrap().permissions().mode(),
+        before.mode()
     );
 }

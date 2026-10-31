@@ -1,4 +1,5 @@
 //! Authoritative pane state and pure transitions. No filesystem calls.
+mod creation;
 mod metadata;
 mod pane;
 pub use metadata::MetadataFormat;
@@ -123,6 +124,7 @@ impl App {
             self.status = "Deferred refresh cancelled by newer navigation".into();
         }
         state.reset_range();
+        state.creation = None;
         state.generation += 1;
         state.pending = Some(path.clone());
         state.error = None;
@@ -206,6 +208,9 @@ impl App {
         match result {
             Ok(snapshot) => self.install_listing(pane, attempted, snapshot),
             Err(error) => {
+                if attempted.is_some() {
+                    state.creation = None;
+                }
                 if attempted.is_some() && state.refresh_pending {
                     state.refresh_pending = false;
                     self.status = "Deferred refresh cancelled because navigation failed".into();
