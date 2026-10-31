@@ -206,11 +206,11 @@ fn overlay(c: &mut Controller, event: &Event, geometry: &Geometry) {
     state.scroll = state
         .scroll
         .min(limit)
-        .saturating_add_signed(delta.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16)
+        .saturating_add_signed(delta)
         .min(limit);
 }
 
-fn scroll_delta(event: &Event, geometry: &Geometry, page: u16) -> i32 {
+fn scroll_delta(event: &Event, geometry: &Geometry, page: u16) -> i16 {
     match event {
         Event::Key(key) if key.kind != KeyEventKind::Release && key.modifiers.is_empty() => {
             key_scroll(key.code, page)
@@ -230,14 +230,15 @@ fn scroll_delta(event: &Event, geometry: &Geometry, page: u16) -> i32 {
     }
 }
 
-fn key_scroll(code: KeyCode, page: u16) -> i32 {
+fn key_scroll(code: KeyCode, page: u16) -> i16 {
+    let page = page.min(i16::MAX as u16) as i16;
     match code {
         KeyCode::Up => -1,
         KeyCode::Down => 1,
-        KeyCode::PageUp => -i32::from(page),
-        KeyCode::PageDown => i32::from(page),
-        KeyCode::Home => -i32::MAX,
-        KeyCode::End => i32::MAX,
+        KeyCode::PageUp => -page,
+        KeyCode::PageDown => page,
+        KeyCode::Home => i16::MIN,
+        KeyCode::End => i16::MAX,
         _ => 0,
     }
 }

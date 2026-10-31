@@ -11,6 +11,7 @@ use ratatui::{Frame, layout::Rect, widgets::Paragraph};
 pub struct ContextLayout {
     pub shell: modal::Layout<()>,
     pub scroll_limit: u16,
+    row_count: usize,
     paragraphs: Vec<HelpParagraph>,
 }
 
@@ -39,6 +40,7 @@ pub(in crate::ui) fn layout(app: &App, bounds: Rect) -> Option<ContextLayout> {
     Some(ContextLayout {
         shell,
         scroll_limit,
+        row_count,
         paragraphs,
     })
 }
@@ -70,10 +72,13 @@ pub(in crate::ui) fn render(
         .scroll((state.scroll.min(layout.scroll_limit), 0)),
         layout.shell.body,
     );
+    let start = usize::from(state.scroll.min(layout.scroll_limit));
+    let end = (start + usize::from(layout.shell.body.height)).min(layout.row_count);
     let hint = format!(
-        "↑/↓ wheel · PageUp/PageDown · {}/{}",
-        state.scroll.min(layout.scroll_limit) + 1,
-        layout.scroll_limit + 1
+        "Lines {}–{} of {} · ↑/↓ wheel · PageUp/PageDown",
+        (start + 1).min(end),
+        end,
+        layout.row_count,
     );
     frame.render_widget(
         Paragraph::new(modal::truncate(&hint, layout.shell.footer.width))

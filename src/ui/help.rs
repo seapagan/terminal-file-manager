@@ -155,9 +155,10 @@ fn line(row: &Row, app: &App, theme: &Theme, key_width: usize) -> Line<'static> 
             Span::styled(row.text.clone(), theme.style(Role::Value)),
         ])
     };
-    if app
-        .help_landing
-        .is_some_and(|(target, until)| target == row.target && app.now < until)
+    if (!row.keys.is_empty() || !row.text.is_empty())
+        && app
+            .help_landing
+            .is_some_and(|(target, until)| target == row.target && app.now < until)
     {
         line = line.style(theme.style(Role::Cursor));
     }
