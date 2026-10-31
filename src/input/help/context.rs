@@ -123,14 +123,10 @@ fn opens_with_key(c: &Controller, key: KeyEvent, topic: HelpTopic) -> bool {
     if key.code == KeyCode::F(1) && key.modifiers.is_empty() {
         return true;
     }
-    if c.bindings.action(key) != Some(crate::input::Action::Help) {
-        return false;
-    }
-    let printable = matches!(key.code, KeyCode::Char(_))
-        && !key
-            .modifiers
-            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT);
-    !printable || !editing(&c.app, topic)
+    key.code == KeyCode::Char('?')
+        && (key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT)
+        && c.bindings.action(key) == Some(crate::input::Action::Help)
+        && !editing(&c.app, topic)
 }
 
 fn editing(app: &App, topic: HelpTopic) -> bool {

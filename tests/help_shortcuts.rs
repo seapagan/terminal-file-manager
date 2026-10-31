@@ -270,3 +270,19 @@ fn configured_main_help_override_keeps_its_effective_action_and_label() {
     key(&mut c, "F1");
     assert!(c.app.operations.show_history && !c.app.help);
 }
+
+#[test]
+fn remapping_escape_to_help_cannot_intercept_a_dialogs_reserved_cancel() {
+    let root = tempfile::tempdir().unwrap();
+    let bindings = Bindings::new(&[("Esc".into(), Action::Help)].into()).unwrap();
+    let mut c = Controller::new(
+        dialog_fixture::dialog(Plan::create_file(root.path().into())),
+        bindings,
+        Default::default(),
+    );
+    key(&mut c, "Esc");
+    assert!(c.app.operations.dialog.is_none());
+    assert!(c.app.context_help.is_none());
+    assert!(c.app.operations.outbox.is_empty());
+    assert!(!c.quit);
+}
