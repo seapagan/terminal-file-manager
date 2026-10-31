@@ -25,7 +25,7 @@ impl Bindings {
                 .or_default()
                 .push(super::help::key_name(*code, *modifiers));
         }
-        grouped
+        let mut entries: Vec<_> = grouped
             .into_iter()
             .map(|(action, mut keys)| {
                 keys.sort();
@@ -35,7 +35,9 @@ impl Bindings {
                     description: super::help::description(action),
                 }
             })
-            .collect()
+            .collect();
+        entries.sort_by_key(|entry| super::help::priority(entry.action));
+        entries
     }
     /// Build and validate configurable bindings.
     ///

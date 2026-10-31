@@ -1724,3 +1724,9 @@ synonyms, contextual topics, parent focus restoration and literal question marks
 in pattern, operation and incident text fields. Repeated/released or modified
 function keys cannot open another layer. A native PTY/ConPTY scenario opens the
 main document with F1 and contextual Help with ? from a non-editor control.
+
+Help ordering regressions place Refresh in Navigation and unavailable Viewer/Editor
+last in Views & Metadata. They cover practical order across all seven sections,
+configured bindings (including otherwise unbound view controls), deterministic
+search ties, and rendered jumps to moved actions at 20/40/80/120 columns without
+dispatching those actions. A metadata uniqueness check rejects duplicate command rows.

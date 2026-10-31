@@ -423,7 +423,10 @@ recursive preview accounting and lifecycle-derived job counts are unchanged.
 
 ## Categorised Help
 
-Help groups the effective action keymap into one document. Measured wrapped rows
+Help groups the effective action keymap into one document. One metadata table
+owns each action's description, section and display priority; row order puts
+common commands before specialised and unavailable commands. Effective bindings
+still come from the live keymap, independently of the Action enum order. Measured wrapped rows
 supply section/action anchors, scrolling bounds and landing highlights. The
 shared modal shell contains the temporary fuzzy jump picker; it keeps the main
 document and its scroll position. Search ranks title/action matches before keys
