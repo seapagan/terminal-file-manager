@@ -1704,3 +1704,6 @@ Header/Key/Value styles unchanged. Create File/Directory parent labels
 and paths retain their hierarchy, and search/preview/job/conflict explanations
 remain readable. Existing disabled-action and narrow-terminal hit tests retain
 their safety assertions, including the complete 80-column Alt+Enter Info control.
+
+Help polish regressions cover compact section rows, command-detail click targets,
+query/result separation, narrow result geometry and Unicode query cursor bounds.

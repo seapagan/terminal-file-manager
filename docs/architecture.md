@@ -448,3 +448,7 @@ Help section headings use the dedicated SectionHeader role: light cyan
 Create dialogs present the parent as a Label/Value row. Informational progress, search feedback and reasons
 for unavailable actions use readable text roles; disabled controls retain the
 Disabled role. Other theme roles and operation eligibility remain unchanged.
+
+The jump picker gives sections one selectable row and commands a title with a
+separate shortcut/category line. Its plain query field and separator sit outside
+result hit regions. Measured result heights keep the selected entry in view.
