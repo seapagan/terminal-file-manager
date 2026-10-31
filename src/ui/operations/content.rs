@@ -152,10 +152,7 @@ pub(super) fn header(app: &App) -> Vec<Row> {
 fn form(dialog: &OperationDialog) -> Vec<Row> {
     let mut rows = Vec::new();
     if dialog.plan.operation.creates_entry() {
-        rows.push(Row::styled(
-            format!("Parent: {}", dialog.base.display()),
-            Role::Muted,
-        ));
+        rows.push(Row::key_value("Parent", dialog.base.display().to_string()));
         rows.push(Row::plain(""));
     }
     rows.extend(rename_notice(dialog));
@@ -350,7 +347,7 @@ fn destructive(dialog: &OperationDialog, frame: u8) -> Vec<Row> {
             if dialog.plan.preview.is_some() {
                 Role::Status
             } else {
-                Role::Disabled
+                Role::Label
             },
         )
         .single_line(),

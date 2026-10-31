@@ -80,13 +80,25 @@ fn assert_create_form(plan: Plan) {
 fn assert_create_style(app: &App, level: ColorLevel) {
     let (buffer, g) = draw(app, level);
     assert!(g.operation_enabled(KeyCode::Enter));
+    let theme = Theme::new(level);
     let (x, y) = at(&buffer, "Parent:");
     assert_eq!(
         buffer[(x, y)].fg,
-        Theme::new(level).style(Role::Muted).fg.unwrap_or_default()
+        theme.style(Role::Label).fg.unwrap_or_default()
     );
     assert!(
         buffer[(x, y)]
+            .modifier
+            .contains(ratatui::style::Modifier::BOLD)
+    );
+    let x = x + "Parent: ".len() as u16;
+    assert_eq!(buffer[(x, y)].symbol(), "/");
+    assert_eq!(
+        buffer[(x, y)].fg,
+        theme.style(Role::Value).fg.unwrap_or_default()
+    );
+    assert!(
+        !buffer[(x, y)]
             .modifier
             .contains(ratatui::style::Modifier::DIM)
     );

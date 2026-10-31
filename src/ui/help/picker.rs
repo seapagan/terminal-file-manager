@@ -80,7 +80,7 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, layout: &Picke
     }
     if layout.hits.is_empty() {
         frame.render_widget(
-            Paragraph::new("No matching commands").style(theme.style(Role::Muted)),
+            Paragraph::new("No matching commands").style(theme.style(Role::Value)),
             layout.shell.body,
         );
     }

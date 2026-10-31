@@ -442,3 +442,8 @@ Effective shortcut hints share the same preferred-alias lookup as the footer.
 Metadata count/cancel/refresh hints, its measured Close action and Jobs detail
 routes follow configured bindings. Shared modal actions own their display labels
 so runtime key text uses the same measurement and hit regions as fixed controls.
+
+Help section headings use the semantic Header role. Create dialogs present the
+parent as a Label/Value row. Informational progress, search feedback and reasons
+for unavailable actions use readable text roles; disabled controls retain the
+Disabled role. Theme palettes and operation eligibility remain unchanged.

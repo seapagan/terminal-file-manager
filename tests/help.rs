@@ -261,11 +261,24 @@ fn section_and_landing_styles_remain_visible_in_colour_and_monochrome() {
             })
             .unwrap();
         let cell = &terminal.backend().buffer()[(layout.body.x, layout.body.y)];
-        assert!(cell.modifier.contains(Modifier::BOLD | Modifier::DIM));
-        assert!(!cell.modifier.contains(Modifier::REVERSED));
+        assert_heading_style(cell, &theme);
         let search = layout.search.unwrap();
         assert_eq!(shown(terminal.backend().buffer(), search), "[/ Jump]");
     }
+}
+
+fn assert_heading_style(cell: &ratatui::buffer::Cell, theme: &Theme) {
+    use ratatui::style::Modifier;
+    assert!(cell.modifier.contains(Modifier::BOLD));
+    assert!(!cell.modifier.contains(Modifier::DIM));
+    assert_eq!(
+        cell.fg,
+        theme
+            .style(terminal_file_manager::color::Role::Header)
+            .fg
+            .unwrap_or_default()
+    );
+    assert!(!cell.modifier.contains(Modifier::REVERSED));
 }
 
 fn shown(buffer: &ratatui::buffer::Buffer, area: Rect) -> String {

@@ -182,7 +182,7 @@ fn disabled(job: &Job) -> Vec<Row> {
     if job.active() {
         return vec![Row::styled(
             "Retry and reconciliation wait for worker acknowledgment.",
-            Role::Disabled,
+            Role::Value,
         )];
     }
     if job.state == JobState::Critical {
@@ -200,7 +200,7 @@ fn disabled(job: &Job) -> Vec<Row> {
     if !job.can_retry() && !job.can_reconcile() {
         return vec![Row::styled(
             "Retry unavailable: no incomplete operands remain.",
-            Role::Disabled,
+            Role::Value,
         )];
     }
     Vec::new()

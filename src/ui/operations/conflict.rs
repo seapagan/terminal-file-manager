@@ -283,7 +283,7 @@ fn footer(source: &Entry, destination: &Entry, newer: bool) -> Vec<Row> {
             } else {
                 "Newer disabled: time unavailable."
             },
-            Role::Disabled,
+            Role::Value,
         ));
     }
     rows

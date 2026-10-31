@@ -1696,3 +1696,9 @@ Configured-binding rendering also covers metadata count/cancel hints, the Close
 control, startup Jobs hints and failure-detail routes. The regression reassigns
 c, Esc, F9 and Alt+j and checks the actual F11/F6/F1 labels in TestBackend cells.
 Default labels and existing narrow-terminal safety tests remain in force.
+
+Readability regressions inspect TestBackend cells in colour and monochrome:
+Help headings remain bold without dimming, Create File/Directory parent labels
+and paths retain their hierarchy, and search/preview/job/conflict explanations
+remain readable. Existing disabled-action and narrow-terminal hit tests retain
+their safety assertions, including the complete 80-column Alt+Enter Info control.

@@ -9,7 +9,6 @@ use crate::{
 use ratatui::{
     Frame,
     layout::Rect,
-    style::Modifier,
     text::{Line, Span},
     widgets::Paragraph,
 };
@@ -142,10 +141,7 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, layout: &HelpL
 
 fn line(row: &Row, app: &App, theme: &Theme, key_width: usize) -> Line<'static> {
     let mut line = if row.heading {
-        Line::styled(
-            row.text.clone(),
-            theme.style(Role::Muted).add_modifier(Modifier::BOLD),
-        )
+        Line::styled(row.text.clone(), theme.style(Role::Header))
     } else {
         let padding = key_width.saturating_sub(Line::raw(&row.keys).width()) + 1;
         Line::from(vec![
