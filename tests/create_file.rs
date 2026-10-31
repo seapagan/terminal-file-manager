@@ -294,7 +294,7 @@ fn configured_keys_and_footer_click_use_the_same_create_file_action() {
         .iter()
         .find(|control| control.action == Action::CreateFile)
         .unwrap();
-    assert_eq!(control.label, "Alt+N New file");
+    assert_eq!(control.label, "Alt+N File");
     let event = mouse(Rect::new(control.area.right() - 1, control.area.y, 1, 1));
     c.handle(event, &g, Duration::ZERO);
     assert!(c.app.operations.dialog.is_some());
@@ -309,7 +309,7 @@ fn footer_shortcuts_fit_without_partial_labels_and_use_help_notation() {
     use terminal_file_manager::{color::Theme, input::Action};
     let (_root, c) = loaded();
     let theme = Theme::new(colored_text::ColorLevel::TrueColor);
-    for (width, new_file_visible) in [(49, false), (50, true), (180, true)] {
+    for (width, new_file_visible) in [(43, false), (44, true), (80, true), (180, true)] {
         let mut terminal = Terminal::new(TestBackend::new(width, 24)).unwrap();
         terminal
             .draw(|f| {
@@ -415,6 +415,8 @@ fn invalid_windows_file_names_disable_create_and_fail_without_mutation() {
         "NUL",
         "con.txt",
         "COM1",
+        "CONIN$",
+        "conout$",
         "LPT9.txt",
         "file:stream",
         "bad?name",
@@ -475,3 +477,32 @@ fn create_file_shortcuts_submit_an_empty_regular_file_from_an_empty_pane() {
         assert_eq!(metadata.len(), 0);
     }
 }
+
+#[test]
+fn creation_completion_during_an_older_scan_uses_the_deferred_refresh() {
+    let (root, mut c) = loaded();
+    let plan = submit(&mut c, "new");
+    let old_request = c.app.request_refresh(0).unwrap();
+    let old_snapshot = terminal_file_manager::fs::list(
+        root.path(),
+        &terminal_file_manager::fs::IgnoreContext::isolated(),
+        &false.into(),
+    )
+    .unwrap();
+    let record = execute(&plan, Default::default(), &false.into(), |_| Decision::Skip);
+    let requests = c.complete_operation(Update::Finished { id: 1, record });
+    assert!(requests.is_empty());
+    c.app
+        .complete_listing(0, old_request.generation, Ok(old_snapshot));
+    assert!(c.app.panes[0].cursor.is_none());
+    let request = c
+        .app
+        .take_refresh(0)
+        .expect("completion must schedule a fresh scan");
+    install(&mut c, request);
+    assert_eq!(c.app.panes[0].cursor, Some(root.path().join("new")));
+}
+
+#[cfg(windows)]
+#[path = "create_file/windows.rs"]
+mod windows;

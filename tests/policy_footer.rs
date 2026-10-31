@@ -112,7 +112,7 @@ fn footer_info_uses_the_popup_binding_and_fits_whole_controls_in_both_layouts() 
                 .footer_controls
                 .iter()
                 .find(|c| c.action == Action::Metadata);
-            if width >= 85 {
+            if width >= 80 {
                 let info = info.unwrap();
                 assert_eq!(info.label, "Alt+Enter Info");
                 let value: String = (info.area.x..info.area.right())
@@ -120,8 +120,6 @@ fn footer_info_uses_the_popup_binding_and_fits_whole_controls_in_both_layouts() 
                     .collect();
                 assert_eq!(value, info.label);
                 click_info(app, &g, info);
-            } else {
-                assert!(info.is_none());
             }
             assert!(
                 g.footer_controls

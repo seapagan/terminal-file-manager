@@ -277,7 +277,7 @@ fn shifted_printable_help_chord_and_user_override_remain_usable() {
 #[test]
 fn footer_hit_testing_dispatches_the_labelled_action_and_ignores_disabled_tail() {
     let (_root, mut controller) = controller();
-    let geometry = ui::geometry(&controller.app, ratatui::layout::Rect::new(0, 0, 140, 24));
+    let geometry = ui::geometry(&controller.app, ratatui::layout::Rect::new(0, 0, 130, 24));
     let click = |column| {
         Event::Mouse(MouseEvent {
             kind: MouseEventKind::Down(MouseButton::Left),
@@ -286,7 +286,14 @@ fn footer_hit_testing_dispatches_the_labelled_action_and_ignores_disabled_tail()
             modifiers: KeyModifiers::NONE,
         })
     };
-    controller.handle(click(139), &geometry, Duration::ZERO);
+    let narrow = ui::geometry(&controller.app, ratatui::layout::Rect::new(0, 0, 80, 24));
+    assert!(
+        narrow
+            .footer_controls
+            .iter()
+            .all(|control| control.area.right() <= 79)
+    );
+    controller.handle(click(79), &narrow, Duration::ZERO);
     assert!(!controller.app.sidebar);
     let info = geometry
         .footer_controls

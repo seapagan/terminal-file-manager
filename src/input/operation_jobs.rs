@@ -13,14 +13,15 @@ impl Controller {
     pub fn register_operation(
         &mut self,
         id: u64,
-        plan: crate::operations::Plan,
+        mut plan: crate::operations::Plan,
         options: crate::operations::Options,
         retry_of: Option<u64>,
     ) {
         if plan.operation == crate::operations::Operation::CreateFile
             && let Some(path) = &plan.destination
         {
-            self.app.panes[self.app.active].track_creation(id, path.clone());
+            let pane = *plan.originating_pane.get_or_insert(self.app.active);
+            self.app.panes[pane].track_creation(id, path.clone());
         }
         self.app.operations.history.push(Job {
             presentation: None,

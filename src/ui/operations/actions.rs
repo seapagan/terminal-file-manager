@@ -204,7 +204,7 @@ pub(super) fn enabled(app: &App, key: KeyCode) -> bool {
         (Operation::Trash | Operation::Delete, KeyCode::Char('T' | 'D')) => {
             dialog.ready && dialog.plan.preview.is_some() && dialog.error.is_none()
         }
-        (Operation::Mkdir | Operation::CreateFile, KeyCode::Enter) => dialog.directory_name_valid(),
+        (Operation::Mkdir | Operation::CreateFile, KeyCode::Enter) => dialog.name_valid(),
         _ => true,
     }
 }

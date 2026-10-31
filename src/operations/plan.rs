@@ -22,6 +22,7 @@ pub enum Operation {
 #[derive(Clone, Debug)]
 pub struct Plan {
     pub operation: Operation,
+    pub(crate) originating_pane: Option<usize>,
     pub operands: Vec<Entry>,
     pub destination: Option<PathBuf>,
     pub incoming_name: Option<std::ffi::OsString>,
@@ -52,6 +53,7 @@ impl Plan {
     pub fn mkdir(destination: PathBuf) -> Self {
         Self {
             operation: Operation::Mkdir,
+            originating_pane: None,
             operands: Vec::new(),
             destination: Some(destination),
             incoming_name: None,
@@ -126,6 +128,7 @@ impl Plan {
         }
         Ok(Self {
             operation,
+            originating_pane: None,
             operands,
             destination,
             incoming_name: None,
@@ -254,11 +257,11 @@ impl Plan {
 
     pub(super) fn validate_directories(&self) -> super::safety::Result<()> {
         if self.operation == Operation::CreateFile
-            && !self
+            && self
                 .destination
                 .as_ref()
                 .and_then(|path| path.file_name())
-                .is_some_and(valid_file_name)
+                .is_none_or(|name| file_name_error(name).is_some())
         {
             return Err(invalid("Enter one valid native file name").into());
         }
@@ -289,19 +292,25 @@ impl Plan {
     }
 }
 
-pub(crate) fn valid_file_name(name: &std::ffi::OsStr) -> bool {
+pub(crate) fn file_name_error(name: &std::ffi::OsStr) -> Option<&'static str> {
     use std::path::Path;
     let path = Path::new(name);
     if name.as_encoded_bytes().contains(&0) || path.file_name() != Some(name) {
-        return false;
+        return Some("Enter one file name without path separators, NUL, or dot components");
     }
     #[cfg(windows)]
     {
         let Some(text) = name.to_str() else {
-            return false;
+            return Some("Enter a valid Unicode file name on Windows");
         };
-        if text.ends_with(['.', ' ']) || text.chars().any(|c| c < ' ' || "<>:\"|?*".contains(c)) {
-            return false;
+        if text.ends_with(['.', ' ']) {
+            return Some("Windows file names cannot end with a dot or space");
+        }
+        if text.chars().any(|c| c < ' ' || "<>:\"|?*".contains(c)) {
+            return Some("Windows file names cannot contain control characters or < > : \" | ? *");
+        }
+        if text.eq_ignore_ascii_case("CONIN$") || text.eq_ignore_ascii_case("CONOUT$") {
+            return Some("Choose another file name; this is a reserved Windows device name");
         }
         let stem = text
             .split('.')
@@ -319,10 +328,10 @@ pub(crate) fn valid_file_name(name: &std::ffi::OsStr) -> bool {
                 })
             })
         {
-            return false;
+            return Some("Choose another file name; this is a reserved Windows device name");
         }
     }
-    true
+    None
 }
 
 #[derive(Clone, Debug)]

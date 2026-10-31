@@ -51,8 +51,15 @@ fn create_file_refuses_live_and_dangling_symlink_collisions() {
 #[cfg(unix)]
 fn create_file_permission_denied_creates_nothing() {
     use std::os::unix::fs::PermissionsExt;
-    assert!(!nix::unistd::geteuid().is_root());
+    if nix::unistd::geteuid().is_root() {
+        eprintln!("Skipped: root bypasses directory write permissions");
+        return;
+    }
     let root = tempfile::tempdir().unwrap();
+    let restore = RestorePermissions(
+        root.path().into(),
+        fs::metadata(root.path()).unwrap().permissions(),
+    );
     fs::set_permissions(root.path(), fs::Permissions::from_mode(0o500)).unwrap();
     let record = execute(
         &Plan::create_file(root.path().join("new")),
@@ -60,9 +67,9 @@ fn create_file_permission_denied_creates_nothing() {
         &false.into(),
         |_| Decision::Skip,
     );
-    fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
     assert_eq!(record.entries[0].outcome, Outcome::Failed);
     assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
+    drop(restore);
 }
 
 #[cfg(unix)]
@@ -247,5 +254,35 @@ fn mode_changes_use_frozen_identity_and_reject_replacement_links() {
             .permissions()
             .mode(),
         before
+    );
+}
+
+#[cfg(unix)]
+struct RestorePermissions(std::path::PathBuf, fs::Permissions);
+
+#[cfg(unix)]
+impl Drop for RestorePermissions {
+    fn drop(&mut self) {
+        if let Err(error) = fs::set_permissions(&self.0, self.1.clone()) {
+            eprintln!("Failed to restore {}: {error}", self.0.display());
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn create_file_permission_fixture_restores_permissions_on_panic() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let before = fs::metadata(root.path()).unwrap().permissions();
+    let result = std::panic::catch_unwind(|| {
+        let _restore = RestorePermissions(root.path().into(), before.clone());
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o500)).unwrap();
+        panic!("simulate an assertion failure before restoration");
+    });
+    assert!(result.is_err());
+    assert_eq!(
+        fs::metadata(root.path()).unwrap().permissions().mode(),
+        before.mode()
     );
 }

@@ -122,12 +122,9 @@ fn submit(
     dialog: &mut OperationDialog,
     geometry: &crate::ui::Geometry,
 ) -> bool {
-    if dialog.plan.operation.creates_entry() && !dialog.directory_name_valid() {
-        let message = if dialog.plan.operation == Operation::CreateFile {
-            "Enter one file name without path separators, NUL, or dot components"
-        } else {
-            "Enter one directory name without path separators, NUL, or dot components"
-        };
+    if dialog.plan.operation.creates_entry()
+        && let Some(message) = dialog.name_error()
+    {
         dialog.error = Some(message.into());
         controller.app.status = message.into();
         return true;
@@ -213,6 +210,7 @@ fn apply_fields(dialog: &mut OperationDialog) -> io::Result<()> {
             }
         }
         Operation::Mkdir | Operation::CreateFile => {
+            dialog.plan.originating_pane = Some(dialog.pane);
             dialog.plan.set_destination(dialog.base.join(&dialog.text));
         }
         Operation::Rename => {

@@ -110,3 +110,30 @@ fn invalid_range_target_preserves_revision_and_cache_but_real_ranges_invalidate(
     assert_eq!(state.cached_preview(pane).unwrap().marked, 1);
     assert_eq!(state.preview_scans.get(), 3);
 }
+
+#[test]
+fn pattern_input_owns_navigation_without_invalidating_the_preview() {
+    use crate::input::{Bindings, Controller};
+    use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+    let (_root, app) = loaded();
+    let mut controller = Controller::new(
+        app,
+        Bindings::new(&Default::default()).unwrap(),
+        Default::default(),
+    );
+    let before = controller.app.panes[0].cursor.clone();
+    for code in [KeyCode::Down, KeyCode::Up, KeyCode::Down] {
+        let geometry = ui::geometry(&controller.app, Rect::new(0, 0, 120, 30));
+        controller.handle(
+            Event::Key(KeyEvent::new(code, KeyModifiers::NONE)),
+            &geometry,
+            std::time::Duration::ZERO,
+        );
+    }
+    ui::geometry(&controller.app, Rect::new(0, 0, 120, 30));
+    assert_eq!(controller.app.panes[0].cursor, before);
+    assert_eq!(
+        controller.app.pattern.as_ref().unwrap().preview_scans.get(),
+        1
+    );
+}

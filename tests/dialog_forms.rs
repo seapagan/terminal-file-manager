@@ -181,11 +181,11 @@ fn invalid_create_renders_specific_feedback_and_recovers_after_editing() {
             "Enter one file name without path separators, NUL, or dot components",
         ),
     ] {
-        assert_invalid_create_feedback(plan, message);
+        assert_invalid_create_feedback(plan, "nested/directory", message);
     }
 }
 
-fn assert_invalid_create_feedback(plan: Plan, message: &str) {
+fn assert_invalid_create_feedback(plan: Plan, name: &str, message: &str) {
     let mut c = Controller::new(
         dialog_fixture::dialog(plan),
         Bindings::new(&Default::default()).unwrap(),
@@ -193,7 +193,7 @@ fn assert_invalid_create_feedback(plan: Plan, message: &str) {
     );
     let g = ui::geometry(&c.app, Rect::new(0, 0, 120, 40));
     for event in [
-        Event::Paste("nested/directory".into()),
+        Event::Paste(name.into()),
         Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
     ] {
         c.handle(event, &g, std::time::Duration::ZERO);
@@ -219,4 +219,29 @@ fn assert_invalid_create_feedback(plan: Plan, message: &str) {
         |intent| matches!(intent, Intent::Submit(plan, _) if plan.destination.as_deref()
             == Some(std::path::Path::new("/controlled/資料")))
     ));
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_create_feedback_explains_reserved_names_and_invalid_characters() {
+    for (name, message) in [
+        (
+            "CON",
+            "Choose another file name; this is a reserved Windows device name",
+        ),
+        (
+            "CONIN$",
+            "Choose another file name; this is a reserved Windows device name",
+        ),
+        (
+            "a:b",
+            "Windows file names cannot contain control characters or < > : \" | ? *",
+        ),
+        (
+            "trailing.",
+            "Windows file names cannot end with a dot or space",
+        ),
+    ] {
+        assert_invalid_create_feedback(Plan::create_file("/controlled".into()), name, message);
+    }
 }
