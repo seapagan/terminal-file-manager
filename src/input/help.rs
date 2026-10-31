@@ -16,6 +16,16 @@ pub struct HelpEntry {
     pub description: &'static str,
 }
 
+impl HelpEntry {
+    /// Keep a familiar alias when still bound, otherwise use the shortest effective label.
+    pub fn preferred_key(&self, preferred: &str) -> Option<&str> {
+        let keys = || self.keys.split(" / ").filter(|key| !key.is_empty());
+        keys()
+            .find(|key| *key == preferred)
+            .or_else(|| keys().min_by_key(|key| ratatui::text::Line::raw(*key).width()))
+    }
+}
+
 use super::Action;
 use crossterm::event::{KeyCode, KeyModifiers};
 

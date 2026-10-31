@@ -12,6 +12,8 @@ pub use pattern::{
 };
 use std::path::PathBuf;
 
+pub(crate) const WELCOME: &str = "Local files — ? for help, F9 / Alt+j for jobs";
+
 /// A bounded worker request carries identity independently of display text.
 #[derive(Clone, Debug)]
 pub struct Request {
@@ -108,10 +110,31 @@ impl App {
             overlay_scroll: 0,
             metadata_scroll: 0,
             metadata_formats: [None; 2],
-            status: "Local files — ? for help, F9 / Alt+j for jobs".into(),
+            status: WELCOME.into(),
             now: std::time::SystemTime::now(),
             details: std::array::from_fn(|_| Detail::default()),
         }
+    }
+
+    /// Current display label for a browser action, independent of its input routing.
+    pub fn shortcut(&self, action: crate::input::Action, preferred: &str) -> &str {
+        self.help_rows
+            .iter()
+            .find(|entry| entry.action == action)
+            .and_then(|entry| entry.preferred_key(preferred))
+            .unwrap_or("Unbound")
+    }
+
+    /// Full effective hint with the familiar alias first, preserving default status text.
+    pub fn shortcut_hint(&self, action: crate::input::Action, preferred: &str) -> String {
+        let Some(entry) = self.help_rows.iter().find(|entry| entry.action == action) else {
+            return "Unbound".into();
+        };
+        let first = entry.preferred_key(preferred).unwrap_or("Unbound");
+        std::iter::once(first)
+            .chain(entry.keys.split(" / ").filter(|key| *key != first))
+            .collect::<Vec<_>>()
+            .join(" / ")
     }
 
     /// Effective width never changes the user's requested layout.

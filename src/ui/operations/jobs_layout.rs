@@ -88,7 +88,7 @@ fn actions(
 fn context_width(actions: &[crate::ui::modal::actions::Action<OperationTarget>]) -> u16 {
     actions
         .iter()
-        .map(|a| crate::ui::modal::width(a.label).saturating_add(3))
+        .map(|a| crate::ui::modal::width(&a.label).saturating_add(3))
         .fold(0u16, u16::saturating_add)
         .saturating_sub(1)
 }

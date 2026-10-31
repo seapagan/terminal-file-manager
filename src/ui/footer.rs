@@ -39,17 +39,7 @@ pub(super) fn controls(app: &crate::app::App, area: Rect) -> Vec<FooterControl> 
         let Some(entry) = app.help_rows.iter().find(|entry| entry.action == action) else {
             continue;
         };
-        let keys: Vec<_> = entry.keys.split(" / ").collect();
-        let key = keys
-            .iter()
-            .find(|key| **key == preferred)
-            .copied()
-            .or_else(|| {
-                keys.iter()
-                    .min_by_key(|key| super::modal::width(key))
-                    .copied()
-            })
-            .unwrap_or("");
+        let key = entry.preferred_key(preferred).unwrap_or("");
         let label = format!("{key} {title}");
         let width = super::modal::width(&label);
         if u32::from(x) + u32::from(width) > u32::from(area.right()) {

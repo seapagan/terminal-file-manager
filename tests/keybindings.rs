@@ -188,3 +188,53 @@ fn default_case_sensitive_pairs_keep_their_actions_and_canonical_labels() {
         );
     }
 }
+
+#[test]
+fn configured_shortcuts_reach_metadata_and_status_hints() {
+    use colored_text::ColorLevel;
+    use ratatui::{Terminal, backend::TestBackend};
+    use terminal_file_manager::{app::App, color::Theme, input::Controller, ui};
+    let keys = bindings(&[
+        ("c", Action::Help),
+        ("F11", Action::Count),
+        ("Esc", Action::Help),
+        ("F6", Action::Cancel),
+        ("F9", Action::Help),
+        ("Alt+j", Action::Help),
+        ("F1", Action::Jobs),
+    ]);
+    let mut c = Controller::new(App::new("owned-hints".into()), keys, Default::default());
+    c.app.popup = true;
+    let mut terminal = Terminal::new(TestBackend::new(160, 40)).unwrap();
+    terminal
+        .draw(|f| {
+            ui::render(f, &c.app, &Theme::new(ColorLevel::NoColor));
+        })
+        .unwrap();
+    let text: String = terminal
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect();
+    assert!(text.contains("F11: count/size on demand; F6 cancels/closes"));
+    assert!(text.contains("[F6 Close]"));
+    assert!(text.contains("F1 for jobs"));
+    c.app.popup = false;
+    c.app.status = "Owned failure — F9 details".into();
+    terminal
+        .draw(|f| {
+            ui::render(f, &c.app, &Theme::new(ColorLevel::NoColor));
+        })
+        .unwrap();
+    let text: String = terminal
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect();
+    assert!(text.contains("Owned failure — F1 details"));
+    assert!(!text.contains("Owned failure — F9 details"));
+}

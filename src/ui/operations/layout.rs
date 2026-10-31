@@ -204,7 +204,7 @@ fn controls(shell: &modal::Layout<OperationTarget>) -> Vec<OperationControl> {
         .map(|button| OperationControl {
             area: button.area,
             target: button.action.intent,
-            label: button.action.label,
+            label: button.action.label.clone(),
             enabled: button.action.enabled,
         })
         .collect()

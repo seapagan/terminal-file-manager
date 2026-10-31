@@ -110,7 +110,7 @@ fn measured_buttons_fields_counts_and_focus_match_keyboard_and_mouse() {
         assert!(text.contains("Replace: 0 visible marks -> 2 matches"));
         let layout = geometry.pattern.unwrap();
         for region in &layout.shell.actions {
-            assert!(text.contains(region.action.label));
+            assert!(text.contains(&region.action.label));
             assert!(region.area.right() < layout.shell.outer.right());
             assert!(region.area.bottom() < layout.shell.outer.bottom());
         }

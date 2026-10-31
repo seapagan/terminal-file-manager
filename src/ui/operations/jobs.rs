@@ -36,7 +36,7 @@ pub(super) fn controls(app: &App, area: Rect) -> Vec<OperationControl> {
                 1,
             ),
             target: OperationTarget::Job(index),
-            label: "",
+            label: String::new(),
             enabled: true,
         })
         .collect()

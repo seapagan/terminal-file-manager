@@ -163,7 +163,7 @@ fn pack<T: Clone>(actions: &[Action<T>], available: u16) -> Vec<ActionRegion<T>>
     let mut regions = Vec::new();
     let (mut x, mut y) = (0u16, 0u16);
     for (index, action) in actions.iter().enumerate() {
-        let length = width(action.label).max(action.min_width).saturating_add(2);
+        let length = width(&action.label).max(action.min_width).saturating_add(2);
         if length > available {
             continue;
         }
@@ -203,7 +203,7 @@ fn measured_width<T>(spec: &Spec<'_, T>, terminal_width: u16) -> u16 {
     let action_width = spec
         .actions
         .iter()
-        .map(|a| usize::from(width(a.label).max(a.min_width)) + 3)
+        .map(|a| usize::from(width(&a.label).max(a.min_width)) + 3)
         .sum::<usize>()
         .saturating_sub(1);
     let desired = spec

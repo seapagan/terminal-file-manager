@@ -1687,3 +1687,8 @@ and Apply to all; Jobs evidence/scroll; and metadata scroll. Help blocks paste,
 Enter, shortcuts and clicks from reaching parent operations. Configured metadata
 keys appear in contextual text; exact Ctrl+c retains safe-exit routing. Native
 terminal input covers F1, literal question marks and resumed pattern editing.
+
+Configured-binding rendering also covers metadata count/cancel hints, the Close
+control, startup Jobs hints and failure-detail routes. The regression reassigns
+c, Esc, F9 and Alt+j and checks the actual F11/F6/F1 labels in TestBackend cells.
+Default labels and existing narrow-terminal safety tests remain in force.

@@ -96,17 +96,14 @@ pub(super) fn render(frame: &mut Frame, app: &App, bounds: Rect, theme: &Theme, 
     }
 }
 
-fn fields(
-    detail: &Detail,
-    pane: &MetadataFormat,
-    now: std::time::SystemTime,
-    theme: &Theme,
-    floating: bool,
-) -> Vec<Field> {
+fn fields(app: &App, theme: &Theme, floating: bool) -> Vec<Field> {
+    let detail = &app.details[app.active];
+    let pane = app.metadata_format(floating);
+    let now = app.now;
     if let Some(error) = &detail.stale {
-        return stale_fields(error, theme, floating);
+        return stale_fields(app, error, theme, floating);
     }
-    let mut fields = entry_fields(detail, pane, now);
+    let mut fields = entry_fields(detail, &pane, now);
     if let Some(totals) = &detail.totals {
         match totals {
             Ok(totals) => {
@@ -130,35 +127,35 @@ fn fields(
         }
     }
     if detail.counting {
-        fields.push(("Status", "Calculating totals… Esc cancels".into()));
+        fields.push((
+            "Status",
+            format!(
+                "Calculating totals… {} cancels",
+                app.shortcut(Action::Cancel, "Esc")
+            ),
+        ));
     }
-    fields.push((
-        "Keys",
-        if floating {
-            "c: count/size on demand; Esc cancels/closes"
-        } else {
-            "c: count/size on demand; Esc cancels the count"
-        }
-        .into(),
-    ));
+    fields.push(("Keys", keys_help(app, floating)));
     fields
         .into_iter()
-        .map(|(label, value)| Field::plain(label, value, theme).interactive(detail, pane, theme))
+        .map(|(label, value)| Field::plain(label, value, theme).interactive(detail, &pane, theme))
         .collect()
 }
 
-fn stale_fields(error: &str, theme: &Theme, floating: bool) -> Vec<Field> {
+fn stale_fields(app: &App, error: &str, theme: &Theme, floating: bool) -> Vec<Field> {
     vec![
         Field::plain("Status", "Stale directory listing".into(), theme),
         Field::plain("Error", error.into(), theme),
         Field::plain(
             "Keys",
             if floating {
-                "Esc closes"
+                format!("{} closes", app.shortcut(Action::Cancel, "Esc"))
             } else {
-                "r: refresh; reopen to select a new context"
-            }
-            .into(),
+                format!(
+                    "{}: refresh; reopen to select a new context",
+                    app.shortcut(Action::Refresh, "r")
+                )
+            },
             theme,
         ),
     ]
@@ -280,15 +277,9 @@ fn label_width(fields: &[Field], width: u16) -> usize {
 }
 
 fn layout(app: &App, bounds: Rect, theme: &Theme, floating: bool) -> Layout {
-    let fields = fields(
-        &app.details[app.active],
-        &app.metadata_format(floating),
-        app.now,
-        theme,
-        floating,
-    );
+    let fields = fields(app, theme, floating);
     let (shell, measured_rows) = if floating {
-        let (shell, rows) = popup_layout(&fields, bounds, theme, &app.details[app.active]);
+        let (shell, rows) = popup_layout(app, &fields, bounds, theme, &app.details[app.active]);
         (Some(shell), rows)
     } else {
         (None, Vec::new())
@@ -330,6 +321,7 @@ fn layout(app: &App, bounds: Rect, theme: &Theme, floating: bool) -> Layout {
 }
 
 fn popup_layout(
+    app: &App,
     fields: &[Field],
     bounds: Rect,
     theme: &Theme,
@@ -338,7 +330,7 @@ fn popup_layout(
     let mut measured_rows = Vec::new();
     let shell = {
         let actions = [super::modal::actions::Action::custom(
-            "Esc Close",
+            format!("{} Close", app.shortcut(Action::Cancel, "Esc")),
             Action::Cancel,
             crossterm::event::KeyCode::Esc,
         )];
@@ -416,4 +408,17 @@ pub(super) fn help_control(app: &App, bounds: Rect) -> Option<Rect> {
     )
     .shell
     .and_then(|shell| shell.help)
+}
+
+fn keys_help(app: &App, floating: bool) -> String {
+    format!(
+        "{}: count/size on demand; {} {}",
+        app.shortcut(Action::Count, "c"),
+        app.shortcut(Action::Cancel, "Esc"),
+        if floating {
+            "cancels/closes"
+        } else {
+            "cancels the count"
+        }
+    )
 }

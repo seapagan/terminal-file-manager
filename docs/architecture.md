@@ -437,3 +437,8 @@ geometry. Its read-only input layer consumes events before the parent, while
 the existing exact Ctrl+c safe-exit route remains available. Fixed dialog keys
 use lowercase labels for case-insensitive controls; uppercase-only destructive
 confirmation keeps its existing restrictions.
+
+Effective shortcut hints share the same preferred-alias lookup as the footer.
+Metadata count/cancel/refresh hints, its measured Close action and Jobs detail
+routes follow configured bindings. Shared modal actions own their display labels
+so runtime key text uses the same measurement and hit regions as fixed controls.

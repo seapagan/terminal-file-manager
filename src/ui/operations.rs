@@ -30,7 +30,7 @@ pub enum OperationTarget {
 pub struct OperationControl {
     pub area: Rect,
     pub target: OperationTarget,
-    pub label: &'static str,
+    pub label: String,
     /// Projected shell eligibility for geometry consumers and tests.
     /// Activation uses the measured shell's hit/key policy, not this field.
     pub enabled: bool,
@@ -147,7 +147,7 @@ fn field_controls(rows: &[content::Row], area: Rect, scroll: usize) -> Vec<Opera
             row.field.map(|field| OperationControl {
                 area: Rect::new(area.x, area.y + offset as u16, area.width, 1),
                 target: OperationTarget::Field(field),
-                label: "",
+                label: String::new(),
                 enabled: true,
             })
         })
@@ -170,7 +170,11 @@ fn notices(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
     }
     let notice = if app.operations.incidents() {
         Some((
-            "CRITICAL · F9 details: OS reported permanent deletion during F8 Trash".to_owned(),
+            format!(
+                "CRITICAL · {} details: OS reported permanent deletion during {} Trash",
+                app.shortcut(crate::input::Action::Jobs, "F9"),
+                app.shortcut(crate::input::Action::Trash, "F8")
+            ),
             Role::Error,
         ))
     } else if visible(app) {
@@ -181,7 +185,7 @@ fn notices(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
             .iter()
             .rev()
             .find(|notice| notice.expires > app.now)
-            .map(|notice| short_notice(notice, area.width))
+            .map(|notice| short_notice(app, notice, area.width))
     };
     if let Some((text, role)) = notice {
         frame.render_widget(Clear, area);
@@ -189,7 +193,7 @@ fn notices(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
     }
 }
 
-fn short_notice(notice: &crate::operations::Notice, width: u16) -> (String, Role) {
+fn short_notice(app: &App, notice: &crate::operations::Notice, width: u16) -> (String, Role) {
     use crate::operations::NoticeSeverity;
     let (label, role) = match notice.severity {
         NoticeSeverity::Success => ("Success", Role::Status),
@@ -200,7 +204,7 @@ fn short_notice(notice: &crate::operations::Notice, width: u16) -> (String, Role
     let summary = clean.strip_suffix(" — F9 details").unwrap_or(&clean);
     let text = format!("{label}: {summary}");
     (
-        super::status_text(&format!("{text} — F9 details"), width),
+        super::status_text(app, &format!("{text} — F9 details"), width),
         role,
     )
 }
