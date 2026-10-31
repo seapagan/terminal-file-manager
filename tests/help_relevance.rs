@@ -29,10 +29,7 @@ fn compact_fuzzy_names_and_phrase_words_retain_useful_matches() {
 }
 
 #[test]
-fn rankings_and_effective_shortcut_results_remain_deterministic() {
-    for query in ["copy", "pane", "back", "rnme", "crtfl"] {
-        assert_eq!(targets(query), targets(query));
-    }
+fn search_uses_effective_shortcuts() {
     let bindings = Bindings::new(&std::collections::BTreeMap::from([(
         "F11".into(),
         Action::Rename,
@@ -42,4 +39,40 @@ fn rankings_and_effective_shortcut_results_remain_deterministic() {
     assert_eq!(hits.len(), 1);
     assert_eq!(hits[0].target, HelpTarget::Action(Action::Rename));
     assert!(hits[0].keys.contains("F11"));
+}
+
+#[test]
+fn rank_tiers_and_equal_score_order_follow_the_document() {
+    use terminal_file_manager::input::HelpEntry;
+    let entries: Vec<_> = [
+        (Action::CreateFile, "coppery", ""),
+        (Action::Mkdir, "Other", "copy"),
+        (Action::Rename, "Safely copy", ""),
+        (Action::Trash, "Never copy", ""),
+        (Action::Move, "Copy items", ""),
+        (Action::Copy, "Copy", ""),
+    ]
+    .into_iter()
+    .map(|(action, description, keys)| HelpEntry {
+        action,
+        description,
+        keys: keys.into(),
+    })
+    .collect();
+    let actual: Vec<_> = help_hits(&entries, "  CoPy  ")
+        .into_iter()
+        .map(|hit| hit.target)
+        .collect();
+    assert_eq!(
+        actual,
+        [
+            Action::Copy,
+            Action::Move,
+            Action::Rename,
+            Action::Trash,
+            Action::Mkdir,
+            Action::CreateFile
+        ]
+        .map(HelpTarget::Action)
+    );
 }

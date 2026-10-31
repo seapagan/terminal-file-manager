@@ -141,24 +141,26 @@ fn title_help_click_restores_pattern_mode_case_scroll_and_geometry() {
     );
     let g = ui::geometry(&c.app, Rect::new(0, 0, 100, 32));
     let area = g.context_control.unwrap();
-    let parent_shell = g.pattern.unwrap().shell;
+    let parent_shell = g.pattern.as_ref().unwrap().shell.clone();
+    let parent_render = draw(&c);
     let mouse = Event::Mouse(MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Left),
         column: area.right() - 1,
         row: area.y,
         modifiers: KeyModifiers::NONE,
     });
-    c.handle(
-        mouse,
-        &ui::geometry(&c.app, Rect::new(0, 0, 100, 32)),
-        Duration::ZERO,
-    );
+    c.handle(mouse, &g, Duration::ZERO);
     assert!(c.app.context_help.is_some());
     key(&mut c, "End");
     key(&mut c, "Alt+w");
-    let g = ui::geometry(&c.app, Rect::new(0, 0, 100, 32));
-    assert_eq!(g.pattern.unwrap().shell.outer, parent_shell.outer);
     key(&mut c, "Esc");
+    let restored = ui::geometry(&c.app, Rect::new(0, 0, 100, 32))
+        .pattern
+        .unwrap()
+        .shell;
+    assert_eq!(restored.outer, parent_shell.outer);
+    assert_eq!(restored.body, parent_shell.body);
+    assert_eq!(draw(&c), parent_render);
     let parent = c.app.pattern.as_ref().unwrap();
     assert_eq!(
         (
@@ -236,6 +238,7 @@ fn narrow_context_help_has_f1_access_and_clamps_its_own_scroll_only() {
     for width in [1, 20, 40, 80, 120] {
         let mut c = controller(App::new("owned-context-help".into()));
         key(&mut c, "Alt+b");
+        c.app.pattern.as_mut().unwrap().scroll = 7;
         key(&mut c, "F1");
         c.app.context_help.as_mut().unwrap().scroll = u16::MAX;
         let bounds = Rect::new(0, 0, width, 12);
@@ -249,7 +252,9 @@ fn narrow_context_help_has_f1_access_and_clamps_its_own_scroll_only() {
                 ui::render(f, &c.app, &Theme::new(ColorLevel::NoColor));
             })
             .unwrap();
-        assert!(c.app.pattern.is_some());
+        assert_eq!(c.app.pattern.as_ref().unwrap().scroll, 7);
+        key(&mut c, "Esc");
+        assert_eq!(c.app.pattern.as_ref().unwrap().scroll, 7);
         assert!(c.app.operations.outbox.is_empty());
     }
 }

@@ -140,13 +140,15 @@ fn ranking_is_stable_and_searches_effective_keys_sections_and_action_names() {
                 .any(|hit| hit.target == HelpTarget::Action(Action::PatternSelection))
         );
     }
-    for query in ["back", "trash", "move", "pane", "crtfl"] {
-        let targets = |hits: Vec<terminal_file_manager::input::HelpHit>| {
-            hits.into_iter().map(|hit| hit.target).collect::<Vec<_>>()
-        };
+    for (query, action) in [
+        ("back", Action::Back),
+        ("trash", Action::Trash),
+        ("move", Action::Move),
+        ("crtfl", Action::CreateFile),
+    ] {
         assert_eq!(
-            targets(help_hits(&entries, query)),
-            targets(help_hits(&entries, query))
+            help_hits(&entries, query)[0].target,
+            HelpTarget::Action(action)
         );
     }
 }

@@ -107,3 +107,29 @@ fn fuzzy_gap(word: &str, query: &str) -> Option<usize> {
     }
     (span <= count * 2).then_some(span - count)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{fuzzy_gap, rank};
+
+    #[test]
+    fn rank_prefers_titles_then_shortcuts_then_word_abbreviations() {
+        assert_eq!(rank("copy", "Copy", "", ""), Some((0, 0)));
+        assert_eq!(rank("copy", "Copy files", "", ""), Some((1, 0)));
+        assert_eq!(rank("copy", "Safely copy", "", ""), Some((2, 0)));
+        assert_eq!(rank("f11", "Rename", "F11", "rename"), Some((3, 0)));
+        assert_eq!(rank("rnme", "Rename", "", "rename"), Some((4, 2)));
+        assert_eq!(rank("ry", "Rename safely", "", ""), None);
+        assert_eq!(rank("copy", "Co", "py", ""), None);
+    }
+
+    #[test]
+    fn fuzzy_matches_require_a_word_start_and_sufficient_letter_density() {
+        assert_eq!(fuzzy_gap("rename", "rnme"), Some(2));
+        assert_eq!(fuzzy_gap("rename", "nme"), None);
+        assert_eq!(fuzzy_gap("rabcdefghimn", "rmn"), None);
+        assert_eq!(fuzzy_gap("rename", "rmz"), None);
+        assert_eq!(fuzzy_gap("éclair", "écr"), Some(3));
+        assert_eq!(fuzzy_gap("", "rnme"), None);
+    }
+}

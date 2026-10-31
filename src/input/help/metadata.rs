@@ -338,9 +338,15 @@ mod tests {
     }
 
     #[test]
-    fn lookup_preserves_each_rows_priority_section_and_description() {
-        for (priority, (action, section, description)) in super::COMMANDS.iter().enumerate() {
-            assert_eq!(super::metadata(*action), (priority, *section, *description));
-        }
+    fn navigation_starts_with_cursor_movement_in_practical_order() {
+        use super::{Action, HelpSection};
+        assert_eq!(
+            super::metadata(Action::Up),
+            (0, HelpSection::Navigation, "Move cursor up")
+        );
+        assert_eq!(
+            super::metadata(Action::Down),
+            (1, HelpSection::Navigation, "Move cursor down")
+        );
     }
 }

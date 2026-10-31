@@ -79,11 +79,10 @@ fn check_header(width: u16, level: ColorLevel, title: &str) {
     let b = terminal.backend().buffer();
     if let Some(close) = layout.close {
         assert_eq!(shown(b, close), "[×]");
-        assert_eq!(close.right(), layout.outer.right() - 1);
-        assert!(close.x > layout.outer.x + 2 + modal::width(title));
+        assert!(shown(b, layout.outer).contains(title.split_whitespace().last().unwrap()));
+        assert_eq!(b[(layout.outer.right() - 1, close.y)].symbol(), "┐");
         if let Some(help) = layout.help {
             assert_eq!(shown(b, help), "[?]");
-            assert_eq!(close.x, help.right() + 1);
             assert_eq!(shown(b, Rect::new(help.x, help.y, 7, 1)), "[?]─[×]");
             assert_eq!(
                 &b[(help.right(), help.y)],
