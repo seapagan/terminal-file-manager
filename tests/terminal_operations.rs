@@ -394,7 +394,7 @@ fn view_dialog_help_and_profile_editing_cross_the_native_terminal_parser() {
     for (open, title, help, restored) in [
         (
             "V",
-            "View options",
+            "Human sizes",
             "View Options Help",
             "Space/Enter changes",
         ),

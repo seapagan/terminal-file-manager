@@ -45,12 +45,28 @@ pub(super) fn measure(
     spec.footer_rows = (super::text::wrap_value(hint, usize::from(initial.body.width))
         .len()
         .min(usize::from(initial.body.height.saturating_sub(1)))) as u16;
-    let mut shell = spec.measure(bounds, |_| count);
+    let mut shell = menu_shell(&spec, bounds, initial.outer.width, count);
     while spec.footer_rows > 0 && shell.body.height == 0 {
         spec.footer_rows -= 1;
-        shell = spec.measure(bounds, |_| count);
+        shell = menu_shell(&spec, bounds, initial.outer.width, count);
     }
     shell
+}
+
+fn menu_shell(
+    spec: &modal::Spec<'_, ()>,
+    bounds: Rect,
+    width: u16,
+    count: usize,
+) -> modal::Layout<()> {
+    let available = Rect {
+        height: bounds.height.saturating_sub(2),
+        ..bounds
+    };
+    let height = count
+        .saturating_add(usize::from(spec.footer_rows) + 4)
+        .min(usize::from(available.height)) as u16;
+    modal::Layout::viewport(spec, super::centered(available, width, height))
 }
 
 pub(super) fn render(frame: &mut Frame, app: &App, shell: &modal::Layout<()>, theme: &Theme) {

@@ -180,6 +180,59 @@ fn controller_with_menu(name: &str) -> Controller {
 }
 
 #[test]
+fn common_terminals_show_every_view_option_and_fifteen_profile_rows() {
+    for open in ["V", "Alt+v"] {
+        let mut c = controller_with_menu(open);
+        if open == "Alt+v" {
+            c.app.profile_names = (0..13).map(|i| format!("Profile {i:02}")).collect();
+        }
+        let bounds = Rect::new(0, 0, 80, 24);
+        let (buffer, g) = draw(&c, bounds, ColorLevel::NoColor);
+        assert!(g.menu_layout.unwrap().body.height >= 15);
+        let shown = text(&buffer);
+        if open == "V" {
+            assert!(shown.contains("Human sizes"));
+            assert!(shown.contains("Preferred metadata"));
+            assert!(shown.contains("Owner/group display"));
+        } else {
+            assert!(shown.contains("Profile 00"));
+            assert!(shown.contains("Profile 12"));
+            assert!(shown.contains("Save active as…"));
+        }
+    }
+}
+
+#[test]
+fn short_menus_use_available_height_and_keep_last_selection_clickable() {
+    for open in ["V", "Alt+v"] {
+        let mut c = controller_with_menu(open);
+        c.app.profile_names = (0..20).map(|i| format!("Profile {i:02}")).collect();
+        let bounds = Rect::new(0, 0, 80, 10);
+        key_at(&mut c, "End", bounds);
+        if open == "V" {
+            for _ in 0..15 {
+                key_at(&mut c, "Down", bounds);
+            }
+        }
+        let (buffer, g) = draw(&c, bounds, ColorLevel::NoColor);
+        let shell = g.menu_layout.unwrap();
+        assert_eq!(shell.outer.height, 8);
+        assert!(text(&buffer).contains(if open == "V" {
+            "Owner/group display"
+        } else {
+            "Save active as…"
+        }));
+        let row = Rect::new(shell.body.x, shell.body.bottom() - 1, 1, 1);
+        click(&mut c, row, bounds);
+        if open == "V" {
+            assert!(c.preferences_changed);
+        } else {
+            assert_eq!(c.app.profile_name.as_deref(), Some(""));
+        }
+    }
+}
+
+#[test]
 fn mouse_help_and_close_keep_view_changes_and_do_not_change_another_row() {
     let mut c = controller_with_menu("V");
     let bounds = Rect::new(0, 0, 80, 24);
