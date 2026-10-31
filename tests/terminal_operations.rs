@@ -332,7 +332,11 @@ fn searchable_help_jumps_and_layers_escape_in_a_native_terminal() {
             ("Jump to section or search commands", "trash"),
             ("Preview and move selection", "\r"),
             ("Preview and move selection", "/"),
-            ("Jump to section or search commands", "\x1b\x1bq"),
+            // A raw Esc Esc q batch is ambiguous to ConPTY (Alt+q).
+            // Observe each restored layer before sending the next key.
+            ("Jump to section or search commands", "\x1b"),
+            ("name one visible entry", "\x1b"),
+            ("help-sentinel", "q"),
         ],
         true,
     );

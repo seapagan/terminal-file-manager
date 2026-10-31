@@ -273,3 +273,28 @@ fn shown(buffer: &ratatui::buffer::Buffer, area: Rect) -> String {
         .map(|x| buffer[(x, area.y)].symbol())
         .collect()
 }
+
+#[test]
+fn picker_ignores_alt_quit_and_release_events_before_independent_escape_presses() {
+    use crossterm::event::KeyEventKind;
+    let mut c = controller();
+    key(&mut c, "?");
+    key(&mut c, "/");
+    key(&mut c, "Alt+q");
+    let g = ui::geometry(&c.app, Rect::new(0, 0, 120, 32));
+    for code in [KeyCode::Char('q'), KeyCode::Esc, KeyCode::Enter] {
+        let key = KeyEvent::new_with_kind(code, KeyModifiers::NONE, KeyEventKind::Release);
+        c.handle(Event::Key(key), &g, Duration::ZERO);
+    }
+    assert!(!c.quit);
+    assert!(c.app.help);
+    assert!(c.app.help_picker.as_ref().unwrap().query.is_empty());
+    key(&mut c, "Esc");
+    assert!(c.app.help_picker.is_none());
+    assert!(c.app.help);
+    key(&mut c, "Esc");
+    assert!(!c.app.help);
+    assert!(!c.quit);
+    key(&mut c, "q");
+    assert!(c.quit);
+}

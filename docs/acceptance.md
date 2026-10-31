@@ -1676,7 +1676,11 @@ jumps, inner-first Esc and pane/operation isolation. TestBackend checks cover
 1/12/20/40/80/120-column bounds, resize clamping, title/result hit regions,
 landing highlights and colour/monochrome styles. The native PTY/ConPTY scenario
 opens Help, searches Trash, jumps and closes both layers without changing its
-owned sentinel. Platform execution results belong to the delivery checkpoint;
+owned sentinel. Each Esc waits for the restored document or pane before the
+next key. A native Windows event probe checks ConPTY interpretation of the
+original raw Esc/Esc/q batch; controller tests retain independent Esc presses,
+Alt+q isolation and ignored release events. Platform execution results belong
+to the delivery checkpoint;
 xwin alone does not establish Windows runtime behaviour.
 
 Context Help regressions cover F1 and exact title-button cells/hit regions,

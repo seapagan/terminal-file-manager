@@ -32,12 +32,19 @@ impl HelpTopic {
         if app.popup {
             return Some(Self::Metadata);
         }
+        Self::dialog(app).or_else(|| Self::workspace(app))
+    }
+
+    fn dialog(app: &App) -> Option<Self> {
         match &app.operations.dialog {
-            Some(Dialog::Operation(dialog)) => return Some(Self::Operation(dialog.plan.operation)),
-            Some(Dialog::Exit { .. }) => return Some(Self::Exit),
-            Some(Dialog::IncidentExit { .. }) => return Some(Self::Incident),
-            None => {}
+            Some(Dialog::Operation(dialog)) => Some(Self::Operation(dialog.plan.operation)),
+            Some(Dialog::Exit { .. }) => Some(Self::Exit),
+            Some(Dialog::IncidentExit { .. }) => Some(Self::Incident),
+            None => None,
         }
+    }
+
+    fn workspace(app: &App) -> Option<Self> {
         if app.operations.show_history {
             Some(Self::Jobs)
         } else if !app.operations.conflicts.is_empty() {
@@ -57,16 +64,7 @@ impl HelpTopic {
             Self::Metadata => "Metadata Help",
             Self::Exit => "Safe Exit Help",
             Self::Incident => "Incident Help",
-            Self::Operation(operation) => match operation {
-                Operation::Copy => "Copy Help",
-                Operation::Move => "Move Help",
-                Operation::Mkdir => "Create Directory Help",
-                Operation::CreateFile => "Create File Help",
-                Operation::Rename => "Rename Help",
-                Operation::Trash => "Trash Help",
-                Operation::Delete => "Permanent Delete Help",
-                Operation::Permissions(_) | Operation::ReadOnly(_) => "Attributes Help",
-            },
+            Self::Operation(operation) => operation_title(operation),
         }
     }
 
@@ -81,6 +79,19 @@ impl HelpTopic {
             Self::Operation(operation) => return operation_text(operation, app),
         };
         with_binding(action, lines, app)
+    }
+}
+
+fn operation_title(operation: Operation) -> &'static str {
+    match operation {
+        Operation::Copy => "Copy Help",
+        Operation::Move => "Move Help",
+        Operation::Mkdir => "Create Directory Help",
+        Operation::CreateFile => "Create File Help",
+        Operation::Rename => "Rename Help",
+        Operation::Trash => "Trash Help",
+        Operation::Delete => "Permanent Delete Help",
+        Operation::Permissions(_) | Operation::ReadOnly(_) => "Attributes Help",
     }
 }
 
@@ -226,15 +237,7 @@ const INCIDENT: &[&str] = &[
 fn scroll_delta(event: &Event, geometry: &Geometry, page: u16) -> i32 {
     match event {
         Event::Key(key) if key.kind != KeyEventKind::Release && key.modifiers.is_empty() => {
-            match key.code {
-                KeyCode::Up => -1,
-                KeyCode::Down => 1,
-                KeyCode::PageUp => -(page as i32),
-                KeyCode::PageDown => i32::from(page),
-                KeyCode::Home => -i32::MAX,
-                KeyCode::End => i32::MAX,
-                _ => 0,
-            }
+            key_scroll(key.code, page)
         }
         Event::Mouse(mouse)
             if geometry.context_help.as_ref().is_some_and(|layout| {
@@ -247,6 +250,18 @@ fn scroll_delta(event: &Event, geometry: &Geometry, page: u16) -> i32 {
                 _ => 0,
             }
         }
+        _ => 0,
+    }
+}
+
+fn key_scroll(code: KeyCode, page: u16) -> i32 {
+    match code {
+        KeyCode::Up => -1,
+        KeyCode::Down => 1,
+        KeyCode::PageUp => -i32::from(page),
+        KeyCode::PageDown => i32::from(page),
+        KeyCode::Home => -i32::MAX,
+        KeyCode::End => i32::MAX,
         _ => 0,
     }
 }

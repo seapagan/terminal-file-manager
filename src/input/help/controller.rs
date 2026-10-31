@@ -1,6 +1,8 @@
 use super::{HelpTarget, help_hits};
 use crate::{input::Controller, ui::Geometry};
-use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind};
+use crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind,
+};
 
 pub(in crate::input) fn handle(c: &mut Controller, event: &Event, geometry: &Geometry) -> bool {
     if !c.app.help {
@@ -50,38 +52,48 @@ pub(in crate::input) fn handle(c: &mut Controller, event: &Event, geometry: &Geo
 
 fn picker(c: &mut Controller, event: &Event, geometry: &Geometry) {
     match event {
-        Event::Key(key) if key.kind != KeyEventKind::Release => match key.code {
-            KeyCode::Esc if key.kind == KeyEventKind::Press => c.app.help_picker = None,
-            KeyCode::Enter if key.kind == KeyEventKind::Press => {
-                let state = c.app.help_picker.as_ref().expect("picker");
-                if let Some(hit) = help_hits(&c.app.help_rows, &state.query).get(state.selected) {
-                    jump(c, hit.target, geometry);
-                }
-            }
-            KeyCode::Up => select(c, -1),
-            KeyCode::Down => select(c, 1),
-            KeyCode::PageUp => select(c, -7),
-            KeyCode::PageDown => select(c, 7),
-            KeyCode::Backspace => {
-                let state = c.app.help_picker.as_mut().expect("picker");
-                state.query.pop();
-                state.selected = 0;
-            }
-            KeyCode::Char(ch)
-                if !key.modifiers.intersects(
-                    KeyModifiers::CONTROL
-                        | KeyModifiers::ALT
-                        | KeyModifiers::SUPER
-                        | KeyModifiers::META
-                        | KeyModifiers::HYPER,
-                ) =>
-            {
-                append(c, &ch.to_string())
-            }
-            _ => {}
-        },
+        Event::Key(key) if key.kind != KeyEventKind::Release => picker_key(c, key, geometry),
         Event::Paste(text) => append(c, text),
         Event::Mouse(mouse) => mouse_picker(c, mouse, geometry),
+        _ => {}
+    }
+}
+
+fn picker_key(c: &mut Controller, key: &KeyEvent, geometry: &Geometry) {
+    match key.code {
+        KeyCode::Esc if key.kind == KeyEventKind::Press => c.app.help_picker = None,
+        KeyCode::Enter if key.kind == KeyEventKind::Press => {
+            let state = c.app.help_picker.as_ref().expect("picker");
+            if let Some(hit) = help_hits(&c.app.help_rows, &state.query).get(state.selected) {
+                jump(c, hit.target, geometry);
+            }
+        }
+        KeyCode::Backspace => {
+            let state = c.app.help_picker.as_mut().expect("picker");
+            state.query.pop();
+            state.selected = 0;
+        }
+        KeyCode::Char(ch)
+            if !key.modifiers.intersects(
+                KeyModifiers::CONTROL
+                    | KeyModifiers::ALT
+                    | KeyModifiers::SUPER
+                    | KeyModifiers::META
+                    | KeyModifiers::HYPER,
+            ) =>
+        {
+            append(c, &ch.to_string())
+        }
+        code => picker_movement(c, code),
+    }
+}
+
+fn picker_movement(c: &mut Controller, code: KeyCode) {
+    match code {
+        KeyCode::Up => select(c, -1),
+        KeyCode::Down => select(c, 1),
+        KeyCode::PageUp => select(c, -7),
+        KeyCode::PageDown => select(c, 7),
         _ => {}
     }
 }
