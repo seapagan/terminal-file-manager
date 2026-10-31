@@ -114,14 +114,7 @@ fn render_with_help(
     }
     for (area, label) in [(help, "[?]"), (close, "[×]")] {
         let Some(area) = area else { continue };
-        frame.render_widget(
-            Paragraph::new(label).style(
-                theme
-                    .style(Role::Key)
-                    .add_modifier(ratatui::style::Modifier::UNDERLINED),
-            ),
-            area,
-        );
+        frame.render_widget(Paragraph::new(label).style(theme.style(Role::Key)), area);
     }
 }
 

@@ -408,15 +408,20 @@ fn assert_help_header(title: &str, width: u16, level: colored_text::ColorLevel) 
             .map(|x| buffer[(x, area.y)].symbol())
             .collect();
         assert_eq!(text, "[?]");
-        assert!(
-            buffer[(area.x, area.y)]
-                .modifier
-                .contains(ratatui::style::Modifier::UNDERLINED)
-        );
         assert!(area.x >= layout.outer.x + 2 + super::width(title));
         assert!(area.right() < layout.outer.right());
     } else {
         assert!(super::width(title).saturating_add(11) > layout.outer.width);
+    }
+    let buffer = terminal.backend().buffer();
+    for area in [layout.help, layout.close].into_iter().flatten() {
+        for x in area.x..area.right() {
+            assert!(
+                !buffer[(x, area.y)]
+                    .modifier
+                    .contains(ratatui::style::Modifier::UNDERLINED)
+            );
+        }
     }
     assert!(
         Spec {
