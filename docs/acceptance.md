@@ -1733,7 +1733,6 @@ dispatching those actions. Metadata checks reject duplicate rows and verify look
 fields/priority. An exhaustive match generated from the same rows rejects missing
 Actions at compile time.
 
-
 View Options, View Profiles and Save Profile use the shared measured shell.
 Focused regressions inspect semantic `[?]─[×]` cells without underlines at all
 colour levels, row hit regions, padding, wrapped Unicode names and narrow resize
