@@ -45,6 +45,8 @@ configured in your installation.
 ## Keyboard shortcuts
 
 These are the default bindings. You can customise them in `config.toml`.
+Uppercase letter bindings use `Shift+` plus the lowercase letter below; for
+example, `Shift+v` opens view options while `v` reverses the sort order.
 
 ### Navigation and layout
 
@@ -54,10 +56,10 @@ These are the default bindings. You can customise them in `config.toml`.
 | Home / End / PageUp / PageDown | Jump or scroll through the listing |
 | Enter / Backspace (or Alt+Up) | Enter directory / go to parent, highlighting the directory just exited |
 | Alt+Left / Alt+Right | Go back / forward in directory history |
-| Alt+P | Toggle one or two panes |
+| Alt+p | Toggle one or two panes |
 | Tab / Shift+Tab | Switch active pane |
 | Ctrl+Left / Ctrl+Right | Adjust the pane split |
-| Alt+M | Maximise or restore the active pane |
+| Alt+m | Maximise or restore the active pane |
 
 ### Selection and display
 
@@ -65,14 +67,14 @@ These are the default bindings. You can customise them in `config.toml`.
 | --- | --- |
 | Space / Insert | Toggle a mark / toggle a mark and advance |
 | Shift+Up / Shift+Down or Shift+click | Extend or shrink a marked range |
-| Ctrl+A / Ctrl+U | Mark all / clear marks in the visible listing |
-| Alt+B | Mark, unmark or replace visible marks by wildcard or regex |
+| Ctrl+a / Ctrl+u | Mark all / clear marks in the visible listing |
+| Alt+b | Mark, unmark or replace visible marks by wildcard or regex |
 | `/` | Filter the current listing; Enter accepts, Esc cancels or clears |
 | `h` | Show or hide hidden entries |
 | `i` | Cycle Git-ignore display: dim, hide, off |
 | `s` / `v` / `g` | Cycle sort order / reverse order / directory grouping |
 | `r` | Refresh the directory |
-| `V` / Alt+V | View options / view profiles |
+| `Shift+v` / Alt+v | View options / view profiles |
 
 Linux and macOS refresh local directories, including the hidden pane, while
 preserving the cursor and surviving marks. **On Windows, press `r` to see
@@ -85,16 +87,16 @@ directory disappears or another directory replaces it, reopen the directory;
 
 ### Pattern selection
 
-Press **Alt+B** or click **Alt+B Mark** to mark filenames by wildcard or regex.
+Press **Alt+b** or click **Alt+b Mark** to mark filenames by wildcard or regex.
 Type a pattern, choose **Wildcard**, **Regex** and **Case sensitive** options,
 then use **Mark**, **Unmark** or **Replace**. With a valid pattern, Enter from
 the Pattern field moves to Mark; a second Enter applies it. Esc cancels without
 changing marks.
 
-Tab or click to move between controls. Use **Alt+W/X/S** to change matching
-options while typing, and **Alt+M/U/R** to mark, unmark or replace. Outside the
-Pattern field, the control letters also work without Alt. You can assign
-another shortcut to `pattern-selection` in `[bindings]`.
+Tab or click to move between controls. Use **Alt+w / Alt+x / Alt+s** to change
+matching options while typing, and **Alt+m / Alt+u / Alt+r** to mark, unmark or
+replace. Outside the Pattern field, the control letters also work without Alt.
+You can assign another shortcut to `pattern-selection` in `[bindings]`.
 
 Wildcards match the whole filename, for example `*.rs`, `file?.txt` or `[abc]*`.
 Regex matches substrings; use anchors such as `^report.*\.txt$` to match a whole
@@ -110,62 +112,62 @@ review the new matches. Enlarge the terminal if the controls cannot fit.
 
 | Keys | Action |
 | --- | --- |
-| Alt+I / Alt+Enter | Toggle metadata sidebar / open metadata popup |
+| Alt+i / Alt+Enter | Toggle metadata sidebar / open metadata popup |
 | F2 | Open the preferred metadata presentation |
 | `c` (in metadata view) | Count a directory's contents and size |
 | F12 | Toggle colour diagnostics |
 | Alt+PageUp / Alt+PageDown | Scroll colour diagnostics |
 | `?` | Show keyboard help |
-| `q` / F10 / Ctrl+C | Quit without saving a session |
-| `Q` | Save the navigation session and quit |
+| `q` / F10 / Ctrl+c | Quit without saving a session |
+| `Shift+q` | Save the navigation session and quit |
 
 ### Local operations
 
 | Keys | Action |
 | --- | --- |
-| F5 / Alt+C | Copy the visible selection |
-| F6 / Alt+X | Move the visible selection |
+| F5 / Alt+c | Copy the visible selection |
+| F6 / Alt+x | Move the visible selection |
 | F7 | Create a directory |
-| Shift+F7 / Alt+N | Create an empty file |
-| Alt+R / Alt+A | Rename one entry / edit supported attributes |
-| F8 / Alt+T | Preview and move the selection to native Trash |
-| Shift+F8 / Alt+D | Preview permanent deletion; Enter cancels |
-| F9 / Alt+J | Jobs, progress and retained results |
+| Shift+F7 / Alt+n | Create an empty file |
+| Alt+r / Alt+a | Rename one entry / edit supported attributes |
+| F8 / Alt+t | Preview and move the selection to native Trash |
+| Shift+F8 / Alt+d | Preview permanent deletion; Enter cancels |
+| F9 / Alt+j | Jobs, progress and retained results |
 
 Create a file or directory in the active pane by entering one name. Existing
-entries stay intact. Press **Shift+F7** or **Alt+N** to create an empty file,
-or click **Alt+N File** in the footer. `tfm` selects the new file if it is visible
+entries stay intact. Press **Shift+F7** or **Alt+n** to create an empty file,
+or click **Alt+n File** in the footer. `tfm` selects the new file if it is visible
 and you have not moved the cursor or changed the selection or directory in the
 meantime.
 
 Other operations use visible marks, or the cursor when no visible marks remain.
 With two panes, copy and move target the other pane: one entry starts at once,
-while multiple entries ask for confirmation. Shift+F5/F6 or `C`/`M` bypass that
-confirmation. With one pane, choose the destination in the dialog. F2 in a
-transfer dialog toggles SHA-256 verification.
+while multiple entries ask for confirmation. Shift+F5 / Shift+F6 or
+`Shift+c` / `Shift+m` bypass that confirmation. With one pane, choose the
+destination in the dialog. F2 in a transfer dialog toggles SHA-256 verification.
 
 Trash and permanent deletion show a preview before confirmation. Wait for
 counting to finish and review the selection. Enlarge the terminal if the preview
 cannot fit. **Enter cancels permanent deletion.**
 
 Conflicts compare Incoming with Existing and default to Skip. Newer replaces
-Existing only when Incoming has a later modification time. `A Apply to all`
+Existing only when Incoming has a later modification time. `a Apply to all`
 applies your next choice to matching conflicts in the job; Esc cancels the job.
 Directories merge. Enlarge the terminal if the comparison cannot fit.
 
 Press F9 to inspect jobs and errors. Select a job with Up/Down or the mouse;
-PgUp/PgDown or the wheel scrolls its details. Jobs opens in Summary; `E` toggles
+PgUp/PgDown or the wheel scrolls its details. Jobs opens in Summary; `e` toggles
 Evidence.
 Available actions depend on the job's state:
 
-- `C` requests cancellation.
-- `R` retries incomplete work, leaving completed entries untouched.
-- `X Reconcile` rechecks an eligible unknown outcome.
+- `c` requests cancellation.
+- `r` retries incomplete work, leaving completed entries untouched.
+- `x Reconcile` rechecks an eligible unknown outcome.
 
 **An unknown outcome blocks retries and normal safe exit until reconciled.**
 Critical irreversible Trash incidents require the separate acknowledgement below.
 
-Results stay in Jobs for the current session. `Q` saves navigation, not job
+Results stay in Jobs for the current session. `Shift+q` saves navigation, not job
 history. On quit, choose Return, Wait, or Cancel safely; `tfm` waits for active
 operations and cleanup.
 
@@ -184,8 +186,8 @@ visibility option; operations use the visible selection.
 
 ## Views and metadata
 
-Press `V` to change the active pane's columns, sorting, file sizes, timestamps,
-permissions or ownership display. Press Alt+V for the built-in **Compact**,
+Press `Shift+v` to change the active pane's columns, sorting, file sizes,
+timestamps, permissions or ownership display. Press Alt+v for the built-in **Compact**,
 **Detailed** and **Minimal** profiles, or save your own named view. Apply a
 profile to the active pane with Enter; use Space to choose **Apply to both**
 before confirming. Changes to a saved profile must be saved again to update it.
@@ -203,14 +205,14 @@ Close the floating popup with Esc before navigating or starting a file operation
 
 ## Saving and restoring sessions
 
-Press `Q` to save both pane locations and the layout when quitting. Restore them
-later with:
+Press `Shift+q` to save both pane locations and the layout when quitting.
+Restore them later with:
 
 ```sh
 tfm --restore-session
 ```
 
-Ordinary quit (`q`, F10 or Ctrl+C) does not overwrite your saved session. You
+Ordinary quit (`q`, F10 or Ctrl+c) does not overwrite your saved session. You
 can also enable automatic restoration on startup with `restore_session = true`.
 Explicit command-line paths take precedence over automatic restoration.
 
