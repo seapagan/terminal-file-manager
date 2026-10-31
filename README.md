@@ -258,7 +258,12 @@ owner = false
 "Ctrl+f" = "filter"
 ```
 
-Custom bindings override the defaults, and `?` always displays the effective
+Press `?` for one scrollable Help document, grouped by task. Press `/` in Help
+or click **Jump** to find a section or search commands and their effective
+shortcuts. Use the arrows and Enter, or click a result, to jump to its entry.
+Esc closes the picker first, then Help.
+
+Custom bindings override the defaults, and `?` displays the effective
 shortcuts. For punctuation keys, use the character produced rather than a
 `Shift+` symbol combination; some modified-key combinations cannot be
 reliably distinguished by terminals.

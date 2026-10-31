@@ -141,6 +141,10 @@ fn tick(app: &mut App) -> bool {
         return false;
     }
     app.now = now;
+    let help_expired = app.help_landing.is_some_and(|(_, until)| now >= until);
+    if help_expired {
+        app.help_landing = None;
+    }
     let expired = app
         .operations
         .notices
@@ -148,6 +152,7 @@ fn tick(app: &mut App) -> bool {
         .any(|notice| notice.expires <= now);
     app.operations.notices.retain(|notice| notice.expires > now);
     expired
+        || help_expired
         || app.operations.active()
         || app.panes.iter().any(|pane| pane.fuzzy_timestamps)
         || app

@@ -13,7 +13,11 @@ impl Controller {
         } else {
             geometry.footer.width
         };
-        let requests = self.handle_event(event, geometry, now);
+        let requests = if super::help::handle(self, &event, geometry) {
+            Vec::new()
+        } else {
+            self.handle_event(event, geometry, now)
+        };
         self.app
             .sync_metadata_views(self.app.sidebar_visible(width));
         requests

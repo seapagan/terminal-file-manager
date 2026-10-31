@@ -420,3 +420,12 @@ It preserves distinct causes and uncertainty restrictions. Evidence retains each
 full individual reason, native source/target spelling, receipts and recovery
 records. Mixed/special-object selection summaries use neutral entry counts;
 recursive preview accounting and lifecycle-derived job counts are unchanged.
+
+## Categorised Help
+
+Help groups the effective action keymap into one document. Measured wrapped rows
+supply section/action anchors, scrolling bounds and landing highlights. The
+shared modal shell contains the temporary fuzzy jump picker; it keeps the main
+document and its scroll position. Search ranks title/action matches before keys
+and fuzzy descriptions, retaining document order for ties. Input routing consumes
+picker events before browser and operation handlers.

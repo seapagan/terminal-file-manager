@@ -3,6 +3,7 @@ mod diagnostics;
 mod footer;
 mod help;
 pub use footer::FooterControl;
+pub use help::HelpLayout;
 mod layout;
 mod listing;
 mod measure;
@@ -83,8 +84,8 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     if app.popup {
         metadata::render(frame, app, frame.area(), theme, true);
     }
-    if app.help {
-        help::render(frame, app, theme);
+    if let Some(layout) = &geometry.help {
+        help::render(frame, app, theme, layout);
     }
     if let Some(area) = geometry.menu {
         if app.view_menu.is_some() {

@@ -160,7 +160,10 @@ impl Controller {
     }
 
     fn movement(&mut self, action: Action, geometry: &Geometry) {
-        let height = page_height(geometry, self.app.active);
+        let height = geometry.help.as_ref().map_or_else(
+            || page_height(geometry, self.app.active),
+            |layout| usize::from(layout.body.height),
+        );
         if self.app.help || self.app.popup {
             let delta = match action {
                 Action::Up => -1,
@@ -319,6 +322,8 @@ impl Controller {
             }
             Action::Help => {
                 self.app.help = !self.app.help;
+                self.app.help_picker = None;
+                self.app.help_landing = None;
                 self.app.overlay_scroll = 0;
             }
             _ => {}

@@ -4,6 +4,7 @@ use ratatui::layout::Rect;
 /// File panes, optional metadata and stable bottom controls.
 #[derive(Clone, Debug)]
 pub struct Geometry {
+    pub help: Option<super::help::HelpLayout>,
     pub pattern: Option<super::PatternLayout>,
     pub(super) operation_layout: Option<super::operations::Layout>,
     pub operation_controls: Vec<super::OperationControl>,
@@ -93,6 +94,7 @@ fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
     let (operation_controls, operation_scroll_limit, operation_layout) =
         super::operations::geometry(app, area);
     Geometry {
+        help: super::help::layout(app, area),
         pattern: super::pattern::layout(app, area),
         operation_layout,
         operation_controls,
@@ -160,7 +162,10 @@ fn scroll_limits(app: &App, geometry: &mut Geometry, area: Rect) {
         }
     }
     geometry.overlay_scroll_limit = if app.help {
-        super::help::scroll_limit(app, area)
+        geometry
+            .help
+            .as_ref()
+            .map_or(0, |layout| layout.scroll_limit)
     } else if app.popup {
         super::metadata::scroll_limit(app, area, true)
     } else {

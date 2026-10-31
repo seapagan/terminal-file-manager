@@ -1,3 +1,10 @@
+mod controller;
+pub(super) use controller::handle;
+mod search;
+mod sections;
+pub use search::{HelpHit, HelpPicker, HelpTarget, help_hits};
+pub use sections::HelpSection;
+
 /// Effective bindings and their action identity, shared by Help and shortcut hints.
 #[derive(Clone, Debug)]
 pub struct HelpEntry {

@@ -1667,3 +1667,14 @@ legitimate device-like names, stream syntax and rendered error feedback, includi
 panic; root execution skips the denial case. Pattern navigation tests preserve
 the preview cache. See the accepted/merged checkpoint above for final native
 platform results; Linux cross-builds do not establish Windows runtime proof.
+
+## PM3-04: Help document and jump picker
+
+Focused tests cover the seven sections, every effective action, wrapped anchors,
+stable fuzzy ranking, configured keys, empty/no-result queries, keyboard/mouse
+jumps, inner-first Esc and pane/operation isolation. TestBackend checks cover
+1/12/20/40/80/120-column bounds, resize clamping, title/result hit regions,
+landing highlights and colour/monochrome styles. The native PTY/ConPTY scenario
+opens Help, searches Trash, jumps and closes both layers without changing its
+owned sentinel. Platform execution results belong to the delivery checkpoint;
+xwin alone does not establish Windows runtime behaviour.

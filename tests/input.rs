@@ -215,7 +215,17 @@ fn help_scrolling_reaches_last_action_without_changing_pane_policy() {
                 .iter()
                 .map(|cell| cell.symbol())
                 .collect::<String>();
-            assert!(text.contains(controller.app.help_rows.last().unwrap().description));
+            let last = controller
+                .app
+                .help_rows
+                .iter()
+                .rev()
+                .find(|entry| {
+                    entry.action.help_section()
+                        == terminal_file_manager::input::HelpSection::Application
+                })
+                .unwrap();
+            assert!(text.contains(last.description));
         }
     }
     key(&mut controller, "Esc");

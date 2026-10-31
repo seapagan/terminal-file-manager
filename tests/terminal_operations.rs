@@ -319,3 +319,25 @@ fn pattern_overlong_native_input_requires_correction_before_apply() {
         b"preserved"
     );
 }
+
+#[test]
+fn searchable_help_jumps_and_layers_escape_in_a_native_terminal() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("help-sentinel"), b"preserved").unwrap();
+    drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("help-sentinel", "?"),
+            ("Navigation", "/"),
+            ("Jump to section or search commands", "trash"),
+            ("Preview and move selection", "\r"),
+            ("Preview and move selection", "/"),
+            ("Jump to section or search commands", "\x1b\x1bq"),
+        ],
+        true,
+    );
+    assert_eq!(
+        fs::read(root.path().join("help-sentinel")).unwrap(),
+        b"preserved"
+    );
+}
