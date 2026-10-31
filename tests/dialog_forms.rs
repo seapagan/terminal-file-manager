@@ -171,8 +171,23 @@ fn assert_transfer_text(buffer: &Buffer, enabled: bool) {
 
 #[test]
 fn invalid_create_renders_specific_feedback_and_recovers_after_editing() {
+    for (plan, message) in [
+        (
+            Plan::mkdir("/controlled".into()),
+            "Enter one directory name without path separators, NUL, or dot components",
+        ),
+        (
+            Plan::create_file("/controlled".into()),
+            "Enter one file name without path separators, NUL, or dot components",
+        ),
+    ] {
+        assert_invalid_create_feedback(plan, message);
+    }
+}
+
+fn assert_invalid_create_feedback(plan: Plan, message: &str) {
     let mut c = Controller::new(
-        dialog_fixture::dialog(Plan::mkdir("/controlled".into())),
+        dialog_fixture::dialog(plan),
         Bindings::new(&Default::default()).unwrap(),
         Default::default(),
     );
@@ -184,7 +199,7 @@ fn invalid_create_renders_specific_feedback_and_recovers_after_editing() {
         c.handle(event, &g, std::time::Duration::ZERO);
     }
     let (buffer, disabled) = draw(&c.app, ColorLevel::NoColor);
-    at(&buffer, "Enter one directory name");
+    at(&buffer, message);
     assert!(!disabled.operation_enabled(KeyCode::Enter));
     assert!(c.app.operations.outbox.is_empty());
     for event in [

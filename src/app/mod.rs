@@ -208,7 +208,9 @@ impl App {
         match result {
             Ok(snapshot) => self.install_listing(pane, attempted, snapshot),
             Err(error) => {
-                state.creation = None;
+                if attempted.is_some() {
+                    state.creation = None;
+                }
                 if attempted.is_some() && state.refresh_pending {
                     state.refresh_pending = false;
                     self.status = "Deferred refresh cancelled because navigation failed".into();

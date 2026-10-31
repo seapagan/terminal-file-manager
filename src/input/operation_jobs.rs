@@ -18,7 +18,6 @@ impl Controller {
         retry_of: Option<u64>,
     ) {
         if plan.operation == crate::operations::Operation::CreateFile
-            && retry_of.is_none()
             && let Some(path) = &plan.destination
         {
             self.app.panes[self.app.active].track_creation(id, path.clone());

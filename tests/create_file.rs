@@ -79,7 +79,14 @@ fn successful_creation_refreshes_and_highlights_only_the_originating_pane() {
 
 #[test]
 fn later_cursor_marks_filter_and_navigation_take_precedence_over_creation() {
-    for change in ["cursor", "marks", "filter", "navigation", "pending"] {
+    for change in [
+        "cursor",
+        "marks",
+        "filter",
+        "navigation",
+        "failed",
+        "pending",
+    ] {
         let (root, mut c) = loaded();
         let initial = submit(&mut c, "a");
         finish(&mut c, &initial);
@@ -100,6 +107,11 @@ fn later_cursor_marks_filter_and_navigation_take_precedence_over_creation() {
             "navigation" => {
                 let request = c.app.request_listing(0, root.path().into());
                 install(&mut c, request);
+            }
+            "failed" => {
+                let request = c.app.request_listing(0, root.path().join("missing"));
+                c.app
+                    .complete_listing(0, request.generation, Err("not found".into()));
             }
             _ => {
                 c.app.request_listing(0, root.path().join("missing"));
@@ -141,6 +153,28 @@ fn creation_highlight_survives_refresh_and_respects_native_visibility() {
             visible.then(|| root.path().join(name))
         );
     }
+}
+
+#[test]
+fn creation_highlight_survives_a_failed_refresh_after_success() {
+    let (root, mut c) = loaded();
+    let initial = submit(&mut c, "a");
+    finish(&mut c, &initial);
+    let plan = submit(&mut c, "new");
+    let record = execute(&plan, Default::default(), &false.into(), |_| Decision::Skip);
+    let id = c.app.operations.history.last().unwrap().id;
+    let requests = c.complete_operation(Update::Finished { id, record });
+    for request in requests {
+        assert!(c.app.complete_listing(
+            request.pane,
+            request.generation,
+            Err("transient refresh failure".into()),
+        ));
+    }
+    assert_eq!(c.app.panes[0].cursor, Some(root.path().join("a")));
+    let request = c.app.request_refresh(0).unwrap();
+    install(&mut c, request);
+    assert_eq!(c.app.panes[0].cursor, Some(root.path().join("new")));
 }
 
 #[test]

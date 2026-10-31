@@ -73,6 +73,51 @@ fn preview(queue: &mut Queue, plan: Plan) -> Plan {
     }
 }
 
+fn install_listing(controller: &mut Controller, path: &Path) {
+    let snapshot =
+        crate::fs::list(path, &crate::fs::IgnoreContext::isolated(), &false.into()).unwrap();
+    let generation = controller.app.panes[0].generation;
+    controller.app.complete_listing(0, generation, Ok(snapshot));
+}
+
+#[test]
+fn create_file_retry_highlights_only_when_the_active_directory_matches() {
+    for navigate in [false, true] {
+        let (root, mut controller, mut queue, _) = fixture();
+        let path = root.path().join("new");
+        install_listing(&mut controller, root.path());
+        fs::write(&path, "collision").unwrap();
+        controller.app.operations.outbox.push(Intent::Submit(
+            Plan::create_file(path.clone()),
+            Options::default(),
+        ));
+        submit(&mut controller, &mut queue);
+        let parent = acknowledge(&mut controller, &mut queue, Decision::Skip);
+        assert_eq!(controller.app.operations.history[0].state, JobState::Failed);
+        fs::remove_file(&path).unwrap();
+        let directory = if navigate {
+            root.path().join("target")
+        } else {
+            root.path().into()
+        };
+        controller.app.request_listing(0, directory.clone());
+        install_listing(&mut controller, &directory);
+        let before = controller.app.panes[0].cursor.clone();
+        controller.app.operations.outbox.push(Intent::Retry(parent));
+        submit(&mut controller, &mut queue);
+        acknowledge(&mut controller, &mut queue, Decision::Skip);
+        let child = controller.app.operations.history.last().unwrap();
+        assert_eq!(child.retry_of, Some(parent));
+        assert_eq!(child.state, JobState::Completed);
+        assert!(path.is_file());
+        install_listing(&mut controller, &directory);
+        assert_eq!(
+            controller.app.panes[0].cursor,
+            if navigate { before } else { Some(path) }
+        );
+    }
+}
+
 #[test]
 fn retry_copies_only_incomplete_operands_and_links_the_child_attempt() {
     let (root, mut controller, mut queue, mut plan) = fixture();
