@@ -271,7 +271,7 @@ fn configured_binding_and_mouse_footer_open_the_same_form() {
         c.app
             .help_rows
             .iter()
-            .any(|entry| entry.keys.contains("F11") && entry.description.contains("pattern"))
+            .any(|entry| entry.keys.contains("F11") && entry.action == Action::PatternSelection)
     );
 }
 

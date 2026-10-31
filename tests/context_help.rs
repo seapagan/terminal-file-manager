@@ -268,7 +268,7 @@ fn configured_metadata_keys_appear_in_context_and_emergency_exit_still_works() {
     );
     key(&mut c, "Alt+Enter");
     key(&mut c, "F1");
-    assert!(draw(&c).contains("F11 counts directory descendants"));
+    assert!(draw(&c).contains("selected directory: F11."));
     key(&mut c, "Ctrl+c");
     assert!(c.quit);
     assert!(c.app.context_help.is_none());

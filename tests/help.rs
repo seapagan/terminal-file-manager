@@ -133,6 +133,13 @@ fn ranking_is_stable_and_searches_effective_keys_sections_and_action_names() {
     assert_eq!(hits[0].keys, "F11 / Shift+F7");
     assert!(!help_hits(&entries, "split pane").is_empty());
     assert!(help_hits(&entries, "zzzzzzzz").is_empty());
+    for query in ["wildcard", "regex", "unmark", "pattern"] {
+        assert!(
+            help_hits(&entries, query)
+                .iter()
+                .any(|hit| hit.target == HelpTarget::Action(Action::PatternSelection))
+        );
+    }
     for query in ["back", "trash", "move", "pane", "crtfl"] {
         let targets = |hits: Vec<terminal_file_manager::input::HelpHit>| {
             hits.into_iter().map(|hit| hit.target).collect::<Vec<_>>()

@@ -452,3 +452,6 @@ Disabled role. Other theme roles and operation eligibility remain unchanged.
 The jump picker gives sections one selectable row and commands a title with a
 separate shortcut/category line. Its plain query field and separator sit outside
 result hit regions. Measured result heights keep the selected entry in view.
+Context Help carries literal shortcut fragments through Help-local word wrapping
+and semantic Key styling. Long tokens fall back to existing grapheme-safe cell
+wrapping; metadata and other shared text renderers keep their existing rules.

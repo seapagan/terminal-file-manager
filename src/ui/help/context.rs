@@ -2,7 +2,8 @@
 use crate::{
     app::App,
     color::{Role, Theme},
-    ui::{modal, text::wrap_value},
+    input::HelpParagraph,
+    ui::modal,
 };
 use ratatui::{Frame, layout::Rect, widgets::Paragraph};
 
@@ -10,7 +11,7 @@ use ratatui::{Frame, layout::Rect, widgets::Paragraph};
 pub struct ContextLayout {
     pub shell: modal::Layout<()>,
     pub scroll_limit: u16,
-    rows: Vec<String>,
+    paragraphs: Vec<HelpParagraph>,
 }
 
 pub(in crate::ui) fn layout(app: &App, bounds: Rect) -> Option<ContextLayout> {
@@ -21,7 +22,7 @@ pub(in crate::ui) fn layout(app: &App, bounds: Rect) -> Option<ContextLayout> {
         (),
         crossterm::event::KeyCode::Esc,
     )];
-    let mut rows = Vec::new();
+    let mut row_count = 0;
     let shell = modal::Spec {
         title: state.topic.title(),
         help: false,
@@ -31,19 +32,14 @@ pub(in crate::ui) fn layout(app: &App, bounds: Rect) -> Option<ContextLayout> {
         actions: &actions,
     }
     .measure(bounds, |width| {
-        for paragraph in &paragraphs {
-            if !rows.is_empty() {
-                rows.push(String::new());
-            }
-            rows.extend(wrap_value(paragraph, usize::from(width)));
-        }
-        rows.len()
+        row_count = super::prose::lines(&paragraphs, width, None).len();
+        row_count
     });
-    let scroll_limit = shell.scroll_limit(rows.len()).min(usize::from(u16::MAX)) as u16;
+    let scroll_limit = shell.scroll_limit(row_count).min(usize::from(u16::MAX)) as u16;
     Some(ContextLayout {
         shell,
         scroll_limit,
-        rows,
+        paragraphs,
     })
 }
 
@@ -65,9 +61,13 @@ pub(in crate::ui) fn render(
         Role::Header,
     );
     frame.render_widget(
-        Paragraph::new(layout.rows.join("\n"))
-            .style(theme.style(Role::Value))
-            .scroll((state.scroll.min(layout.scroll_limit), 0)),
+        Paragraph::new(super::prose::lines(
+            &layout.paragraphs,
+            layout.shell.body.width,
+            Some(theme),
+        ))
+        .style(theme.style(Role::Value))
+        .scroll((state.scroll.min(layout.scroll_limit), 0)),
         layout.shell.body,
     );
     let hint = format!(

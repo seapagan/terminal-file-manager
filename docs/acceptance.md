@@ -1707,3 +1707,7 @@ their safety assertions, including the complete 80-column Alt+Enter Info control
 
 Help polish regressions cover compact section rows, command-detail click targets,
 query/result separation, narrow result geometry and Unicode query cursor bounds.
+Context prose tests check word boundaries, wide/combining graphemes, configured
+Unicode/backtick shortcuts, semantic key styles and case-sensitive safety text.
+Parent focus/state restoration and the 80-column Info contract retain their
+existing behavioural tests. Help descriptions avoid internal milestone labels.

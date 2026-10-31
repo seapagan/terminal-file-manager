@@ -113,13 +113,13 @@ fn canonical_labels_preserve_case_modifiers_and_effective_overrides() {
         ("View options", "Shift+v"),
         ("Select or save a named view profile", "Alt+v"),
         ("Mark all visible entries", "Ctrl+a"),
-        ("Save navigation session and quit", "Shift+q"),
+        ("Save pane locations and quit", "Shift+q"),
     ] {
         assert_eq!(labels(description), expected);
     }
     assert!(labels("Create empty file").contains("Alt+n"));
     assert!(labels("Create empty file").contains("Shift+F7"));
-    assert!(labels("Quit without saving a navigation session").contains("Ctrl+Alt+Shift+x"));
+    assert!(labels("Quit without saving pane locations").contains("Ctrl+Alt+Shift+x"));
     assert_eq!(keys.action(letter("x", Mods::CONTROL | Mods::ALT)), None);
     assert_eq!(
         keys.action(letter("X", Mods::CONTROL | Mods::ALT)),
