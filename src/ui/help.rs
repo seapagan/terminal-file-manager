@@ -1,4 +1,5 @@
 //! One measured document supplies rendering, scroll bounds and jump anchors.
+pub(super) mod context;
 mod picker;
 use crate::{
     app::App,

@@ -263,6 +263,10 @@ or click **Jump** to find a section or search commands and their effective
 shortcuts. Use the arrows and Enter, or click a result, to jump to its entry.
 Esc closes the picker first, then Help.
 
+In a dialog, press F1 or click **?** in its title for contextual Help. Esc
+returns to the same dialog, field and selection. You can still type `?` in a
+Wildcard or Regex expression.
+
 Custom bindings override the defaults, and `?` displays the effective
 shortcuts. For punctuation keys, use the character produced rather than a
 `Shift+` symbol combination; some modified-key combinations cannot be

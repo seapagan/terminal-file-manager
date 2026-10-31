@@ -49,6 +49,7 @@ pub(super) fn layout(app: &App, terminal: Rect) -> Option<Layout> {
     let actions = super::layout::buttons(app, terminal.width);
     let mut spec = modal::Spec {
         title: content::title(app),
+        help: true,
         content_width: usize::from(desired),
         pinned_rows: 0,
         footer_rows: 0,

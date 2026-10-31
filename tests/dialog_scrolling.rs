@@ -66,7 +66,7 @@ fn fixed_positions(rows: &[String]) -> (usize, usize, usize) {
     );
     assert!(
         rows.iter()
-            .any(|row| row.contains("/50") && row.contains("PgUp"))
+            .any(|row| row.contains("/50") && row.contains("PageUp"))
     );
     let from = rows.iter().position(|row| row.contains("From:")).unwrap();
     (from, warning, actions)

@@ -13,7 +13,9 @@ impl Controller {
         } else {
             geometry.footer.width
         };
-        let requests = if super::help::handle(self, &event, geometry) {
+        let requests = if super::help::context_handle(self, &event, geometry)
+            || super::help::handle(self, &event, geometry)
+        {
             Vec::new()
         } else {
             self.handle_event(event, geometry, now)

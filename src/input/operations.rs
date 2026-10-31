@@ -283,7 +283,7 @@ fn scroll(controller: &mut Controller, event: &Event, geometry: &Geometry) -> bo
     true
 }
 
-fn interrupt(event: &Event) -> bool {
+pub(super) fn interrupt(event: &Event) -> bool {
     matches!(event, Event::Key(key)
         if key.kind != KeyEventKind::Release
         && key.code == KeyCode::Char('c')

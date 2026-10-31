@@ -179,7 +179,7 @@ fn grouped_causes_and_all_outcomes_remain_distinct_with_full_evidence() {
         "{summary}"
     );
     assert!(summary.contains("UNKNOWN"));
-    assert!(!summary.contains("R Retry"));
+    assert!(!summary.contains("r Retry"));
     assert!(!summary.contains("(E details)"));
     let all = evidence(&mut c);
     for reason in [

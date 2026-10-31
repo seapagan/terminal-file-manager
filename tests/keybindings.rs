@@ -151,3 +151,40 @@ fn footer_uses_effective_keys_when_preferred_defaults_are_reassigned() {
         );
     }
 }
+
+#[test]
+fn default_case_sensitive_pairs_keep_their_actions_and_canonical_labels() {
+    let keys = bindings(&[]);
+    for (text, action) in [
+        ("v", Action::Reverse),
+        ("V", Action::ViewOptions),
+        ("Alt+v", Action::ViewProfiles),
+        ("q", Action::Quit),
+        ("Q", Action::SaveQuit),
+        ("c", Action::Count),
+        ("C", Action::CopyQuick),
+        ("M", Action::MoveQuick),
+        ("Alt+n", Action::CreateFile),
+        ("Alt+b", Action::PatternSelection),
+        ("Ctrl+a", Action::SelectAll),
+    ] {
+        let (code, modifiers) = chord(text).unwrap();
+        assert_eq!(keys.action(KeyEvent::new(code, modifiers)), Some(action));
+    }
+    let entries = keys.help_entries();
+    for (action, expected) in [
+        (Action::CopyQuick, "Shift+c"),
+        (Action::MoveQuick, "Shift+m"),
+        (Action::PatternSelection, "Alt+b"),
+    ] {
+        assert!(
+            entries
+                .iter()
+                .find(|entry| entry.action == action)
+                .unwrap()
+                .keys
+                .split(" / ")
+                .any(|key| key == expected)
+        );
+    }
+}

@@ -16,7 +16,9 @@ mod scroll;
 pub(crate) mod view;
 pub use bindings::{Bindings, chord};
 pub use controller::Controller;
-pub use help::{HelpEntry, HelpHit, HelpPicker, HelpSection, HelpTarget, help_hits};
+pub use help::{
+    ContextHelp, HelpEntry, HelpHit, HelpPicker, HelpSection, HelpTarget, HelpTopic, help_hits,
+};
 
 /// Browser and local-operation actions share dispatch; later milestones explain unavailability.
 #[derive(

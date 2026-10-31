@@ -64,16 +64,16 @@ pub(super) fn buttons(app: &App, narrow: bool) -> Vec<Button> {
             buttons
         }
         Some(Dialog::Exit { .. }) => vec![
-            ("R Return", KeyCode::Char('r')),
+            ("r Return", KeyCode::Char('r')),
             (
-                if narrow { "W Wait" } else { "W Wait then exit" },
+                if narrow { "w Wait" } else { "w Wait then exit" },
                 KeyCode::Char('w'),
             ),
             (
                 if narrow {
-                    "C Stop + exit"
+                    "c Stop + exit"
                 } else {
-                    "C Cancel safely then exit"
+                    "c Cancel safely then exit"
                 },
                 KeyCode::Char('c'),
             ),
@@ -137,7 +137,7 @@ fn history(app: &App, narrow: bool) -> Vec<Button> {
     let mut buttons = vec![
         (
             if app.operations.jobs_evidence {
-                "E Summary"
+                "e Summary"
             } else {
                 "e Evidence"
             },
@@ -147,21 +147,21 @@ fn history(app: &App, narrow: bool) -> Vec<Button> {
     ];
     if let Some(job) = app.operations.history.get(app.operations.cursor) {
         if app.operations.waiting_exit.is_none() && job.can_reconcile() {
-            buttons.push(("X Reconcile", KeyCode::Char('x')));
+            buttons.push(("x Reconcile", KeyCode::Char('x')));
         }
         if app.operations.waiting_exit.is_none() && job.can_retry() {
             buttons.push((
                 if narrow {
-                    "R Retry"
+                    "r Retry"
                 } else {
-                    "R Retry incomplete"
+                    "r Retry incomplete"
                 },
                 KeyCode::Char('r'),
             ));
         }
         if job.active() {
             buttons.push((
-                if narrow { "C Cancel" } else { "C Cancel job" },
+                if narrow { "c Cancel" } else { "c Cancel job" },
                 KeyCode::Char('c'),
             ));
         }
@@ -179,10 +179,10 @@ fn history(app: &App, narrow: bool) -> Vec<Button> {
 
 fn conflict(app: &App, narrow: bool) -> Vec<Button> {
     vec![
-        ("S Skip", KeyCode::Char('s')),
-        ("R Replace", KeyCode::Char('r')),
-        ("K Keep both", KeyCode::Char('k')),
-        ("N Newer", KeyCode::Char('n')),
+        ("s Skip", KeyCode::Char('s')),
+        ("r Replace", KeyCode::Char('r')),
+        ("k Keep both", KeyCode::Char('k')),
+        ("n Newer", KeyCode::Char('n')),
         (all_label(app), KeyCode::Char('a')),
         (
             if narrow {

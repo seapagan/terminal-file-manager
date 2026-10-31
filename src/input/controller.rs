@@ -298,7 +298,7 @@ impl Controller {
                 self.app.maximized = !self.app.maximized;
                 self.dragging_divider = false;
                 self.app.status = if self.app.maximized {
-                    "Active pane maximised — Alt+M restores split"
+                    "Active pane maximised — Alt+m restores split"
                 } else {
                     "Split restored"
                 }

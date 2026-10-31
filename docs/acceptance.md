@@ -1678,3 +1678,12 @@ landing highlights and colour/monochrome styles. The native PTY/ConPTY scenario
 opens Help, searches Trash, jumps and closes both layers without changing its
 owned sentinel. Platform execution results belong to the delivery checkpoint;
 xwin alone does not establish Windows runtime behaviour.
+
+Context Help regressions cover F1 and exact title-button cells/hit regions,
+Unicode titles, optional controls, 1/20/40/80/120-column layouts, short terminals,
+colour depths and monochrome. Parent restoration tests retain pattern text,
+mode, case, focus and scroll; operation fields/action geometry; conflict choice
+and Apply to all; Jobs evidence/scroll; and metadata scroll. Help blocks paste,
+Enter, shortcuts and clicks from reaching parent operations. Configured metadata
+keys appear in contextual text; exact Ctrl+c retains safe-exit routing. Native
+terminal input covers F1, literal question marks and resumed pattern editing.

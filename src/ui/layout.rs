@@ -4,6 +4,8 @@ use ratatui::layout::Rect;
 /// File panes, optional metadata and stable bottom controls.
 #[derive(Clone, Debug)]
 pub struct Geometry {
+    pub context_help: Option<super::ContextLayout>,
+    pub context_control: Option<Rect>,
     pub help: Option<super::help::HelpLayout>,
     pub pattern: Option<super::PatternLayout>,
     pub(super) operation_layout: Option<super::operations::Layout>,
@@ -93,9 +95,13 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
 fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
     let (operation_controls, operation_scroll_limit, operation_layout) =
         super::operations::geometry(app, area);
+    let pattern = super::pattern::layout(app, area);
+    let context_control = context_control(app, area, operation_layout.as_ref(), pattern.as_ref());
     Geometry {
+        context_help: super::help::context::layout(app, area),
+        context_control,
         help: super::help::layout(app, area),
-        pattern: super::pattern::layout(app, area),
+        pattern,
         operation_layout,
         operation_controls,
         operation_scroll_limit,
@@ -183,4 +189,20 @@ fn scroll_limits(app: &App, geometry: &mut Geometry, area: Rect) {
                 .map_or_else(Vec::new, |area| super::metadata::controls(app, area, false))
         };
     }
+}
+
+fn context_control(
+    app: &App,
+    area: Rect,
+    operation: Option<&super::operations::Layout>,
+    pattern: Option<&super::PatternLayout>,
+) -> Option<Rect> {
+    crate::input::HelpTopic::current(app)?;
+    if app.popup {
+        return super::metadata::help_control(app, area);
+    }
+    if let Some(layout) = operation {
+        return layout.shell.help;
+    }
+    pattern.and_then(|layout| layout.shell.help)
 }

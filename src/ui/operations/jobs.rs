@@ -76,7 +76,7 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
 
 pub(super) fn details(app: &App) -> Vec<Row> {
     let mut rows = vec![Row::styled(
-        "Up/Down selects · PgUp/PgDown scroll details · evidence is session only",
+        "Up/Down selects · PageUp/PageDown scroll details · evidence is session only",
         Role::Label,
     )];
     if let Some(error) = &app.operations.last_error {

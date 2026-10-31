@@ -20,6 +20,7 @@ pub(super) fn layout(app: &App, bounds: Rect) -> Option<PickerLayout> {
     let hits = help_hits(&app.help_rows, &state.query);
     let shell = modal::Spec::<()> {
         title: "Jump to section or search commands",
+        help: false,
         content_width: 62,
         pinned_rows: 1,
         footer_rows: 1,

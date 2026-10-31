@@ -74,7 +74,7 @@ struct Layout {
 pub(super) fn render(frame: &mut Frame, app: &App, bounds: Rect, theme: &Theme, floating: bool) {
     let layout = layout(app, bounds, theme, floating);
     if let Some(shell) = &layout.shell {
-        super::modal::render_shell(frame, layout.area, "Metadata — ↑/↓ or wheel", theme);
+        super::modal::render_measured(frame, shell, "Metadata — ↑/↓ or wheel", theme, Role::Header);
         frame.render_widget(
             Paragraph::new(layout.lines).scroll((layout.scroll, 0)),
             layout.inner,
@@ -344,6 +344,7 @@ fn popup_layout(
         )];
         super::modal::Spec {
             title: "Metadata — ↑/↓ or wheel",
+            help: true,
             content_width: label_width(fields, u16::MAX)
                 + fields
                     .iter()
@@ -405,3 +406,14 @@ pub(super) fn controls(app: &App, bounds: Rect, floating: bool) -> Vec<MetadataC
 
 #[cfg(test)]
 mod tests;
+
+pub(super) fn help_control(app: &App, bounds: Rect) -> Option<Rect> {
+    layout(
+        app,
+        bounds,
+        &Theme::new(colored_text::ColorLevel::NoColor),
+        true,
+    )
+    .shell
+    .and_then(|shell| shell.help)
+}

@@ -54,6 +54,7 @@ fn disabled_actions_and_nonpress_events_never_produce_an_intent() {
     }
     let layout = Spec {
         title: "Question",
+        help: false,
         content_width: 4,
         pinned_rows: 0,
         footer_rows: 0,
@@ -97,6 +98,7 @@ fn narrow_preset_retains_the_original_safe_action_focus_identity() {
     .group();
     let layout = Spec {
         title: "Delete",
+        help: false,
         content_width: 10,
         pinned_rows: 0,
         footer_rows: 0,
@@ -127,6 +129,7 @@ fn intrinsic_shell_has_padding_and_exact_centred_unicode_hit_regions() {
     for width in [20, 40, 80, 120] {
         let layout = Spec {
             title: "Title",
+            help: false,
             content_width: 12,
             pinned_rows: 0,
             footer_rows: 0,
@@ -188,6 +191,7 @@ fn long_content_and_titles_obey_tiny_offset_bounds_and_keep_actions_fixed() {
             let bounds = Rect::new(3, 5, width, height);
             let layout = Spec {
                 title: &"界".repeat(500),
+                help: false,
                 content_width: 10000,
                 pinned_rows: 5,
                 footer_rows: 0,
@@ -308,6 +312,7 @@ fn capped_shell_centres_in_the_original_usable_area() {
                 let bounds = Rect::new(3, 5, width, height);
                 let layout = Spec {
                     title: "Centred",
+                    help: false,
                     content_width: 30,
                     pinned_rows: 0,
                     footer_rows: 0,
@@ -363,4 +368,63 @@ fn shared_shell_insets_all_titles_one_border_cell_and_keeps_border_style() {
             assert_eq!(b[(2, 0)].fg, theme.style(Role::Error).fg.unwrap());
         }
     }
+}
+
+#[test]
+fn optional_help_header_reserves_unicode_title_and_exact_cells_at_all_widths() {
+    for title in ["Pattern selection", "界 λ Help"] {
+        for width in [1, 20, 40, 80, 120] {
+            for level in [
+                colored_text::ColorLevel::NoColor,
+                colored_text::ColorLevel::Ansi16,
+                colored_text::ColorLevel::Ansi256,
+                colored_text::ColorLevel::TrueColor,
+            ] {
+                assert_help_header(title, width, level);
+            }
+        }
+    }
+}
+
+fn assert_help_header(title: &str, width: u16, level: colored_text::ColorLevel) {
+    let theme = Theme::new(level);
+    let spec = Spec::<()> {
+        title,
+        help: true,
+        content_width: 50,
+        pinned_rows: 0,
+        footer_rows: 0,
+        actions: &[],
+    };
+    let bounds = Rect::new(0, 0, width, 20);
+    let layout = spec.measure(bounds, |_| 2);
+    let mut terminal = Terminal::new(TestBackend::new(width, 20)).unwrap();
+    terminal
+        .draw(|f| render_measured(f, &layout, title, &theme, Role::Header))
+        .unwrap();
+    if let Some(area) = layout.help {
+        let buffer = terminal.backend().buffer();
+        let text: String = (area.x..area.right())
+            .map(|x| buffer[(x, area.y)].symbol())
+            .collect();
+        assert_eq!(text, "[? F1]");
+        assert!(
+            buffer[(area.x, area.y)]
+                .modifier
+                .contains(ratatui::style::Modifier::UNDERLINED)
+        );
+        assert!(area.x >= layout.outer.x + 2 + super::width(title));
+        assert!(area.right() < layout.outer.right());
+    } else {
+        assert!(super::width(title).saturating_add(11) > layout.outer.width);
+    }
+    assert!(
+        Spec {
+            help: false,
+            ..spec
+        }
+        .measure(bounds, |_| 2)
+        .help
+        .is_none()
+    );
 }

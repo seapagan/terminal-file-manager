@@ -12,6 +12,7 @@ pub(super) fn layout(app: &App, terminal: Rect) -> super::Layout {
     let context = actions(&actual[2..]);
     let spec = modal::Spec {
         title: content::title(app),
+        help: true,
         content_width: 0,
         pinned_rows: 3.min(height / 5),
         footer_rows: 2.min(height / 5),

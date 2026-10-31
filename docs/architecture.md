@@ -429,3 +429,11 @@ shared modal shell contains the temporary fuzzy jump picker; it keeps the main
 document and its scroll position. Search ranks title/action matches before keys
 and fuzzy descriptions, retaining document order for ties. Input routing consumes
 picker events before browser and operation handlers.
+
+Shared modal specifications opt into a measured title-border Help control.
+Narrow shells keep their title and the F1 keyboard route. Context Help stores
+only its topic and scroll; the parent retains its fields, focus, selection and
+geometry. Its read-only input layer consumes events before the parent, while
+the existing exact Ctrl+c safe-exit route remains available. Fixed dialog keys
+use lowercase labels for case-insensitive controls; uppercase-only destructive
+confirmation keeps its existing restrictions.

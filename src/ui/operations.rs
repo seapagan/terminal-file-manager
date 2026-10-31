@@ -78,9 +78,9 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, geometry: &sup
     let Some(layout) = &geometry.operation_layout else {
         return;
     };
-    super::modal::render_shell_with_title_role(
+    super::modal::render_measured(
         frame,
-        layout.outer,
+        &layout.shell,
         content::title(app),
         theme,
         content::title_role(app),
@@ -96,7 +96,7 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, geometry: &sup
             format!("0/{total} · Resize")
         } else {
             format!(
-                "{}-{}/{total} · PgUp/PgDown",
+                "{}-{}/{total} · PageUp/PageDown",
                 start + 1,
                 start + layout.rows.len()
             )

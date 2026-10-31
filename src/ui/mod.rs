@@ -3,7 +3,7 @@ mod diagnostics;
 mod footer;
 mod help;
 pub use footer::FooterControl;
-pub use help::HelpLayout;
+pub use help::{HelpLayout, context::ContextLayout};
 mod layout;
 mod listing;
 mod measure;
@@ -99,6 +99,7 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     }
     pattern::render(frame, app, theme, geometry.pattern.as_ref());
     operations::render(frame, app, theme, &geometry);
+    help::context::render(frame, app, theme, geometry.context_help.as_ref());
     geometry
 }
 

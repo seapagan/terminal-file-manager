@@ -341,3 +341,21 @@ fn searchable_help_jumps_and_layers_escape_in_a_native_terminal() {
         b"preserved"
     );
 }
+
+#[test]
+fn context_f1_and_literal_question_marks_cross_the_native_terminal_parser() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("ok"), b"preserved").unwrap();
+    drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("ok", "\x1bb"),
+            ("Pattern selection", "?\x1bOP"),
+            ("Pattern Help", "\r\x1bm\x1b"),
+            ("selects; Enter activates. Esc cancels.", "?\x1bm"),
+            ("[*]", "q"),
+        ],
+        false,
+    );
+    assert_eq!(fs::read(root.path().join("ok")).unwrap(), b"preserved");
+}

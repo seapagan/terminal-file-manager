@@ -1,3 +1,6 @@
+mod context;
+pub(super) use context::handle as context_handle;
+pub use context::{ContextHelp, HelpTopic};
 mod controller;
 pub(super) use controller::handle;
 mod search;
@@ -37,7 +40,7 @@ pub(super) fn accepts(action: Action) -> bool {
 
 pub(super) fn key_name(code: KeyCode, modifiers: KeyModifiers) -> String {
     let mut modifiers = modifiers;
-    let uppercase = matches!(code, KeyCode::Char(c) if c.is_ascii_uppercase());
+    let uppercase = matches!(code, KeyCode::Char(c) if c.is_uppercase());
     if uppercase {
         modifiers.insert(KeyModifiers::SHIFT);
     }
@@ -53,7 +56,7 @@ pub(super) fn key_name(code: KeyCode, modifiers: KeyModifiers) -> String {
     }
     name.push_str(&match code {
         KeyCode::Char(' ') => "Space".into(),
-        KeyCode::Char(c) if uppercase => c.to_ascii_lowercase().to_string(),
+        KeyCode::Char(c) if uppercase => c.to_lowercase().collect(),
         KeyCode::Char(c) => c.to_string(),
         KeyCode::F(n) => format!("F{n}"),
         _ => format!("{code:?}"),
@@ -98,7 +101,7 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
     (Forward, "Forward in pane history"),
     (SaveQuit, "Save navigation session and quit"),
     (Quit, "Quit without saving a navigation session"),
-    (Help, "Toggle help"),
+    (Help, "Help; F1 explains an open dialog"),
     (Diagnostics, "Toggle read-only diagnostics"),
     (DiagnosticsUp, "Scroll diagnostics up"),
     (DiagnosticsDown, "Scroll diagnostics down"),
