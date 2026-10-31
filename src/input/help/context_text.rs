@@ -37,19 +37,29 @@ fn paragraph(text: &str, bindings: &[&str]) -> HelpParagraph {
 
 pub(super) fn text(topic: HelpTopic, app: &App) -> Vec<HelpParagraph> {
     let (action, lines) = match topic {
-        HelpTopic::Pattern => (Action::PatternSelection, PATTERN),
-        HelpTopic::Conflict => (Action::Jobs, CONFLICT),
-        HelpTopic::Jobs => (Action::Jobs, JOBS),
+        HelpTopic::ViewOptions => (Action::ViewOptions, VIEW_OPTIONS),
+        HelpTopic::ViewProfiles => (Action::ViewProfiles, VIEW_PROFILES),
+        HelpTopic::SaveProfile => (Action::ViewProfiles, SAVE_PROFILE),
         HelpTopic::Metadata => return metadata(app),
-        HelpTopic::Exit => (Action::Quit, EXIT),
-        HelpTopic::Incident => (Action::Quit, INCIDENT),
-        HelpTopic::Operation(operation) => operation_text(operation),
+        _ => dialog_text(topic),
     };
     let mut text: Vec<_> = lines.iter().map(|line| paragraph(line, &[])).collect();
     if let Some(entry) = app.help_rows.iter().find(|entry| entry.action == action) {
         text.push(paragraph("Open from the file list: `{}`.", &[&entry.keys]));
     }
     text
+}
+
+fn dialog_text(topic: HelpTopic) -> (Action, &'static [&'static str]) {
+    match topic {
+        HelpTopic::Pattern => (Action::PatternSelection, PATTERN),
+        HelpTopic::Conflict => (Action::Jobs, CONFLICT),
+        HelpTopic::Jobs => (Action::Jobs, JOBS),
+        HelpTopic::Exit => (Action::Quit, EXIT),
+        HelpTopic::Incident => (Action::Quit, INCIDENT),
+        HelpTopic::Operation(operation) => operation_text(operation),
+        _ => unreachable!("dialog Help topic"),
+    }
 }
 
 fn operation_text(operation: Operation) -> (Action, &'static [&'static str]) {
@@ -152,3 +162,17 @@ fn metadata(app: &App) -> Vec<HelpParagraph> {
         ),
     ]
 }
+
+const VIEW_OPTIONS: &[&str] = &[
+    "Change how you see the active pane. Use `Up` / `Down` or the mouse wheel to select a setting. Press `Space` / `Enter` or click its row to change it.",
+    "Changes take effect as you make them. `Esc` closes this menu and keeps your changes. If you use a named profile, changed settings appear as Modified without changing the saved profile.",
+];
+const VIEW_PROFILES: &[&str] = &[
+    "Choose saved display settings with `Up` / `Down`, `Home` / `End` or the mouse wheel. Click a profile to select it. Press `Enter` to apply it to the active pane.",
+    "Press `Space` on a profile to select Apply selected to both, then `Enter` or `Space` to apply it. You can also click that row. Profiles change display settings; your pane locations stay the same.",
+    "Choose Save active as… to save the active pane's settings under a name. `Esc` closes the list without applying the selected profile.",
+];
+const SAVE_PROFILE: &[&str] = &[
+    "Type a name for the active pane's display settings. You can type ? here; use `F1` for Help. `Backspace` removes the last character.",
+    "Press `Enter` to save. An existing name replaces that saved profile. Your pane locations stay the same. `Esc` discards the typed name and returns to the profile list.",
+];

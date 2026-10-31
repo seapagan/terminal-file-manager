@@ -386,3 +386,52 @@ fn help_synonyms_choose_document_and_context_in_a_native_terminal() {
         b"preserved"
     );
 }
+
+#[test]
+fn view_dialog_help_and_profile_editing_cross_the_native_terminal_parser() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("view-help-sentinel"), b"preserved").unwrap();
+    for (open, title, help, restored) in [
+        (
+            "V",
+            "View options",
+            "View Options Help",
+            "Space/Enter changes",
+        ),
+        (
+            "\x1bv",
+            "View profiles",
+            "View Profiles Help",
+            "Enter: active pane",
+        ),
+    ] {
+        drive(
+            command(root.path(), root.path(), None),
+            &[
+                ("view-help-sentinel", open),
+                (title, "?"),
+                (help, "\x1b"),
+                // Observe the restored menu before the next independent key.
+                (restored, "\x03"),
+            ],
+            false,
+        );
+    }
+    drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("view-help-sentinel", "\x1bv"),
+            ("View profiles", "\x1b[F\r"),
+            ("Save profile", "?\x1bOP"),
+            ("Save Profile Help", "\x1b"),
+            ("Name: ?", "\x1b"),
+            ("Save active as", "\x03"),
+        ],
+        false,
+    );
+    assert_eq!(
+        fs::read(root.path().join("view-help-sentinel")).unwrap(),
+        b"preserved"
+    );
+    assert!(!root.path().join("config/tfm/config.toml").exists());
+}

@@ -1732,3 +1732,14 @@ search ties, and rendered jumps to moved actions at 20/40/80/120 columns without
 dispatching those actions. Metadata checks reject duplicate rows and verify lookup
 fields/priority. An exhaustive match generated from the same rows rejects missing
 Actions at compile time.
+
+
+View Options, View Profiles and Save Profile use the shared measured shell.
+Focused regressions inspect semantic `[?]─[×]` cells without underlines at all
+colour levels, row hit regions, padding, wrapped Unicode names and narrow resize
+bounds. Both Help keys preserve selection, settings and parent geometry; Save
+Profile keeps literal `?`, and F1 opens its Help. Help blocks parent edits and
+clicks. Closing Help, name editing and the profile list dismisses one layer per
+click or Esc without saving. Existing profile application, replacement and
+persistence tests remain in force. Native PTY/ConPTY coverage exercises both menu
+Help topics, literal profile-name input, F1, restored parents and safe exit.

@@ -18,7 +18,6 @@ mod pattern;
 mod policy;
 mod profiles;
 pub use pattern::{PatternControl, PatternLayout};
-pub(crate) use profiles::hit as profile_hit;
 mod summary;
 mod text;
 mod view;
@@ -96,11 +95,11 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     if let Some(layout) = &geometry.help {
         help::render(frame, app, theme, layout);
     }
-    if let Some(area) = geometry.menu {
+    if let Some(shell) = &geometry.menu_layout {
         if app.view_menu.is_some() {
-            view::render(frame, app, area, theme);
+            view::render(frame, app, shell, theme);
         } else {
-            profiles::render(frame, app, area, theme);
+            profiles::render(frame, app, shell, theme);
         }
     }
     if let Some(lines) = diagnostics {

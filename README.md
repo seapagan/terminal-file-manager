@@ -263,7 +263,8 @@ or click **Jump** to find a section or search commands and their effective
 shortcuts. Use the arrows and Enter, or click a result, to jump to its entry.
 Esc closes the picker first, then Help.
 
-In a dialog, press `?` or F1, or click **?** in its title, for contextual Help.
+In a dialog, including View options, View profiles and Save profile, press `?`
+or F1, or click **?** in its title, for contextual Help.
 While editing a text field, `?` stays literal; use F1 for Help. Esc returns to
 the same dialog, field and selection. Click **×** to cancel or close a dialog.
 

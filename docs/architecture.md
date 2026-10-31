@@ -441,6 +441,10 @@ The shared modal shell measures a safe title-border close control and an optiona
 Help control, displayed as `[?]─[×]`. A close click enters the owning layer
 through its existing Esc route, including preview cleanup and safe exit. Controls
 that cannot fit beside the full title stay hidden without resizing the shell.
+View Options, View Profiles and Save Profile also use the shared measured shell.
+Their menu rows and title controls use its body and header rectangles for input;
+Save Profile keeps literal question marks in the name field and cancels back to
+the profile list.
 The default ? and F1 bindings open the same Help: the main document from the
 file manager and contextual Help in applicable dialogs. Printable characters
 remain literal in text fields; F1 supplies Help there and in narrow shells. Context Help stores

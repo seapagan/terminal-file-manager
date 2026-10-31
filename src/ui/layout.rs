@@ -21,6 +21,7 @@ pub struct Geometry {
     pub footer: Rect,
     pub footer_controls: Vec<super::FooterControl>,
     pub menu: Option<Rect>,
+    pub menu_layout: Option<super::modal::Layout<()>>,
     pub diagnostics: Option<Rect>,
     pub diagnostics_scroll_limit: u16,
     pub overlay_scroll_limit: u16,
@@ -98,7 +99,11 @@ fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
     let (operation_controls, operation_scroll_limit, operation_layout) =
         super::operations::geometry(app, area);
     let pattern = super::pattern::layout(app, area);
-    let context_control = context_control(app, area, operation_layout.as_ref(), pattern.as_ref());
+    let menu_layout = menu_layout(app, area);
+    let context_control = menu_layout
+        .as_ref()
+        .and_then(|shell| shell.help)
+        .or_else(|| context_control(app, area, operation_layout.as_ref(), pattern.as_ref()));
     Geometry {
         context_help: super::help::context::layout(app, area),
         context_control,
@@ -117,7 +122,8 @@ fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
         divider: None,
         sidebar: None,
         footer_controls: Vec::new(),
-        menu: menu_area(app, area),
+        menu: menu_layout.as_ref().map(|shell| shell.outer),
+        menu_layout,
         diagnostics: app.diagnostics.then(|| super::diagnostics::area(area)),
         diagnostics_scroll_limit: 0,
         status: Rect::new(
@@ -135,11 +141,11 @@ fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
     }
 }
 
-fn menu_area(app: &App, area: Rect) -> Option<Rect> {
+fn menu_layout(app: &App, area: Rect) -> Option<super::modal::Layout<()>> {
     if app.view_menu.is_some() {
-        Some(super::view::area(area, crate::input::view::OPTIONS.len()))
+        Some(super::view::layout(app, area))
     } else if app.profile_menu.is_some() {
-        Some(super::profiles::area(app, area))
+        Some(super::profiles::layout(app, area))
     } else {
         None
     }
@@ -220,7 +226,10 @@ fn close_control(app: &App, area: Rect, geometry: &Geometry) -> Option<Rect> {
     if let Some(layout) = &geometry.pattern {
         return layout.shell.close;
     }
-    if app.diagnostics || geometry.menu.is_some() {
+    if let Some(shell) = &geometry.menu_layout {
+        return shell.close;
+    }
+    if app.diagnostics {
         return None;
     }
     if let Some(layout) = &geometry.help {

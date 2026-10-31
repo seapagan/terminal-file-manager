@@ -425,8 +425,8 @@ impl Controller {
             return true;
         }
         if self.app.profile_menu.is_some() {
-            if let Some(area) = geometry.menu {
-                super::profiles::mouse(self, event, area);
+            if let Some(shell) = &geometry.menu_layout {
+                super::profiles::mouse(self, event, shell);
             }
             return true;
         }

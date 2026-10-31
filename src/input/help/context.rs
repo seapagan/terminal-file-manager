@@ -12,6 +12,9 @@ use crossterm::event::{
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HelpTopic {
     Pattern,
+    ViewOptions,
+    ViewProfiles,
+    SaveProfile,
     Operation(Operation),
     Conflict,
     Jobs,
@@ -28,13 +31,29 @@ pub struct ContextHelp {
 
 impl HelpTopic {
     pub fn current(app: &App) -> Option<Self> {
-        if app.help || app.diagnostics || app.view_menu.is_some() || app.profile_menu.is_some() {
+        if app.help || app.diagnostics {
             return None;
         }
         if app.popup {
             return Some(Self::Metadata);
         }
-        Self::dialog(app).or_else(|| Self::workspace(app))
+        Self::menu(app)
+            .or_else(|| Self::dialog(app))
+            .or_else(|| Self::workspace(app))
+    }
+
+    fn menu(app: &App) -> Option<Self> {
+        if app.view_menu.is_some() {
+            Some(Self::ViewOptions)
+        } else if app.profile_menu.is_some() {
+            Some(if app.profile_name.is_some() {
+                Self::SaveProfile
+            } else {
+                Self::ViewProfiles
+            })
+        } else {
+            None
+        }
     }
 
     fn dialog(app: &App) -> Option<Self> {
@@ -60,18 +79,28 @@ impl HelpTopic {
 
     pub fn title(self) -> &'static str {
         match self {
-            Self::Pattern => "Pattern Help",
-            Self::Conflict => "Conflict Help",
-            Self::Jobs => "Jobs Help",
-            Self::Metadata => "Metadata Help",
-            Self::Exit => "Safe Exit Help",
-            Self::Incident => "Incident Help",
+            Self::ViewOptions => "View Options Help",
+            Self::ViewProfiles => "View Profiles Help",
+            Self::SaveProfile => "Save Profile Help",
             Self::Operation(operation) => operation_title(operation),
+            _ => workspace_title(self),
         }
     }
 
     pub fn text(self, app: &App) -> Vec<super::HelpParagraph> {
         super::context_text::text(self, app)
+    }
+}
+
+fn workspace_title(topic: HelpTopic) -> &'static str {
+    match topic {
+        HelpTopic::Pattern => "Pattern Help",
+        HelpTopic::Conflict => "Conflict Help",
+        HelpTopic::Jobs => "Jobs Help",
+        HelpTopic::Metadata => "Metadata Help",
+        HelpTopic::Exit => "Safe Exit Help",
+        HelpTopic::Incident => "Incident Help",
+        _ => unreachable!("workspace Help topic"),
     }
 }
 
@@ -138,7 +167,7 @@ fn editing(app: &App, topic: HelpTopic) -> bool {
         HelpTopic::Operation(operation) => {
             !matches!(operation, Operation::Delete | Operation::Trash)
         }
-        HelpTopic::Incident => true,
+        HelpTopic::Incident | HelpTopic::SaveProfile => true,
         _ => false,
     }
 }
