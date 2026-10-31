@@ -309,7 +309,10 @@ pub(crate) fn file_name_error(name: &std::ffi::OsStr) -> Option<&'static str> {
         if text.chars().any(|c| c < ' ' || "<>:\"|?*".contains(c)) {
             return Some("Windows file names cannot contain control characters or < > : \" | ? *");
         }
-        if text.eq_ignore_ascii_case("CONIN$") || text.eq_ignore_ascii_case("CONOUT$") {
+        if ["CONIN$", "CONOUT$"]
+            .iter()
+            .any(|name| text.eq_ignore_ascii_case(name))
+        {
             return Some("Choose another file name; this is a reserved Windows device name");
         }
         let stem = text
