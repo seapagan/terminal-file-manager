@@ -274,7 +274,7 @@ fn assert_heading_style(cell: &ratatui::buffer::Cell, theme: &Theme) {
     assert_eq!(
         cell.fg,
         theme
-            .style(terminal_file_manager::color::Role::Header)
+            .style(terminal_file_manager::color::Role::SectionHeader)
             .fg
             .unwrap_or_default()
     );
