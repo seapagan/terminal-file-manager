@@ -241,7 +241,7 @@ fn apply_fields(dialog: &mut OperationDialog) -> io::Result<()> {
 fn rename_target(dialog: &OperationDialog) -> io::Result<PathBuf> {
     if !dialog.edited && dialog.plan.operands[0].name.to_str().is_none() {
         return Err(io::Error::other(
-            "Native name is display only; Ctrl+A and enter a replacement filename",
+            "Native name is display only; Ctrl+a and enter a replacement filename",
         ));
     }
     validate_name(&dialog.text)?;

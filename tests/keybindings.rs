@@ -96,3 +96,58 @@ fn ambiguous_nonletter_shift_is_rejected_and_printed_symbols_match_both_protocol
         }
     }
 }
+
+#[test]
+fn canonical_labels_preserve_case_modifiers_and_effective_overrides() {
+    let keys = bindings(&[("Ctrl+Alt+Shift+x", Action::Quit)]);
+    let rows = keys.help_rows();
+    let labels = |description: &str| {
+        rows.iter()
+            .find(|(_, text)| text == description)
+            .unwrap()
+            .0
+            .as_str()
+    };
+    for (description, expected) in [
+        ("Reverse sort direction", "v"),
+        ("View options", "Shift+v"),
+        ("Select or save a named view profile", "Alt+v"),
+        ("Mark all visible entries", "Ctrl+a"),
+        ("Save navigation session and quit", "Shift+q"),
+    ] {
+        assert_eq!(labels(description), expected);
+    }
+    assert!(labels("Create empty file").contains("Alt+n"));
+    assert!(labels("Create empty file").contains("Shift+F7"));
+    assert!(labels("Quit without saving a navigation session").contains("Ctrl+Alt+Shift+x"));
+    assert_eq!(keys.action(letter("x", Mods::CONTROL | Mods::ALT)), None);
+    assert_eq!(
+        keys.action(letter("X", Mods::CONTROL | Mods::ALT)),
+        Some(Action::Quit)
+    );
+}
+
+#[test]
+fn footer_uses_effective_keys_when_preferred_defaults_are_reassigned() {
+    use terminal_file_manager::{app::App, input::Controller, ui};
+    let keys = bindings(&[
+        ("Alt+n", Action::Help),
+        ("F5", Action::Help),
+        ("Ctrl+c", Action::Help),
+    ]);
+    let c = Controller::new(App::new("owned".into()), keys, Default::default());
+    let g = ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 200, 24));
+    for (action, label) in [
+        (Action::Copy, "Alt+c Copy"),
+        (Action::CreateFile, "Shift+F7 File"),
+    ] {
+        assert_eq!(
+            g.footer_controls
+                .iter()
+                .find(|control| control.action == action)
+                .unwrap()
+                .label,
+            label
+        );
+    }
+}

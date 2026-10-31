@@ -65,7 +65,7 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
     let height = area.height.saturating_sub(2);
     let body = Rect::new(area.x, area.y, area.width, height);
     let mut geometry = initial_geometry(app, area, height);
-    geometry.footer_controls = super::footer::controls(geometry.footer);
+    geometry.footer_controls = super::footer::controls(app, geometry.footer);
     if app.visible_panes(area.width).len() == 2 {
         let width = ((u32::from(body.width) * u32::from(app.split_percent.clamp(20, 80)) / 100)
             as u16)

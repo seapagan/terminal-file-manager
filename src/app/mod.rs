@@ -64,7 +64,7 @@ pub struct App {
     pub profile_name: Option<String>,
     pub profile_names: Vec<String>,
     pub metadata_presentation: crate::settings::MetadataPresentation,
-    pub help_rows: Vec<(String, String)>,
+    pub help_rows: Vec<crate::input::HelpEntry>,
     pub overlay_scroll: u16,
     pub metadata_scroll: u16,
     pub metadata_formats: [Option<MetadataFormat>; 2],
@@ -98,11 +98,11 @@ impl App {
             metadata_presentation: crate::settings::MetadataPresentation::default(),
             help_rows: crate::input::Bindings::new(&Default::default())
                 .expect("default bindings")
-                .help_rows(),
+                .help_entries(),
             overlay_scroll: 0,
             metadata_scroll: 0,
             metadata_formats: [None; 2],
-            status: "Local files — ? for help, F9 / Alt+J for jobs".into(),
+            status: "Local files — ? for help, F9 / Alt+j for jobs".into(),
             now: std::time::SystemTime::now(),
             details: std::array::from_fn(|_| Detail::default()),
         }

@@ -35,7 +35,8 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme) {
 fn rows(app: &App, width: usize, key_width: usize, theme: &Theme) -> Vec<Line<'static>> {
     app.help_rows
         .iter()
-        .flat_map(|(keys, action)| {
+        .flat_map(|entry| {
+            let (keys, action) = (&entry.keys, entry.description);
             let key_lines = super::text::wrap_value(keys, key_width);
             let action_lines = super::text::wrap_value(action, width.saturating_sub(key_width + 1));
             let count = key_lines.len().max(action_lines.len());
@@ -66,13 +67,13 @@ fn metrics(app: &App, bounds: ratatui::layout::Rect) -> (usize, usize) {
     let natural_keys = app
         .help_rows
         .iter()
-        .map(|(keys, _)| Line::raw(keys).width())
+        .map(|entry| Line::raw(&entry.keys).width())
         .max()
         .unwrap_or(0);
     let natural_action = app
         .help_rows
         .iter()
-        .map(|(_, action)| Line::raw(action).width())
+        .map(|entry| Line::raw(entry.description).width())
         .max()
         .unwrap_or(0);
     let width = (natural_keys + natural_action + 5)
@@ -87,7 +88,8 @@ pub(super) fn scroll_limit(app: &App, bounds: ratatui::layout::Rect) -> u16 {
     let count: usize = app
         .help_rows
         .iter()
-        .map(|(keys, action)| {
+        .map(|entry| {
+            let (keys, action) = (&entry.keys, entry.description);
             super::text::wrap_value(keys, key_width)
                 .len()
                 .max(super::text::wrap_value(action, width.saturating_sub(key_width + 3)).len())

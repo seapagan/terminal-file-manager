@@ -37,7 +37,7 @@ impl Controller {
             retry_of,
         });
         self.app.operations.cursor = self.app.operations.history.len() - 1;
-        self.app.status = format!("Job {id} queued — F9 / Alt+J for jobs");
+        self.app.status = format!("Job {id} queued — F9 / Alt+j for jobs");
     }
 
     /// Worker outcomes remain tied to their job even after pane navigation changes.

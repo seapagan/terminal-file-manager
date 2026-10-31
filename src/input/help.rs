@@ -1,3 +1,11 @@
+/// Effective bindings and their action identity, shared by Help and shortcut hints.
+#[derive(Clone, Debug)]
+pub struct HelpEntry {
+    pub action: super::Action,
+    pub keys: String,
+    pub description: &'static str,
+}
+
 use super::Action;
 use crossterm::event::{KeyCode, KeyModifiers};
 
@@ -21,6 +29,11 @@ pub(super) fn accepts(action: Action) -> bool {
 }
 
 pub(super) fn key_name(code: KeyCode, modifiers: KeyModifiers) -> String {
+    let mut modifiers = modifiers;
+    let uppercase = matches!(code, KeyCode::Char(c) if c.is_ascii_uppercase());
+    if uppercase {
+        modifiers.insert(KeyModifiers::SHIFT);
+    }
     let mut name = String::new();
     for (flag, text) in [
         (KeyModifiers::CONTROL, "Ctrl+"),
@@ -33,7 +46,7 @@ pub(super) fn key_name(code: KeyCode, modifiers: KeyModifiers) -> String {
     }
     name.push_str(&match code {
         KeyCode::Char(' ') => "Space".into(),
-        KeyCode::Char(c) if !modifiers.is_empty() => c.to_uppercase().to_string(),
+        KeyCode::Char(c) if uppercase => c.to_ascii_lowercase().to_string(),
         KeyCode::Char(c) => c.to_string(),
         KeyCode::F(n) => format!("F{n}"),
         _ => format!("{code:?}"),
@@ -133,7 +146,7 @@ const DESCRIPTIONS: &[(Action, &str)] = &[
     (Attributes, "Edit supported permissions/attributes"),
     (
         Jobs,
-        "Jobs summary; E toggles evidence; cancellation and retry",
+        "Jobs summary; e toggles evidence; cancellation and retry",
     ),
     (Path, "Unavailable until M5: path entry"),
     (Zoxide, "Reserved for zoxide (M5)"),

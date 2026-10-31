@@ -256,7 +256,7 @@ fn rename_notice(dialog: &OperationDialog) -> Vec<Row> {
     if dialog.plan.operation == Operation::Rename && dialog.plan.operands[0].name.to_str().is_none()
     {
         rows.push(Row::styled(
-            "Original name is escaped for display. Ctrl+A and type a replacement; Esc cancels.",
+            "Original name is escaped for display. Ctrl+a and type a replacement; Esc cancels.",
             Role::Warning,
         ));
     }

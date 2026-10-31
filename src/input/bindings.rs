@@ -10,6 +10,14 @@ pub struct Bindings {
 impl Bindings {
     /// Aligned help rows come from the effective keymap, including overrides.
     pub fn help_rows(&self) -> Vec<(String, String)> {
+        self.help_entries()
+            .into_iter()
+            .map(|entry| (entry.keys, entry.description.into()))
+            .collect()
+    }
+
+    /// Typed action rows retain identity for Help anchors and effective shortcut hints.
+    pub fn help_entries(&self) -> Vec<super::HelpEntry> {
         let mut grouped = BTreeMap::<Action, Vec<String>>::new();
         for ((code, modifiers), action) in &self.keys {
             grouped
@@ -21,7 +29,11 @@ impl Bindings {
             .into_iter()
             .map(|(action, mut keys)| {
                 keys.sort();
-                (keys.join(" / "), super::help::description(action).into())
+                super::HelpEntry {
+                    action,
+                    keys: keys.join(" / "),
+                    description: super::help::description(action),
+                }
             })
             .collect()
     }

@@ -77,7 +77,7 @@ pub(super) fn summary(app: &App, width: u16) -> Vec<Row> {
 fn result_rows(job: &Job, summary: &crate::operations::JobSummary) -> Vec<Row> {
     if job.active() && job.record.is_some() {
         return vec![Row::styled(
-            format!("Previous result (E Evidence): {}", summary.counts),
+            format!("Previous result (e Evidence): {}", summary.counts),
             Role::Warning,
         )];
     }
@@ -99,7 +99,7 @@ fn result_rows(job: &Job, summary: &crate::operations::JobSummary) -> Vec<Row> {
     if summary.omitted_groups > 0 {
         rows.push(
             Row::styled(
-                format!("{} more cause groups — E Evidence", summary.omitted_groups),
+                format!("{} more cause groups — e Evidence", summary.omitted_groups),
                 Role::Warning,
             )
             .single_line(),

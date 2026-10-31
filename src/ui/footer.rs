@@ -13,30 +13,45 @@ use ratatui::{
 #[derive(Clone, Debug)]
 pub struct FooterControl {
     pub area: Rect,
-    pub label: &'static str,
+    pub label: String,
     pub action: Action,
 }
 
-pub(super) fn controls(area: Rect) -> Vec<FooterControl> {
+pub(super) fn controls(app: &crate::app::App, area: Rect) -> Vec<FooterControl> {
     let mut controls = Vec::new();
     let mut x = area.x;
-    for (label, action) in [
-        ("? Help", Action::Help),
-        ("F5 Copy", Action::Copy),
-        ("F6 Move", Action::Move),
-        ("F7 Dir", Action::Mkdir),
-        ("Alt+N File", Action::CreateFile),
-        ("F8 Trash", Action::Trash),
-        ("F9 Jobs", Action::Jobs),
-        ("Alt+Enter Info", Action::Metadata),
-        ("q Quit", Action::Quit),
-        ("Alt+B Mark", Action::PatternSelection),
-        ("Alt+P Panes", Action::TogglePanes),
-        ("V View", Action::ViewOptions),
-        ("/ Filter", Action::Filter),
-        ("Alt+V Profiles", Action::ViewProfiles),
+    for (preferred, title, action) in [
+        ("?", "Help", Action::Help),
+        ("F5", "Copy", Action::Copy),
+        ("F6", "Move", Action::Move),
+        ("F7", "Dir", Action::Mkdir),
+        ("Alt+n", "File", Action::CreateFile),
+        ("F8", "Trash", Action::Trash),
+        ("F9", "Jobs", Action::Jobs),
+        ("Alt+Enter", "Info", Action::Metadata),
+        ("q", "Quit", Action::Quit),
+        ("Alt+b", "Mark", Action::PatternSelection),
+        ("Alt+p", "Panes", Action::TogglePanes),
+        ("Shift+v", "View", Action::ViewOptions),
+        ("/", "Filter", Action::Filter),
+        ("Alt+v", "Profiles", Action::ViewProfiles),
     ] {
-        let width = label.len() as u16;
+        let Some(entry) = app.help_rows.iter().find(|entry| entry.action == action) else {
+            continue;
+        };
+        let keys: Vec<_> = entry.keys.split(" / ").collect();
+        let key = keys
+            .iter()
+            .find(|key| **key == preferred)
+            .copied()
+            .or_else(|| {
+                keys.iter()
+                    .min_by_key(|key| super::modal::width(key))
+                    .copied()
+            })
+            .unwrap_or("");
+        let label = format!("{key} {title}");
+        let width = super::modal::width(&label);
         if u32::from(x) + u32::from(width) > u32::from(area.right()) {
             break;
         }

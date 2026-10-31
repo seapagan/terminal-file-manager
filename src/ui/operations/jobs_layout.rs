@@ -77,7 +77,7 @@ fn actions(
         .map(|&(label, key)| {
             let mut action = Action::custom(label, OperationTarget::Key(key), key);
             if key == crossterm::event::KeyCode::Char('e') {
-                action.min_width = modal::width("E Evidence");
+                action.min_width = modal::width("e Evidence");
             }
             action
         })

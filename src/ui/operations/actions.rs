@@ -139,7 +139,7 @@ fn history(app: &App, narrow: bool) -> Vec<Button> {
             if app.operations.jobs_evidence {
                 "E Summary"
             } else {
-                "E Evidence"
+                "e Evidence"
             },
             KeyCode::Char('e'),
         ),
@@ -230,8 +230,8 @@ fn conflict_enabled(app: &App, key: KeyCode) -> bool {
 
 fn all_label(app: &App) -> &'static str {
     if app.operations.conflicts.front().is_some_and(|c| c.all) {
-        "A Apply to all: On"
+        "a Apply to all: On"
     } else {
-        "A Apply to all: Off"
+        "a Apply to all: Off"
     }
 }
