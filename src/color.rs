@@ -16,6 +16,7 @@ use std::time::SystemTime;
 pub enum Role {
     Normal,
     Header,
+    SectionHeader,
     Directory,
     Executable,
     Link,
@@ -118,6 +119,7 @@ impl Theme {
             style = style.fg(color);
         }
         match role {
+            Role::SectionHeader => self.section_header_style(),
             Role::ActivePane if self.level >= ColorLevel::Ansi256 => {
                 self.pair((220, 225, 230), (22, 28, 36))
             }
@@ -129,6 +131,20 @@ impl Theme {
                 style.add_modifier(Modifier::DIM)
             }
             _ => style,
+        }
+    }
+
+    fn section_header_style(&self) -> Style {
+        let style = Style {
+            // #89dceb keeps section titles lighter than shortcut-key accents.
+            fg: resolve_rgb(0x89, 0xdc, 0xeb, self.level).map(map_color),
+            ..Style::default()
+        }
+        .add_modifier(Modifier::BOLD);
+        if self.level == ColorLevel::NoColor {
+            style.add_modifier(Modifier::UNDERLINED)
+        } else {
+            style
         }
     }
 

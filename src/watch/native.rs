@@ -186,7 +186,9 @@ fn relevant(event: &Event, raw: &Path, physical: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use notify::event::{AccessKind, AccessMode, Flag, MetadataKind, ModifyKind};
+    use notify::event::{
+        AccessKind, AccessMode, CreateKind, DataChange, Flag, MetadataKind, ModifyKind,
+    };
 
     #[test]
     fn backend_errors_and_overflow_require_rescan_and_native_re_registration() {
@@ -322,11 +324,13 @@ mod tests {
             let event = Event::new(kind).add_path(raw.join("file"));
             assert!(!relevant(&event, raw, physical));
         }
-        assert!(!relevant(
-            &Event::new(EventKind::Any).add_path("/alias/sibling/file".into()),
-            raw,
-            physical
-        ));
+        for sibling in ["/alias/sibling", "/alias/sibling/file", "/physical/sibling"] {
+            assert!(!relevant(
+                &Event::new(EventKind::Any).add_path(sibling.into()),
+                raw,
+                physical
+            ));
+        }
         assert!(!relevant(
             &Event::new(EventKind::Any).add_path(raw.join("child/grandchild")),
             raw,
@@ -338,7 +342,13 @@ mod tests {
     fn mutations_aliases_empty_paths_and_overflow_conservatively_invalidate() {
         let raw = Path::new("/alias/current");
         let physical = Path::new("/physical/current");
-        for path in [raw.to_path_buf(), raw.join("file"), physical.join("file")] {
+        for path in [
+            raw.to_path_buf(),
+            raw.join("file"),
+            physical.join("file"),
+            raw.parent().unwrap().to_path_buf(),
+            physical.parent().unwrap().to_path_buf(),
+        ] {
             for kind in [
                 EventKind::Create(notify::event::CreateKind::File),
                 EventKind::Remove(notify::event::RemoveKind::File),
@@ -358,5 +368,87 @@ mod tests {
             raw,
             physical
         ));
+    }
+
+    #[test]
+    fn delayed_setup_hints_get_one_throttled_catchup_while_precise_noise_is_ignored() {
+        use crate::watch::tests::{finish, prepared};
+        let (root, mut app, mut pool, mut runtime) = prepared();
+        let selected = root.path().join("selected");
+        std::fs::write(&selected, b"data").unwrap();
+        runtime.slots[0].signals.publish(READY | DIRTY);
+        runtime.poll(&mut app, &mut pool, Duration::ZERO);
+        finish(&mut app, &mut pool);
+        app.panes[0].toggle_mark();
+        let marks = app.panes[0].marks.clone();
+        let raw = root.path();
+        let failed = AtomicBool::new(false);
+        for (kind, path) in [
+            (EventKind::Create(CreateKind::Folder), raw.into()),
+            (EventKind::Create(CreateKind::File), selected.clone()),
+            (
+                EventKind::Modify(ModifyKind::Data(DataChange::Content)),
+                selected.clone(),
+            ),
+        ] {
+            on_event(
+                Ok(Event::new(kind).add_path(path)),
+                raw,
+                raw,
+                &runtime.slots[0].signals,
+                &failed,
+            );
+        }
+        runtime.poll(&mut app, &mut pool, Duration::from_millis(60));
+        assert_precise_noise_ignored(raw, &selected, &runtime.slots[0].signals, &failed);
+        runtime.poll(&mut app, &mut pool, Duration::from_millis(999));
+        assert_eq!(app.panes[0].generation, 2);
+        assert_eq!(pool.active_count(), 0);
+        runtime.poll(&mut app, &mut pool, Duration::from_secs(1));
+        assert_eq!(app.panes[0].generation, 3);
+        assert_eq!(pool.active_count(), 1);
+        finish(&mut app, &mut pool);
+        for time in [1200, 2000, 29000] {
+            runtime.poll(&mut app, &mut pool, Duration::from_millis(time));
+            assert_eq!(pool.active_count(), 0);
+            assert_eq!(app.panes[0].generation, 3);
+        }
+        assert!(!failed.load(Ordering::Acquire));
+        assert_eq!(app.panes[0].marks, marks);
+        assert_eq!(app.panes[0].cursor.as_deref(), Some(selected.as_path()));
+        assert_eq!(app.panes[0].entries.len(), 1);
+        assert_eq!(std::fs::read(selected).unwrap(), b"data");
+    }
+
+    fn assert_precise_noise_ignored(
+        raw: &Path,
+        selected: &Path,
+        signals: &Signals,
+        failed: &AtomicBool,
+    ) {
+        for (kind, path) in [
+            (EventKind::Access(AccessKind::Read), selected.to_path_buf()),
+            (
+                EventKind::Modify(ModifyKind::Metadata(MetadataKind::AccessTime)),
+                selected.to_path_buf(),
+            ),
+            (
+                EventKind::Create(CreateKind::File),
+                raw.with_file_name("sibling"),
+            ),
+            (
+                EventKind::Modify(ModifyKind::Data(DataChange::Content)),
+                raw.with_file_name("sibling"),
+            ),
+        ] {
+            on_event(
+                Ok(Event::new(kind).add_path(path)),
+                raw,
+                raw,
+                signals,
+                failed,
+            );
+            assert_eq!(signals.bits.load(Ordering::Acquire), 0);
+        }
     }
 }

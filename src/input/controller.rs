@@ -26,7 +26,7 @@ pub struct Controller {
 impl Controller {
     /// Own the authoritative app and validated keymap.
     pub fn new(mut app: App, bindings: Bindings, preferences: Settings) -> Self {
-        app.help_rows = bindings.help_rows();
+        app.help_rows = bindings.help_entries();
         app.metadata_presentation = preferences.metadata_presentation;
         app.profile_names = preferences.profiles.keys().cloned().collect();
         Self {
@@ -123,7 +123,7 @@ impl Controller {
                     Some(0)
                 };
                 self.app.popup = false;
-                self.app.help = false;
+                self.app.close_help();
             }
             HumanSizes | FuzzyTimestamps | Permissions | ColumnSize | ColumnModified
             | ColumnAttributes | ColumnOwner | OwnerDisplay | MetadataPresentation => {
@@ -160,7 +160,10 @@ impl Controller {
     }
 
     fn movement(&mut self, action: Action, geometry: &Geometry) {
-        let height = page_height(geometry, self.app.active);
+        let height = geometry.help.as_ref().map_or_else(
+            || page_height(geometry, self.app.active),
+            |layout| usize::from(layout.body.height),
+        );
         if self.app.help || self.app.popup {
             let delta = match action {
                 Action::Up => -1,
@@ -295,9 +298,10 @@ impl Controller {
                 self.app.maximized = !self.app.maximized;
                 self.dragging_divider = false;
                 self.app.status = if self.app.maximized {
-                    "Active pane maximised — Alt+M restores split"
+                    let key = self.app.shortcut(Action::Maximise, "Alt+m");
+                    format!("Active pane maximised — {key} restores split")
                 } else {
-                    "Split restored"
+                    "Split restored".into()
                 }
                 .into();
             }
@@ -318,8 +322,9 @@ impl Controller {
                 self.app.overlay_scroll = 0;
             }
             Action::Help => {
-                self.app.help = !self.app.help;
-                self.app.overlay_scroll = 0;
+                let open = !self.app.help;
+                self.app.close_help();
+                self.app.help = open;
             }
             _ => {}
         }
@@ -343,7 +348,7 @@ impl Controller {
     fn cancel(&mut self) {
         self.app.cancel_totals();
         if self.app.help || self.app.popup {
-            self.app.help = false;
+            self.app.close_help();
             self.app.popup = false;
         } else {
             self.app.panes[self.app.active].set_filter(String::new());
@@ -420,8 +425,8 @@ impl Controller {
             return true;
         }
         if self.app.profile_menu.is_some() {
-            if let Some(area) = geometry.menu {
-                super::profiles::mouse(self, event, area);
+            if let Some(shell) = &geometry.menu_layout {
+                super::profiles::mouse(self, event, shell);
             }
             return true;
         }

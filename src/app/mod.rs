@@ -5,12 +5,16 @@ mod pane;
 pub use metadata::MetadataFormat;
 mod pattern;
 mod selection;
+mod status;
 use crate::fs::{Entry, Snapshot, Totals};
 pub use pane::{IgnoreMode, Pane, SelectionCounts};
 pub use pattern::{
     PatternControl, PatternMode, PatternOperation, PatternPreview, PatternSelection,
 };
+pub use status::Status;
 use std::path::PathBuf;
+
+pub(crate) const WELCOME: &str = "Local files — ? for help, F9 / Alt+j for jobs";
 
 /// A bounded worker request carries identity independently of display text.
 #[derive(Clone, Debug)]
@@ -55,6 +59,9 @@ pub struct App {
     pub sidebar_left: bool,
     pub popup: bool,
     pub help: bool,
+    pub context_help: Option<crate::input::ContextHelp>,
+    pub help_picker: Option<crate::input::HelpPicker>,
+    pub help_landing: Option<(crate::input::HelpTarget, std::time::SystemTime)>,
     pub pattern: Option<PatternSelection>,
     pub diagnostics: bool,
     pub diagnostics_scroll: u16,
@@ -64,11 +71,11 @@ pub struct App {
     pub profile_name: Option<String>,
     pub profile_names: Vec<String>,
     pub metadata_presentation: crate::settings::MetadataPresentation,
-    pub help_rows: Vec<(String, String)>,
+    pub help_rows: Vec<crate::input::HelpEntry>,
     pub overlay_scroll: u16,
     pub metadata_scroll: u16,
     pub metadata_formats: [Option<MetadataFormat>; 2],
-    pub status: String,
+    pub status: Status,
     pub now: std::time::SystemTime,
     pub details: [Detail; 2],
 }
@@ -87,6 +94,9 @@ impl App {
             sidebar_left: false,
             popup: false,
             help: false,
+            context_help: None,
+            help_picker: None,
+            help_landing: None,
             pattern: None,
             diagnostics: false,
             diagnostics_scroll: 0,
@@ -98,14 +108,46 @@ impl App {
             metadata_presentation: crate::settings::MetadataPresentation::default(),
             help_rows: crate::input::Bindings::new(&Default::default())
                 .expect("default bindings")
-                .help_rows(),
+                .help_entries(),
             overlay_scroll: 0,
             metadata_scroll: 0,
             metadata_formats: [None; 2],
-            status: "Local files — ? for help, F9 / Alt+J for jobs".into(),
+            status: Status::Welcome,
             now: std::time::SystemTime::now(),
             details: std::array::from_fn(|_| Detail::default()),
         }
+    }
+
+    /// End the Help session without retaining picker, landing or document scroll.
+    pub fn close_help(&mut self) {
+        self.help = false;
+        self.help_picker = None;
+        self.help_landing = None;
+        self.overlay_scroll = 0;
+    }
+
+    /// Effective Help entry shared by command hints and contextual Help.
+    pub fn help_entry(&self, action: crate::input::Action) -> Option<&crate::input::HelpEntry> {
+        self.help_rows.iter().find(|entry| entry.action == action)
+    }
+
+    /// Current display label for a browser action, independent of its input routing.
+    pub fn shortcut(&self, action: crate::input::Action, preferred: &str) -> &str {
+        self.help_entry(action)
+            .and_then(|entry| entry.preferred_key(preferred))
+            .unwrap_or("Unbound")
+    }
+
+    /// Full effective hint with the familiar alias first, preserving default status text.
+    pub fn shortcut_hint(&self, action: crate::input::Action, preferred: &str) -> String {
+        let Some(entry) = self.help_entry(action) else {
+            return "Unbound".into();
+        };
+        let first = entry.preferred_key(preferred).unwrap_or("Unbound");
+        std::iter::once(first)
+            .chain(entry.keys.split(" / ").filter(|key| *key != first))
+            .collect::<Vec<_>>()
+            .join(" / ")
     }
 
     /// Effective width never changes the user's requested layout.
@@ -156,7 +198,7 @@ impl App {
         let state = self.panes.get_mut(pane)?;
         if let Some(path) = &state.pending {
             state.refresh_pending = true;
-            self.status = format!("Refresh queued for {} after navigation", path.display());
+            self.status = format!("Refresh queued for {} after navigation", path.display()).into();
             return None;
         }
         self.invalidate_listing_details(pane);

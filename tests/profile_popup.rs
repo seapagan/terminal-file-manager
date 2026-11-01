@@ -197,7 +197,8 @@ fn profiles_resize_scroll_unicode_and_clicks_stay_in_the_rendered_viewport() {
             assert_eq!(c.app.profile_menu, Some(c.app.profile_names.len() + 1));
             key(&mut c, KeyCode::Home, w, h);
             let (_, g) = draw(&c, w, h);
-            click(&mut c, &g, area.x + 2, area.y + 2);
+            let body = g.menu_layout.as_ref().unwrap().body;
+            click(&mut c, &g, body.x, body.y + 1);
             assert_eq!(c.app.profile_menu, Some(1));
             key(&mut c, KeyCode::Enter, w, h);
             assert_eq!(c.app.panes[0].profile.as_deref(), Some("Detailed"));
@@ -212,8 +213,9 @@ fn long_profile_names_truncate_without_drawing_or_clicking_outside_content() {
     c.app.profile_names = vec![format!("界e\u{301}{}", "長".repeat(60))];
     let (buffer, g) = draw(&c, 40, 16);
     let area = g.menu.unwrap();
-    let row: String = (area.x + 2..area.right() - 2)
-        .map(|x| buffer[(x, area.y + 1)].symbol())
+    let body = g.menu_layout.as_ref().unwrap().body;
+    let row: String = (body.x..body.right())
+        .map(|x| buffer[(x, body.y)].symbol())
         .collect();
     assert!(row.starts_with("界 e\u{301}"));
     assert!(row.trim_end().ends_with('…'));
@@ -239,8 +241,9 @@ fn confirmation_row_fits_long_names_when_terminal_width_allows() {
         let expected = format!("Apply selected to both: {name}");
         let (buffer, g) = draw(&c, 120, 24);
         let area = g.menu.unwrap();
-        let row: String = (area.x + 2..area.right() - 2)
-            .map(|x| buffer[(x, area.y + 2)].symbol())
+        let body = g.menu_layout.as_ref().unwrap().body;
+        let row: String = (body.x..body.right())
+            .map(|x| buffer[(x, body.y + 1)].symbol())
             .collect();
         // TestBackend retains padding cells after wide graphemes.
         let expected = expected.replace('界', "界 ");

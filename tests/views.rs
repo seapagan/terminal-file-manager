@@ -139,12 +139,12 @@ fn view_menu_mouse_uses_drawn_geometry_and_column_settings_round_trip() {
     );
     key(&mut controller, "V");
     let geometry = ui::geometry(&controller.app, ratatui::layout::Rect::new(0, 0, 120, 24));
-    let area = geometry.menu.unwrap();
+    let body = geometry.menu_layout.as_ref().unwrap().body;
     controller.handle(
         Event::Mouse(MouseEvent {
             kind: MouseEventKind::Down(MouseButton::Left),
-            column: area.x + 2,
-            row: area.y + 9,
+            column: body.x,
+            row: body.y + 8,
             modifiers: KeyModifiers::NONE,
         }),
         &geometry,

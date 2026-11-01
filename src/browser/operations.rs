@@ -75,7 +75,8 @@ fn reconcile(controller: &mut Controller, queue: &mut Queue, id: u64) -> std::io
     queue.reconcile(id, job.plan.clone(), record.clone())?;
     job.state = crate::operations::JobState::Queued;
     job.progress = None;
-    controller.app.status = format!("Job {id}: checking retained identities and owned staging");
+    controller.app.status =
+        format!("Job {id}: checking retained identities and owned staging").into();
     Ok(())
 }
 

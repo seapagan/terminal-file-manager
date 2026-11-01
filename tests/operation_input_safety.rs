@@ -55,7 +55,7 @@ fn replace_field(controller: &mut Controller, text: &str) {
 #[test]
 fn late_preview_results_cannot_approve_a_reopened_destructive_dialog() {
     use terminal_file_manager::operations::Intent;
-    for (action, confirm) in [(Action::Delete, 'D'), (Action::Trash, 't')] {
+    for (action, confirm) in [(Action::Delete, 'D'), (Action::Trash, 'T')] {
         let (root, mut controller) = fixture();
         open(&mut controller, action);
         let old = match controller.app.operations.dialog.as_mut().unwrap() {

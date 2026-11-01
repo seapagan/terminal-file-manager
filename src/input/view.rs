@@ -41,7 +41,7 @@ pub(super) fn key(controller: &mut Controller, key: KeyEvent, geometry: &Geometr
 }
 
 pub(super) fn mouse(controller: &mut Controller, event: MouseEvent, geometry: &Geometry) {
-    let Some(area) = geometry.menu else {
+    let Some(shell) = &geometry.menu_layout else {
         return;
     };
     let index = controller.app.view_menu.as_mut().expect("view menu");
@@ -49,13 +49,10 @@ pub(super) fn mouse(controller: &mut Controller, event: MouseEvent, geometry: &G
         MouseEventKind::ScrollUp => *index = index.saturating_sub(1),
         MouseEventKind::ScrollDown => *index = (*index + 1).min(OPTIONS.len() - 1),
         MouseEventKind::Down(MouseButton::Left)
-            if area.contains((event.column, event.row).into()) =>
+            if shell.body.contains((event.column, event.row).into()) =>
         {
-            if event.row <= area.y || event.row >= area.bottom().saturating_sub(1) {
-                return;
-            }
-            let row = usize::from(event.row - area.y - 1);
-            let start = index.saturating_sub(usize::from(area.height.saturating_sub(3)));
+            let row = usize::from(event.row - shell.body.y);
+            let start = index.saturating_sub(usize::from(shell.body.height.saturating_sub(1)));
             *index = (start + row).min(OPTIONS.len() - 1);
             let action = OPTIONS[*index].1;
             controller.dispatch(action, geometry);

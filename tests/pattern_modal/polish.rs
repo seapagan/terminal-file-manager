@@ -63,9 +63,9 @@ fn radio_checkbox_and_blank_editor_gap_are_visible_and_measured() {
         assert_eq!(text_at(&buffer, gap).trim(), "");
         assert_eq!(layout.hit(gap.x, gap.y), None);
         assert_eq!(layout.fields[1].0.y, editor.y + 2);
-        assert_eq!(text_at(&buffer, layout.fields[1].0), "(●) W Wildcard");
-        assert_eq!(text_at(&buffer, layout.fields[2].0), "( ) X Regex");
-        assert_eq!(text_at(&buffer, layout.fields[3].0), "[x] S Case sensitive");
+        assert_eq!(text_at(&buffer, layout.fields[1].0), "(●) w Wildcard");
+        assert_eq!(text_at(&buffer, layout.fields[2].0), "( ) x Regex");
+        assert_eq!(text_at(&buffer, layout.fields[3].0), "[x] s Case sensitive");
         let text: String = buffer.content.iter().map(|cell| cell.symbol()).collect();
         assert!(!text.to_lowercase().contains("native filename"));
         assert!(text.contains("? matches one byte"));
@@ -99,9 +99,9 @@ fn clicked_and_tabbed_settings_keep_deliberate_focus_and_activate_with_space_or_
         assert_eq!(
             text_at(&buffer, layout.fields[3].0),
             if state.case_sensitive {
-                "[x] S Case sensitive"
+                "[x] s Case sensitive"
             } else {
-                "[ ] S Case sensitive"
+                "[ ] s Case sensitive"
             }
         );
         assert!(
@@ -109,8 +109,8 @@ fn clicked_and_tabbed_settings_keep_deliberate_focus_and_activate_with_space_or_
                 .modifier
                 .contains(Modifier::REVERSED)
         );
-        assert_eq!(text_at(&buffer, layout.fields[1].0), "( ) W Wildcard");
-        assert_eq!(text_at(&buffer, layout.fields[2].0), "(●) X Regex");
+        assert_eq!(text_at(&buffer, layout.fields[1].0), "( ) w Wildcard");
+        assert_eq!(text_at(&buffer, layout.fields[2].0), "(●) x Regex");
     }
     assert_case_repeats_ignored(&mut c);
 }

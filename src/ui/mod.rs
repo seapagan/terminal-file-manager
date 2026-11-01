@@ -3,6 +3,7 @@ mod diagnostics;
 mod footer;
 mod help;
 pub use footer::FooterControl;
+pub use help::{HelpLayout, context::ContextLayout};
 mod layout;
 mod listing;
 mod measure;
@@ -17,7 +18,6 @@ mod pattern;
 mod policy;
 mod profiles;
 pub use pattern::{PatternControl, PatternLayout};
-pub(crate) use profiles::hit as profile_hit;
 mod summary;
 mod text;
 mod view;
@@ -29,18 +29,28 @@ pub use layout::{Geometry, geometry};
 pub use measure::Measurements;
 use ratatui::{Frame, layout::Rect, widgets::Paragraph};
 
-/// Keep the details route visible after clipping an untrusted immediate status.
-fn status_text(text: &str, width: u16) -> String {
-    let clean = clean(text);
-    let Some(summary) = clean.strip_suffix(" — F9 details") else {
-        return clean;
-    };
-    if width < modal::width(" — F9 details") {
-        return modal::truncate("F9 details", width);
+fn status_text(app: &App, status: &crate::app::Status, width: u16) -> String {
+    match status {
+        crate::app::Status::Welcome => format!(
+            "Local files — {} for help, {} for jobs",
+            app.shortcut(crate::input::Action::Help, "?"),
+            app.shortcut_hint(crate::input::Action::Jobs, "F9")
+        ),
+        crate::app::Status::Text(text) => clean(text),
+        crate::app::Status::JobsDetails(text) => details_text(app, text, width),
+    }
+}
+
+/// Keep the explicit details route visible after clipping untrusted prose.
+fn details_text(app: &App, summary: &str, width: u16) -> String {
+    let details = format!("{} details", app.shortcut(crate::input::Action::Jobs, "F9"));
+    let suffix = format!(" — {details}");
+    if width < modal::width(&suffix) {
+        return modal::truncate(&details, width);
     }
     format!(
-        "{} — F9 details",
-        modal::truncate(summary, width.saturating_sub(modal::width(" — F9 details")))
+        "{}{suffix}",
+        modal::truncate(&clean(summary), width.saturating_sub(modal::width(&suffix)))
     )
 }
 
@@ -75,7 +85,7 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
         metadata::render(frame, app, area, theme, false);
     }
     frame.render_widget(
-        Paragraph::new(status_text(&app.status, geometry.status.width))
+        Paragraph::new(status_text(app, &app.status, geometry.status.width))
             .style(theme.style(Role::Status)),
         geometry.status,
     );
@@ -83,14 +93,14 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     if app.popup {
         metadata::render(frame, app, frame.area(), theme, true);
     }
-    if app.help {
-        help::render(frame, app, theme);
+    if let Some(layout) = &geometry.help {
+        help::render(frame, app, theme, layout);
     }
-    if let Some(area) = geometry.menu {
+    if let Some(shell) = &geometry.menu_layout {
         if app.view_menu.is_some() {
-            view::render(frame, app, area, theme);
+            view::render(frame, app, shell, theme);
         } else {
-            profiles::render(frame, app, area, theme);
+            profiles::render(frame, app, shell, theme);
         }
     }
     if let Some(lines) = diagnostics {
@@ -98,6 +108,7 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     }
     pattern::render(frame, app, theme, geometry.pattern.as_ref());
     operations::render(frame, app, theme, &geometry);
+    help::context::render(frame, app, theme, geometry.context_help.as_ref());
     geometry
 }
 

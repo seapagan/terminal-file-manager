@@ -11,7 +11,7 @@ use ratatui::{
 #[derive(Clone, Debug)]
 pub struct Action<T> {
     /// Visible label, including the shortcut when needed.
-    pub label: &'static str,
+    pub label: String,
     /// Stable label budget in display cells, excluding brackets.
     pub min_width: u16,
     /// Optional separately styled trailing toggle state.
@@ -30,9 +30,9 @@ pub struct Action<T> {
 
 impl<T> Action<T> {
     /// A caller-authorized custom shortcut; Enter requires explicit opt-in.
-    pub fn custom(label: &'static str, intent: T, key: KeyCode) -> Self {
+    pub fn custom(label: impl Into<String>, intent: T, key: KeyCode) -> Self {
         Self {
-            label,
+            label: label.into(),
             min_width: 0,
             state: None,
             intent,
@@ -184,16 +184,16 @@ pub fn render<T>(
             region
                 .area
                 .width
-                .saturating_sub(2 + super::width(region.action.label)),
+                .saturating_sub(2 + super::width(&region.action.label)),
         ));
-        let mut spans = vec![Span::raw("["), Span::raw(region.action.label)];
+        let mut spans = vec![Span::raw("["), Span::raw(region.action.label.as_str())];
         if let Some((state, state_role)) = region.action.state {
             spans[1] = Span::raw(
                 region
                     .action
                     .label
                     .strip_suffix(state)
-                    .unwrap_or(region.action.label),
+                    .unwrap_or(region.action.label.as_str()),
             );
             spans.push(Span::styled(
                 state,

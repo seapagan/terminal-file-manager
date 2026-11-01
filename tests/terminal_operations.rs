@@ -303,12 +303,14 @@ fn pattern_overlong_native_input_requires_correction_before_apply() {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("overlong-ready.txt"), "preserved").unwrap();
     // ConPTY key delivery is covered by the short native pattern tests above.
-    let paste = format!("\x1b[200~{}[\x1b[201~", "a".repeat(20_000));
-    let recovery = "\x1bm\x1bu\x1br\r\x7f*\r\r";
+    let paste = format!("\x1b[200~{}\x1b[201~", "a".repeat(4097));
     let steps = [
         ("overlong-ready.txt", "\x1bb"),
         ("Pattern selection", paste.as_str()),
-        ("4096 bytes", recovery),
+        // The warning suffix is new output; earlier letters can reuse old cells.
+        ("Backspace to correct", "\x1bm\x1bu\x1br\r\x1bx"),
+        // The new Regex anchor proves blocked actions left the form open.
+        ("^", "\x1bw\x7f*\r\r"),
         ("[*]", "q"),
     ];
     let transcript = drive(command(root.path(), root.path(), None), &steps, false);
@@ -318,4 +320,120 @@ fn pattern_overlong_native_input_requires_correction_before_apply() {
         fs::read(root.path().join("overlong-ready.txt")).unwrap(),
         b"preserved"
     );
+}
+
+#[test]
+fn searchable_help_jumps_and_layers_escape_in_a_native_terminal() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("help-sentinel"), b"preserved").unwrap();
+    drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("help-sentinel", "?"),
+            ("Navigation", "/"),
+            ("Jump to section or search commands", "trash"),
+            ("Preview and move selection", "\r"),
+            ("Preview and move selection", "/"),
+            // A raw Esc Esc q batch is ambiguous to ConPTY (Alt+q).
+            // Observe each restored layer before sending the next key.
+            ("Jump to section or search commands", "\x1b"),
+            ("cancel work or retry unfinished items", "\x1b"),
+            ("help-sentinel", "q"),
+        ],
+        true,
+    );
+    assert_eq!(
+        fs::read(root.path().join("help-sentinel")).unwrap(),
+        b"preserved"
+    );
+}
+
+#[test]
+fn context_f1_and_literal_question_marks_cross_the_native_terminal_parser() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("ok"), b"preserved").unwrap();
+    drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("ok", "\x1bb"),
+            ("Pattern selection", "?\x1bOP"),
+            ("Pattern Help", "\r\x1bm\x1b"),
+            ("selects; Enter activates. Esc cancels.", "?\x1bm"),
+            ("[*]", "q"),
+        ],
+        false,
+    );
+    assert_eq!(fs::read(root.path().join("ok")).unwrap(), b"preserved");
+}
+
+#[test]
+fn help_synonyms_choose_document_and_context_in_a_native_terminal() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("help-keys-sentinel"), b"preserved").unwrap();
+    drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("help-keys-sentinel", "\x1bOP"),
+            ("Navigation", "\x1b"),
+            ("help-keys-sentinel", "\x1bb"),
+            ("Pattern selection", "\t?"),
+            ("Pattern Help", "\x1b"),
+            ("selects; Enter activates. Esc cancels.", "\x1b"),
+            ("cancelled", "q"),
+        ],
+        false,
+    );
+    assert_eq!(
+        fs::read(root.path().join("help-keys-sentinel")).unwrap(),
+        b"preserved"
+    );
+}
+
+#[test]
+fn view_dialog_help_and_profile_editing_cross_the_native_terminal_parser() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("view-help-sentinel"), b"preserved").unwrap();
+    for (open, title, help, restored) in [
+        (
+            "V",
+            "Human sizes",
+            "View Options Help",
+            "Space/Enter changes",
+        ),
+        (
+            "\x1bv",
+            "View profiles",
+            "View Profiles Help",
+            "Enter: active pane",
+        ),
+    ] {
+        drive(
+            command(root.path(), root.path(), None),
+            &[
+                ("view-help-sentinel", open),
+                (title, "?"),
+                (help, "\x1b"),
+                // Observe the restored menu before the next independent key.
+                (restored, "\x03"),
+            ],
+            false,
+        );
+    }
+    drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("view-help-sentinel", "\x1bv"),
+            ("View profiles", "\x1b[F\r"),
+            ("Save profile", "?\x1bOP"),
+            ("Save Profile Help", "\x1b"),
+            ("Name: ?", "\x1b"),
+            ("Save active as", "\x03"),
+        ],
+        false,
+    );
+    assert_eq!(
+        fs::read(root.path().join("view-help-sentinel")).unwrap(),
+        b"preserved"
+    );
+    assert!(!root.path().join("config/tfm/config.toml").exists());
 }

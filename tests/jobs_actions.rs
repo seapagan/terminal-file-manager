@@ -197,7 +197,7 @@ fn assert_row(buttons: &[&ui::OperationControl], y: u16, g: &ui::Geometry, width
 fn wide_jobs_show_full_context_labels_without_moving_primary_controls() {
     let (_root, mut app) = fixture();
     let (_, initial) = draw(&app, (120, 40), ColorLevel::NoColor);
-    for (index, label) in [(1, "C Cancel job"), (2, "R Retry incomplete")] {
+    for (index, label) in [(1, "c Cancel job"), (2, "r Retry incomplete")] {
         app.operations.cursor = index;
         let (terminal, geometry) = draw(&app, (120, 40), ColorLevel::NoColor);
         let control = geometry
@@ -221,11 +221,11 @@ fn narrow_jobs_show_eligible_shortcuts_inside_the_existing_footer() {
     for size in [(40, 15), (43, 18), (44, 17), (32, 14)] {
         for (index, labels) in [
             (0, vec![]),
-            (1, vec!["C Cancel"]),
-            (2, vec!["R Retry"]),
-            (3, vec!["R Retry"]),
-            (4, vec!["X Reconcile"]),
-            (5, vec!["C Cancel", "Enter Conflict"]),
+            (1, vec!["c Cancel"]),
+            (2, vec!["r Retry"]),
+            (3, vec!["r Retry"]),
+            (4, vec!["x Reconcile"]),
+            (5, vec!["c Cancel", "Enter Conflict"]),
             (6, vec![]),
         ] {
             app.operations.cursor = index;
@@ -241,9 +241,9 @@ fn narrow_jobs_show_eligible_shortcuts_inside_the_existing_footer() {
                 assert!(text.contains(label), "{size:?} job {index}: {text}");
             }
             for (label, available) in [
-                ("R Retry", matches!(index, 2 | 3)),
-                ("C Cancel", matches!(index, 1 | 5)),
-                ("X Reconcile", index == 4),
+                ("r Retry", matches!(index, 2 | 3)),
+                ("c Cancel", matches!(index, 1 | 5)),
+                ("x Reconcile", index == 4),
             ] {
                 if !available {
                     assert!(!text.contains(label), "{size:?} job {index}: {text}");
@@ -254,7 +254,7 @@ fn narrow_jobs_show_eligible_shortcuts_inside_the_existing_footer() {
             }
             if index == 6 {
                 assert!(text.contains("CRITICAL"));
-                assert!(!text.contains("R Retry"));
+                assert!(!text.contains("r Retry"));
             }
             assert!(
                 g.operation_controls
@@ -392,7 +392,7 @@ fn primary_controls_styles_and_empty_band_clicks_stay_consistent() {
             .find(|b| b.target == OperationTarget::Key(KeyCode::Char('e')))
             .unwrap();
         assert_eq!(toggle.area, evidence);
-        assert_eq!(toggle.label, "E Summary");
+        assert_eq!(toggle.label, "e Summary");
         send(&mut c, &next, KeyCode::Char('E'));
         assert!(!c.app.operations.jobs_evidence);
         send(&mut c, &next, KeyCode::Esc);
@@ -415,9 +415,9 @@ fn small_unknown_footer_prioritises_restrictions_and_marks_hint_overflow() {
         .iter()
         .map(|c| c.symbol())
         .collect();
-    assert!(text.contains("UNKNOWN: no R/exit"), "{text}");
-    assert!(text.contains("X Reconcile · …"), "{text}");
-    assert!(!text.contains("R Retry"));
+    assert!(text.contains("UNKNOWN: no r/exit"), "{text}");
+    assert!(text.contains("x Reconcile · …"), "{text}");
+    assert!(!text.contains("r Retry"));
     let e = g
         .operation_controls
         .iter()
@@ -476,8 +476,8 @@ fn narrow_hints_are_informational_and_follow_safe_exit_eligibility() {
             .iter()
             .map(|c| c.symbol())
             .collect();
-        assert!(!text.contains("R Retry"));
-        assert!(!text.contains("X Reconcile"));
+        assert!(!text.contains("r Retry"));
+        assert!(!text.contains("x Reconcile"));
     }
     c.app.operations.waiting_exit = None;
     c.app.operations.history[4].record = Some(Record::default());
@@ -489,7 +489,7 @@ fn narrow_hints_are_informational_and_follow_safe_exit_eligibility() {
         .iter()
         .map(|c| c.symbol())
         .collect();
-    assert!(!text.contains("X Reconcile"));
+    assert!(!text.contains("x Reconcile"));
     assert!(text.contains("UNKNOWN"));
 }
 
@@ -505,5 +505,8 @@ fn one_row_footer_marks_shortcuts_that_cannot_fit() {
         .iter()
         .map(|c| c.symbol())
         .collect();
-    assert!(text.contains("C Cancel · …"), "{text}");
+    assert!(text.contains("c Cancel · …"), "{text}");
 }
+
+#[path = "jobs_actions/help.rs"]
+mod help;

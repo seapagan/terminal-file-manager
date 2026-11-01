@@ -124,7 +124,7 @@ fn large_job_details_scroll_beyond_u16_rows_and_reach_the_final_result() {
         );
     }
     let top = draw(&controller.app);
-    assert!(top.contains("PgUp/PgDown"));
+    assert!(top.contains("PageUp/PageDown"));
     controller.app.operations.scroll = usize::MAX;
     let bottom_start = Instant::now();
     let bottom = draw(&controller.app);

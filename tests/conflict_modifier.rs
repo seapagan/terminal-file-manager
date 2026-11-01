@@ -36,9 +36,9 @@ fn all_modifier_wraps_the_actual_shortcut_enter_or_mouse_decision() {
                 }
                 let text = draw(&c.app, 120, 40, ColorLevel::NoColor).2;
                 assert!(text.contains(if all {
-                    "A Apply to all: On"
+                    "a Apply to all: On"
                 } else {
-                    "A Apply to all: Off"
+                    "a Apply to all: Off"
                 }));
                 submit(&mut c, choice, route);
                 assert_decision(response.try_recv().unwrap(), choice, all);
@@ -132,7 +132,7 @@ fn all_never_enables_disabled_choices_and_new_prompts_start_safe() {
     assert!(
         draw(&c.app, 120, 40, ColorLevel::NoColor)
             .2
-            .contains("A Apply to all: Off")
+            .contains("a Apply to all: Off")
     );
 }
 

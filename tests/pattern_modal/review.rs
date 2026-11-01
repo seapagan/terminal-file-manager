@@ -160,7 +160,7 @@ fn clicked_settings_explain_plain_action_shortcuts_and_keep_their_contract() {
         click(&mut c, target);
         assert_eq!(c.app.pattern.as_ref().unwrap().focus, target);
         let (text, _) = rendered(&c, 100, 24, ColorLevel::NoColor);
-        assert!(text.contains("Outside input: M/U/R apply"));
+        assert!(text.contains("Outside input: m/u/r apply"));
         key(&mut c, "m");
         assert!(c.app.pattern.is_none());
         assert_eq!(c.app.panes[0].marks.len(), 3);

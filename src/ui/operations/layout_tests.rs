@@ -34,13 +34,13 @@ fn scroll_cues_are_interior_and_all_geometry_stays_centred_after_resize() {
         for height in [12, 13, 20, 30, 50] {
             let terminal = Rect::new(0, 0, width, height);
             let layout = Layout::new(&app, terminal);
-            let top = layout.outer.y;
-            let bottom = height - 2 - layout.outer.bottom();
+            let top = layout.shell.outer.y;
+            let bottom = height - 2 - layout.shell.outer.bottom();
             assert!(top.abs_diff(bottom) <= 1);
             if height >= 30 {
-                assert!(layout.outer.height <= height * 3 / 4);
+                assert!(layout.shell.outer.height <= height * 3 / 4);
             }
-            assert!(layout.shell.cue.bottom() < layout.outer.bottom());
+            assert!(layout.shell.cue.bottom() < layout.shell.outer.bottom());
             assert!(layout.shell.cue.y >= layout.body.bottom());
             assert_buffer(&app, &layout, width, height);
         }
@@ -62,15 +62,19 @@ fn assert_buffer(app: &App, layout: &Layout, width: u16, height: u16) {
         assert!(cue.contains("0/50") && cue.contains("Resize"));
     }
     assert_eq!(
-        buffer[(layout.outer.x, layout.outer.bottom() - 1)].symbol(),
+        buffer[(layout.shell.outer.x, layout.shell.outer.bottom() - 1)].symbol(),
         "└"
     );
     assert_eq!(
-        buffer[(layout.outer.right() - 1, layout.outer.bottom() - 1)].symbol(),
+        buffer[(
+            layout.shell.outer.right() - 1,
+            layout.shell.outer.bottom() - 1
+        )]
+            .symbol(),
         "┘"
     );
-    for x in layout.outer.x + 1..layout.outer.right() - 1 {
-        assert_eq!(buffer[(x, layout.outer.bottom() - 1)].symbol(), "─");
+    for x in layout.shell.outer.x + 1..layout.shell.outer.right() - 1 {
+        assert_eq!(buffer[(x, layout.shell.outer.bottom() - 1)].symbol(), "─");
     }
     for action in &layout.shell.actions {
         assert_eq!(buffer[(action.area.x, action.area.y)].symbol(), "[");
@@ -97,14 +101,14 @@ fn jobs_geometry_does_not_follow_selected_text_or_actions() {
         app.operations.cursor = 1;
         app.operations.jobs_evidence = true;
         let second = Layout::new(&app, area);
-        assert_eq!(first.outer, second.outer);
+        assert_eq!(first.shell.outer, second.shell.outer);
         assert_eq!(first.list, second.list);
         assert_eq!(first.body, second.body);
-        assert!(first.outer.width <= 120);
-        assert!(first.outer.height <= 28);
+        assert!(first.shell.outer.width <= 120);
+        assert!(first.shell.outer.height <= 28);
         app.operations.history[1].state = JobState::Running;
         let running = Layout::new(&app, area);
-        assert_eq!(first.outer, running.outer);
+        assert_eq!(first.shell.outer, running.shell.outer);
         assert_eq!(first.body, running.body);
         assert_eq!(first.shell.footer, running.shell.footer);
         for state in [
@@ -157,7 +161,7 @@ fn jobs_app() -> App {
 }
 
 fn assert_jobs_regions(first: &Layout, next: &Layout) {
-    assert_eq!(first.outer, next.outer);
+    assert_eq!(first.shell.outer, next.shell.outer);
     assert_eq!(first.list, next.list);
     assert_eq!(first.body, next.body);
     assert_eq!(first.shell.footer, next.shell.footer);
@@ -252,7 +256,7 @@ fn assert_spinner_frames(app: &mut App, layout: &Layout) {
         previous = buffer.clone();
         let next = Layout::new(app, Rect::new(0, 0, 80, 24));
         assert_eq!(next.header[0].text.chars().next(), Some(glyph));
-        assert_eq!(next.outer, layout.outer);
+        assert_eq!(next.shell.outer, layout.shell.outer);
         assert_eq!(next.body, layout.body);
         for (a, b) in next.buttons.iter().zip(&layout.buttons) {
             assert_eq!(a.area, b.area);
@@ -364,16 +368,22 @@ fn assert_conflict_widths(app: &mut App, width: u16) {
     let area = Rect::new(0, 0, width, 50);
     set_paths(app, "source/a.txt", "destination/a.txt");
     let short = Layout::new(app, area);
-    assert!(short.outer.width < 80);
+    assert!(short.shell.outer.width < 80);
     set_paths(
         app,
         "source/nested/incoming-folder/a.txt",
         "destination/nested/existing-folder/a.txt",
     );
     let long = Layout::new(app, area);
-    assert!(long.outer.width > short.outer.width);
-    assert!(long.outer.x >= 1 && long.outer.right() < width);
-    assert!(long.outer.x.abs_diff(width - long.outer.right()) <= 1);
+    assert!(long.shell.outer.width > short.shell.outer.width);
+    assert!(long.shell.outer.x >= 1 && long.shell.outer.right() < width);
+    assert!(
+        long.shell
+            .outer
+            .x
+            .abs_diff(width - long.shell.outer.right())
+            <= 1
+    );
     assert_eq!(long.rows.iter().any(|r| r.text.contains('…')), width == 80);
     set_paths(
         app,
@@ -381,7 +391,7 @@ fn assert_conflict_widths(app: &mut App, width: u16) {
         &format!("destination/{}a.txt", "nested/".repeat(40)),
     );
     let exhausted = Layout::new(app, area);
-    assert_eq!(exhausted.outer.width, width - 2);
+    assert_eq!(exhausted.shell.outer.width, width - 2);
     assert!(
         exhausted
             .rows

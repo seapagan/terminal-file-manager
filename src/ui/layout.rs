@@ -4,6 +4,10 @@ use ratatui::layout::Rect;
 /// File panes, optional metadata and stable bottom controls.
 #[derive(Clone, Debug)]
 pub struct Geometry {
+    pub context_help: Option<super::ContextLayout>,
+    pub context_control: Option<Rect>,
+    pub modal_close: Option<Rect>,
+    pub help: Option<super::help::HelpLayout>,
     pub pattern: Option<super::PatternLayout>,
     pub(super) operation_layout: Option<super::operations::Layout>,
     pub operation_controls: Vec<super::OperationControl>,
@@ -17,6 +21,7 @@ pub struct Geometry {
     pub footer: Rect,
     pub footer_controls: Vec<super::FooterControl>,
     pub menu: Option<Rect>,
+    pub menu_layout: Option<super::modal::Layout<()>>,
     pub diagnostics: Option<Rect>,
     pub diagnostics_scroll_limit: u16,
     pub overlay_scroll_limit: u16,
@@ -65,7 +70,7 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
     let height = area.height.saturating_sub(2);
     let body = Rect::new(area.x, area.y, area.width, height);
     let mut geometry = initial_geometry(app, area, height);
-    geometry.footer_controls = super::footer::controls(geometry.footer);
+    geometry.footer_controls = super::footer::controls(app, geometry.footer);
     if app.visible_panes(area.width).len() == 2 {
         let width = ((u32::from(body.width) * u32::from(app.split_percent.clamp(20, 80)) / 100)
             as u16)
@@ -86,14 +91,25 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
         geometry.panes[app.active] = Some(body);
     }
     scroll_limits(app, &mut geometry, area);
+    geometry.modal_close = close_control(app, &geometry);
     geometry
 }
 
 fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
     let (operation_controls, operation_scroll_limit, operation_layout) =
         super::operations::geometry(app, area);
+    let pattern = super::pattern::layout(app, area);
+    let menu_layout = menu_layout(app, area);
+    let context_control = menu_layout
+        .as_ref()
+        .and_then(|shell| shell.help)
+        .or_else(|| context_control(app, operation_layout.as_ref(), pattern.as_ref()));
     Geometry {
-        pattern: super::pattern::layout(app, area),
+        context_help: super::help::context::layout(app, area),
+        context_control,
+        modal_close: None,
+        help: super::help::layout(app, area),
+        pattern,
         operation_layout,
         operation_controls,
         operation_scroll_limit,
@@ -106,7 +122,8 @@ fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
         divider: None,
         sidebar: None,
         footer_controls: Vec::new(),
-        menu: menu_area(app, area),
+        menu: menu_layout.as_ref().map(|shell| shell.outer),
+        menu_layout,
         diagnostics: app.diagnostics.then(|| super::diagnostics::area(area)),
         diagnostics_scroll_limit: 0,
         status: Rect::new(
@@ -124,11 +141,11 @@ fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
     }
 }
 
-fn menu_area(app: &App, area: Rect) -> Option<Rect> {
+fn menu_layout(app: &App, area: Rect) -> Option<super::modal::Layout<()>> {
     if app.view_menu.is_some() {
-        Some(super::view::area(area, crate::input::view::OPTIONS.len()))
+        Some(super::view::layout(app, area))
     } else if app.profile_menu.is_some() {
-        Some(super::profiles::area(app, area))
+        Some(super::profiles::layout(app, area))
     } else {
         None
     }
@@ -159,23 +176,72 @@ fn scroll_limits(app: &App, geometry: &mut Geometry, area: Rect) {
                 super::summary::row_count(app.panes[id].visible.len(), counts, *area);
         }
     }
-    geometry.overlay_scroll_limit = if app.help {
-        super::help::scroll_limit(app, area)
-    } else if app.popup {
-        super::metadata::scroll_limit(app, area, true)
-    } else {
-        0
-    };
-    geometry.metadata_scroll_limit = geometry
+    geometry.overlay_scroll_limit = geometry
+        .help
+        .as_ref()
+        .map_or(0, |layout| layout.scroll_limit);
+    metadata_geometry(app, geometry, area);
+}
+
+fn metadata_geometry(app: &App, geometry: &mut Geometry, area: Rect) {
+    let sidebar = geometry
         .sidebar
-        .map_or(0, |area| super::metadata::scroll_limit(app, area, false));
+        .map(|area| super::metadata::geometry(app, area, false));
+    geometry.metadata_scroll_limit = sidebar.as_ref().map_or(0, |layout| layout.limit);
+    let visible = if app.popup {
+        let popup = super::metadata::geometry(app, area, true);
+        if !app.help {
+            geometry.overlay_scroll_limit = popup.limit;
+        }
+        if crate::input::HelpTopic::current(app).is_some() {
+            geometry.context_control = popup.help;
+        }
+        geometry.modal_close = popup.close;
+        Some(popup)
+    } else {
+        sidebar
+    };
     if !app.help && geometry.menu.is_none() {
-        geometry.metadata_controls = if app.popup {
-            super::metadata::controls(app, area, true)
-        } else {
-            geometry
-                .sidebar
-                .map_or_else(Vec::new, |area| super::metadata::controls(app, area, false))
-        };
+        geometry.metadata_controls = visible.map_or_else(Vec::new, |layout| layout.controls);
     }
+}
+
+fn context_control(
+    app: &App,
+    operation: Option<&super::operations::Layout>,
+    pattern: Option<&super::PatternLayout>,
+) -> Option<Rect> {
+    crate::input::HelpTopic::current(app)?;
+    if app.popup {
+        return None;
+    }
+    if let Some(layout) = operation {
+        return layout.shell.help;
+    }
+    pattern.and_then(|layout| layout.shell.help)
+}
+
+fn close_control(app: &App, geometry: &Geometry) -> Option<Rect> {
+    if let Some(layout) = &geometry.context_help {
+        return layout.shell.close;
+    }
+    if let Some(layout) = &geometry.operation_layout {
+        return layout.shell.close;
+    }
+    if let Some(layout) = &geometry.pattern {
+        return layout.shell.close;
+    }
+    if let Some(shell) = &geometry.menu_layout {
+        return shell.close;
+    }
+    if app.diagnostics {
+        return None;
+    }
+    if let Some(layout) = &geometry.help {
+        return layout
+            .picker
+            .as_ref()
+            .map_or(layout.close, |picker| picker.shell.close);
+    }
+    geometry.modal_close
 }

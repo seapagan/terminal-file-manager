@@ -27,8 +27,8 @@ pub(super) fn text_at(buffer: &Buffer, area: Rect) -> String {
 fn assert_control_cells(buffer: &Buffer, layout: &ui::PatternLayout) {
     let wildcard = layout.fields[1].0;
     let regex = layout.fields[2].0;
-    assert_eq!(text_at(buffer, wildcard), "(●) W Wildcard");
-    assert_eq!(text_at(buffer, regex), "( ) X Regex");
+    assert_eq!(text_at(buffer, wildcard), "(●) w Wildcard");
+    assert_eq!(text_at(buffer, regex), "( ) x Regex");
     for (i, (area, _)) in layout.fields.iter().enumerate() {
         assert!(layout.shell.body.contains((area.x, area.y).into()));
         assert!(area.right() <= layout.shell.body.right());
@@ -93,8 +93,8 @@ fn selected_and_focused_controls_have_distinct_stable_monochrome_cells() {
                 assert_stable_layout(&layout, &after);
                 changed.push(text_at(&buffer, regex));
             }
-            assert_eq!(changed[0], "(●) X Regex");
-            assert_eq!(changed[1], "( ) X Regex");
+            assert_eq!(changed[0], "(●) x Regex");
+            assert_eq!(changed[1], "( ) x Regex");
             assert_eq!(layout.hit(wildcard.x - 1, wildcard.y), None);
             assert!(!text_at(&before, layout.fields[0].0).contains('▏'));
         }

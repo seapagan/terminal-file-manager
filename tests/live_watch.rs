@@ -11,6 +11,10 @@ use terminal_file_manager::{
     workers::{Pool, Value},
 };
 
+#[cfg(not(windows))]
+#[path = "live_watch/chatter.rs"]
+mod chatter;
+
 #[cfg(unix)]
 struct RestorePermissions(std::path::PathBuf, std::fs::Permissions);
 
@@ -348,31 +352,6 @@ fn native_permission_loss_keeps_last_good_rows_and_recovers_without_navigation()
     until(&mut app, &mut pool, &mut watch, started, |app| {
         app.panes.iter().all(|p| p.error.is_none())
     });
-}
-
-#[test]
-#[cfg(not(windows))]
-fn native_reads_and_unrelated_parent_chatter_do_not_schedule_scans() {
-    let root = tempfile::tempdir().unwrap();
-    let path = root.path().join("current");
-    std::fs::create_dir(&path).unwrap();
-    std::fs::write(path.join("selected"), "data").unwrap();
-    let mut app = loaded(&path);
-    let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
-    let mut watch = Runtime::default();
-    let started = Instant::now();
-    until(&mut app, &mut pool, &mut watch, started, |app| {
-        app.panes.iter().all(|p| p.generation > 1)
-    });
-    let baseline = [app.panes[0].generation, app.panes[1].generation];
-    for index in 0..100 {
-        std::fs::read(path.join("selected")).unwrap();
-        fs::list(&path, &IgnoreContext::isolated(), &AtomicBool::new(false)).unwrap();
-        std::fs::write(root.path().join(format!("sibling-{index}")), "unrelated").unwrap();
-        watch.poll(&mut app, &mut pool, started.elapsed());
-        assert!(pool.next(Duration::from_millis(10)).is_none());
-    }
-    assert_eq!([app.panes[0].generation, app.panes[1].generation], baseline);
 }
 
 fn copy_fixture() -> (

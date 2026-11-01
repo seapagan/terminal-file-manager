@@ -11,7 +11,7 @@ pub(super) fn open(controller: &mut Controller) {
     controller.app.profile_name = None;
     controller.app.view_menu = None;
     controller.app.popup = false;
-    controller.app.help = false;
+    controller.app.close_help();
 }
 
 pub(super) fn key(controller: &mut Controller, key: KeyEvent) {
@@ -118,7 +118,7 @@ fn edit(controller: &mut Controller, key: KeyEvent) {
 fn save(controller: &mut Controller) {
     let name = controller.app.profile_name.as_ref().unwrap().clone();
     if let Err(error) = validate_profile_name(&name) {
-        controller.app.status = error;
+        controller.app.status = error.into();
         return;
     }
     let pane = &mut controller.app.panes[controller.app.active];
@@ -140,7 +140,11 @@ fn save(controller: &mut Controller) {
     controller.app.profile_names = controller.preferences.profiles.keys().cloned().collect();
 }
 
-pub(super) fn mouse(controller: &mut Controller, event: MouseEvent, area: ratatui::layout::Rect) {
+pub(super) fn mouse(
+    controller: &mut Controller,
+    event: MouseEvent,
+    shell: &crate::ui::modal::Layout<()>,
+) {
     if controller.app.profile_name.is_some() {
         return;
     }
@@ -150,13 +154,17 @@ pub(super) fn mouse(controller: &mut Controller, event: MouseEvent, area: ratatu
             key(controller, KeyEvent::new(KeyCode::Down, KeyModifiers::NONE))
         }
         MouseEventKind::Down(MouseButton::Left)
-            if area.contains((event.column, event.row).into()) =>
+            if shell.body.contains((event.column, event.row).into()) =>
         {
-            let Some(index) =
-                crate::ui::profile_hit(&controller.app, area, (event.column, event.row).into())
-            else {
+            let start = controller
+                .app
+                .profile_menu
+                .unwrap_or(0)
+                .saturating_sub(usize::from(shell.body.height.saturating_sub(1)));
+            let index = start + usize::from(event.row - shell.body.y);
+            if index >= controller.app.profile_names.len() + 2 {
                 return;
-            };
+            }
             controller.app.profile_menu = Some(index);
             if index < controller.app.profile_names.len() {
                 controller.app.profile_choice = index;
