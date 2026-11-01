@@ -303,12 +303,14 @@ fn pattern_overlong_native_input_requires_correction_before_apply() {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("overlong-ready.txt"), "preserved").unwrap();
     // ConPTY key delivery is covered by the short native pattern tests above.
-    let paste = format!("\x1b[200~{}[\x1b[201~", "a".repeat(20_000));
-    let recovery = "\x1bm\x1bu\x1br\r\x7f*\r\r";
+    let paste = format!("\x1b[200~{}\x1b[201~", "a".repeat(4097));
     let steps = [
         ("overlong-ready.txt", "\x1bb"),
         ("Pattern selection", paste.as_str()),
-        ("4096 bytes", recovery),
+        // The warning suffix is new output; earlier letters can reuse old cells.
+        ("Backspace to correct", "\x1bm\x1bu\x1br\r\x1bx"),
+        // The new Regex anchor proves blocked actions left the form open.
+        ("^", "\x1bw\x7f*\r\r"),
         ("[*]", "q"),
     ];
     let transcript = drive(command(root.path(), root.path(), None), &steps, false);
