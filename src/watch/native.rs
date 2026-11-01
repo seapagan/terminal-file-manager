@@ -143,6 +143,13 @@ fn on_event(
     signals: &Signals,
     failed: &AtomicBool,
 ) {
+    if super::trace_chatter(raw) {
+        let relevant = result.as_ref().map(|event| relevant(event, raw, physical));
+        eprintln!(
+            "WATCH-DIAG callback at={:?} raw={raw:?} physical={physical:?} relevant={relevant:?} result={result:?}",
+            Instant::now()
+        );
+    }
     match result {
         Ok(event) if event.need_rescan() => {
             failed.store(true, Ordering::Release);

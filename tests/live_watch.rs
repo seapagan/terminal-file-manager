@@ -353,7 +353,17 @@ fn native_permission_loss_keeps_last_good_rows_and_recovers_without_navigation()
 #[test]
 #[cfg(not(windows))]
 fn native_reads_and_unrelated_parent_chatter_do_not_schedule_scans() {
-    let root = tempfile::tempdir().unwrap();
+    for attempt in 0..10 {
+        chatter_probe(attempt);
+    }
+}
+
+#[cfg(not(windows))]
+fn chatter_probe(attempt: usize) {
+    let root = tempfile::Builder::new()
+        .prefix("tfm-watch-chatter-")
+        .tempdir()
+        .unwrap();
     let path = root.path().join("current");
     std::fs::create_dir(&path).unwrap();
     std::fs::write(path.join("selected"), "data").unwrap();
@@ -365,12 +375,27 @@ fn native_reads_and_unrelated_parent_chatter_do_not_schedule_scans() {
         app.panes.iter().all(|p| p.generation > 1)
     });
     let baseline = [app.panes[0].generation, app.panes[1].generation];
+    eprintln!(
+        "WATCH-DIAG baseline attempt={attempt} at={:?} elapsed={:?} generations={baseline:?} path={path:?}",
+        Instant::now(),
+        started.elapsed()
+    );
     for index in 0..100 {
+        eprintln!(
+            "WATCH-DIAG noise attempt={attempt} index={index} elapsed={:?}",
+            started.elapsed()
+        );
         std::fs::read(path.join("selected")).unwrap();
         fs::list(&path, &IgnoreContext::isolated(), &AtomicBool::new(false)).unwrap();
         std::fs::write(root.path().join(format!("sibling-{index}")), "unrelated").unwrap();
         watch.poll(&mut app, &mut pool, started.elapsed());
-        assert!(pool.next(Duration::from_millis(10)).is_none());
+        let completion = pool.next(Duration::from_millis(10));
+        assert!(
+            completion.is_none(),
+            "WATCH-DIAG unexpected completion attempt={attempt} index={index} elapsed={:?} request={:?}",
+            started.elapsed(),
+            completion.as_ref().map(|c| &c.request)
+        );
     }
     assert_eq!([app.panes[0].generation, app.panes[1].generation], baseline);
 }
