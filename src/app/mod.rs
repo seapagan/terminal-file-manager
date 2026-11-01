@@ -5,11 +5,13 @@ mod pane;
 pub use metadata::MetadataFormat;
 mod pattern;
 mod selection;
+mod status;
 use crate::fs::{Entry, Snapshot, Totals};
 pub use pane::{IgnoreMode, Pane, SelectionCounts};
 pub use pattern::{
     PatternControl, PatternMode, PatternOperation, PatternPreview, PatternSelection,
 };
+pub use status::Status;
 use std::path::PathBuf;
 
 pub(crate) const WELCOME: &str = "Local files — ? for help, F9 / Alt+j for jobs";
@@ -73,7 +75,7 @@ pub struct App {
     pub overlay_scroll: u16,
     pub metadata_scroll: u16,
     pub metadata_formats: [Option<MetadataFormat>; 2],
-    pub status: String,
+    pub status: Status,
     pub now: std::time::SystemTime,
     pub details: [Detail; 2],
 }
@@ -110,7 +112,7 @@ impl App {
             overlay_scroll: 0,
             metadata_scroll: 0,
             metadata_formats: [None; 2],
-            status: WELCOME.into(),
+            status: Status::Welcome,
             now: std::time::SystemTime::now(),
             details: std::array::from_fn(|_| Detail::default()),
         }
@@ -124,18 +126,21 @@ impl App {
         self.overlay_scroll = 0;
     }
 
+    /// Effective Help entry shared by command hints and contextual Help.
+    pub fn help_entry(&self, action: crate::input::Action) -> Option<&crate::input::HelpEntry> {
+        self.help_rows.iter().find(|entry| entry.action == action)
+    }
+
     /// Current display label for a browser action, independent of its input routing.
     pub fn shortcut(&self, action: crate::input::Action, preferred: &str) -> &str {
-        self.help_rows
-            .iter()
-            .find(|entry| entry.action == action)
+        self.help_entry(action)
             .and_then(|entry| entry.preferred_key(preferred))
             .unwrap_or("Unbound")
     }
 
     /// Full effective hint with the familiar alias first, preserving default status text.
     pub fn shortcut_hint(&self, action: crate::input::Action, preferred: &str) -> String {
-        let Some(entry) = self.help_rows.iter().find(|entry| entry.action == action) else {
+        let Some(entry) = self.help_entry(action) else {
             return "Unbound".into();
         };
         let first = entry.preferred_key(preferred).unwrap_or("Unbound");
@@ -193,7 +198,7 @@ impl App {
         let state = self.panes.get_mut(pane)?;
         if let Some(path) = &state.pending {
             state.refresh_pending = true;
-            self.status = format!("Refresh queued for {} after navigation", path.display());
+            self.status = format!("Refresh queued for {} after navigation", path.display()).into();
             return None;
         }
         self.invalidate_listing_details(pane);

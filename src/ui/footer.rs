@@ -36,7 +36,7 @@ pub(super) fn controls(app: &crate::app::App, area: Rect) -> Vec<FooterControl> 
         ("/", "Filter", Action::Filter),
         ("Alt+v", "Profiles", Action::ViewProfiles),
     ] {
-        let Some(entry) = app.help_rows.iter().find(|entry| entry.action == action) else {
+        let Some(entry) = app.help_entry(action) else {
             continue;
         };
         let key = entry.preferred_key(preferred).unwrap_or("");

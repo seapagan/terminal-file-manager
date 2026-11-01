@@ -118,7 +118,7 @@ fn edit(controller: &mut Controller, key: KeyEvent) {
 fn save(controller: &mut Controller) {
     let name = controller.app.profile_name.as_ref().unwrap().clone();
     if let Err(error) = validate_profile_name(&name) {
-        controller.app.status = error;
+        controller.app.status = error.into();
         return;
     }
     let pane = &mut controller.app.panes[controller.app.active];

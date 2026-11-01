@@ -54,7 +54,7 @@ pub(super) fn accepts(action: Action) -> bool {
 
 pub(super) fn key_name(code: KeyCode, modifiers: KeyModifiers) -> String {
     let mut modifiers = modifiers;
-    let uppercase = matches!(code, KeyCode::Char(c) if c.is_uppercase());
+    let uppercase = matches!(code, KeyCode::Char(c) if c.is_ascii_uppercase());
     if uppercase {
         modifiers.insert(KeyModifiers::SHIFT);
     }
@@ -70,7 +70,7 @@ pub(super) fn key_name(code: KeyCode, modifiers: KeyModifiers) -> String {
     }
     name.push_str(&match code {
         KeyCode::Char(' ') => "Space".into(),
-        KeyCode::Char(c) if uppercase => c.to_lowercase().collect(),
+        KeyCode::Char(c) if uppercase => c.to_ascii_lowercase().to_string(),
         KeyCode::Char(c) => c.to_string(),
         KeyCode::F(n) => format!("F{n}"),
         _ => format!("{code:?}"),

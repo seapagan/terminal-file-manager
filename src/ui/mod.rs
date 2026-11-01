@@ -29,19 +29,20 @@ pub use layout::{Geometry, geometry};
 pub use measure::Measurements;
 use ratatui::{Frame, layout::Rect, widgets::Paragraph};
 
-/// Keep the details route visible after clipping an untrusted immediate status.
-fn status_text(app: &App, text: &str, width: u16) -> String {
-    if text == crate::app::WELCOME {
-        return format!(
+fn status_text(app: &App, status: &crate::app::Status, width: u16) -> String {
+    match status {
+        crate::app::Status::Welcome => format!(
             "Local files — {} for help, {} for jobs",
             app.shortcut(crate::input::Action::Help, "?"),
             app.shortcut_hint(crate::input::Action::Jobs, "F9")
-        );
+        ),
+        crate::app::Status::Text(text) => clean(text),
+        crate::app::Status::JobsDetails(text) => details_text(app, text, width),
     }
-    let clean = clean(text);
-    let Some(summary) = clean.strip_suffix(" — F9 details") else {
-        return clean;
-    };
+}
+
+/// Keep the explicit details route visible after clipping untrusted prose.
+fn details_text(app: &App, summary: &str, width: u16) -> String {
     let details = format!("{} details", app.shortcut(crate::input::Action::Jobs, "F9"));
     let suffix = format!(" — {details}");
     if width < modal::width(&suffix) {
@@ -49,7 +50,7 @@ fn status_text(app: &App, text: &str, width: u16) -> String {
     }
     format!(
         "{}{suffix}",
-        modal::truncate(summary, width.saturating_sub(modal::width(&suffix)))
+        modal::truncate(&clean(summary), width.saturating_sub(modal::width(&suffix)))
     )
 }
 

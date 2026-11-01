@@ -176,7 +176,7 @@ fn enter(controller: &mut Controller, layout: &crate::ui::PatternLayout) {
                     "Show the pattern and counts; scroll up or enlarge terminal".into()
                 });
             state.feedback = Some(reason.clone());
-            controller.app.status = reason;
+            controller.app.status = reason.into();
         }
     } else if let Some(target) = layout
         .targets()
@@ -240,10 +240,11 @@ fn activate(controller: &mut Controller, target: PatternControl, move_focus: boo
                     controller.app.status = format!(
                         "Pattern selection: {} matches; visible marks updated",
                         preview.matches
-                    );
+                    )
+                    .into();
                     return;
                 }
-                Err(error) => controller.app.status = error,
+                Err(error) => controller.app.status = error.into(),
             }
         }
     }

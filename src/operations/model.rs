@@ -217,9 +217,9 @@ impl State {
             })
     }
     /// Retain the raw rejection in Jobs and return its immediate status with a details route.
-    pub fn fail(&mut self, detail: String, now: SystemTime) -> String {
+    pub fn fail(&mut self, detail: String, now: SystemTime) -> crate::app::Status {
         let text = format!("Not started: {detail}");
-        let status = format!("{text} — F9 details");
+        let status = crate::app::Status::JobsDetails(text.clone());
         self.notify(text, now, NoticeSeverity::Error);
         self.last_error = Some(detail);
         status

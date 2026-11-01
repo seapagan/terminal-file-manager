@@ -222,7 +222,8 @@ fn configured_shortcuts_reach_metadata_and_status_hints() {
     assert!(text.contains("[F6 Close]"));
     assert!(text.contains("F1 for jobs"));
     c.app.popup = false;
-    c.app.status = "Owned failure — F9 details".into();
+    c.app.status = c.app.operations.fail("Owned failure".into(), c.app.now);
+    c.app.operations.notices.clear();
     terminal
         .draw(|f| {
             ui::render(f, &c.app, &Theme::new(ColorLevel::NoColor));
@@ -235,6 +236,33 @@ fn configured_shortcuts_reach_metadata_and_status_hints() {
         .iter()
         .map(|cell| cell.symbol())
         .collect();
-    assert!(text.contains("Owned failure — F1 details"));
+    assert!(text.contains("Not started: Owned failure — F1 details"));
     assert!(!text.contains("Owned failure — F9 details"));
+}
+
+#[test]
+fn unicode_shortcut_labels_round_trip_without_changing_case_or_shift() {
+    let keys = bindings(&[
+        ("É", Action::Copy),
+        ("é", Action::Move),
+        ("Shift+É", Action::Rename),
+    ]);
+    let entries = keys.help_entries();
+    for (action, label) in [
+        (Action::Copy, "É"),
+        (Action::Move, "é"),
+        (Action::Rename, "Shift+É"),
+    ] {
+        assert!(
+            entries
+                .iter()
+                .find(|entry| entry.action == action)
+                .unwrap()
+                .keys
+                .split(" / ")
+                .any(|key| key == label)
+        );
+        let (code, modifiers) = chord(label).unwrap();
+        assert_eq!(keys.action(KeyEvent::new(code, modifiers)), Some(action));
+    }
 }

@@ -200,13 +200,8 @@ fn short_notice(app: &App, notice: &crate::operations::Notice, width: u16) -> (S
         NoticeSeverity::Warning => ("Warning", Role::Warning),
         NoticeSeverity::Error => ("Error", Role::Error),
     };
-    let clean = super::clean(&notice.text);
-    let summary = clean.strip_suffix(" — F9 details").unwrap_or(&clean);
-    let text = format!("{label}: {summary}");
-    (
-        super::status_text(app, &format!("{text} — F9 details"), width),
-        role,
-    )
+    let text = format!("{label}: {}", notice.text);
+    (super::details_text(app, &text, width), role)
 }
 
 /// The event loop calls this with monotonic elapsed time; only visible pending counts redraw.

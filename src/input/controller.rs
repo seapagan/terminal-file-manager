@@ -298,9 +298,12 @@ impl Controller {
                 self.app.maximized = !self.app.maximized;
                 self.dragging_divider = false;
                 self.app.status = if self.app.maximized {
-                    "Active pane maximised — Alt+m restores split"
+                    format!(
+                        "Active pane maximised — {} restores split",
+                        self.app.shortcut(Action::Maximise, "Alt+m")
+                    )
                 } else {
-                    "Split restored"
+                    "Split restored".into()
                 }
                 .into();
             }

@@ -49,7 +49,7 @@ pub(super) fn text(topic: HelpTopic, app: &App) -> Vec<HelpParagraph> {
         HelpTopic::Operation(operation) => operation_text(operation),
     };
     let mut text: Vec<_> = lines.iter().map(|line| paragraph(line, &[])).collect();
-    if let Some(entry) = app.help_rows.iter().find(|entry| entry.action == action) {
+    if let Some(entry) = app.help_entry(action) {
         text.push(paragraph("Open from the file list: `{}`.", &[&entry.keys]));
     }
     text
@@ -119,9 +119,7 @@ const INCIDENT: &[&str] = &[
 ];
 
 fn bound(app: &App, action: Action) -> &str {
-    app.help_rows
-        .iter()
-        .find(|entry| entry.action == action)
+    app.help_entry(action)
         .map_or("Unbound", |entry| entry.keys.as_str())
 }
 fn metadata(app: &App) -> Vec<HelpParagraph> {

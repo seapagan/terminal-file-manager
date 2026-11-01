@@ -40,7 +40,8 @@ impl Controller {
         self.app.status = format!(
             "Job {id} queued — {} for jobs",
             self.app.shortcut_hint(super::Action::Jobs, "F9")
-        );
+        )
+        .into();
     }
 
     /// Worker outcomes remain tied to their job even after pane navigation changes.
@@ -132,7 +133,7 @@ impl Controller {
             .find(|job| job.id == id)
         {
             job.finish(record, self.app.now);
-            self.app.status = crate::operations::summary(job);
+            self.app.status = crate::operations::summary(job).into();
             let severity = match job.state {
                 JobState::Completed => crate::operations::NoticeSeverity::Success,
                 JobState::Failed | JobState::Unknown | JobState::Critical => {
@@ -148,7 +149,7 @@ impl Controller {
             if !incident {
                 self.app
                     .operations
-                    .notify(self.app.status.clone(), self.app.now, severity);
+                    .notify(self.app.status.to_string(), self.app.now, severity);
             }
             super::operations::check_exit(self);
             return refresh(self);
