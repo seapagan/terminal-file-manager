@@ -2,16 +2,19 @@
 use super::{Action, HelpSection};
 
 pub(in crate::input) fn description(action: Action) -> &'static str {
-    metadata(action).2
+    metadata(action).1
 }
 
 pub(in crate::input) fn priority(action: Action) -> usize {
-    metadata(action).0
+    COMMANDS
+        .iter()
+        .position(|(candidate, _, _)| *candidate == action)
+        .expect("every action has a command row")
 }
 
 impl Action {
     pub fn help_section(self) -> HelpSection {
-        metadata(self).1
+        metadata(self).0
     }
 }
 
@@ -22,14 +25,10 @@ macro_rules! define_commands {
             $(($action, $section, $description)),*
         ];
 
-        fn metadata(action: Action) -> (usize, HelpSection, &'static str) {
-            let (section, description) = match action {
+        fn metadata(action: Action) -> (HelpSection, &'static str) {
+            match action {
                 $($action => ($section, $description)),*
-            };
-            let priority = COMMANDS.iter()
-                .position(|(candidate, _, _)| *candidate == action)
-                .expect("the exhaustive match and table share the same rows");
-            (priority, section, description)
+            }
         }
     };
 }
@@ -342,11 +341,11 @@ mod tests {
         use super::{Action, HelpSection};
         assert_eq!(
             super::metadata(Action::Up),
-            (0, HelpSection::Navigation, "Move cursor up")
+            (HelpSection::Navigation, "Move cursor up")
         );
         assert_eq!(
             super::metadata(Action::Down),
-            (1, HelpSection::Navigation, "Move cursor down")
+            (HelpSection::Navigation, "Move cursor down")
         );
     }
 }

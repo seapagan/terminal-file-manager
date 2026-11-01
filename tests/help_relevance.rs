@@ -76,3 +76,30 @@ fn rank_tiers_and_equal_score_order_follow_the_document() {
         .map(HelpTarget::Action)
     );
 }
+
+#[test]
+fn equal_rank_hits_keep_section_order_and_each_sections_entry_order() {
+    use terminal_file_manager::input::HelpEntry;
+    let entries: Vec<_> = [Action::Jobs, Action::Help, Action::Down, Action::Up]
+        .into_iter()
+        .map(|action| HelpEntry {
+            action,
+            description: "Navigation",
+            keys: String::new(),
+        })
+        .collect();
+    let targets: Vec<_> = help_hits(&entries, "navigation")
+        .into_iter()
+        .map(|hit| hit.target)
+        .collect();
+    assert_eq!(
+        targets,
+        vec![
+            HelpTarget::Section(HelpSection::Navigation),
+            HelpTarget::Action(Action::Down),
+            HelpTarget::Action(Action::Up),
+            HelpTarget::Action(Action::Jobs),
+            HelpTarget::Action(Action::Help)
+        ]
+    );
+}

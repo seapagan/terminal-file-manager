@@ -1,7 +1,7 @@
 use crate::{
     app::App,
     color::{Role, Theme},
-    input::{HelpHit, HelpTarget, help_hits},
+    input::{HelpHit, HelpTarget},
     ui::{modal, text::wrap_value},
 };
 use ratatui::{
@@ -17,13 +17,13 @@ pub struct PickerLayout {
     pub shell: modal::Layout<()>,
     pub query: Rect,
     pub separator: Rect,
-    pub hits: Vec<HelpHit>,
+    pub hits: std::sync::Arc<[HelpHit]>,
     pub controls: Vec<(Rect, usize)>,
 }
 
 pub(super) fn layout(app: &App, bounds: Rect) -> Option<PickerLayout> {
     let state = app.help_picker.as_ref()?;
-    let hits = help_hits(&app.help_rows, &state.query);
+    let hits = state.hits(&app.help_rows);
     let rows = hits
         .iter()
         .take(7)

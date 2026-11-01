@@ -376,39 +376,31 @@ fn value_controls(rows: &[Row], inner: Rect, scroll: u16, offset: u16) -> Vec<Me
         .collect()
 }
 
-pub(super) fn scroll_limit(app: &App, bounds: Rect, floating: bool) -> u16 {
-    layout(
-        app,
-        bounds,
-        &Theme::new(colored_text::ColorLevel::NoColor),
-        floating,
-    )
-    .limit
+/// One measurement supplies all metadata input regions and scroll bounds.
+pub(super) struct MetadataGeometry {
+    pub limit: u16,
+    pub controls: Vec<MetadataControl>,
+    pub help: Option<Rect>,
+    pub close: Option<Rect>,
 }
 
-pub(super) fn controls(app: &App, bounds: Rect, floating: bool) -> Vec<MetadataControl> {
-    layout(
+pub(super) fn geometry(app: &App, bounds: Rect, floating: bool) -> MetadataGeometry {
+    let layout = layout(
         app,
         bounds,
         &Theme::new(colored_text::ColorLevel::NoColor),
         floating,
-    )
-    .controls
+    );
+    MetadataGeometry {
+        limit: layout.limit,
+        controls: layout.controls,
+        help: layout.shell.as_ref().and_then(|shell| shell.help),
+        close: layout.shell.as_ref().and_then(|shell| shell.close),
+    }
 }
 
 #[cfg(test)]
 mod tests;
-
-pub(super) fn help_control(app: &App, bounds: Rect) -> Option<Rect> {
-    layout(
-        app,
-        bounds,
-        &Theme::new(colored_text::ColorLevel::NoColor),
-        true,
-    )
-    .shell
-    .and_then(|shell| shell.help)
-}
 
 fn keys_help(app: &App, floating: bool) -> String {
     format!(
@@ -421,15 +413,4 @@ fn keys_help(app: &App, floating: bool) -> String {
             "cancels the count"
         }
     )
-}
-
-pub(super) fn close_control(app: &App, bounds: Rect) -> Option<Rect> {
-    layout(
-        app,
-        bounds,
-        &Theme::new(colored_text::ColorLevel::NoColor),
-        true,
-    )
-    .shell
-    .and_then(|shell| shell.close)
 }

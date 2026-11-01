@@ -1,4 +1,4 @@
-use super::{HelpTarget, help_hits};
+use super::HelpTarget;
 use crate::{input::Controller, ui::Geometry};
 use crossterm::event::{
     Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind,
@@ -62,7 +62,7 @@ fn picker_key(c: &mut Controller, key: &KeyEvent, geometry: &Geometry) {
         KeyCode::Esc if key.kind == KeyEventKind::Press => c.app.help_picker = None,
         KeyCode::Enter if key.kind == KeyEventKind::Press => {
             let state = c.app.help_picker.as_ref().expect("picker");
-            if let Some(hit) = help_hits(&c.app.help_rows, &state.query).get(state.selected) {
+            if let Some(hit) = state.hits(&c.app.help_rows).get(state.selected) {
                 jump(c, hit.target, geometry);
             }
         }
@@ -134,7 +134,7 @@ fn append(c: &mut Controller, text: &str) {
 
 fn select(c: &mut Controller, delta: isize) {
     let state = c.app.help_picker.as_mut().expect("picker");
-    let count = help_hits(&c.app.help_rows, &state.query).len();
+    let count = state.hits(&c.app.help_rows).len();
     state.selected = state
         .selected
         .saturating_add_signed(delta)

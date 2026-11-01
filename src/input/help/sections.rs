@@ -1,5 +1,5 @@
 /// Ordered categories in the continuous Help document.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum HelpSection {
     Navigation,
     Selection,

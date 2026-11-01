@@ -91,7 +91,7 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
         geometry.panes[app.active] = Some(body);
     }
     scroll_limits(app, &mut geometry, area);
-    geometry.modal_close = close_control(app, area, &geometry);
+    geometry.modal_close = close_control(app, &geometry);
     geometry
 }
 
@@ -103,7 +103,7 @@ fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
     let context_control = menu_layout
         .as_ref()
         .and_then(|shell| shell.help)
-        .or_else(|| context_control(app, area, operation_layout.as_ref(), pattern.as_ref()));
+        .or_else(|| context_control(app, operation_layout.as_ref(), pattern.as_ref()));
     Geometry {
         context_help: super::help::context::layout(app, area),
         context_control,
@@ -176,39 +176,44 @@ fn scroll_limits(app: &App, geometry: &mut Geometry, area: Rect) {
                 super::summary::row_count(app.panes[id].visible.len(), counts, *area);
         }
     }
-    geometry.overlay_scroll_limit = if app.help {
-        geometry
-            .help
-            .as_ref()
-            .map_or(0, |layout| layout.scroll_limit)
-    } else if app.popup {
-        super::metadata::scroll_limit(app, area, true)
-    } else {
-        0
-    };
-    geometry.metadata_scroll_limit = geometry
+    geometry.overlay_scroll_limit = geometry
+        .help
+        .as_ref()
+        .map_or(0, |layout| layout.scroll_limit);
+    metadata_geometry(app, geometry, area);
+}
+
+fn metadata_geometry(app: &App, geometry: &mut Geometry, area: Rect) {
+    let sidebar = geometry
         .sidebar
-        .map_or(0, |area| super::metadata::scroll_limit(app, area, false));
+        .map(|area| super::metadata::geometry(app, area, false));
+    geometry.metadata_scroll_limit = sidebar.as_ref().map_or(0, |layout| layout.limit);
+    let visible = if app.popup {
+        let popup = super::metadata::geometry(app, area, true);
+        if !app.help {
+            geometry.overlay_scroll_limit = popup.limit;
+        }
+        if crate::input::HelpTopic::current(app).is_some() {
+            geometry.context_control = popup.help;
+        }
+        geometry.modal_close = popup.close;
+        Some(popup)
+    } else {
+        sidebar
+    };
     if !app.help && geometry.menu.is_none() {
-        geometry.metadata_controls = if app.popup {
-            super::metadata::controls(app, area, true)
-        } else {
-            geometry
-                .sidebar
-                .map_or_else(Vec::new, |area| super::metadata::controls(app, area, false))
-        };
+        geometry.metadata_controls = visible.map_or_else(Vec::new, |layout| layout.controls);
     }
 }
 
 fn context_control(
     app: &App,
-    area: Rect,
     operation: Option<&super::operations::Layout>,
     pattern: Option<&super::PatternLayout>,
 ) -> Option<Rect> {
     crate::input::HelpTopic::current(app)?;
     if app.popup {
-        return super::metadata::help_control(app, area);
+        return None;
     }
     if let Some(layout) = operation {
         return layout.shell.help;
@@ -216,7 +221,7 @@ fn context_control(
     pattern.and_then(|layout| layout.shell.help)
 }
 
-fn close_control(app: &App, area: Rect, geometry: &Geometry) -> Option<Rect> {
+fn close_control(app: &App, geometry: &Geometry) -> Option<Rect> {
     if let Some(layout) = &geometry.context_help {
         return layout.shell.close;
     }
@@ -238,7 +243,5 @@ fn close_control(app: &App, area: Rect, geometry: &Geometry) -> Option<Rect> {
             .as_ref()
             .map_or(layout.close, |picker| picker.shell.close);
     }
-    app.popup
-        .then(|| super::metadata::close_control(app, area))
-        .flatten()
+    geometry.modal_close
 }

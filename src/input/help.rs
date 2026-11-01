@@ -13,7 +13,7 @@ pub use search::{HelpHit, HelpPicker, HelpTarget, help_hits};
 pub use sections::HelpSection;
 
 /// Effective bindings and their action identity, shared by Help and shortcut hints.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HelpEntry {
     pub action: super::Action,
     pub keys: String,
