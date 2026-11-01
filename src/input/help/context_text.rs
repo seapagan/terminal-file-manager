@@ -48,6 +48,10 @@ pub(super) fn text(topic: HelpTopic, app: &App) -> Vec<HelpParagraph> {
         HelpTopic::Incident => (Action::Quit, INCIDENT),
         HelpTopic::Operation(operation) => operation_text(operation),
     };
+    action_paragraphs(app, action, lines)
+}
+
+fn action_paragraphs(app: &App, action: Action, lines: &[&str]) -> Vec<HelpParagraph> {
     let mut text: Vec<_> = lines.iter().map(|line| paragraph(line, &[])).collect();
     if let Some(entry) = app.help_entry(action) {
         text.push(paragraph("Open from the file list: `{}`.", &[&entry.keys]));
