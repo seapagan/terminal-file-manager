@@ -97,6 +97,18 @@ fn perform(
     if plan.operation.creates_entry() {
         return create_entry(plan, result);
     }
+    mutate_existing(source, plan, cancel, notify, record, depth, result)
+}
+
+fn mutate_existing(
+    source: &Entry,
+    plan: &Plan,
+    cancel: &AtomicBool,
+    notify: &mut impl FnMut(Event) -> Decision,
+    record: &mut Record,
+    depth: usize,
+    result: &mut EntryResult,
+) -> Result<()> {
     let parents = Parents::capture(&source.path)?;
     safety::revalidate(source, true)?;
     match plan.operation {

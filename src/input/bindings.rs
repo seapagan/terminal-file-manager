@@ -85,15 +85,7 @@ impl Bindings {
 pub fn chord(text: &str) -> Result<(KeyCode, KeyModifiers), String> {
     let mut parts: Vec<_> = text.split('+').collect();
     let key = parts.pop().unwrap_or("");
-    let mut modifiers = KeyModifiers::NONE;
-    for modifier in parts {
-        modifiers |= match modifier.to_ascii_lowercase().as_str() {
-            "ctrl" => KeyModifiers::CONTROL,
-            "alt" => KeyModifiers::ALT,
-            "shift" => KeyModifiers::SHIFT,
-            _ => return Err(format!("unknown modifier in keybinding: {text}")),
-        };
-    }
+    let modifiers = chord_modifiers(&parts, text)?;
     let code = named_key(key)
         .or_else(|| {
             let mut chars = key.chars();
@@ -111,6 +103,19 @@ pub fn chord(text: &str) -> Result<(KeyCode, KeyModifiers), String> {
     Ok(normalize_chord(code, modifiers))
 }
 
+fn chord_modifiers(parts: &[&str], text: &str) -> Result<KeyModifiers, String> {
+    let mut modifiers = KeyModifiers::NONE;
+    for modifier in parts {
+        modifiers |= match modifier.to_ascii_lowercase().as_str() {
+            "ctrl" => KeyModifiers::CONTROL,
+            "alt" => KeyModifiers::ALT,
+            "shift" => KeyModifiers::SHIFT,
+            _ => return Err(format!("unknown modifier in keybinding: {text}")),
+        };
+    }
+    Ok(modifiers)
+}
+
 fn normalize_chord(code: KeyCode, mut modifiers: KeyModifiers) -> (KeyCode, KeyModifiers) {
     if let KeyCode::Char(c) = code
         && c.is_ascii_alphabetic()
@@ -124,27 +129,31 @@ fn normalize_chord(code: KeyCode, mut modifiers: KeyModifiers) -> (KeyCode, KeyM
 }
 
 fn named_key(key: &str) -> Option<KeyCode> {
-    match key.to_ascii_lowercase().as_str() {
-        "up" => Some(KeyCode::Up),
-        "down" => Some(KeyCode::Down),
-        "left" => Some(KeyCode::Left),
-        "right" => Some(KeyCode::Right),
-        "home" => Some(KeyCode::Home),
-        "end" => Some(KeyCode::End),
-        "pageup" => Some(KeyCode::PageUp),
-        "pagedown" => Some(KeyCode::PageDown),
-        "enter" => Some(KeyCode::Enter),
-        "backspace" => Some(KeyCode::Backspace),
-        "tab" => Some(KeyCode::Tab),
-        "space" => Some(KeyCode::Char(' ')),
-        "insert" => Some(KeyCode::Insert),
-        "esc" => Some(KeyCode::Esc),
-        _ => key
-            .strip_prefix('F')
-            .and_then(|number| number.parse::<u8>().ok())
-            .filter(|n| (1..=24).contains(n))
-            .map(KeyCode::F),
-    }
+    const NAMED_KEYS: &[(&str, KeyCode)] = &[
+        ("up", KeyCode::Up),
+        ("down", KeyCode::Down),
+        ("left", KeyCode::Left),
+        ("right", KeyCode::Right),
+        ("home", KeyCode::Home),
+        ("end", KeyCode::End),
+        ("pageup", KeyCode::PageUp),
+        ("pagedown", KeyCode::PageDown),
+        ("enter", KeyCode::Enter),
+        ("backspace", KeyCode::Backspace),
+        ("tab", KeyCode::Tab),
+        ("space", KeyCode::Char(' ')),
+        ("insert", KeyCode::Insert),
+        ("esc", KeyCode::Esc),
+    ];
+    NAMED_KEYS
+        .iter()
+        .find_map(|(name, code)| name.eq_ignore_ascii_case(key).then_some(*code))
+        .or_else(|| {
+            key.strip_prefix('F')
+                .and_then(|number| number.parse::<u8>().ok())
+                .filter(|n| (1..=24).contains(n))
+                .map(KeyCode::F)
+        })
 }
 
 use Action::*;

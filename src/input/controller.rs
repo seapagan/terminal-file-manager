@@ -58,21 +58,7 @@ impl Controller {
             return Vec::new();
         }
         match event {
-            Event::Key(key) if key.kind != KeyEventKind::Release => {
-                if self.filter_before.is_some() {
-                    self.filter_key(key);
-                    return Vec::new();
-                }
-                if self.app.profile_menu.is_some() {
-                    super::profiles::key(self, key);
-                    return Vec::new();
-                }
-                if self.app.view_menu.is_some() {
-                    super::view::key(self, key, geometry);
-                    return Vec::new();
-                }
-                self.bound_key(key, geometry)
-            }
+            Event::Key(key) if key.kind != KeyEventKind::Release => self.editing_key(key, geometry),
             Event::Paste(text) if self.filter_before.is_some() => {
                 self.append_filter(&text);
                 Vec::new()
@@ -86,6 +72,23 @@ impl Controller {
         }
     }
 
+    fn editing_key(
+        &mut self,
+        key: crossterm::event::KeyEvent,
+        geometry: &Geometry,
+    ) -> Vec<Request> {
+        if self.filter_before.is_some() {
+            self.filter_key(key);
+        } else if self.app.profile_menu.is_some() {
+            super::profiles::key(self, key);
+        } else if self.app.view_menu.is_some() {
+            super::view::key(self, key, geometry);
+        } else {
+            return self.bound_key(key, geometry);
+        }
+        Vec::new()
+    }
+
     fn bound_key(&mut self, key: crossterm::event::KeyEvent, geometry: &Geometry) -> Vec<Request> {
         self.bindings
             .action(key)
@@ -97,7 +100,6 @@ impl Controller {
     }
 
     pub(super) fn dispatch_action(&mut self, action: Action, geometry: &Geometry) -> Vec<Request> {
-        use Action::*;
         let action = self.preferred_action(action);
         if self.app.help && !super::help::accepts(action) {
             return Vec::new();
@@ -109,6 +111,14 @@ impl Controller {
             self.app.status = reason.into();
             return Vec::new();
         }
+        if self.application_action(action, geometry) {
+            return Vec::new();
+        }
+        self.pane_action(action, geometry)
+    }
+
+    fn application_action(&mut self, action: Action, geometry: &Geometry) -> bool {
+        use Action::*;
         match action {
             Diagnostics | DiagnosticsUp | DiagnosticsDown => {
                 super::diagnostics::action(self, action, geometry)
@@ -116,6 +126,7 @@ impl Controller {
             SplitLeft => super::divider::adjust(self, self.app.split_percent.saturating_sub(5)),
             SplitRight => super::divider::adjust(self, self.app.split_percent.saturating_add(5)),
             ViewProfiles => super::profiles::open(self),
+            Quit | SaveQuit => self.exit(action),
             ViewOptions => {
                 self.app.view_menu = if self.app.view_menu.is_some() {
                     None
@@ -129,20 +140,34 @@ impl Controller {
             | ColumnAttributes | ColumnOwner | OwnerDisplay | MetadataPresentation => {
                 super::view::formatting(self, action)
             }
+            TogglePanes | Maximise | FocusPane | ToggleSidebar | Metadata | Help => {
+                self.layout(action, geometry)
+            }
+            _ => return false,
+        }
+        true
+    }
+
+    fn pane_action(&mut self, action: Action, geometry: &Geometry) -> Vec<Request> {
+        use Action::*;
+        match action {
             Up | Down | Home | End | PageUp | PageDown => self.movement(action, geometry),
             ExtendUp | ExtendDown => self.extend_selection(action, geometry),
             Enter | Parent | Back | Forward | Refresh => return self.navigate(action),
             Mark | MarkNext | SelectAll | ClearVisible => self.selection(action, geometry),
             Hidden | Ignore | Sort | Reverse | Group => self.policy(action),
-            TogglePanes | Maximise | FocusPane | ToggleSidebar | Metadata | Help => {
-                self.layout(action, geometry)
-            }
-            Quit | SaveQuit => self.exit(action),
             Filter => self.begin_filter(),
             PatternSelection => super::pattern::open(self),
             Count => return self.count(geometry),
             Cancel => self.cancel(),
-            _ => {}
+            // These actions are handled or normalized before pane dispatch.
+            Diagnostics | DiagnosticsUp | DiagnosticsDown | SplitLeft | SplitRight
+            | ViewProfiles | Quit | SaveQuit | ViewOptions | HumanSizes | FuzzyTimestamps
+            | Permissions | ColumnSize | ColumnModified | ColumnAttributes | ColumnOwner
+            | OwnerDisplay | MetadataPresentation | TogglePanes | Maximise | FocusPane
+            | ToggleSidebar | Metadata | Help | Info | Viewer | Editor | Path | Zoxide
+            | OppositeZoxide | ExitDirectory | Copy | Move | Mkdir | CreateFile | Trash
+            | Delete | Rename | Attributes | Jobs | CopyQuick | MoveQuick => {}
         }
         Vec::new()
     }
@@ -157,40 +182,6 @@ impl Controller {
 
     fn exit(&mut self, action: Action) {
         super::operations::exit(self, action == Action::SaveQuit);
-    }
-
-    fn movement(&mut self, action: Action, geometry: &Geometry) {
-        let height = geometry.help.as_ref().map_or_else(
-            || page_height(geometry, self.app.active),
-            |layout| usize::from(layout.body.height),
-        );
-        if self.app.help || self.app.popup {
-            let delta = match action {
-                Action::Up => -1,
-                Action::Home => -i16::MAX,
-                Action::End => i16::MAX,
-                Action::PageUp => -(height as i16),
-                Action::PageDown => height as i16,
-                _ => 1,
-            };
-            self.app.overlay_scroll = self
-                .app
-                .overlay_scroll
-                .min(geometry.overlay_scroll_limit)
-                .saturating_add_signed(delta)
-                .min(geometry.overlay_scroll_limit);
-            return;
-        }
-        let pane = &mut self.app.panes[self.app.active];
-        let delta = match action {
-            Action::Up => -1,
-            Action::Home => -isize::MAX,
-            Action::End => isize::MAX,
-            Action::PageUp => -(height as isize),
-            Action::PageDown => height as isize,
-            _ => 1,
-        };
-        pane.move_cursor(delta, height);
     }
 
     fn navigate(&mut self, action: Action) -> Vec<Request> {
@@ -283,28 +274,8 @@ impl Controller {
 
     fn layout(&mut self, action: Action, geometry: &Geometry) {
         match action {
-            Action::TogglePanes => {
-                self.app.dual = !self.app.dual;
-                self.app.maximized = false;
-                self.dragging_divider = false;
-                self.app.status = if self.app.dual {
-                    "Two-pane layout"
-                } else {
-                    "Single-pane layout"
-                }
-                .into();
-            }
-            Action::Maximise if self.app.dual => {
-                self.app.maximized = !self.app.maximized;
-                self.dragging_divider = false;
-                self.app.status = if self.app.maximized {
-                    let key = self.app.shortcut(Action::Maximise, "Alt+m");
-                    format!("Active pane maximised — {key} restores split")
-                } else {
-                    "Split restored".into()
-                }
-                .into();
-            }
+            Action::TogglePanes => self.toggle_panes(),
+            Action::Maximise if self.app.dual => self.maximise(),
             Action::FocusPane if geometry.panes.iter().all(Option::is_some) => {
                 self.app.active = 1 - self.app.active;
                 self.app.sidebar = self.app.panes[self.app.active].sidebar;
@@ -328,6 +299,30 @@ impl Controller {
             }
             _ => {}
         }
+    }
+
+    fn toggle_panes(&mut self) {
+        self.app.dual = !self.app.dual;
+        self.app.maximized = false;
+        self.dragging_divider = false;
+        self.app.status = if self.app.dual {
+            "Two-pane layout"
+        } else {
+            "Single-pane layout"
+        }
+        .into();
+    }
+
+    fn maximise(&mut self) {
+        self.app.maximized = !self.app.maximized;
+        self.dragging_divider = false;
+        self.app.status = if self.app.maximized {
+            let key = self.app.shortcut(Action::Maximise, "Alt+m");
+            format!("Active pane maximised — {key} restores split")
+        } else {
+            "Split restored".into()
+        }
+        .into();
     }
 
     fn count(&mut self, geometry: &Geometry) -> Vec<Request> {

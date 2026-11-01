@@ -224,13 +224,7 @@ fn schedule(
         while let Ok(message) = events.try_recv() {
             receive(message, &mut active, &mut coordinator, &updates);
         }
-        for (id, worker) in &active {
-            if let Ok(mut progress) = worker.progress.lock()
-                && let Some(event) = progress.take()
-            {
-                let _ = updates.try_send(Update::Progress { id: *id, event });
-            }
-        }
+        publish_progress(&active, &updates);
         while let Ok(submission) = submissions.try_recv() {
             pending.push_back(submission);
         }
@@ -249,6 +243,16 @@ fn schedule(
             Ok(submission) => pending.push_back(submission),
             Err(mpsc::RecvTimeoutError::Disconnected) => stop.store(true, Ordering::Relaxed),
             Err(mpsc::RecvTimeoutError::Timeout) => {}
+        }
+    }
+}
+
+fn publish_progress(active: &BTreeMap<u64, Running>, updates: &mpsc::SyncSender<Update>) {
+    for (id, worker) in active {
+        if let Ok(mut progress) = worker.progress.lock()
+            && let Some(event) = progress.take()
+        {
+            let _ = updates.try_send(Update::Progress { id: *id, event });
         }
     }
 }

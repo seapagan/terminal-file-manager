@@ -130,16 +130,7 @@ fn repository(directory: &Path) -> io::Result<Option<(PathBuf, PathBuf)>> {
             Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
             Err(error) => return Err(error),
         };
-        let metadata = if metadata.file_type().is_symlink() {
-            fs::metadata(&dot)?
-        } else {
-            metadata
-        };
-        let git = if metadata.is_dir() {
-            dot
-        } else {
-            gitdir(&dot)?
-        };
+        let git = git_directory(&dot, metadata)?;
         let common = match fs::read_to_string(git.join("commondir")) {
             Ok(text) => git.join(text.trim()),
             Err(error) if error.kind() == io::ErrorKind::NotFound => git,
@@ -150,6 +141,19 @@ fn repository(directory: &Path) -> io::Result<Option<(PathBuf, PathBuf)>> {
     Ok(None)
 }
 
+fn git_directory(dot: &Path, metadata: fs::Metadata) -> io::Result<PathBuf> {
+    let metadata = if metadata.file_type().is_symlink() {
+        fs::metadata(dot)?
+    } else {
+        metadata
+    };
+    if metadata.is_dir() {
+        Ok(dot.to_path_buf())
+    } else {
+        gitdir(dot)
+    }
+}
+
 fn gitdir(dot: &Path) -> io::Result<PathBuf> {
     let text = fs::read_to_string(dot)?;
     let relative = text
@@ -157,4 +161,39 @@ fn gitdir(dot: &Path) -> io::Result<PathBuf> {
         .ok_or_else(|| io::Error::other("invalid .git file"))?
         .trim();
     Ok(dot.parent().unwrap_or(Path::new(".")).join(relative))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn malformed_nested_git_pointer_never_falls_back_to_an_ancestor_repository() {
+        let root = tempfile::tempdir().unwrap();
+        fs::create_dir(root.path().join(".git")).unwrap();
+        let nested = root.path().join("nested");
+        fs::create_dir(&nested).unwrap();
+        assert_eq!(
+            repository(&nested).unwrap(),
+            Some((root.path().to_owned(), root.path().join(".git")))
+        );
+        fs::write(nested.join(".git"), "invalid pointer").unwrap();
+        assert_eq!(
+            repository(&nested).unwrap_err().to_string(),
+            "invalid .git file"
+        );
+    }
+
+    #[test]
+    fn an_existing_invalid_commondir_is_an_error_rather_than_missing_metadata() {
+        let root = tempfile::tempdir().unwrap();
+        let git = root.path().join(".git");
+        fs::create_dir(&git).unwrap();
+        assert_eq!(
+            repository(root.path()).unwrap(),
+            Some((root.path().to_owned(), git.clone()))
+        );
+        fs::create_dir(git.join("commondir")).unwrap();
+        assert!(repository(root.path()).is_err());
+    }
 }

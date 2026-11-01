@@ -14,11 +14,10 @@ from unittest.mock import patch
 from test_check_complexity import CHECKER
 from test_check_complexity_remediation import LIMITS
 
-# Rust 1.23.0 counts each match token, not each arm: ordinary has three
-# outcomes but CCN 2. Nested adds two matches; guarded adds the guard; closure
-# adds one match and one if. Macro/string/comment tokens are not functions.
-# Python structural match counts all three cases; this f-string's conditional
-# is ignored in 1.23.0. The separately gated 1.24.1 upgrade changes these metrics.
+# Lizard 1.24.3 counts Rust match arms after the first: ordinary has CCN 3.
+# Nested matches each contribute one; guarded adds its guard; closure adds if.
+# Macro/string/comment tokens are not functions. Python structural match counts
+# all three cases, and the f-string conditional contributes one decision.
 RUST_CORPUS = """fn ordinary(x: i32) -> i32 {
     match x { 0 => 10, 1 => 20, _ => 30 }
 }
@@ -271,7 +270,7 @@ class ScannerAcceptanceTests(unittest.TestCase):
                 CHECKER._file_metrics(damaged, set(files), functions)
 
     def test_representative_language_boundaries(self) -> None:
-        """Freeze audited parser behaviour without claiming corrected Rust CCN."""
+        """Verify corrected Rust match-arm and Python f-string complexity."""
         self._write("corpus.rs", RUST_CORPUS)
         self._write("corpus.py", PYTHON_CORPUS)
         functions, nloc = CHECKER._scan_sources(self.root, ["corpus.py", "corpus.rs"])
@@ -279,14 +278,14 @@ class ScannerAcceptanceTests(unittest.TestCase):
         self.assertEqual(
             observed,
             {
-                "ordinary": (1, 3, 2, 1),
+                "ordinary": (1, 3, 3, 1),
                 "nested": (4, 3, 3, 1),
-                "guarded": (7, 3, 3, 1),
+                "guarded": (7, 3, 4, 1),
                 "closure": (10, 4, 3, 1),
                 "adjacent": (17, 1, 1, 0),
                 "expanded": (15, 1, 1, 1),
                 "structural": (1, 5, 4, 1),
-                "formatted": (7, 2, 1, 1),
+                "formatted": (7, 2, 2, 1),
             },
         )
         self.assertEqual(nloc, {"corpus.py": 7, "corpus.rs": 17})

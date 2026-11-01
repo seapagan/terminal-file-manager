@@ -353,11 +353,9 @@ pub(super) fn indicator(entry: &Entry) -> &'static str {
 
 pub(super) fn type_indicator(kind: EntryKind, executable: bool, broken: bool) -> &'static str {
     match kind {
+        EntryKind::File => file_indicator(executable),
+        EntryKind::Link => link_indicator(broken),
         EntryKind::Directory => "d",
-        EntryKind::File if executable => "*",
-        EntryKind::File => "-",
-        EntryKind::Link if broken => "!",
-        EntryKind::Link => "@",
         EntryKind::Junction => "j",
         EntryKind::ReparsePoint => "r",
         EntryKind::Socket => "s",
@@ -365,6 +363,14 @@ pub(super) fn type_indicator(kind: EntryKind, executable: bool, broken: bool) ->
         EntryKind::Device => "D",
         EntryKind::Unknown => "?",
     }
+}
+
+fn file_indicator(executable: bool) -> &'static str {
+    if executable { "*" } else { "-" }
+}
+
+fn link_indicator(broken: bool) -> &'static str {
+    if broken { "!" } else { "@" }
 }
 
 pub(super) fn size(bytes: Option<u64>) -> String {
@@ -403,6 +409,27 @@ pub(super) fn timestamp(time: Option<std::time::SystemTime>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn type_indicators_keep_file_flags_separate_from_other_entry_kinds() {
+        for executable in [false, true] {
+            for broken in [false, true] {
+                for (kind, expected) in [
+                    (EntryKind::Directory, "d"),
+                    (EntryKind::File, if executable { "*" } else { "-" }),
+                    (EntryKind::Link, if broken { "!" } else { "@" }),
+                    (EntryKind::Junction, "j"),
+                    (EntryKind::ReparsePoint, "r"),
+                    (EntryKind::Socket, "s"),
+                    (EntryKind::Fifo, "p"),
+                    (EntryKind::Device, "D"),
+                    (EntryKind::Unknown, "?"),
+                ] {
+                    assert_eq!(type_indicator(kind, executable, broken), expected);
+                }
+            }
+        }
+    }
 
     #[test]
     fn timestamps_retain_precision_and_out_of_range_metadata_cannot_panic() {

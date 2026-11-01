@@ -152,24 +152,29 @@ fn operand_rows(
                 .and_then(|r| operand.path.strip_prefix(r).ok())
                 .unwrap_or(&operand.path);
             let mut row = crate::ui::modal::entry_row(operand, path);
-            // A retained record belongs to the previous result while reconciliation is active.
-            let result = if job.active() { &None } else { result };
-            let (cue, role) = match result {
-                Some(Outcome::Completed) => ("Done", Role::Status),
-                Some(Outcome::Failed) => ("Failed", Role::Error),
-                Some(Outcome::SafetyIncident) => ("CRITICAL", Role::Error),
-                Some(Outcome::Changed) => ("Changed", Role::Warning),
-                Some(Outcome::Skipped) => ("Skipped", Role::Warning),
-                Some(Outcome::Cancelled) => ("Cancel", Role::Warning),
-                Some(Outcome::CopiedSourceRetained) => ("Retained", Role::Warning),
-                Some(Outcome::OutcomeUnknown) => ("Unknown", Role::Warning),
-                None if job.active() => (state(job.state), Role::Value),
-                None => ("Unrecorded", Role::Warning),
-            };
+            let (cue, role) = operand_status(job, *result);
             row.role = role;
             row.file_status(cue)
         })
         .collect()
+}
+
+fn operand_status(job: &Job, result: Option<Outcome>) -> (&'static str, Role) {
+    // A retained record belongs to the previous result while reconciliation is active.
+    if job.active() {
+        return (state(job.state), Role::Value);
+    }
+    match result {
+        Some(Outcome::Completed) => ("Done", Role::Status),
+        Some(Outcome::Failed) => ("Failed", Role::Error),
+        Some(Outcome::SafetyIncident) => ("CRITICAL", Role::Error),
+        Some(Outcome::Changed) => ("Changed", Role::Warning),
+        Some(Outcome::Skipped) => ("Skipped", Role::Warning),
+        Some(Outcome::Cancelled) => ("Cancel", Role::Warning),
+        Some(Outcome::CopiedSourceRetained) => ("Retained", Role::Warning),
+        Some(Outcome::OutcomeUnknown) => ("Unknown", Role::Warning),
+        None => ("Unrecorded", Role::Warning),
+    }
 }
 
 fn completed_verb(operation: crate::operations::Operation) -> &'static str {

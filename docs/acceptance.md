@@ -612,8 +612,10 @@ Early Linux experiments established raw-path requirements, sent-request
 uncertainty and the restriction to same-filesystem Trash that preserves link
 identity. Linux PTY parser/restoration fixtures passed ten cases; they did not
 establish ConPTY or representative-terminal behaviour. Those contracts remain
-in [architecture](architecture.md) and the M1/M2/M3/M7 acceptance below. Retain
-Lizard 1.23.0; a parser upgrade needs its separate compatibility gate.
+in [architecture](architecture.md) and the M1/M2/M3/M7 acceptance below.
+The tooling now pins Lizard 1.24.3; its scanner acceptance corpus covers
+corrected Rust match-arm counting and Python f-string complexity. Earlier
+Lizard 1.23.0 results in this record remain historical evidence.
 
 ## M2: implementation in progress
 
@@ -958,8 +960,9 @@ remain as stated above.
   manifest-derived exact 1.95.0 full compiler gate; strict maintainability.
   Full Linux verification also requires reference x86_64 MSVC xwin check,
   warning-denying Clippy and build; fast verification excludes xwin.
-- Required Python 3.10+ Ruff ALL/strict mypy/unittest and actual Lizard 1.23.0
-  checker. All 18 canonical assertions and distinct legacy regressions remain.
+- Required Python 3.10+ Ruff ALL/strict mypy/unittest and actual Lizard
+  checker, initially 1.23.0 and now pinned to 1.24.3. All 18 canonical
+  assertions and distinct legacy regressions remain.
   Raw-name/XML/CSV/source-reconciliation corrections require adversarial tests.
 - Complexity limits: CCN 10, function NLOC 50, parameters 8, file NLOC 500.
   Equality passes; findings are advisory and need checkpoint disposition;

@@ -204,3 +204,37 @@ fn refreshed_snapshot_replaces_the_remembered_filesystem_order() {
         original.reverse();
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn version_sort_falls_back_to_native_names_when_either_name_is_not_utf8() {
+    use std::{ffi::OsString, os::unix::ffi::OsStringExt};
+    let (_root, mut items) = entries();
+    let names = [
+        OsString::from_vec(b"file-\xff".to_vec()),
+        OsString::from("file-z"),
+        OsString::from_vec(b"file-\xfe".to_vec()),
+    ];
+    for (entry, name) in items.iter_mut().zip(&names) {
+        entry.name = name.clone();
+    }
+    for reverse in [false, true] {
+        SortPolicy {
+            sort: Sort::Version,
+            grouping: Grouping::Mixed,
+            reverse,
+        }
+        .apply(&mut items);
+        let mut expected = vec![names[1].clone(), names[2].clone(), names[0].clone()];
+        if reverse {
+            expected.reverse();
+        }
+        assert_eq!(
+            items
+                .iter()
+                .map(|entry| entry.name.clone())
+                .collect::<Vec<_>>(),
+            expected
+        );
+    }
+}

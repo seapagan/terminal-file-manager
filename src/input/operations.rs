@@ -13,7 +13,20 @@ pub(super) fn action(controller: &mut Controller, action: Action, geometry: &Geo
         state.scroll = 0;
         return true;
     }
-    let operation = match action {
+    let Some(operation) = operation_for(action) else {
+        return false;
+    };
+    if let Err(error) = open(controller, action, operation, geometry) {
+        controller.app.status = controller
+            .app
+            .operations
+            .fail(error.to_string(), controller.app.now);
+    }
+    true
+}
+
+fn operation_for(action: Action) -> Option<Operation> {
+    Some(match action {
         Action::Copy | Action::CopyQuick => Operation::Copy,
         Action::Move | Action::MoveQuick => Operation::Move,
         Action::Mkdir => Operation::Mkdir,
@@ -28,15 +41,8 @@ pub(super) fn action(controller: &mut Controller, action: Action, geometry: &Geo
                 Operation::ReadOnly(false)
             }
         }
-        _ => return false,
-    };
-    if let Err(error) = open(controller, action, operation, geometry) {
-        controller.app.status = controller
-            .app
-            .operations
-            .fail(error.to_string(), controller.app.now);
-    }
-    true
+        _ => return None,
+    })
 }
 
 fn open(
@@ -259,28 +265,37 @@ fn scroll(controller: &mut Controller, event: &Event, geometry: &Geometry) -> bo
     }
     let limit = geometry.operation_scroll_limit;
     state.scroll = state.scroll.min(limit);
-    let delta = match event {
+    let Some(delta) = scroll_delta(event, geometry) else {
+        return false;
+    };
+    state.scroll = state.scroll.saturating_add_signed(delta).min(limit);
+    true
+}
+
+fn scroll_delta(event: &Event, geometry: &Geometry) -> Option<isize> {
+    match event {
         Event::Key(key) => match key.code {
-            KeyCode::PageUp | KeyCode::PageDown if key.kind != KeyEventKind::Press => return true,
-            KeyCode::PageUp => -8,
-            KeyCode::PageDown => 8,
-            _ => return false,
+            KeyCode::PageUp | KeyCode::PageDown if key.kind != KeyEventKind::Press => Some(0),
+            KeyCode::PageUp => Some(-8),
+            KeyCode::PageDown => Some(8),
+            _ => None,
         },
         Event::Mouse(mouse) => {
             let delta = match mouse.kind {
                 MouseEventKind::ScrollUp => -3,
                 MouseEventKind::ScrollDown => 3,
-                _ => return false,
+                _ => return None,
             };
-            if !geometry.operation_scroll_contains(mouse.column, mouse.row) {
-                return true;
-            }
-            delta
+            Some(
+                if geometry.operation_scroll_contains(mouse.column, mouse.row) {
+                    delta
+                } else {
+                    0
+                },
+            )
         }
-        _ => return false,
-    };
-    state.scroll = state.scroll.saturating_add_signed(delta).min(limit);
-    true
+        _ => None,
+    }
 }
 
 pub(super) fn interrupt(event: &Event) -> bool {

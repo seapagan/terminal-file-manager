@@ -299,15 +299,7 @@ pub(crate) fn counts_summary(job: &Job) -> String {
 
 fn completed(job: &Job, record: &Record) -> String {
     use super::Operation::*;
-    let verb = match job.plan.operation {
-        Copy => "copied",
-        Move => "moved",
-        Mkdir | CreateFile => "created",
-        Rename => "renamed",
-        Trash => "trashed",
-        Delete => "permanently deleted",
-        _ => "updated",
-    };
+    let verb = completed_verb(job.plan.operation);
     if job.plan.operation == Trash {
         return trash_completed(record);
     }
@@ -339,6 +331,19 @@ fn completed(job: &Job, record: &Record) -> String {
         ));
     }
     text
+}
+
+fn completed_verb(operation: super::Operation) -> &'static str {
+    use super::Operation::*;
+    match operation {
+        Copy => "copied",
+        Move => "moved",
+        Mkdir | CreateFile => "created",
+        Rename => "renamed",
+        Trash => "trashed",
+        Delete => "permanently deleted",
+        _ => "updated",
+    }
 }
 
 fn noun(number: usize, singular: &str, plural: &str) -> String {

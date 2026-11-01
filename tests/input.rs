@@ -486,3 +486,33 @@ fn exact_emergency_exit_survives_all_modals_and_user_overrides() {
     key(&mut c, "Ctrl+Alt+c");
     assert!(!c.quit && c.app.diagnostics);
 }
+
+#[test]
+fn filter_profile_and_view_routing_keep_precedence_and_key_kinds() {
+    use crossterm::event::KeyEventKind::{Press, Release, Repeat};
+    let (_root, mut c) = controller();
+    key(&mut c, "/");
+    c.app.profile_menu = Some(0);
+    c.app.view_menu = Some(0);
+    raw_key(&mut c, KeyCode::Char('a'), KeyModifiers::NONE, Release);
+    assert_eq!(c.app.panes[0].filter, "");
+    raw_key(&mut c, KeyCode::Char('a'), KeyModifiers::NONE, Repeat);
+    assert_eq!(c.app.panes[0].filter, "a");
+    assert_eq!(c.app.profile_menu, Some(0));
+    assert_eq!(c.app.view_menu, Some(0));
+    key(&mut c, "Enter");
+    raw_key(&mut c, KeyCode::Down, KeyModifiers::NONE, Release);
+    assert_eq!(c.app.profile_menu, Some(0));
+    raw_key(&mut c, KeyCode::Down, KeyModifiers::NONE, Repeat);
+    assert_eq!(c.app.profile_menu, Some(1));
+    assert_eq!(c.app.view_menu, Some(0));
+    raw_key(&mut c, KeyCode::Esc, KeyModifiers::NONE, Repeat);
+    assert_eq!(c.app.profile_menu, Some(1));
+    raw_key(&mut c, KeyCode::Esc, KeyModifiers::NONE, Press);
+    assert!(c.app.profile_menu.is_none());
+    raw_key(&mut c, KeyCode::Enter, KeyModifiers::NONE, Repeat);
+    assert!(!c.preferences_changed);
+    raw_key(&mut c, KeyCode::Enter, KeyModifiers::NONE, Press);
+    assert!(c.preferences_changed);
+    assert!(!c.app.panes[0].human_sizes);
+}

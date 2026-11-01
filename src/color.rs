@@ -101,21 +101,8 @@ impl Theme {
 
     /// Focus, cursor and marks remain distinguishable in monochrome terminals.
     pub fn style(&self, role: Role) -> Style {
-        let named = match role {
-            Role::Header | Role::Link | Role::Label | Role::Key | Role::Hidden => {
-                Some(AnsiColor::Cyan)
-            }
-            Role::Muted => Some(AnsiColor::BrightBlack),
-            Role::Status => Some(AnsiColor::Green),
-            Role::Error => Some(AnsiColor::Red),
-            Role::Directory => Some(AnsiColor::Blue),
-            Role::Executable => Some(AnsiColor::Green),
-            Role::Warning => Some(AnsiColor::Yellow),
-            Role::Marked => Some(AnsiColor::Magenta),
-            _ => None,
-        };
         let mut style = Style::default();
-        if let Some(color) = named.and_then(|c| self.accent(c)) {
+        if let Some(color) = role_accent(role).and_then(|c| self.accent(c)) {
             style = style.fg(color);
         }
         match role {
@@ -294,28 +281,40 @@ impl Theme {
     }
 }
 
+fn role_accent(role: Role) -> Option<AnsiColor> {
+    match role {
+        Role::Header | Role::Link | Role::Label | Role::Key | Role::Hidden => Some(AnsiColor::Cyan),
+        Role::Muted => Some(AnsiColor::BrightBlack),
+        Role::Status => Some(AnsiColor::Green),
+        Role::Error => Some(AnsiColor::Red),
+        Role::Directory => Some(AnsiColor::Blue),
+        Role::Executable => Some(AnsiColor::Green),
+        Role::Warning => Some(AnsiColor::Yellow),
+        Role::Marked => Some(AnsiColor::Magenta),
+        _ => None,
+    }
+}
+
 /// Explicit named/indexed/RGB mapping preserves Ratatui's cell semantics.
 pub fn map_color(resolved: ResolvedColor) -> Color {
     match resolved {
         ResolvedColor::Ansi256(n) => Color::Indexed(n),
         ResolvedColor::Rgb(r, g, b) => Color::Rgb(r, g, b),
-        ResolvedColor::Named(named) => match named {
-            AnsiColor::Black => Color::Black,
-            AnsiColor::Red => Color::Red,
-            AnsiColor::Green => Color::Green,
-            AnsiColor::Yellow => Color::Yellow,
-            AnsiColor::Blue => Color::Blue,
-            AnsiColor::Magenta => Color::Magenta,
-            AnsiColor::Cyan => Color::Cyan,
-            AnsiColor::White => Color::Gray,
-            AnsiColor::BrightBlack => Color::DarkGray,
-            AnsiColor::BrightRed => Color::LightRed,
-            AnsiColor::BrightGreen => Color::LightGreen,
-            AnsiColor::BrightYellow => Color::LightYellow,
-            AnsiColor::BrightBlue => Color::LightBlue,
-            AnsiColor::BrightMagenta => Color::LightMagenta,
-            AnsiColor::BrightCyan => Color::LightCyan,
-            AnsiColor::BrightWhite => Color::White,
-        },
+        ResolvedColor::Named(named) => map_named_color(named),
     }
+}
+
+fn map_named_color(named: AnsiColor) -> Color {
+    use AnsiColor::*;
+    let (base, normal, bright) = match named {
+        Black | BrightBlack => (Black, Color::Black, Color::DarkGray),
+        Red | BrightRed => (Red, Color::Red, Color::LightRed),
+        Green | BrightGreen => (Green, Color::Green, Color::LightGreen),
+        Yellow | BrightYellow => (Yellow, Color::Yellow, Color::LightYellow),
+        Blue | BrightBlue => (Blue, Color::Blue, Color::LightBlue),
+        Magenta | BrightMagenta => (Magenta, Color::Magenta, Color::LightMagenta),
+        Cyan | BrightCyan => (Cyan, Color::Cyan, Color::LightCyan),
+        White | BrightWhite => (White, Color::Gray, Color::White),
+    };
+    if named == base { normal } else { bright }
 }

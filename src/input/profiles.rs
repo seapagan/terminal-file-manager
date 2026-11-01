@@ -32,12 +32,16 @@ pub(super) fn key(controller: &mut Controller, key: KeyEvent) {
         edit(controller, key);
         return;
     }
+    menu_key(controller, key.code);
+}
+
+fn menu_key(controller: &mut Controller, code: KeyCode) {
     let index = controller
         .app
         .profile_menu
         .as_mut()
         .expect("profile selector");
-    match key.code {
+    match code {
         KeyCode::Up => *index = index.saturating_sub(1),
         KeyCode::Down => *index = (*index + 1).min(controller.app.profile_names.len() + 1),
         KeyCode::Home => *index = 0,
@@ -54,6 +58,10 @@ pub(super) fn key(controller: &mut Controller, key: KeyEvent) {
         KeyCode::Esc => controller.app.profile_menu = None,
         _ => {}
     }
+    remember_choice(controller);
+}
+
+fn remember_choice(controller: &mut Controller) {
     if let Some(index) = controller.app.profile_menu
         && index < controller.app.profile_names.len()
     {

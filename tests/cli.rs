@@ -265,3 +265,55 @@ fn configured_restore_uses_saved_locations_instead_of_cwd() {
         [directory.clone(), directory]
     );
 }
+
+#[test]
+fn single_paths_and_terminated_options_keep_their_invocation_variants() {
+    use terminal_file_manager::{Invocation, run};
+    for path in ["", ".", "native-界"] {
+        let Invocation::Browse(actual) = run(&[path.into()]).unwrap() else {
+            panic!("a single plain path keeps Browse intent");
+        };
+        assert_eq!(actual, std::path::PathBuf::from(path));
+    }
+    for path in ["--help", "--version", "--restore-session", "--"] {
+        let Invocation::Browse(actual) = run(&["--".into(), path.into()]).unwrap() else {
+            panic!("a terminated path cannot become an option");
+        };
+        assert_eq!(actual, std::path::PathBuf::from(path));
+    }
+}
+
+#[test]
+fn startup_option_termination_keeps_flags_and_validation_order() {
+    use terminal_file_manager::{Invocation, run};
+    let arguments =
+        ["--save-session", "--", "--restore-session", "--two-panes"].map(std::ffi::OsString::from);
+    let Invocation::BrowseOptions(options) = run(&arguments).unwrap() else {
+        panic!("startup options");
+    };
+    assert!(options.save_session);
+    assert!(!options.restore_session);
+    assert!(!options.two_panes);
+    assert_eq!(
+        options.locations(),
+        ["--restore-session", "--two-panes"].map(std::path::PathBuf::from)
+    );
+    for arguments in [
+        vec!["--restore-session", "one", "two", "three"],
+        vec!["--restore-session", "one", "--unknown"],
+    ] {
+        let native = arguments
+            .iter()
+            .map(std::ffi::OsString::from)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            run(&native).unwrap_err(),
+            "unsupported arguments; use --help"
+        );
+    }
+    let native = ["--restore-session", "one"].map(std::ffi::OsString::from);
+    assert_eq!(
+        run(&native).unwrap_err(),
+        "--restore-session cannot be combined with explicit paths"
+    );
+}

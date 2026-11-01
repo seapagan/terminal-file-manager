@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
 LIMITS = {
-    "COMPLEXITY_LIZARD_VERSION": "1.23.0",
+    "COMPLEXITY_LIZARD_VERSION": "1.24.3",
     "COMPLEXITY_MAX_CCN": "10",
     "COMPLEXITY_MAX_FUNCTION_NLOC": "50",
     "COMPLEXITY_MAX_PARAMETERS": "8",
