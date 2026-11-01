@@ -64,6 +64,13 @@ pub(super) fn mouse(controller: &mut Controller, event: MouseEvent, geometry: &G
 pub(super) fn formatting(controller: &mut Controller, action: Action) {
     let pane = &mut controller.app.panes[controller.app.active];
     match action {
+        Action::MetadataPresentation => {
+            controller.preferences.metadata_presentation =
+                match controller.preferences.metadata_presentation {
+                    MetadataPresentation::Sidebar => MetadataPresentation::Popup,
+                    MetadataPresentation::Popup => MetadataPresentation::Sidebar,
+                }
+        }
         Action::HumanSizes => pane.human_sizes = !pane.human_sizes,
         Action::FuzzyTimestamps => pane.fuzzy_timestamps = !pane.fuzzy_timestamps,
         Action::Permissions => {
@@ -78,18 +85,7 @@ pub(super) fn formatting(controller: &mut Controller, action: Action) {
                 crate::owner::OwnerDisplay::Numeric => crate::owner::OwnerDisplay::Names,
             };
         }
-        Action::ColumnSize => pane.columns.size = !pane.columns.size,
-        Action::ColumnModified => pane.columns.modified = !pane.columns.modified,
-        Action::ColumnAttributes => pane.columns.attributes = !pane.columns.attributes,
-        Action::ColumnOwner => pane.columns.owner = !pane.columns.owner,
-        Action::MetadataPresentation => {
-            controller.preferences.metadata_presentation =
-                match controller.preferences.metadata_presentation {
-                    MetadataPresentation::Sidebar => MetadataPresentation::Popup,
-                    MetadataPresentation::Popup => MetadataPresentation::Sidebar,
-                }
-        }
-        _ => {}
+        _ => column_formatting(pane, action),
     }
     if action != Action::MetadataPresentation {
         pane.profile_modified = pane.profile.is_some();
@@ -98,6 +94,16 @@ pub(super) fn formatting(controller: &mut Controller, action: Action) {
     controller.app.metadata_presentation = controller.preferences.metadata_presentation;
     controller.preferences.capture(&controller.app, action);
     controller.preferences_changed = true;
+}
+
+fn column_formatting(pane: &mut crate::app::Pane, action: Action) {
+    match action {
+        Action::ColumnSize => pane.columns.size = !pane.columns.size,
+        Action::ColumnModified => pane.columns.modified = !pane.columns.modified,
+        Action::ColumnAttributes => pane.columns.attributes = !pane.columns.attributes,
+        Action::ColumnOwner => pane.columns.owner = !pane.columns.owner,
+        _ => {}
+    }
 }
 
 pub(crate) fn rows(app: &App, preferred: MetadataPresentation) -> Vec<(String, String)> {

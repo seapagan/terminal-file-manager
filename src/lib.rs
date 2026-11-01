@@ -47,17 +47,21 @@ pub enum Invocation {
 pub fn run(arguments: &[OsString]) -> Result<Invocation, &'static str> {
     match arguments {
         [] => Ok(Invocation::BrowseOptions(startup::Startup::default())),
-        [argument] if argument == "--help" || argument == "-h" => {
-            Ok(Invocation::Output(HELP.to_owned()))
-        }
-        [argument] if argument == "--version" || argument == "-V" => Ok(Invocation::Output(
-            format!("tfm {}", env!("CARGO_PKG_VERSION")),
-        )),
-        [argument] if !argument.as_encoded_bytes().starts_with(b"-") => {
-            Ok(Invocation::Browse(argument.into()))
-        }
+        [argument] => single_argument(argument),
         [separator, path] if separator == "--" => Ok(Invocation::Browse(path.into())),
         _ => startup::parse(arguments),
+    }
+}
+
+fn single_argument(argument: &OsString) -> Result<Invocation, &'static str> {
+    match argument.as_encoded_bytes() {
+        b"--help" | b"-h" => Ok(Invocation::Output(HELP.to_owned())),
+        b"--version" | b"-V" => Ok(Invocation::Output(format!(
+            "tfm {}",
+            env!("CARGO_PKG_VERSION")
+        ))),
+        bytes if !bytes.starts_with(b"-") => Ok(Invocation::Browse(argument.into())),
+        _ => startup::parse(std::slice::from_ref(argument)),
     }
 }
 

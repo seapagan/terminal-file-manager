@@ -167,3 +167,40 @@ fn staged_identity_replacement_is_quarantined_and_never_cleaned_as_owned() {
     assert_eq!(record.entries[0].outcome, Outcome::OutcomeUnknown);
     assert!(record.entries[0].detail.contains("tfm-stage"));
 }
+
+#[test]
+fn cancellation_during_conflict_notification_precedes_the_returned_decision() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    for decision in [Decision::Replace, Decision::KeepBoth, Decision::Newer] {
+        let root = tempfile::tempdir().unwrap();
+        fs::write(root.path().join("source"), "incoming").unwrap();
+        fs::create_dir(root.path().join("target")).unwrap();
+        fs::write(root.path().join("target/source"), "previous").unwrap();
+        let cancel = AtomicBool::new(false);
+        let plan = Plan::paths(
+            Operation::Move,
+            vec![root.path().join("source")],
+            Some(root.path().join("target")),
+        )
+        .unwrap();
+        let mut events = 0;
+        let record = execute(&plan, Options::default(), &cancel, |event| {
+            assert!(matches!(event, Event::Conflict { .. }));
+            events += 1;
+            cancel.store(true, Ordering::Relaxed);
+            decision.clone()
+        });
+        assert_eq!(events, 1);
+        assert_eq!(record.entries.len(), 1);
+        assert_eq!(record.entries[0].outcome, Outcome::Cancelled);
+        assert_eq!(record.entries[0].bytes, 0);
+        assert!(record.entries[0].recovery.is_none());
+        assert_eq!(fs::read(root.path().join("source")).unwrap(), b"incoming");
+        assert_eq!(
+            fs::read(root.path().join("target/source")).unwrap(),
+            b"previous"
+        );
+        assert_eq!(fs::read_dir(root.path().join("target")).unwrap().count(), 1);
+    }
+}

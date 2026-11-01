@@ -137,6 +137,18 @@ impl Settings {
     pub fn capture(&mut self, app: &App, action: Action) {
         let pane = &app.panes[app.active];
         match action {
+            Action::ToggleSidebar => self.sidebar = app.sidebar,
+            Action::Sort => self.sort = pane.sort.sort,
+            Action::Group => self.grouping = pane.sort.grouping,
+            Action::Reverse => self.reverse = pane.sort.reverse,
+            Action::Hidden => self.hidden = pane.show_hidden,
+            Action::Ignore => self.ignore = pane.ignore,
+            _ => self.capture_display(pane, action),
+        }
+    }
+
+    fn capture_display(&mut self, pane: &crate::app::Pane, action: Action) {
+        match action {
             Action::HumanSizes => self.human_sizes = pane.human_sizes,
             Action::FuzzyTimestamps => self.fuzzy_timestamps = pane.fuzzy_timestamps,
             Action::OwnerDisplay => self.owner_display = pane.owner_display,
@@ -145,12 +157,6 @@ impl Settings {
             Action::ColumnModified => self.columns.modified = pane.columns.modified,
             Action::ColumnAttributes => self.columns.attributes = pane.columns.attributes,
             Action::ColumnOwner => self.columns.owner = pane.columns.owner,
-            Action::ToggleSidebar => self.sidebar = app.sidebar,
-            Action::Sort => self.sort = pane.sort.sort,
-            Action::Group => self.grouping = pane.sort.grouping,
-            Action::Reverse => self.reverse = pane.sort.reverse,
-            Action::Hidden => self.hidden = pane.show_hidden,
-            Action::Ignore => self.ignore = pane.ignore,
             _ => {}
         }
     }

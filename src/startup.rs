@@ -15,18 +15,7 @@ pub(crate) fn parse(arguments: &[OsString]) -> Result<Invocation, &'static str> 
     let mut startup = Startup::default();
     let mut positional = false;
     for argument in arguments {
-        if positional {
-            startup.paths.push(argument.into());
-            continue;
-        }
-        match argument.as_encoded_bytes() {
-            b"--" => positional = true,
-            b"--restore-session" => startup.restore_session = true,
-            b"--save-session" => startup.save_session = true,
-            b"-2" | b"--two-panes" => startup.two_panes = true,
-            bytes if bytes.starts_with(b"-") => return Err("unsupported arguments; use --help"),
-            _ => startup.paths.push(argument.into()),
-        }
+        parse_argument(&mut startup, &mut positional, argument)?;
     }
     if startup.paths.len() > 2 {
         return Err("unsupported arguments; use --help");
@@ -35,6 +24,26 @@ pub(crate) fn parse(arguments: &[OsString]) -> Result<Invocation, &'static str> 
         return Err("--restore-session cannot be combined with explicit paths");
     }
     Ok(Invocation::BrowseOptions(startup))
+}
+
+fn parse_argument(
+    startup: &mut Startup,
+    positional: &mut bool,
+    argument: &OsString,
+) -> Result<(), &'static str> {
+    if *positional {
+        startup.paths.push(argument.into());
+        return Ok(());
+    }
+    match argument.as_encoded_bytes() {
+        b"--" => *positional = true,
+        b"--restore-session" => startup.restore_session = true,
+        b"--save-session" => startup.save_session = true,
+        b"-2" | b"--two-panes" => startup.two_panes = true,
+        bytes if bytes.starts_with(b"-") => return Err("unsupported arguments; use --help"),
+        _ => startup.paths.push(argument.into()),
+    }
+    Ok(())
 }
 
 impl Startup {

@@ -266,3 +266,43 @@ fn unicode_shortcut_labels_round_trip_without_changing_case_or_shift() {
         assert_eq!(keys.action(KeyEvent::new(code, modifiers)), Some(action));
     }
 }
+
+#[test]
+fn named_keys_ignore_ascii_case_without_changing_function_key_prefix_rules() {
+    for (name, code) in [
+        ("Up", KeyCode::Up),
+        ("Down", KeyCode::Down),
+        ("Left", KeyCode::Left),
+        ("Right", KeyCode::Right),
+        ("Home", KeyCode::Home),
+        ("End", KeyCode::End),
+        ("PageUp", KeyCode::PageUp),
+        ("PageDown", KeyCode::PageDown),
+        ("Enter", KeyCode::Enter),
+        ("Backspace", KeyCode::Backspace),
+        ("Tab", KeyCode::Tab),
+        ("Space", KeyCode::Char(' ')),
+        ("Insert", KeyCode::Insert),
+        ("Esc", KeyCode::Esc),
+    ] {
+        assert_eq!(chord(name).unwrap(), (code, Mods::NONE));
+        assert_eq!(
+            chord(&name.to_ascii_uppercase()).unwrap(),
+            (code, Mods::NONE)
+        );
+        assert_eq!(
+            chord(&name.to_ascii_lowercase()).unwrap(),
+            (code, Mods::NONE)
+        );
+    }
+    for number in [1, 12, 24] {
+        assert_eq!(
+            chord(&format!("F{number}")).unwrap(),
+            (KeyCode::F(number), Mods::NONE)
+        );
+        assert!(chord(&format!("f{number}")).is_err());
+    }
+    for invalid in ["F0", "F25", "F256", "Unknown", "Énter"] {
+        assert!(chord(invalid).is_err(), "{invalid}");
+    }
+}

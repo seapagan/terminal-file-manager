@@ -48,14 +48,7 @@ impl Controller {
     pub fn complete_operation(&mut self, update: Update) -> Vec<Request> {
         match update {
             Update::Preview { id, plan } => {
-                if let Some(Dialog::Operation(dialog)) = &mut self.app.operations.dialog
-                    && dialog.preview_id == Some(id)
-                {
-                    dialog.plan = *plan;
-                    dialog.ready = true;
-                    dialog.error = None;
-                    self.app.status = "Preview ready; review exact counts before confirming".into();
-                }
+                self.complete_preview(id, *plan);
             }
             Update::Started { id } => {
                 self.start_operation(id);
@@ -91,6 +84,17 @@ impl Controller {
             }
         }
         Vec::new()
+    }
+
+    fn complete_preview(&mut self, id: u64, plan: crate::operations::Plan) {
+        if let Some(Dialog::Operation(dialog)) = &mut self.app.operations.dialog
+            && dialog.preview_id == Some(id)
+        {
+            dialog.plan = plan;
+            dialog.ready = true;
+            dialog.error = None;
+            self.app.status = "Preview ready; review exact counts before confirming".into();
+        }
     }
 
     fn start_operation(&mut self, id: u64) {

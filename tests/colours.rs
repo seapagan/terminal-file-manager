@@ -78,15 +78,7 @@ const LEVELS: [ColorLevel; 4] = [
 
 fn expected_style(level: ColorLevel, colour: Option<Color>, bold: bool, dim: bool) -> Style {
     let fg = colour.and_then(|named| {
-        let (rgb, index) = match named {
-            Color::Red => (Color::Rgb(190, 65, 70), 131),
-            Color::Green => (Color::Rgb(50, 145, 90), 65),
-            Color::Yellow => (Color::Rgb(165, 125, 35), 136),
-            Color::Blue => (Color::Rgb(70, 120, 185), 67),
-            Color::Magenta => (Color::Rgb(155, 90, 160), 97),
-            Color::Cyan => (Color::Rgb(35, 140, 150), 30),
-            _ => panic!("unexpected oracle colour"),
-        };
+        let (rgb, index) = oracle_palette(named);
         match level {
             ColorLevel::NoColor => None,
             ColorLevel::Ansi16 => Some(named),
@@ -105,6 +97,18 @@ fn expected_style(level: ColorLevel, colour: Option<Color>, bold: bool, dim: boo
         style = style.add_modifier(Modifier::DIM);
     }
     style
+}
+
+fn oracle_palette(named: Color) -> (Color, u8) {
+    match named {
+        Color::Red => (Color::Rgb(190, 65, 70), 131),
+        Color::Green => (Color::Rgb(50, 145, 90), 65),
+        Color::Yellow => (Color::Rgb(165, 125, 35), 136),
+        Color::Blue => (Color::Rgb(70, 120, 185), 67),
+        Color::Magenta => (Color::Rgb(155, 90, 160), 97),
+        Color::Cyan => (Color::Rgb(35, 140, 150), 30),
+        _ => panic!("unexpected oracle colour"),
+    }
 }
 
 #[test]
@@ -262,4 +266,39 @@ fn ignored_executable_app(root: &std::path::Path) -> App {
     pane.refilter();
     pane.select_all();
     app
+}
+
+#[test]
+fn resolved_named_palette_preserves_all_normal_and_bright_terminal_colours() {
+    use colored_text::{AnsiColor, ResolvedColor};
+    use terminal_file_manager::color::map_color;
+    for (named, expected) in [
+        (AnsiColor::Black, Color::Black),
+        (AnsiColor::Red, Color::Red),
+        (AnsiColor::Green, Color::Green),
+        (AnsiColor::Yellow, Color::Yellow),
+        (AnsiColor::Blue, Color::Blue),
+        (AnsiColor::Magenta, Color::Magenta),
+        (AnsiColor::Cyan, Color::Cyan),
+        (AnsiColor::White, Color::Gray),
+        (AnsiColor::BrightBlack, Color::DarkGray),
+        (AnsiColor::BrightRed, Color::LightRed),
+        (AnsiColor::BrightGreen, Color::LightGreen),
+        (AnsiColor::BrightYellow, Color::LightYellow),
+        (AnsiColor::BrightBlue, Color::LightBlue),
+        (AnsiColor::BrightMagenta, Color::LightMagenta),
+        (AnsiColor::BrightCyan, Color::LightCyan),
+        (AnsiColor::BrightWhite, Color::White),
+    ] {
+        assert_eq!(
+            map_color(ResolvedColor::Named(named)),
+            expected,
+            "{named:?}"
+        );
+    }
+    assert_eq!(map_color(ResolvedColor::Ansi256(255)), Color::Indexed(255));
+    assert_eq!(
+        map_color(ResolvedColor::Rgb(1, 128, 255)),
+        Color::Rgb(1, 128, 255)
+    );
 }

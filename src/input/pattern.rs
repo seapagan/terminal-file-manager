@@ -115,7 +115,6 @@ fn ignored_key(key: KeyEvent) -> bool {
 }
 
 fn shortcut(controller: &mut Controller, key: KeyEvent, layout: &crate::ui::PatternLayout) -> bool {
-    use crate::app::PatternOperation::*;
     if key.kind != KeyEventKind::Press
         || (controller.app.pattern.as_ref().unwrap().focus == PatternControl::Expression
             && !key.modifiers.contains(KeyModifiers::ALT))
@@ -125,20 +124,27 @@ fn shortcut(controller: &mut Controller, key: KeyEvent, layout: &crate::ui::Patt
     let KeyCode::Char(letter) = key.code else {
         return false;
     };
-    let target = match letter.to_ascii_lowercase() {
-        'w' => PatternControl::Mode(PatternMode::Wildcard),
-        'x' => PatternControl::Mode(PatternMode::Regex),
-        's' => PatternControl::Case,
-        'm' => PatternControl::Apply(Mark),
-        'u' => PatternControl::Apply(Unmark),
-        'r' => PatternControl::Apply(Replace),
-        _ => return false,
+    let Some(target) = shortcut_target(letter) else {
+        return false;
     };
     if layout.targets().contains(&target) {
         let move_focus = matches!(target, PatternControl::Apply(_));
         activate(controller, target, move_focus);
     }
     true
+}
+
+fn shortcut_target(letter: char) -> Option<PatternControl> {
+    use crate::app::PatternOperation::*;
+    Some(match letter.to_ascii_lowercase() {
+        'w' => PatternControl::Mode(PatternMode::Wildcard),
+        'x' => PatternControl::Mode(PatternMode::Regex),
+        's' => PatternControl::Case,
+        'm' => PatternControl::Apply(Mark),
+        'u' => PatternControl::Apply(Unmark),
+        'r' => PatternControl::Apply(Replace),
+        _ => return None,
+    })
 }
 
 fn advance_focus(controller: &mut Controller, key: KeyEvent, layout: &crate::ui::PatternLayout) {

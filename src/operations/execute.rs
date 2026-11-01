@@ -154,6 +154,15 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
         if source.may_recurse() && previous.may_recurse() {
             return Ok(Some((destination.into(), Some(previous))));
         }
+        self.resolve_conflict(source, destination, previous)
+    }
+
+    fn resolve_conflict(
+        &mut self,
+        source: &Entry,
+        destination: &Path,
+        previous: Entry,
+    ) -> Result<Option<(PathBuf, Option<Entry>)>> {
         let newer_available = newer_available(source, &previous);
         let decision = self.conflict_decision(source, &previous, newer_available);
         self.check_cancel()?;

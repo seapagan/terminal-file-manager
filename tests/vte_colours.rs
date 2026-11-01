@@ -129,18 +129,22 @@ fn palette_names(buffer: &mut Buffer, app: &App) {
                 continue;
             }
             let y = area.y + 2 + row as u16;
-            for x in start..area.right() - 1 {
-                let cell = &mut buffer[(x, y)];
-                if cell.symbol() == " " {
-                    break;
-                }
-                cell.fg = match cell.fg {
-                    Color::Rgb(70, 120, 185) => Color::Indexed(67),
-                    Color::Rgb(220, 225, 230) => Color::Indexed(254),
-                    other => other,
-                };
-            }
+            palette_name(buffer, start..area.right() - 1, y);
         }
+    }
+}
+
+fn palette_name(buffer: &mut Buffer, columns: std::ops::Range<u16>, y: u16) {
+    for x in columns {
+        let cell = &mut buffer[(x, y)];
+        if cell.symbol() == " " {
+            break;
+        }
+        cell.fg = match cell.fg {
+            Color::Rgb(70, 120, 185) => Color::Indexed(67),
+            Color::Rgb(220, 225, 230) => Color::Indexed(254),
+            other => other,
+        };
     }
 }
 
