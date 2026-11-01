@@ -249,7 +249,7 @@ class ComplexityCheckerTests(unittest.TestCase):
             ],
         )
 
-    def test_function_metrics_parse_lizard_1_23_csv(self) -> None:
+    def test_function_metrics_parse_lizard_1_24_3_csv(self) -> None:
         """Representative verbose Lizard CSV produces function metrics."""
         output = (
             "NLOC,CCN,token,PARAM,length,location,file,function,long_name,start,end\n"
@@ -393,7 +393,7 @@ class ComplexityCheckerTests(unittest.TestCase):
     def test_main_rejects_lizard_version_mismatch(self) -> None:
         """The checker enforces exact equality with the configured version."""
         environment = {
-            "COMPLEXITY_LIZARD_VERSION": "1.23.0",
+            "COMPLEXITY_LIZARD_VERSION": "1.24.3",
             "COMPLEXITY_MAX_CCN": "10",
             "COMPLEXITY_MAX_FUNCTION_NLOC": "50",
             "COMPLEXITY_MAX_PARAMETERS": "8",
@@ -404,7 +404,7 @@ class ComplexityCheckerTests(unittest.TestCase):
             patch.object(CHECKER, "_run", return_value="1.24.0\n"),
             self.assertRaisesRegex(
                 CHECKER.CheckerError,
-                "Lizard version mismatch: expected 1.23.0, got '1.24.0'",
+                "Lizard version mismatch: expected 1.24.3, got '1.24.0'",
             ),
         ):
             CHECKER.main()

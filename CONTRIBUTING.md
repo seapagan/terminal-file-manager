@@ -77,7 +77,7 @@ input tests use cached state/TestBackend, independently of a real terminal.
 Install stable Rust with `rustfmt`, Clippy and `llvm-tools-preview`, plus
 `cargo-make`, `cargo-nextest`, `cargo-llvm-cov`, `cargo-audit`, `cargo-deny`,
 `actionlint`, `ShellCheck` and `zizmor`. Full verification also uses Python
-3.10+, Ruff, mypy and Lizard 1.23.0 for static support-code checks and source
+3.10+, Ruff, mypy and Lizard 1.24.3 for static support-code checks and source
 complexity analysis. Install and verify required tools before running the
 corresponding tasks; missing prerequisites must not be treated as passing.
 
