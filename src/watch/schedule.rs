@@ -16,7 +16,7 @@ impl Backoff {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub(super) struct Schedule {
     first: Option<Duration>,
     last: Duration,

@@ -101,12 +101,6 @@ impl Runtime {
             if slot.due(&app.panes[pane], now)
                 && let Some(request) = app.request_reconciliation(pane)
             {
-                if trace_chatter(&request.path) {
-                    eprintln!(
-                        "WATCH-DIAG start now={now:?} pane={pane} urgent={} failed={} schedule={:?} request={request:?}",
-                        slot.urgent, slot.failed, slot.schedule
-                    );
-                }
                 slot.schedule.started(now);
                 slot.urgent = false;
                 slot.sweep = now
@@ -167,12 +161,6 @@ impl Slot {
 
     fn consume(&mut self, app: &mut App, pane: usize, now: Duration) -> bool {
         let bits = self.signals.bits.swap(0, Ordering::AcqRel);
-        if bits != 0 && trace_chatter(&app.panes[pane].path) {
-            eprintln!(
-                "WATCH-DIAG consume now={now:?} pane={pane} bits={bits} schedule={:?} path={:?}",
-                self.schedule, app.panes[pane].path
-            );
-        }
         // Repeated backend failures are covered by fallback, not fresh dirty work.
         if bits & (DIRTY | ERROR) == DIRTY {
             self.schedule.dirty(now);
@@ -215,9 +203,4 @@ fn new_worker(mode: Mode) -> Option<NativeWorker> {
     }
     let _ = mode;
     None
-}
-
-// Temporary native investigation: only this owned test fixture emits event traces.
-fn trace_chatter(path: &std::path::Path) -> bool {
-    cfg!(debug_assertions) && path.to_string_lossy().contains("tfm-watch-chatter-")
 }
