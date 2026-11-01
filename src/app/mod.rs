@@ -116,6 +116,14 @@ impl App {
         }
     }
 
+    /// End the Help session without retaining picker, landing or document scroll.
+    pub fn close_help(&mut self) {
+        self.help = false;
+        self.help_picker = None;
+        self.help_landing = None;
+        self.overlay_scroll = 0;
+    }
+
     /// Current display label for a browser action, independent of its input routing.
     pub fn shortcut(&self, action: crate::input::Action, preferred: &str) -> &str {
         self.help_rows

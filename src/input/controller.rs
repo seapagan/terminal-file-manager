@@ -123,7 +123,7 @@ impl Controller {
                     Some(0)
                 };
                 self.app.popup = false;
-                self.app.help = false;
+                self.app.close_help();
             }
             HumanSizes | FuzzyTimestamps | Permissions | ColumnSize | ColumnModified
             | ColumnAttributes | ColumnOwner | OwnerDisplay | MetadataPresentation => {
@@ -321,10 +321,9 @@ impl Controller {
                 self.app.overlay_scroll = 0;
             }
             Action::Help => {
-                self.app.help = !self.app.help;
-                self.app.help_picker = None;
-                self.app.help_landing = None;
-                self.app.overlay_scroll = 0;
+                let open = !self.app.help;
+                self.app.close_help();
+                self.app.help = open;
             }
             _ => {}
         }
@@ -348,7 +347,7 @@ impl Controller {
     fn cancel(&mut self) {
         self.app.cancel_totals();
         if self.app.help || self.app.popup {
-            self.app.help = false;
+            self.app.close_help();
             self.app.popup = false;
         } else {
             self.app.panes[self.app.active].set_filter(String::new());

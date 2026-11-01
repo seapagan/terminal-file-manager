@@ -320,3 +320,36 @@ fn picker_ignores_alt_quit_and_release_events_before_independent_escape_presses(
     key(&mut c, "q");
     assert!(c.quit);
 }
+
+#[test]
+fn help_close_paths_discard_all_session_state() {
+    use terminal_file_manager::input::{Action, HelpSection, HelpTarget};
+    let root = tempfile::tempdir().unwrap();
+    for action in [
+        Action::Help,
+        Action::Cancel,
+        Action::ViewOptions,
+        Action::ViewProfiles,
+        Action::CreateFile,
+    ] {
+        let mut c = controller();
+        c.app = App::new(root.path().into());
+        let snapshot = terminal_file_manager::fs::list(
+            root.path(),
+            &terminal_file_manager::fs::IgnoreContext::isolated(),
+            &false.into(),
+        )
+        .unwrap();
+        c.app.complete_listing(0, 1, Ok(snapshot));
+        c.app.help = matches!(action, Action::Help | Action::Cancel);
+        c.app.help_picker = Some(Default::default());
+        c.app.help_landing = Some((HelpTarget::Section(HelpSection::Navigation), c.app.now));
+        c.app.overlay_scroll = 20;
+        let g = ui::geometry(&c.app, Rect::new(0, 0, 120, 32));
+        c.dispatch(action, &g);
+        assert!(!c.app.help, "{action:?}");
+        assert!(c.app.help_picker.is_none(), "{action:?}");
+        assert!(c.app.help_landing.is_none(), "{action:?}");
+        assert_eq!(c.app.overlay_scroll, 0, "{action:?}");
+    }
+}

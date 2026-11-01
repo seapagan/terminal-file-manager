@@ -22,9 +22,7 @@ pub(in crate::input) fn handle(c: &mut Controller, event: &Event, geometry: &Geo
     }
     match event {
         Event::Key(key) if key.kind == KeyEventKind::Press && key.code == KeyCode::Esc => {
-            c.app.help = false;
-            c.app.help_landing = None;
-            c.app.overlay_scroll = 0;
+            c.app.close_help();
             true
         }
         Event::Key(key)

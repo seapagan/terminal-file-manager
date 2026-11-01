@@ -87,24 +87,17 @@ impl HelpTopic {
             Self::ViewProfiles => "View Profiles Help",
             Self::SaveProfile => "Save Profile Help",
             Self::Operation(operation) => operation_title(operation),
-            _ => workspace_title(self),
+            Self::Pattern => "Pattern Help",
+            Self::Conflict => "Conflict Help",
+            Self::Jobs => "Jobs Help",
+            Self::Metadata => "Metadata Help",
+            Self::Exit => "Safe Exit Help",
+            Self::Incident => "Incident Help",
         }
     }
 
     pub fn text(self, app: &App) -> Vec<super::HelpParagraph> {
         super::context_text::text(self, app)
-    }
-}
-
-fn workspace_title(topic: HelpTopic) -> &'static str {
-    match topic {
-        HelpTopic::Pattern => "Pattern Help",
-        HelpTopic::Conflict => "Conflict Help",
-        HelpTopic::Jobs => "Jobs Help",
-        HelpTopic::Metadata => "Metadata Help",
-        HelpTopic::Exit => "Safe Exit Help",
-        HelpTopic::Incident => "Incident Help",
-        _ => unreachable!("workspace Help topic"),
     }
 }
 
@@ -186,6 +179,7 @@ fn overlay(c: &mut Controller, event: &Event, geometry: &Geometry) {
         .as_ref()
         .map_or(1, |layout| layout.shell.body.height.max(1));
     if let Event::Resize(width, height) = event {
+        crate::input::scroll::resize(c, *width, *height);
         let geometry =
             crate::ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, *width, *height));
         let limit = geometry

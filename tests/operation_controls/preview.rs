@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn changed_destructive_scope_cancels_the_old_preview_before_replacing_it() {
-    for (action, confirm) in [(Action::Delete, 'D'), (Action::Trash, 't')] {
+    for (action, confirm) in [(Action::Delete, 'D'), (Action::Trash, 'T')] {
         let (root, mut controller) = controller();
         controller.app.panes[0].select_all();
         let mut queue = terminal_file_manager::operations::Queue::new().unwrap();

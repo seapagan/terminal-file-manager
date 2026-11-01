@@ -93,7 +93,7 @@ fn destructive(
     }
     let confirm = match dialog.plan.operation {
         Operation::Delete => key == KeyCode::Char('D'),
-        _ => matches!(key, KeyCode::Char('t' | 'T')),
+        _ => key == KeyCode::Char('T'),
     };
     if !confirm {
         return true;

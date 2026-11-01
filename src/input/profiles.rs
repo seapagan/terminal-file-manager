@@ -11,7 +11,7 @@ pub(super) fn open(controller: &mut Controller) {
     controller.app.profile_name = None;
     controller.app.view_menu = None;
     controller.app.popup = false;
-    controller.app.help = false;
+    controller.app.close_help();
 }
 
 pub(super) fn key(controller: &mut Controller, key: KeyEvent) {

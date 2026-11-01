@@ -105,3 +105,26 @@ fn help_requires_an_unmodified_press_and_respects_question_rebinding() {
         HelpTopic::Jobs
     ));
 }
+
+#[test]
+fn context_resize_clamps_parent_scroll_and_ends_divider_drag() {
+    let mut c = controller();
+    c.app.popup = true;
+    c.app.context_help = Some(ContextHelp {
+        topic: HelpTopic::Metadata,
+        scroll: u16::MAX,
+    });
+    c.app.overlay_scroll = u16::MAX;
+    c.app.metadata_scroll = u16::MAX;
+    c.dragging_divider = true;
+    let area = ratatui::layout::Rect::new(0, 0, 120, 40);
+    let g = crate::ui::geometry(&c.app, area);
+    assert!(handle(&mut c, &Event::Resize(120, 40), &g));
+    assert!(!c.dragging_divider);
+    assert_eq!(c.app.overlay_scroll, g.overlay_scroll_limit);
+    assert_eq!(c.app.metadata_scroll, g.metadata_scroll_limit);
+    assert_eq!(
+        c.app.context_help.as_ref().unwrap().scroll,
+        g.context_help.unwrap().scroll_limit
+    );
+}

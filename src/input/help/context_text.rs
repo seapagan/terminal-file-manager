@@ -41,25 +41,18 @@ pub(super) fn text(topic: HelpTopic, app: &App) -> Vec<HelpParagraph> {
         HelpTopic::ViewProfiles => (Action::ViewProfiles, VIEW_PROFILES),
         HelpTopic::SaveProfile => (Action::ViewProfiles, SAVE_PROFILE),
         HelpTopic::Metadata => return metadata(app),
-        _ => dialog_text(topic),
-    };
-    let mut text: Vec<_> = lines.iter().map(|line| paragraph(line, &[])).collect();
-    if let Some(entry) = app.help_rows.iter().find(|entry| entry.action == action) {
-        text.push(paragraph("Open from the file list: `{}`.", &[&entry.keys]));
-    }
-    text
-}
-
-fn dialog_text(topic: HelpTopic) -> (Action, &'static [&'static str]) {
-    match topic {
         HelpTopic::Pattern => (Action::PatternSelection, PATTERN),
         HelpTopic::Conflict => (Action::Jobs, CONFLICT),
         HelpTopic::Jobs => (Action::Jobs, JOBS),
         HelpTopic::Exit => (Action::Quit, EXIT),
         HelpTopic::Incident => (Action::Quit, INCIDENT),
         HelpTopic::Operation(operation) => operation_text(operation),
-        _ => unreachable!("dialog Help topic"),
+    };
+    let mut text: Vec<_> = lines.iter().map(|line| paragraph(line, &[])).collect();
+    if let Some(entry) = app.help_rows.iter().find(|entry| entry.action == action) {
+        text.push(paragraph("Open from the file list: `{}`.", &[&entry.keys]));
     }
+    text
 }
 
 fn operation_text(operation: Operation) -> (Action, &'static [&'static str]) {

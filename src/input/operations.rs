@@ -84,7 +84,7 @@ fn open_dialog(controller: &mut Controller, plan: Plan, native_target: std::path
             .push(Intent::Preview(plan.clone()));
     }
     controller.app.popup = false;
-    controller.app.help = false;
+    controller.app.close_help();
     controller.app.operations.dialog = Some(Dialog::Operation(Box::new(OperationDialog {
         plan,
         pane,

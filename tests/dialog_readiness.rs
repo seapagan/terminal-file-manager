@@ -305,3 +305,38 @@ fn clipped_danger_title_blocks_delete_even_when_trash_context_would_fit() {
         assert_eq!(button(&g, key).enabled, operation == Operation::Trash);
     }
 }
+
+#[test]
+fn completed_trash_preview_requires_uppercase_confirmation() {
+    let (_root, plan) = completed_plan(Operation::Trash);
+    let mut c = Controller::new(
+        dialog_fixture::dialog(plan),
+        Bindings::new(&Default::default()).unwrap(),
+        Default::default(),
+    );
+    let g = ui::geometry(&c.app, Rect::new(0, 0, 120, 40));
+    assert!(g.operation_enabled(KeyCode::Char('T')));
+    for (code, kind) in [
+        (KeyCode::Char('t'), crossterm::event::KeyEventKind::Press),
+        (KeyCode::Char('T'), crossterm::event::KeyEventKind::Repeat),
+        (KeyCode::Char('T'), crossterm::event::KeyEventKind::Release),
+    ] {
+        c.handle(
+            Event::Key(KeyEvent::new_with_kind(code, KeyModifiers::NONE, kind)),
+            &g,
+            std::time::Duration::ZERO,
+        );
+        assert!(c.app.operations.dialog.is_some());
+        assert!(c.app.operations.outbox.is_empty());
+    }
+    c.handle(
+        Event::Key(KeyEvent::new(KeyCode::Char('T'), KeyModifiers::SHIFT)),
+        &g,
+        std::time::Duration::ZERO,
+    );
+    assert!(c.app.operations.dialog.is_none());
+    assert!(matches!(
+        c.app.operations.outbox.as_slice(),
+        [Intent::Submit(..)]
+    ));
+}
