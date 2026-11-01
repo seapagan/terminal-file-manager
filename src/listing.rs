@@ -68,13 +68,16 @@ fn compare(a: &Entry, b: &Entry, sort: Sort) -> Ordering {
         Sort::Modified => b.modified.cmp(&a.modified),
         Sort::Created => b.created.cmp(&a.created),
         Sort::Kind => a.kind.cmp(&b.kind),
-        Sort::Version => a
-            .name
-            .to_str()
-            .zip(b.name.to_str())
-            .map_or_else(|| name(&a.name, &b.name), |(a, b)| vsort::compare(a, b)),
+        Sort::Version => version(a, b),
     };
     ordering.then_with(|| name(&a.name, &b.name))
+}
+
+fn version(a: &Entry, b: &Entry) -> Ordering {
+    a.name
+        .to_str()
+        .zip(b.name.to_str())
+        .map_or_else(|| name(&a.name, &b.name), |(a, b)| vsort::compare(a, b))
 }
 
 fn name(a: &OsStr, b: &OsStr) -> Ordering {

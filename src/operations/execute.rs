@@ -125,12 +125,7 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
         depth: usize,
         result: &mut EntryResult,
     ) -> Result<()> {
-        self.check_cancel()?;
-        prepare_source(source, depth)?;
-        self.mounts.reject(source)?;
-        let destination =
-            destination.ok_or_else(|| super::plan::invalid("Destination required"))?;
-        safety::reject_overlap(source, destination)?;
+        let destination = self.prepare_destination(source, destination, depth)?;
         let Some((destination, previous)) = self.resolve(source, destination)? else {
             result.outcome = Outcome::Skipped;
             return Ok(());
@@ -141,6 +136,21 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
         }
         self.leaf(source, &destination, previous.as_ref(), result)?;
         Ok(())
+    }
+
+    fn prepare_destination<'a>(
+        &self,
+        source: &Entry,
+        destination: Option<&'a Path>,
+        depth: usize,
+    ) -> Result<&'a Path> {
+        self.check_cancel()?;
+        prepare_source(source, depth)?;
+        self.mounts.reject(source)?;
+        let destination =
+            destination.ok_or_else(|| super::plan::invalid("Destination required"))?;
+        safety::reject_overlap(source, destination)?;
+        Ok(destination)
     }
 
     fn resolve(

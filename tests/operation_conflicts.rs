@@ -204,3 +204,23 @@ fn cancellation_during_conflict_notification_precedes_the_returned_decision() {
         assert_eq!(fs::read_dir(root.path().join("target")).unwrap().count(), 1);
     }
 }
+
+#[test]
+fn cancellation_precedes_changed_source_validation_without_creating_a_destination() {
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("source");
+    let target = root.path().join("target");
+    fs::write(&source, "original").unwrap();
+    fs::create_dir(&target).unwrap();
+    let plan = Plan::paths(Operation::Copy, vec![source.clone()], Some(target.clone())).unwrap();
+    fs::write(&source, "changed source content").unwrap();
+    let record = execute(&plan, Options::default(), &true.into(), |_| {
+        panic!("cancelled preflight must not notify or request a conflict decision");
+    });
+    assert_eq!(record.entries.len(), 1);
+    assert_eq!(record.entries[0].outcome, Outcome::Cancelled);
+    assert_eq!(record.entries[0].bytes, 0);
+    assert!(record.entries[0].recovery.is_none());
+    assert_eq!(fs::read(&source).unwrap(), b"changed source content");
+    assert_eq!(fs::read_dir(&target).unwrap().count(), 0);
+}

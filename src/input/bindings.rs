@@ -85,15 +85,7 @@ impl Bindings {
 pub fn chord(text: &str) -> Result<(KeyCode, KeyModifiers), String> {
     let mut parts: Vec<_> = text.split('+').collect();
     let key = parts.pop().unwrap_or("");
-    let mut modifiers = KeyModifiers::NONE;
-    for modifier in parts {
-        modifiers |= match modifier.to_ascii_lowercase().as_str() {
-            "ctrl" => KeyModifiers::CONTROL,
-            "alt" => KeyModifiers::ALT,
-            "shift" => KeyModifiers::SHIFT,
-            _ => return Err(format!("unknown modifier in keybinding: {text}")),
-        };
-    }
+    let modifiers = chord_modifiers(&parts, text)?;
     let code = named_key(key)
         .or_else(|| {
             let mut chars = key.chars();
@@ -109,6 +101,19 @@ pub fn chord(text: &str) -> Result<(KeyCode, KeyModifiers), String> {
         ));
     }
     Ok(normalize_chord(code, modifiers))
+}
+
+fn chord_modifiers(parts: &[&str], text: &str) -> Result<KeyModifiers, String> {
+    let mut modifiers = KeyModifiers::NONE;
+    for modifier in parts {
+        modifiers |= match modifier.to_ascii_lowercase().as_str() {
+            "ctrl" => KeyModifiers::CONTROL,
+            "alt" => KeyModifiers::ALT,
+            "shift" => KeyModifiers::SHIFT,
+            _ => return Err(format!("unknown modifier in keybinding: {text}")),
+        };
+    }
+    Ok(modifiers)
 }
 
 fn normalize_chord(code: KeyCode, mut modifiers: KeyModifiers) -> (KeyCode, KeyModifiers) {

@@ -306,3 +306,18 @@ fn named_keys_ignore_ascii_case_without_changing_function_key_prefix_rules() {
         assert!(chord(invalid).is_err(), "{invalid}");
     }
 }
+
+#[test]
+fn modifier_errors_precede_key_validation_and_keep_the_original_chord() {
+    for text in ["Bogus+Unknown", "Ctrl+Bogus+Unknown", "Bogus+Shift+?"] {
+        assert_eq!(
+            chord(text).unwrap_err(),
+            format!("unknown modifier in keybinding: {text}")
+        );
+    }
+    assert_eq!(chord("Ctrl+").unwrap_err(), "unknown keybinding: Ctrl+");
+    assert_eq!(
+        chord("Ctrl+Alt+?").unwrap(),
+        (KeyCode::Char('?'), Mods::CONTROL | Mods::ALT)
+    );
+}
