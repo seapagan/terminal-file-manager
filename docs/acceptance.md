@@ -1,5 +1,117 @@
 # Acceptance gates
 
+## PM3-04 accepted and merged — 1 November 2026
+
+The maintainer accepted the completed Help work and merged
+[PR #8](https://github.com/seapagan/terminal-file-manager/pull/8) at
+**09:30:59 UTC** as
+[`aebd41f43c44d12b756c4fbe3450b7defe6cc9ac`](https://github.com/seapagan/terminal-file-manager/commit/aebd41f43c44d12b756c4fbe3450b7defe6cc9ac).
+The final GPG-signed/Signed-off-by feature head was
+[`ab69db1c0cd2a3c89150b489d7f20d6e0e10eab2`](https://github.com/seapagan/terminal-file-manager/commit/ab69db1c0cd2a3c89150b489d7f20d6e0e10eab2).
+Earlier delivery heads, including `d27cad5`, retain their checkpoint evidence
+below and in the local controller; they are not the final head.
+
+The completed external review records cover DeepSeek's menu-density, behavioural
+coverage and Help feedback corrections, followed by Claude's nine findings on
+safe confirmation, Help state, exhaustive routing, configured shortcuts and
+result/metadata reuse. Subsequent corrections cleared the Codacy complexity
+finding and stabilised the Linux overlong-input PTY and macOS watcher fixtures.
+The watcher correction separated delayed relevant setup events from unrelated
+parent chatter without changing production scheduling or filtering. GitHub's
+formal review list is empty; these external reviews are not GitHub approvals.
+This closeout records acceptance and native automated proof, without adding a
+new manual visual-test claim.
+
+| Evidence revision | Rust CI | Linux passed/skipped | macOS passed/skipped | Windows passed/skipped |
+| --- | --- | --- | --- | --- |
+| Final feature head `ab69db1` | [41288291844](https://github.com/seapagan/terminal-file-manager/actions/runs/41288291844) | 848/2 | 825/2 | 794/3 |
+| Merge commit `aebd41f` | [41289189940](https://github.com/seapagan/terminal-file-manager/actions/runs/41289189940) | 848/2 | 825/2 | 794/3 |
+
+Both revisions passed all five Actions workflows, native doctests, exact MSRV
+1.95.0, source quality, dependency/workflow policy, strict source packaging and
+combined coverage. The feature head passed all **19 checks**, including Codacy
+static analysis, diff coverage and coverage variation. Its
+[Codacy summary](https://github.com/seapagan/terminal-file-manager/pull/8#issuecomment-6542471104)
+identifies `ab69db1`, zero new issues, **98.28% diff coverage** and **+0.27
+percentage points** coverage variation. The post-merge push has **14 successful
+checks and two skipped PR-only reporting jobs**; it has no Codacy check records.
+These merge-commit results were retrieved independently of the feature-head
+results. Neither set establishes hosted verification for this documentation edit.
+
+## Lizard 1.24.3 QC maintenance accepted and merged — 1 November 2026
+
+After PM3-04, the maintainer merged
+[PR #9](https://github.com/seapagan/terminal-file-manager/pull/9) at
+**11:43:08 UTC** as
+[`595ae5ddb4f8a38261f27ca8f03fa58a5767a775`](https://github.com/seapagan/terminal-file-manager/commit/595ae5ddb4f8a38261f27ca8f03fa58a5767a775).
+The final GPG-signed/Signed-off-by maintenance head was
+[`66a889728d3f851ef5218f97723d8bce91601862`](https://github.com/seapagan/terminal-file-manager/commit/66a889728d3f851ef5218f97723d8bce91601862).
+This maintenance sits between PM3-04 and PM3-05; it adds no PM3-05 functionality.
+
+The tooling and scanner fixtures now agree on **Lizard 1.24.3**, including
+corrected Rust match-arm and Python f-string counting. Scoped complexity
+remediation preserved behaviour, safety checks and cross-platform contracts.
+The limits remain **CCN 10 / function NLOC 50 / parameters 8 / file NLOC 500**,
+with metric exceedances advisory and scanner-integrity failures fatal. The
+scanner, suppressions, thresholds and dependency policy retain their contracts.
+
+Claude's eight review findings received these dispositions:
+
+| Finding | Final disposition |
+| --- | --- |
+| #1 action dispatch | Exhaustive final `Action` match; routing precedence preserved. Dispatch/application/pane CCN 6/10/10. |
+| #2 named colours | One exhaustive mapping without the separate bright-variant classification; CCN 9. |
+| #3 entry indicators | Exhaustive `EntryKind` match with explicit file/link helpers; CCN 9, helpers 2. |
+| #4 settings grouping | Retained. |
+| #5 relative time | Typed units and shared duration buckets; past/future wording and boundaries preserved; maximum CCN 7. |
+| #6 zero-scroll sentinel | Retained as harmless. |
+| #7 movement ownership | Retained in `scroll.rs`. |
+| #8 documentation | Deferred during code correction; reconciled by this documentation closeout after merge. |
+
+The final source-quality report retains **13 known Rust function-NLOC parser
+artefacts**, with no CCN, parameter or file-NLOC exceedance. Preserve these
+individual dispositions; do not reshape valid source or add suppressions to
+silence them. The final reports identify:
+
+| Source and reported function | Reported NLOC / limit |
+| --- | --- |
+| `src/browser/operations/reconciliation_summary_tests.rs` — `queued_and_running_reconciliation_distinguishes_previous_results_until_finish` | 177/50 |
+| `src/browser/operations/tests.rs` — `open_delete_retry` | 128/50 |
+| `src/input/pattern.rs` — `shortcut_target` | 154/50 |
+| `src/permissions.rs` — `file_type` | 55/50 |
+| `src/ui/operations/layout.rs` — `guard_approval` | 65/50 |
+| `src/ui/operations/layout_tests.rs` — `assert_jobs_regions` | 239/50 |
+| `tests/conflict_controls.rs` — `unavailable_choices_are_visible_inert_and_skipped_by_arrow_navigation` | 345/50 |
+| `tests/dialog_scrolling.rs` — `assert_clipped_delete_blocked` | 77/50 |
+| `tests/jobs_presentation.rs` — `evidence_toggle_is_reversible_and_keeps_each_receipt_and_full_source` | 270/50 |
+| `tests/operation_controls/lifecycle.rs` — `cancel_then_exit_waits_for_acknowledgement_and_return_abandons_exit_intent` | 88/50 |
+| `tests/operation_controls/preview.rs` — `changed_destructive_scope_cancels_the_old_preview_before_replacing_it` | 94/50 |
+| `tests/operation_incidents.rs` — `active_workers_must_acknowledge_stop_before_incident_exit_is_available` | 113/50 |
+| `tests/operation_ui.rs` — `conflict_disables_unsafe_choices_and_formats_optional_metadata` | 244/50 |
+
+| Evidence revision | Rust CI | Linux passed/skipped | macOS passed/skipped | Windows passed/skipped |
+| --- | --- | --- | --- | --- |
+| Final maintenance head `66a8897` | [41300979276](https://github.com/seapagan/terminal-file-manager/actions/runs/41300979276) | 861/2 | 838/2 | 806/3 |
+| Merge commit `595ae5d` | [41303122034](https://github.com/seapagan/terminal-file-manager/actions/runs/41303122034) | 861/2 | 838/2 | 806/3 |
+
+Both revisions passed all five Actions workflows, native doctests, exact MSRV
+1.95.0, source quality, dependency/workflow policy, strict source packaging and
+combined coverage. The maintenance head passed all **19 checks**, including all
+three Codacy checks. Its
+[Codacy summary](https://github.com/seapagan/terminal-file-manager/pull/9#issuecomment-6555686949)
+identifies `66a8897`, zero new issues, **96.93% diff coverage** and **+0.05
+percentage points** variation. Codacy's aggregate complexity/duplication metrics
+are separate from per-function Lizard limits. GitHub has no formal review
+approvals. The post-merge push has **14 successful checks and two skipped PR-only
+reporting jobs**, with no Codacy check records; its results were retrieved
+independently of the maintenance-head results.
+
+Inherited Node `DEP0005` artifact-download and Codacy JGit file-matching warnings
+remain nonblocking; the native coverage merge and uploader succeeded. These
+records do not claim hosted verification of this later documentation commit.
+Earlier 1.23.0 checkpoints below remain historical; 1.24.3 and the 13 artefacts
+above define the current tooling disposition.
+
 ## PM3-03 accepted and merged — 31 October 2026
 
 The maintainer merged [PR #7](https://github.com/seapagan/terminal-file-manager/pull/7)
@@ -7,8 +119,8 @@ at 07:49:24 UTC as
 [`35ad78d`](https://github.com/seapagan/terminal-file-manager/commit/35ad78dcd03b595741e9bf3e4582b87efd961eb5).
 The final feature head was GPG-signed/Signed-off-by
 [`709e8a0`](https://github.com/seapagan/terminal-file-manager/commit/709e8a0220a5fc00d34aecd7fa13e9731ab31323).
-Local empty-file creation is complete. PM3-04 Help is ready for a separate
-assignment; this closeout does not authorise implementation.
+At that checkpoint, local empty-file creation was complete and PM3-04 Help was
+ready for a separate assignment; that closeout did not authorise implementation.
 
 Independent external AI cold reviews ran in sequence: **Codex → DeepSeek →
 Claude**. Codex returned zero findings. DeepSeek identified two minor focus defects:
@@ -521,9 +633,9 @@ package/security/static/maintainability/coverage gates and mandatory Linux xwin
 check/Clippy/build. Xwin supplies cross-build evidence, not native Windows
 execution. Final Codacy static analysis and diff coverage succeeded; the
 maintainer accepted coverage variation of −3.0% against the −1.0% target.
-Lizard 1.23.0's `permissions::file_type` 55/50 result remains an accepted parser
-false positive. No threshold, scanner or dependency-policy exception changes
-follow from this record; see [provenance](provenance.md).
+At that M1 checkpoint, Lizard 1.23.0's `permissions::file_type` 55/50 result
+was an accepted parser false positive. No threshold, scanner or dependency-policy
+exception changes follow from this record; see [provenance](provenance.md).
 
 These results belong to the final M1 head. On 19 October, upstream `main` was
 checked at `10a2682c72de5c6428ae911ea07194d994b6822a`, the README rewrite dated
@@ -749,8 +861,9 @@ artifacts are separate from missing safety tests. Calling no-op callbacks merely
 to raise coverage would add little assurance. Meaningful remediation tests target
 the integration and mutation boundaries above. Final native reports and Codacy
 variation must be compared with this baseline; no waiver or threshold change
-follows from the investigation. Preserve the established Lizard 1.23 parser
-anomalies rather than changing valid source to fit the scanner.
+follows from the investigation. That checkpoint retained the established Lizard
+1.23 parser anomalies without changing valid source to fit the scanner. The QC
+closeout above records the current 1.24.3 disposition.
 
 ### Remediation coverage and remaining disposition, 21 October 2026
 
@@ -800,13 +913,13 @@ affirmative retry submission. These are assurance limits, not demonstrated
 defects or permission to weaken guards. UI detail/error branches remain partly
 uncovered. Neither the native nor merged reports provide branch coverage.
 
-Strict Rust maintainability passes. Lizard 1.23 still merges adjacent valid Rust
-tests: existing `operation_controls.rs:145` reports 141 NLOC, and new
-`operation_incidents.rs:115` reports 113 although that function ends at line 140.
-The prior `permissions::file_type` 55/50 parser anomaly remains unchanged.
+At that checkpoint, strict Rust maintainability passed. Lizard 1.23 merged
+adjacent valid Rust tests: `operation_controls.rs:145` reported 141 NLOC, and
+`operation_incidents.rs:115` reported 113 although that function ended at line 140.
+The prior `permissions::file_type` 55/50 parser anomaly remained unchanged.
 No suppression, scanner change or authenticated issue dismissal occurred.
-The residual coverage variation and new parser finding require separate narrow
-maintainer dispositions. M2 acceptance remains pending.
+The residual coverage variation and new parser finding required separate narrow
+maintainer dispositions; M2 acceptance was pending at that checkpoint.
 
 ### M2 final safety-assurance source checkpoint, 22 October 2026
 
@@ -858,15 +971,15 @@ Linux xwin check/Clippy/build pass separately. Clean signed-tree full verificati
 foreign-native results and regenerated combined/production/diff coverage remain
 pending delivery below. No infrastructure changed; `verify-infra` is not run.
 
-Lizard 1.23.0 reports a new parser merge at
-`src/browser/operations/tests.rs:341`: `open_delete_retry` reports **128 NLOC**
-although its body ends at line 360; the scanner includes the three following
-separate tests. Strict Clippy accepts each function. The established
+At that checkpoint, Lizard 1.23.0 reported a new parser merge at
+`src/browser/operations/tests.rs:341`: `open_delete_retry` reported **128 NLOC**
+although its body ended at line 360; the scanner included the three following
+separate tests. Strict Clippy accepted each function. The established
 `permissions::file_type` 55/50, `operation_controls.rs:145` 141/50 and
-`operation_incidents.rs:115` 113/50 findings remain. No cosmetic restructuring,
+`operation_incidents.rs:115` 113/50 findings remained. No cosmetic restructuring,
 suppression, detector change or issue dismissal follows. Maintainer disposition
 of each scanner finding, residual Codacy variation and final M2 acceptance
-remains pending; behavioral assurance does not waive coverage policy.
+was pending at that checkpoint; behavioral assurance did not waive coverage policy.
 
 #### Native fixture correction, 22 October 2026
 
