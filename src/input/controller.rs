@@ -160,7 +160,14 @@ impl Controller {
             PatternSelection => super::pattern::open(self),
             Count => return self.count(geometry),
             Cancel => self.cancel(),
-            _ => {}
+            // These actions are handled or normalized before pane dispatch.
+            Diagnostics | DiagnosticsUp | DiagnosticsDown | SplitLeft | SplitRight
+            | ViewProfiles | Quit | SaveQuit | ViewOptions | HumanSizes | FuzzyTimestamps
+            | Permissions | ColumnSize | ColumnModified | ColumnAttributes | ColumnOwner
+            | OwnerDisplay | MetadataPresentation | TogglePanes | Maximise | FocusPane
+            | ToggleSidebar | Metadata | Help | Info | Viewer | Editor | Path | Zoxide
+            | OppositeZoxide | ExitDirectory | Copy | Move | Mkdir | CreateFile | Trash
+            | Delete | Rename | Attributes | Jobs | CopyQuick | MoveQuick => {}
         }
         Vec::new()
     }

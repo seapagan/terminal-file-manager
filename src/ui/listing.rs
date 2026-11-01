@@ -353,7 +353,8 @@ pub(super) fn indicator(entry: &Entry) -> &'static str {
 
 pub(super) fn type_indicator(kind: EntryKind, executable: bool, broken: bool) -> &'static str {
     match kind {
-        EntryKind::File | EntryKind::Link => file_or_link_indicator(kind, executable, broken),
+        EntryKind::File => file_indicator(executable),
+        EntryKind::Link => link_indicator(broken),
         EntryKind::Directory => "d",
         EntryKind::Junction => "j",
         EntryKind::ReparsePoint => "r",
@@ -364,14 +365,12 @@ pub(super) fn type_indicator(kind: EntryKind, executable: bool, broken: bool) ->
     }
 }
 
-fn file_or_link_indicator(kind: EntryKind, executable: bool, broken: bool) -> &'static str {
-    if kind == EntryKind::File {
-        if executable { "*" } else { "-" }
-    } else if broken {
-        "!"
-    } else {
-        "@"
-    }
+fn file_indicator(executable: bool) -> &'static str {
+    if executable { "*" } else { "-" }
+}
+
+fn link_indicator(broken: bool) -> &'static str {
+    if broken { "!" } else { "@" }
 }
 
 pub(super) fn size(bytes: Option<u64>) -> String {

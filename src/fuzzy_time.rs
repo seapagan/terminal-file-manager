@@ -18,16 +18,41 @@ pub(crate) const YEAR: Duration = Duration::from_secs(365 * DAY.as_secs());
 
 #[derive(Debug)]
 enum FuzzyTime {
-    Ago(&'static str, u64),
+    Ago(TimeUnit, u64),
     LastWeek,
     LastMonth,
     LastYear,
     Yesterday,
 }
 
+#[derive(Debug)]
+enum TimeUnit {
+    Second,
+    Minute,
+    Hour,
+    Day,
+    Week,
+    Month,
+    Year,
+}
+
+impl TimeUnit {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Second => "second",
+            Self::Minute => "minute",
+            Self::Hour => "hour",
+            Self::Day => "day",
+            Self::Week => "week",
+            Self::Month => "month",
+            Self::Year => "year",
+        }
+    }
+}
+
 /// Format one relative-time unit with simple pluralization.
-fn format_unit(unit: &str, n: u64) -> String {
-    format!("{} {}{}", n, unit, if n == 1 { "" } else { "s" })
+fn format_unit(unit: &TimeUnit, n: u64) -> String {
+    format!("{} {}{}", n, unit.as_str(), if n == 1 { "" } else { "s" })
 }
 
 impl fmt::Display for FuzzyTime {
@@ -44,75 +69,49 @@ impl fmt::Display for FuzzyTime {
 
 /// Format a future timestamp offset.
 fn format_future_time(duration: Duration) -> String {
-    let (unit, n) = if duration < DAY {
+    let (unit, n) = duration_unit(duration);
+    format!("in {}", format_unit(&unit, n))
+}
+
+fn duration_unit(duration: Duration) -> (TimeUnit, u64) {
+    if duration < DAY {
         subday_unit(duration.as_secs())
     } else {
         calendar_unit(duration)
-    };
-    format!("in {}", format_unit(unit, n))
-}
-
-fn subday_unit(seconds: u64) -> (&'static str, u64) {
-    if seconds < 60 {
-        ("second", seconds)
-    } else if seconds < 3600 {
-        ("minute", seconds / 60)
-    } else {
-        ("hour", seconds / 3600)
     }
 }
 
-fn calendar_unit(duration: Duration) -> (&'static str, u64) {
-    let (unit, bucket) = if duration < WEEK {
-        ("day", DAY)
-    } else if duration < MONTH {
-        ("week", WEEK)
-    } else if duration < YEAR {
-        ("month", MONTH)
+fn subday_unit(seconds: u64) -> (TimeUnit, u64) {
+    if seconds < 60 {
+        (TimeUnit::Second, seconds)
+    } else if seconds < 3600 {
+        (TimeUnit::Minute, seconds / 60)
     } else {
-        ("year", YEAR)
+        (TimeUnit::Hour, seconds / 3600)
+    }
+}
+
+fn calendar_unit(duration: Duration) -> (TimeUnit, u64) {
+    let (unit, bucket) = if duration < WEEK {
+        (TimeUnit::Day, DAY)
+    } else if duration < MONTH {
+        (TimeUnit::Week, WEEK)
+    } else if duration < YEAR {
+        (TimeUnit::Month, MONTH)
+    } else {
+        (TimeUnit::Year, YEAR)
     };
     (unit, duration.as_secs() / bucket.as_secs())
 }
 
 /// Bucket a past timestamp offset into the phrase used for display.
 fn get_fuzzy_time(duration: Duration) -> FuzzyTime {
-    let seconds = duration.as_secs();
-    let minutes = seconds / 60;
-    let hours = minutes / 60;
-    match seconds {
-        s if s < 60 => FuzzyTime::Ago("second", s),
-        _ if minutes < 60 => FuzzyTime::Ago("minute", minutes),
-        _ if hours < 24 => FuzzyTime::Ago("hour", hours),
-        _ => older_fuzzy_time(duration),
-    }
-}
-
-fn older_fuzzy_time(duration: Duration) -> FuzzyTime {
-    if duration < MONTH {
-        return recent_fuzzy_time(duration);
-    }
-    if duration < 2 * MONTH {
-        FuzzyTime::LastMonth
-    } else if duration < YEAR {
-        FuzzyTime::Ago("month", duration.as_secs() / MONTH.as_secs())
-    } else if duration < 2 * YEAR {
-        FuzzyTime::LastYear
-    } else {
-        FuzzyTime::Ago("year", duration.as_secs() / YEAR.as_secs())
-    }
-}
-
-fn recent_fuzzy_time(duration: Duration) -> FuzzyTime {
-    let days = duration.as_secs() / DAY.as_secs();
-    if days == 1 {
-        FuzzyTime::Yesterday
-    } else if duration < WEEK {
-        FuzzyTime::Ago("day", days)
-    } else if duration < 2 * WEEK {
-        FuzzyTime::LastWeek
-    } else {
-        FuzzyTime::Ago("week", duration.as_secs() / WEEK.as_secs())
+    match duration_unit(duration) {
+        (TimeUnit::Day, 1) => FuzzyTime::Yesterday,
+        (TimeUnit::Week, 1) => FuzzyTime::LastWeek,
+        (TimeUnit::Month, 1) => FuzzyTime::LastMonth,
+        (TimeUnit::Year, 1) => FuzzyTime::LastYear,
+        (unit, n) => FuzzyTime::Ago(unit, n),
     }
 }
 

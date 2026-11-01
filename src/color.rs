@@ -305,29 +305,16 @@ pub fn map_color(resolved: ResolvedColor) -> Color {
 }
 
 fn map_named_color(named: AnsiColor) -> Color {
-    let (normal, bright) = match named {
-        AnsiColor::Black | AnsiColor::BrightBlack => (Color::Black, Color::DarkGray),
-        AnsiColor::Red | AnsiColor::BrightRed => (Color::Red, Color::LightRed),
-        AnsiColor::Green | AnsiColor::BrightGreen => (Color::Green, Color::LightGreen),
-        AnsiColor::Yellow | AnsiColor::BrightYellow => (Color::Yellow, Color::LightYellow),
-        AnsiColor::Blue | AnsiColor::BrightBlue => (Color::Blue, Color::LightBlue),
-        AnsiColor::Magenta | AnsiColor::BrightMagenta => (Color::Magenta, Color::LightMagenta),
-        AnsiColor::Cyan | AnsiColor::BrightCyan => (Color::Cyan, Color::LightCyan),
-        AnsiColor::White | AnsiColor::BrightWhite => (Color::Gray, Color::White),
+    use AnsiColor::*;
+    let (base, normal, bright) = match named {
+        Black | BrightBlack => (Black, Color::Black, Color::DarkGray),
+        Red | BrightRed => (Red, Color::Red, Color::LightRed),
+        Green | BrightGreen => (Green, Color::Green, Color::LightGreen),
+        Yellow | BrightYellow => (Yellow, Color::Yellow, Color::LightYellow),
+        Blue | BrightBlue => (Blue, Color::Blue, Color::LightBlue),
+        Magenta | BrightMagenta => (Magenta, Color::Magenta, Color::LightMagenta),
+        Cyan | BrightCyan => (Cyan, Color::Cyan, Color::LightCyan),
+        White | BrightWhite => (White, Color::Gray, Color::White),
     };
-    if matches!(
-        named,
-        AnsiColor::BrightBlack
-            | AnsiColor::BrightRed
-            | AnsiColor::BrightGreen
-            | AnsiColor::BrightYellow
-            | AnsiColor::BrightBlue
-            | AnsiColor::BrightMagenta
-            | AnsiColor::BrightCyan
-            | AnsiColor::BrightWhite
-    ) {
-        bright
-    } else {
-        normal
-    }
+    if named == base { normal } else { bright }
 }

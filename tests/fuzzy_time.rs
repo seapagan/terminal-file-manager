@@ -312,3 +312,26 @@ fn exact_clock_boundaries_retain_original_past_and_future_semantics() {
         "0 seconds ago"
     );
 }
+
+#[test]
+fn future_boundaries_preserve_units_and_pluralization_on_both_sides() {
+    let now = fixed_now();
+    let tick = Duration::from_nanos(100);
+    for (seconds, before, at) in [
+        (60, "in 59 seconds", "in 1 minute"),
+        (3600, "in 59 minutes", "in 1 hour"),
+        (86400, "in 23 hours", "in 1 day"),
+        (172800, "in 1 day", "in 2 days"),
+        (604800, "in 6 days", "in 1 week"),
+        (1209600, "in 1 week", "in 2 weeks"),
+        (2592000, "in 4 weeks", "in 1 month"),
+        (5184000, "in 1 month", "in 2 months"),
+        (31536000, "in 12 months", "in 1 year"),
+        (63072000, "in 1 year", "in 2 years"),
+    ] {
+        let boundary = Duration::from_secs(seconds);
+        assert_eq!(fuzzy_time(now + boundary - tick, now), before);
+        assert_eq!(fuzzy_time(now + boundary, now), at);
+        assert_eq!(fuzzy_time(now + boundary + tick, now), at);
+    }
+}
