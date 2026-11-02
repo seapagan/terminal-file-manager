@@ -506,3 +506,6 @@ fn creation_completion_during_an_older_scan_uses_the_deferred_refresh() {
 #[cfg(windows)]
 #[path = "create_file/windows.rs"]
 mod windows;
+
+#[path = "create_file/notifications.rs"]
+mod notifications;

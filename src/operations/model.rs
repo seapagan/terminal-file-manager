@@ -153,19 +153,6 @@ pub struct PendingConflict {
     pub choice: usize,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum NoticeSeverity {
-    Success,
-    Warning,
-    Error,
-}
-
-pub struct Notice {
-    pub text: String,
-    pub expires: SystemTime,
-    pub severity: NoticeSeverity,
-}
-
 /// Session-only operation state. Toast expiry never removes the job's result evidence.
 #[derive(Default)]
 pub struct State {
@@ -181,7 +168,6 @@ pub struct State {
     pub cursor: usize,
     pub scroll: usize,
     pub waiting_exit: Option<bool>,
-    pub notices: VecDeque<Notice>,
     pub exit_snapshot: Option<crate::session::NavigationSession>,
     pub last_error: Option<String>,
 }
@@ -215,26 +201,6 @@ impl State {
                     .iter()
                     .any(|entry| entry.outcome == Outcome::OutcomeUnknown)
             })
-    }
-    /// Retain the raw rejection in Jobs and return its immediate status with a details route.
-    pub fn fail(&mut self, detail: String, now: SystemTime) -> crate::app::Status {
-        let text = format!("Not started: {detail}");
-        let status = crate::app::Status::JobsDetails(text.clone());
-        self.notify(text, now, NoticeSeverity::Error);
-        self.last_error = Some(detail);
-        status
-    }
-    pub fn notify(&mut self, text: String, now: SystemTime, severity: NoticeSeverity) {
-        self.notices
-            .retain(|notice| notice.text != text && notice.expires > now);
-        self.notices.push_back(Notice {
-            text,
-            expires: now + std::time::Duration::from_secs(5),
-            severity,
-        });
-        while self.notices.len() > 2 {
-            self.notices.pop_front();
-        }
     }
 }
 

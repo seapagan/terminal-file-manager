@@ -222,8 +222,8 @@ fn configured_shortcuts_reach_metadata_and_status_hints() {
     assert!(text.contains("[F6 Close]"));
     assert!(text.contains("F1 for jobs"));
     c.app.popup = false;
-    c.app.status = c.app.operations.fail("Owned failure".into(), c.app.now);
-    c.app.operations.notices.clear();
+    c.app.reject_operation("Owned failure".into());
+    c.app.notifications.dismiss_toasts();
     terminal
         .draw(|f| {
             ui::render(f, &c.app, &Theme::new(ColorLevel::NoColor));

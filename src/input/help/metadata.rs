@@ -292,6 +292,7 @@ define_commands! {
         HelpSection::Views,
         "File editor (not available yet)",
     ),
+    (Action::Notifications, HelpSection::Jobs, "Read session notification history; Enter opens linked Jobs evidence"),
     (Action::Help, HelpSection::Application, "Help"),
     (
         Action::Cancel,

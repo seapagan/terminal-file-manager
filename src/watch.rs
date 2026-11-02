@@ -181,19 +181,27 @@ impl Slot {
             self.urgent = true;
         }
         if changed {
-            let message = if failed {
-                "Live filesystem notifications unavailable; periodically refreshing"
-            } else {
-                "Live filesystem notifications recovered"
-            };
-            app.operations.notify(
-                format!("Pane {}: {message}", pane + 1),
-                app.now,
-                NoticeSeverity::Warning,
-            );
+            announce(app, pane, failed);
         }
         changed
     }
+}
+
+fn announce(app: &mut App, pane: usize, failed: bool) {
+    let message = if failed {
+        "Live filesystem notifications unavailable; periodically refreshing"
+    } else {
+        "Live filesystem notifications recovered"
+    };
+    app.notifications.notify(
+        format!("Pane {}: {message}", pane + 1),
+        app.now,
+        if failed {
+            NoticeSeverity::Warning
+        } else {
+            NoticeSeverity::Info
+        },
+    );
 }
 
 fn new_worker(mode: Mode) -> Option<NativeWorker> {

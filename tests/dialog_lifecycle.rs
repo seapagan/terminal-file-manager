@@ -90,7 +90,7 @@ fn completed_job(app: &mut terminal_file_manager::app::App, previous: Operation)
         finished: Some(app.now),
         retry_of: None,
     });
-    app.operations.notify(
+    app.notifications.notify(
         "Completed previous operation".into(),
         app.now,
         NoticeSeverity::Success,

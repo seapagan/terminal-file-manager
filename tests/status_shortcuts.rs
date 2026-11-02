@@ -57,22 +57,22 @@ fn literal_status_and_notice_text_are_never_interpreted_as_shortcut_templates() 
         c.app.status = text.into();
         assert!(draw(&c.app, 160).contains(text));
     }
-    c.app.operations.notify(
+    c.app.notifications.notify(
         "Literal — F9 details".into(),
         c.app.now,
         terminal_file_manager::operations::NoticeSeverity::Error,
     );
     let text = draw(&c.app, 160);
     assert!(
-        text.contains("Error: Literal — F9 details — F1 details"),
+        text.contains("Error: Literal — F9 details — Alt+h details"),
         "{text}"
     );
 }
 #[test]
 fn rejected_request_keeps_effective_details_route_when_clipped() {
     let mut c = controller();
-    c.app.status = c.app.operations.fail("long reason ".repeat(50), c.app.now);
-    c.app.operations.notices.clear();
+    c.app.reject_operation("long reason ".repeat(50));
+    c.app.notifications.dismiss_toasts();
     let text = draw(&c.app, 25);
     assert!(text.contains("F1 details"), "{text}");
     assert!(!text.contains("F9 details"));

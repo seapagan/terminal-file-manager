@@ -31,7 +31,10 @@ pub(super) fn check(controller: &mut Controller) {
 fn stopped(controller: &mut Controller, save: bool) {
     if controller.app.operations.unknown() {
         controller.app.operations.exit_snapshot = None;
-        controller.app.status = "Outcome unknown; exit blocked pending reconciliation".into();
+        controller.app.notify(
+            crate::notifications::Severity::Warning,
+            "Outcome unknown; exit blocked pending reconciliation",
+        );
     } else if controller.app.operations.incidents() {
         controller.app.operations.scroll = 0;
         controller.app.operations.dialog = Some(Dialog::IncidentExit {

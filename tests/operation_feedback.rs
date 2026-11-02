@@ -200,8 +200,7 @@ fn grouped_causes_and_all_outcomes_remain_distinct_with_full_evidence() {
 fn rejected_request_notice_keeps_its_reason_and_does_not_invent_a_job() {
     let root = tempfile::tempdir().unwrap();
     let mut app = App::new(root.path().into());
-    app.operations
-        .fail("Destination is unavailable.".into(), app.now);
+    app.reject_operation("Destination is unavailable.".into());
     let text = draw(&app);
     assert!(text.contains("Not started: Destination is unavailable."));
     assert!(app.operations.history.is_empty());

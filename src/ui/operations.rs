@@ -3,11 +3,7 @@ use crate::{
     color::{Role, Theme},
 };
 use crossterm::event::KeyCode;
-use ratatui::{
-    Frame,
-    layout::Rect,
-    widgets::{Clear, Paragraph},
-};
+use ratatui::{Frame, layout::Rect, widgets::Paragraph};
 mod actions;
 mod conflict;
 mod content;
@@ -74,7 +70,6 @@ pub(super) fn geometry(
 }
 
 pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, geometry: &super::Geometry) {
-    notices(frame, app, theme, geometry.status);
     let Some(layout) = &geometry.operation_layout else {
         return;
     };
@@ -157,51 +152,6 @@ fn field_controls(rows: &[content::Row], area: Rect, scroll: usize) -> Vec<Opera
 fn render_rows(frame: &mut Frame, rows: &[content::Row], area: Rect, theme: &Theme) {
     let text: Vec<_> = rows.iter().map(|row| row.line(area.width, theme)).collect();
     frame.render_widget(Paragraph::new(text), area);
-}
-
-fn notices(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
-    if app.diagnostics
-        || app.help
-        || app.popup
-        || app.view_menu.is_some()
-        || app.profile_menu.is_some()
-    {
-        return;
-    }
-    let notice = if app.operations.incidents() {
-        Some((
-            format!(
-                "CRITICAL · {} details: OS reported permanent deletion during {} Trash",
-                app.shortcut(crate::input::Action::Jobs, "F9"),
-                app.shortcut(crate::input::Action::Trash, "F8")
-            ),
-            Role::Error,
-        ))
-    } else if visible(app) {
-        None
-    } else {
-        app.operations
-            .notices
-            .iter()
-            .rev()
-            .find(|notice| notice.expires > app.now)
-            .map(|notice| short_notice(app, notice, area.width))
-    };
-    if let Some((text, role)) = notice {
-        frame.render_widget(Clear, area);
-        frame.render_widget(Paragraph::new(text).style(theme.style(role)), area);
-    }
-}
-
-fn short_notice(app: &App, notice: &crate::operations::Notice, width: u16) -> (String, Role) {
-    use crate::operations::NoticeSeverity;
-    let (label, role) = match notice.severity {
-        NoticeSeverity::Success => ("Success", Role::Status),
-        NoticeSeverity::Warning => ("Warning", Role::Warning),
-        NoticeSeverity::Error => ("Error", Role::Error),
-    };
-    let text = format!("{label}: {}", notice.text);
-    (super::details_text(app, &text, width), role)
 }
 
 /// The event loop calls this with monotonic elapsed time; only visible pending counts redraw.

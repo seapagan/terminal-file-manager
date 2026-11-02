@@ -437,3 +437,23 @@ fn view_dialog_help_and_profile_editing_cross_the_native_terminal_parser() {
     );
     assert!(!root.path().join("config/tfm/config.toml").exists());
 }
+
+#[test]
+fn notification_history_opens_from_the_native_keyboard_and_restores_the_browser() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("notification-ready"), "preserved").unwrap();
+    drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("notification-ready", "\x1bOR"),
+            ("Viewer/editor unavailable", "\x1bh"),
+            ("Notifications", "\x1b"),
+            ("notification-ready", "q"),
+        ],
+        false,
+    );
+    assert_eq!(
+        fs::read(root.path().join("notification-ready")).unwrap(),
+        b"preserved"
+    );
+}

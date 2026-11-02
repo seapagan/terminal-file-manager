@@ -100,6 +100,11 @@ fn choose(controller: &mut Controller) {
     controller.preferences.capture_view(&view);
     controller.preferences_changed = true;
     controller.app.profile_menu = None;
+    controller.app.notifications.notify(
+        format!("View profile {name} applied"),
+        controller.app.now,
+        crate::notifications::Severity::Info,
+    );
 }
 
 fn edit(controller: &mut Controller, key: KeyEvent) {
@@ -126,7 +131,12 @@ fn edit(controller: &mut Controller, key: KeyEvent) {
 fn save(controller: &mut Controller) {
     let name = controller.app.profile_name.as_ref().unwrap().clone();
     if let Err(error) = validate_profile_name(&name) {
-        controller.app.status = error.into();
+        controller.app.status = error.clone().into();
+        controller.app.notifications.notify(
+            error,
+            controller.app.now,
+            crate::notifications::Severity::Error,
+        );
         return;
     }
     let pane = &mut controller.app.panes[controller.app.active];
@@ -146,6 +156,11 @@ fn save(controller: &mut Controller) {
     controller.app.profile_name = None;
     controller.app.profile_menu = None;
     controller.app.profile_names = controller.preferences.profiles.keys().cloned().collect();
+    controller.app.notifications.notify(
+        format!("View profile {name} saved in session; preferences save on exit"),
+        controller.app.now,
+        crate::notifications::Severity::Success,
+    );
 }
 
 pub(super) fn mouse(

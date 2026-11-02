@@ -61,7 +61,7 @@ fn degraded_scan_intervals_grow_to_thirty_seconds_despite_repeated_errors() {
         finish(&mut app, &mut pool);
     }
     assert_eq!(starts, [0, 2000, 6000, 14000, 30000, 60000, 90000]);
-    assert_eq!(app.operations.notices.len(), 1);
+    assert_eq!(app.notifications.history.len(), 1);
 }
 
 #[test]

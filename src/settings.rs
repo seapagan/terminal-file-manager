@@ -24,6 +24,8 @@ pub enum MetadataPresentation {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Settings {
+    pub toast_placement: crate::notifications::Placement,
+    pub toast_expiry_seconds: u16,
     pub sidebar: bool,
     pub two_panes: bool,
     pub restore_session: bool,
@@ -48,6 +50,8 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            toast_placement: Default::default(),
+            toast_expiry_seconds: 5,
             sidebar: false,
             two_panes: false,
             restore_session: false,
@@ -98,6 +102,9 @@ impl Settings {
         if !(20..=80).contains(&settings.split_percent) {
             return Err("split_percent must be between 20 and 80".into());
         }
+        if !(1..=60).contains(&settings.toast_expiry_seconds) {
+            return Err("toast_expiry_seconds must be between 1 and 60".into());
+        }
         for name in settings.profiles.keys() {
             validate_profile_name(name)?;
         }
@@ -110,6 +117,8 @@ impl Settings {
 
     /// Apply startup/view preferences without replacing native locations.
     pub fn apply(&self, app: &mut App) {
+        app.notifications.placement = self.toast_placement;
+        app.notifications.expiry_seconds = self.toast_expiry_seconds;
         app.sidebar = self.sidebar;
         app.dual = self.two_panes;
         app.split_percent = self.split_percent;

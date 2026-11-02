@@ -6,6 +6,10 @@ use crate::{
 use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind};
 
 pub(super) fn action(controller: &mut Controller, action: Action, geometry: &Geometry) -> bool {
+    if action == Action::Notifications {
+        super::notifications::open(controller);
+        return true;
+    }
     if action == Action::Jobs {
         let state = &mut controller.app.operations;
         state.show_history = !state.show_history;
@@ -17,10 +21,7 @@ pub(super) fn action(controller: &mut Controller, action: Action, geometry: &Geo
         return false;
     };
     if let Err(error) = open(controller, action, operation, geometry) {
-        controller.app.status = controller
-            .app
-            .operations
-            .fail(error.to_string(), controller.app.now);
+        controller.app.reject_operation(error.to_string());
     }
     true
 }

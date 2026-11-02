@@ -8,6 +8,9 @@ mod layout;
 mod listing;
 mod measure;
 mod metadata;
+mod notifications;
+mod status;
+pub use notifications::{HistoryLayout, Toast};
 pub mod modal;
 mod operations;
 pub(crate) use operations::animate_preview;
@@ -21,13 +24,10 @@ pub use pattern::{PatternControl, PatternLayout};
 mod summary;
 mod text;
 mod view;
-use crate::{
-    app::App,
-    color::{Role, Theme},
-};
+use crate::{app::App, color::Theme};
 pub use layout::{Geometry, geometry};
 pub use measure::Measurements;
-use ratatui::{Frame, layout::Rect, widgets::Paragraph};
+use ratatui::{Frame, layout::Rect};
 
 fn status_text(app: &App, status: &crate::app::Status, width: u16) -> String {
     match status {
@@ -84,14 +84,10 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     if let Some(area) = geometry.sidebar {
         metadata::render(frame, app, area, theme, false);
     }
-    frame.render_widget(
-        Paragraph::new(status_text(app, &app.status, geometry.status.width))
-            .style(theme.style(Role::Status)),
-        geometry.status,
-    );
+    status::render(frame, app, geometry.status, theme);
     footer::render(frame, geometry.footer, &geometry.footer_controls, theme);
     if app.popup {
-        metadata::render(frame, app, frame.area(), theme, true);
+        metadata::render(frame, app, overlay_bounds(app, frame.area()), theme, true);
     }
     if let Some(layout) = &geometry.help {
         help::render(frame, app, theme, layout);
@@ -109,6 +105,7 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     pattern::render(frame, app, theme, geometry.pattern.as_ref());
     operations::render(frame, app, theme, &geometry);
     help::context::render(frame, app, theme, geometry.context_help.as_ref());
+    notifications::render(frame, app, &geometry, theme);
     geometry
 }
 
@@ -121,6 +118,15 @@ pub(super) fn centered(area: Rect, width: u16, height: u16) -> Rect {
         width,
         height,
     )
+}
+
+fn overlay_bounds(app: &App, area: Rect) -> Rect {
+    Rect {
+        height: area
+            .height
+            .saturating_sub(status::rows(app, area).saturating_sub(1)),
+        ..area
+    }
 }
 
 #[cfg(test)]

@@ -1,5 +1,26 @@
 # Acceptance gates
 
+## PM3-05 implementation checkpoint — 2 November 2026
+
+The status and notification implementation includes retained session history.
+Alt+h and the status history segment open a measured Notifications modal;
+Older/Newer, Up/Down and Home/End choose events, while PageUp/PageDown and the
+wheel scroll complete details. Enter opens the corresponding Jobs evidence.
+Application notifications create no filesystem jobs. Toast expiry and queue
+pressure retain history, including earlier outcomes after reconciliation.
+
+Focused regressions cover injected expiry clocks, configuration round trips and
+bounds, priority/deduplication, bounded pending presentations, non-operation
+history, mouse controls, widths 20–120, small heights, Unicode/control escaping,
+all colour depths, persistent safety warnings and parent-surface restoration.
+The Create File collision regression checks the visible filename/error, retained
+Jobs evidence and unchanged existing bytes. A native PTY/ConPTY case opens
+history from an application notification and returns to the browser before quit.
+Existing operation, critical-incident, reconciliation and safe-exit regressions
+remain in place. Exact delivery and hosted evidence belong to the current
+controller checkpoint; maintainer visual acceptance and serial independent
+reviews remain outstanding. This checkpoint does not accept or merge PM3-05.
+
 ## PM3-04 accepted and merged — 1 November 2026
 
 The maintainer accepted the completed Help work and merged

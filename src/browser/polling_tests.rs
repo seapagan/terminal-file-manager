@@ -99,7 +99,7 @@ fn native_event_reconciliation_preserves_running_and_completed_counts() {
     );
     assert_eq!(controller.app.metadata_scroll, 7);
     assert!(
-        controller.app.operations.notices.is_empty(),
+        controller.app.notifications.history.is_empty(),
         "native backend must remain healthy"
     );
 }

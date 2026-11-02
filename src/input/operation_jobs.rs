@@ -93,7 +93,10 @@ impl Controller {
             dialog.plan = plan;
             dialog.ready = true;
             dialog.error = None;
-            self.app.status = "Preview ready; review exact counts before confirming".into();
+            self.app.notify(
+                crate::notifications::Severity::Info,
+                "Preview ready; review exact counts before confirming",
+            );
         }
     }
 
@@ -113,16 +116,7 @@ impl Controller {
     }
 
     fn finish_operation(&mut self, id: u64, record: crate::operations::Record) -> Vec<Request> {
-        if let Some(Dialog::Operation(dialog)) = &mut self.app.operations.dialog
-            && dialog.preview_id == Some(id)
-        {
-            dialog.ready = false;
-            let detail = record
-                .entries
-                .first()
-                .map_or_else(|| "Preview cancelled".into(), |entry| entry.detail.clone());
-            dialog.error = Some(detail);
-            self.app.status = "Preview unavailable; confirmation disabled".into();
+        if self.failed_preview(id, &record) {
             return Vec::new();
         }
         self.app
@@ -137,7 +131,7 @@ impl Controller {
             .find(|job| job.id == id)
         {
             job.finish(record, self.app.now);
-            self.app.status = crate::operations::summary(job).into();
+            self.app.status = notification_summary(job).into();
             let severity = match job.state {
                 JobState::Completed => crate::operations::NoticeSeverity::Success,
                 JobState::Failed | JobState::Unknown | JobState::Critical => {
@@ -145,20 +139,57 @@ impl Controller {
                 }
                 _ => crate::operations::NoticeSeverity::Warning,
             };
-            let incident = job.state == JobState::Critical;
             let success = job.state == JobState::Completed;
             for pane in &mut self.app.panes {
                 pane.finish_creation(id, success);
             }
-            if !incident {
-                self.app
-                    .operations
-                    .notify(self.app.status.to_string(), self.app.now, severity);
-            }
+            self.app.notifications.record(
+                self.app.status.to_string(),
+                self.app.now,
+                severity,
+                Some(id),
+            );
             super::operations::check_exit(self);
             return refresh(self);
         }
         Vec::new()
+    }
+    fn failed_preview(&mut self, id: u64, record: &crate::operations::Record) -> bool {
+        if let Some(Dialog::Operation(dialog)) = &mut self.app.operations.dialog
+            && dialog.preview_id == Some(id)
+        {
+            dialog.ready = false;
+            let detail = record
+                .entries
+                .first()
+                .map_or_else(|| "Preview cancelled".into(), |entry| entry.detail.clone());
+            let message = format!("Preview unavailable; confirmation disabled: {detail}");
+            dialog.error = Some(detail);
+            self.app
+                .notify(crate::notifications::Severity::Error, message);
+            return true;
+        }
+        false
+    }
+}
+
+fn notification_summary(job: &Job) -> String {
+    let summary = crate::operations::summary(job);
+    if job.plan.operation.creates_entry() {
+        job.plan
+            .destination
+            .as_ref()
+            .map_or(summary.clone(), |path| {
+                format!(
+                    "{}: {summary} ({})",
+                    path.file_name()
+                        .unwrap_or(path.as_os_str())
+                        .to_string_lossy(),
+                    path.display()
+                )
+            })
+    } else {
+        summary
     }
 }
 
@@ -282,11 +313,16 @@ fn conflict_key(controller: &mut Controller, key: KeyCode, geometry: &Geometry) 
         return;
     };
     if let Some(reason) = disabled(&conflict.event, &decision) {
-        controller.app.status = reason.into();
+        controller
+            .app
+            .notify(crate::notifications::Severity::Warning, reason);
         return;
     }
     if !visible_decision(geometry, &decision) {
-        controller.app.status = "Resize to review the conflict before replacing.".into();
+        controller.app.notify(
+            crate::notifications::Severity::Warning,
+            "Resize to review the conflict before replacing.",
+        );
         return;
     }
     let decision = if conflict.all && !matches!(decision, Decision::Cancel) {

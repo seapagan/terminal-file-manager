@@ -8,9 +8,7 @@ mod mounts;
 mod mutations;
 mod preview;
 mod recovery;
-pub use model::{
-    Dialog, Intent, Job, JobState, Notice, NoticeSeverity, OperationDialog, PendingConflict, State,
-};
+pub use model::{Dialog, Intent, Job, JobState, OperationDialog, PendingConflict, State};
 pub(crate) use model::{counts_summary, summary};
 pub use recovery::{Recovery, reconcile};
 mod queue;
@@ -29,3 +27,6 @@ pub use execute::execute;
 pub use locks::Coordinator;
 pub use plan::{Operation, Plan};
 pub use results::{Decision, EntryResult, Event, Options, Outcome, Record, Stage, TrashResult};
+
+// Existing operation callers share the application notification vocabulary.
+pub use crate::notifications::{Notice, Severity as NoticeSeverity};

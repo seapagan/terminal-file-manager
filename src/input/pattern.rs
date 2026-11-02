@@ -182,7 +182,9 @@ fn enter(controller: &mut Controller, layout: &crate::ui::PatternLayout) {
                     "Show the pattern and counts; scroll up or enlarge terminal".into()
                 });
             state.feedback = Some(reason.clone());
-            controller.app.status = reason.into();
+            controller
+                .app
+                .notify(crate::notifications::Severity::Warning, reason);
         }
     } else if let Some(target) = layout
         .targets()
@@ -248,9 +250,21 @@ fn activate(controller: &mut Controller, target: PatternControl, move_focus: boo
                         preview.matches
                     )
                     .into();
+                    controller.app.notifications.notify(
+                        controller.app.status.to_string(),
+                        controller.app.now,
+                        crate::notifications::Severity::Success,
+                    );
                     return;
                 }
-                Err(error) => controller.app.status = error.into(),
+                Err(error) => {
+                    controller.app.status = error.clone().into();
+                    controller.app.notifications.notify(
+                        error,
+                        controller.app.now,
+                        crate::notifications::Severity::Error,
+                    );
+                }
             }
         }
     }

@@ -44,10 +44,7 @@ pub(super) fn submit(controller: &mut Controller, queue: &mut Queue) {
                 .map(|id| controller.register_operation(id, plan, options, Some(parent))),
         };
         if let Err(error) = result {
-            controller.app.status = controller
-                .app
-                .operations
-                .fail(error.to_string(), controller.app.now);
+            controller.app.reject_operation(error.to_string());
         }
     }
 }

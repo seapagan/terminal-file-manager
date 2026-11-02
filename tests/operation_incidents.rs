@@ -1,3 +1,6 @@
+#[path = "operation_incidents/notifications.rs"]
+mod notifications;
+
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
 use std::{fs, time::Duration};

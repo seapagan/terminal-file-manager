@@ -133,6 +133,7 @@ review the new matches. Enlarge the terminal if the controls cannot fit.
 | F8 / Alt+t | Preview and move the selection to native Trash |
 | Shift+F8 / Alt+d | Preview permanent deletion; Enter cancels |
 | F9 / Alt+j | Jobs, progress and retained results |
+| Alt+h | Session notification history |
 
 Create a file or directory in the active pane by entering one name. Existing
 entries stay intact. Press **Shift+F7** or **Alt+n** to create an empty file,
@@ -183,6 +184,18 @@ between **Hidden: Hide** and **Hidden: Show**. A small `h` beside an entry's typ
 marks it as hidden. `tfm` dims Git-ignored entries by default; choose `hide`
 or `off` if you prefer. It retains marks on entries hidden by a filter or
 visibility option; operations use the visible selection.
+
+## Notifications and status
+
+Toasts highlight successes, warnings and failures without moving keyboard focus.
+Click a toast or press **Alt+h** to read session notification history after the
+toast disappears. Use Up/Down or the Older/Newer buttons to choose an event;
+PgUp/PgDown or the wheel scrolls its details. Enter opens linked Jobs evidence.
+Esc returns to the previous view. History lasts until you exit `tfm`.
+
+The status area keeps current work and selection visible in one row, with a
+second row for critical information when space permits. Critical incidents and
+unknown outcomes remain visible and available in Jobs after toast expiry.
 
 ## Views and metadata
 
@@ -247,6 +260,8 @@ fuzzy_timestamps = true
 owner_display = "names" # or "numeric"
 ignore = "dim" # "dim", "hide" or "off"
 mouse = true
+toast_placement = "bottom-right" # top-left, top-right, bottom-left, bottom-right
+toast_expiry_seconds = 5 # Range: 1–60; history survives expiry
 
 [columns]
 size = true

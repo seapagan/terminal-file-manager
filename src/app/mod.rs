@@ -1,6 +1,7 @@
 //! Authoritative pane state and pure transitions. No filesystem calls.
 mod creation;
 mod metadata;
+mod notifications;
 mod pane;
 pub use metadata::MetadataFormat;
 mod pattern;
@@ -49,6 +50,7 @@ pub struct Detail {
 
 /// Both panes remain alive when hidden or temporarily collapsed by width.
 pub struct App {
+    pub notifications: crate::notifications::Notifications,
     pub operations: crate::operations::State,
     pub panes: [Pane; 2],
     pub active: usize,
@@ -84,6 +86,7 @@ impl App {
     /// Every invocation starts single-pane, with two independent original locations.
     pub fn new(path: PathBuf) -> Self {
         Self {
+            notifications: Default::default(),
             operations: Default::default(),
             panes: [Pane::new(path.clone()), Pane::new(path)],
             active: 0,
@@ -116,6 +119,13 @@ impl App {
             now: std::time::SystemTime::now(),
             details: std::array::from_fn(|_| Detail::default()),
         }
+    }
+
+    /// Publish a meaningful message once for status, toast and session history.
+    pub fn notify(&mut self, severity: crate::notifications::Severity, text: impl Into<String>) {
+        let text = text.into();
+        self.status = text.clone().into();
+        self.notifications.notify(text, self.now, severity);
     }
 
     /// End the Help session without retaining picker, landing or document scroll.
@@ -239,15 +249,17 @@ impl App {
         generation: u64,
         result: Result<Snapshot, String>,
     ) -> bool {
-        let Some(state) = self.panes.get_mut(pane) else {
+        if pane >= self.panes.len() {
             return false;
-        };
+        }
+        let previous = self.listing_notices(pane);
+        let state = &mut self.panes[pane];
         if generation != state.generation {
             return false;
         }
         let attempted = state.pending.take();
         state.listing = false;
-        match result {
+        let accepted = match result {
             Ok(snapshot) => self.install_listing(pane, attempted, snapshot),
             Err(error) => {
                 if attempted.is_some() {
@@ -266,7 +278,11 @@ impl App {
                 self.invalidate_listing_details(pane);
                 true
             }
+        };
+        if accepted {
+            self.retain_listing_notices(pane, &previous);
         }
+        accepted
     }
 
     fn install_listing(
@@ -384,6 +400,13 @@ impl App {
             return false;
         }
         let detail = &mut self.details[request.pane];
+        if let Some(error) = &entry.error {
+            self.notifications.notify(
+                format!("{}: {error}", entry.path.display()),
+                self.now,
+                crate::notifications::Severity::Error,
+            );
+        }
         detail.entry = Some(entry);
         detail.canonical = canonical;
         detail.canonical_pending = false;
@@ -454,6 +477,19 @@ impl App {
             return false;
         }
         detail.counting = false;
+        let message = match &result {
+            Err(error) => Some(format!("{}: {error}", request.path.display())),
+            Ok(totals) if !totals.errors.is_empty() => Some(format!(
+                "{}: incomplete totals: {}",
+                request.path.display(),
+                totals.errors.join("; ")
+            )),
+            _ => None,
+        };
+        if let Some(message) = message {
+            self.notifications
+                .notify(message, self.now, crate::notifications::Severity::Warning);
+        }
         detail.totals = Some(result);
         true
     }

@@ -220,6 +220,7 @@ const DEFAULT_BINDINGS: &[(&str, Action)] = &[
     ("Alt+d", Delete),
     ("Alt+r", Rename),
     ("Alt+a", Attributes),
+    ("Alt+h", Notifications),
     ("F9", Jobs),
     ("Alt+j", Jobs),
     ("Shift+F5", CopyQuick),
