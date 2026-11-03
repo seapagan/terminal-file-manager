@@ -143,11 +143,11 @@ impl Controller {
             for pane in &mut self.app.panes {
                 pane.finish_creation(id, success);
             }
-            self.app.notifications.record(
+            self.app.notifications.record_job(
                 self.app.status.to_string(),
                 self.app.now,
                 severity,
-                Some(id),
+                job,
             );
             super::operations::check_exit(self);
             return refresh(self);

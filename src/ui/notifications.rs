@@ -8,6 +8,8 @@ use crate::{
 use ratatui::{
     Frame,
     layout::Rect,
+    style::Modifier,
+    text::Line,
     widgets::{Clear, Paragraph},
 };
 
@@ -23,20 +25,53 @@ pub struct HistoryLayout {
     pub shell: modal::Layout<crossterm::event::KeyCode>,
     pub rows: Vec<String>,
     pub limit: usize,
+    pub start: usize,
 }
 
 pub(super) fn history(app: &App, area: Rect) -> Option<HistoryLayout> {
     if !app.notifications.open {
         return None;
     }
+    let state = &app.notifications;
+    let desired = if state.details {
+        18
+    } else {
+        state.history.len().clamp(1, 10) as u16 + 7
+    };
     let outer = super::centered(
-        Rect {
-            height: area.height.saturating_sub(2),
-            ..area
-        },
-        area.width.saturating_sub(2).min(96),
-        area.height.saturating_sub(4).min(26),
+        area,
+        area.width.saturating_sub(2).min(88),
+        area.height.saturating_sub(4).min(desired),
     );
+    let actions = history_actions(app);
+    let spec = modal::Spec {
+        title: "Notifications",
+        help: false,
+        content_width: 0,
+        pinned_rows: 1,
+        footer_rows: 0,
+        actions: &actions,
+    };
+    let shell = modal::Layout::viewport(&spec, outer);
+    let rows = if state.details {
+        history_text(app)
+            .lines()
+            .flat_map(|line| super::text::wrap_value(line, usize::from(shell.body.width)))
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    let limit = rows.len().saturating_sub(usize::from(shell.body.height));
+    let start = history_start(state.cursor, usize::from(shell.body.height));
+    Some(HistoryLayout {
+        shell,
+        rows,
+        limit,
+        start,
+    })
+}
+
+fn history_actions(app: &App) -> Vec<modal::actions::Action<crossterm::event::KeyCode>> {
     use crossterm::event::KeyCode;
     let mut actions = vec![
         modal::actions::Action::custom("Up Older", KeyCode::Up, KeyCode::Up),
@@ -54,22 +89,16 @@ pub(super) fn history(app: &App, area: Rect) -> Option<HistoryLayout> {
             KeyCode::Enter,
         ));
     }
-    let spec = modal::Spec {
-        title: "Notifications",
-        help: false,
-        content_width: 0,
-        pinned_rows: 1,
-        footer_rows: 1,
-        actions: &actions,
-    };
-    let shell = modal::Layout::viewport(&spec, outer);
-    let text = history_text(app);
-    let rows = text
-        .lines()
-        .flat_map(|line| super::text::wrap_value(line, usize::from(shell.body.width)))
-        .collect::<Vec<_>>();
-    let limit = rows.len().saturating_sub(usize::from(shell.body.height));
-    Some(HistoryLayout { shell, rows, limit })
+    actions.push(modal::actions::Action::custom(
+        if app.notifications.details {
+            "e List"
+        } else {
+            "e Details"
+        },
+        KeyCode::Char('e'),
+        KeyCode::Char('e'),
+    ));
+    actions
 }
 
 fn history_text(app: &App) -> String {
@@ -105,7 +134,7 @@ pub(super) fn toasts(app: &App, geometry: &super::Geometry) -> Vec<Toast> {
         geometry.status.x,
         top,
         geometry.status.width,
-        geometry.status.y.saturating_sub(top + 2),
+        geometry.status.y.saturating_sub(top + 1),
     );
     let mut result: Vec<Toast> = Vec::new();
     for id in app.notifications.visible() {
@@ -202,37 +231,35 @@ fn occupied(area: Rect, g: &super::Geometry) -> bool {
     .any(|r| area.intersects(r))
 }
 
-fn toast_text(app: &App, id: usize) -> String {
+fn toast_rows(app: &App, id: usize, width: u16) -> Vec<String> {
     let event = &app.notifications.history[id];
+    let count = app.notifications.toast_occurrences(id);
+    let repeat = if count > 1 {
+        format!(" (×{count})")
+    } else {
+        String::new()
+    };
+    let title = if event.presentation.title == event.severity.label() {
+        event.presentation.title.clone()
+    } else {
+        format!("{} · {}", event.severity.label(), event.presentation.title)
+    };
+    let mut rows = vec![format!(
+        "{}{repeat}",
+        modal::truncate(&title, width.saturating_sub(modal::width(&repeat)))
+    )];
+    let mut message = super::text::wrap_words(&event.presentation.message, usize::from(width));
+    if message.len() > 2 {
+        message.truncate(2);
+        message[1] = modal::truncate(&format!("{} …", message[1]), width);
+    }
+    rows.extend(message);
     let key = if event.job.is_some() {
         app.shortcut(crate::input::Action::Jobs, "F9")
     } else {
         app.shortcut(crate::input::Action::Notifications, "Alt+h")
     };
-    let repeat = if event.occurrences > 1 {
-        format!(" (×{})", event.occurrences)
-    } else {
-        String::new()
-    };
-    format!(
-        "{}: {}{repeat} — {key} details",
-        event.severity.label(),
-        super::clean(&event.text)
-    )
-}
-
-fn toast_rows(app: &App, id: usize, width: u16) -> Vec<String> {
-    let mut rows = super::text::wrap_value(&toast_text(app, id), usize::from(width));
-    if rows.len() > 3 {
-        rows.truncate(2);
-        rows.push(modal::truncate(
-            &format!(
-                "… {} details",
-                app.shortcut(crate::input::Action::Notifications, "Alt+h")
-            ),
-            width,
-        ));
-    }
+    rows.push(modal::truncate(&format!("{key} details"), width));
     rows
 }
 
@@ -240,16 +267,42 @@ pub(super) fn render(frame: &mut Frame, app: &App, g: &super::Geometry, theme: &
     for toast in &g.toasts {
         let event = &app.notifications.history[toast.event];
         frame.render_widget(Clear, toast.area);
-        let block =
-            ratatui::widgets::Block::bordered().border_style(theme.style(event.severity.role()));
+        let surface = theme.notification_style();
+        let block = ratatui::widgets::Block::bordered()
+            .style(surface)
+            .border_style(theme.style(Role::Muted));
+        frame.render_widget(block, toast.area);
+        for y in toast.area.y..toast.area.bottom() {
+            frame.buffer_mut()[(toast.area.x, y)]
+                .set_symbol("▎")
+                .set_style(surface.patch(theme.style(event.severity.role())));
+        }
+        let last = toast.rows.len().saturating_sub(1);
+        let lines: Vec<_> = toast
+            .rows
+            .iter()
+            .enumerate()
+            .map(|(index, row)| {
+                let style = if index == 0 {
+                    theme
+                        .style(event.severity.role())
+                        .add_modifier(Modifier::BOLD)
+                } else if index == last {
+                    theme.style(Role::Muted)
+                } else {
+                    theme.style(Role::Normal)
+                };
+                Line::styled(row.clone(), surface.patch(style))
+            })
+            .collect();
         frame.render_widget(
-            Paragraph::new(toast.rows.join(
-                "
-",
-            ))
-            .block(block)
-            .style(theme.style(event.severity.role())),
-            toast.area,
+            Paragraph::new(lines).style(surface),
+            Rect::new(
+                toast.area.x + 1,
+                toast.area.y + 1,
+                toast.area.width.saturating_sub(2),
+                toast.area.height.saturating_sub(2),
+            ),
         );
     }
     if let Some(layout) = &g.notification_history {
@@ -261,13 +314,14 @@ fn render_history(frame: &mut Frame, app: &App, layout: &HistoryLayout, theme: &
     modal::render_measured(frame, &layout.shell, "Notifications", theme, Role::Header);
     modal::actions::render(frame, &layout.shell, theme, None);
     let state = &app.notifications;
+    let controls = if state.details {
+        "PgUp/PgDown scroll · Up/Down events · Esc close"
+    } else {
+        "Up/Down · PgUp/PgDown · Home/End · Esc close"
+    };
     let header = format!(
-        "{}/{} · Up/Down events · Home/End",
-        if state.history.is_empty() {
-            0
-        } else {
-            state.cursor + 1
-        },
+        "{}/{} · {controls}",
+        usize::from(!state.history.is_empty()) + state.cursor,
         state.history.len()
     );
     frame.render_widget(
@@ -275,27 +329,96 @@ fn render_history(frame: &mut Frame, app: &App, layout: &HistoryLayout, theme: &
             .style(theme.style(Role::Key)),
         layout.shell.pinned,
     );
-    let rows: Vec<_> = layout
-        .rows
-        .iter()
-        .skip(state.scroll.min(layout.limit))
-        .take(usize::from(layout.shell.body.height))
-        .cloned()
-        .collect();
-    let role = state
+    if state.details {
+        let rows = layout
+            .rows
+            .iter()
+            .skip(state.scroll.min(layout.limit))
+            .take(usize::from(layout.shell.body.height))
+            .cloned()
+            .collect::<Vec<_>>();
+        frame.render_widget(
+            Paragraph::new(rows.join("\n")).style(theme.style(Role::Value)),
+            layout.shell.body,
+        );
+    } else {
+        render_list(frame, app, layout, theme);
+    }
+}
+
+fn render_list(frame: &mut Frame, app: &App, layout: &HistoryLayout, theme: &Theme) {
+    let state = &app.notifications;
+    let height = usize::from(layout.shell.body.height);
+    let start = layout.start;
+    if state.history.is_empty() {
+        frame.render_widget(
+            Paragraph::new("No notifications this session."),
+            layout.shell.body,
+        );
+    }
+    for (row, (id, event)) in state
         .history
-        .get(state.cursor)
-        .map_or(Role::Value, |e| e.severity.role());
-    frame.render_widget(
-        Paragraph::new(rows.join("\n")).style(theme.style(role)),
-        layout.shell.body,
-    );
-    frame.render_widget(
-        Paragraph::new(modal::truncate(
-            "PageUp/Down details · Esc close",
-            layout.shell.footer.width,
-        ))
-        .style(theme.style(Role::Key)),
-        layout.shell.footer,
-    );
+        .iter()
+        .enumerate()
+        .skip(start)
+        .take(height)
+        .enumerate()
+    {
+        let selected = id == state.cursor;
+        let width = layout.shell.body.width;
+        let line = history_row(event, selected, width, app.now);
+        let style = if selected {
+            theme.style(Role::Cursor)
+        } else {
+            theme.style(event.severity.role())
+        };
+        frame.render_widget(
+            Paragraph::new(line).style(style),
+            Rect::new(
+                layout.shell.body.x,
+                layout.shell.body.y + row as u16,
+                width,
+                1,
+            ),
+        );
+    }
+}
+
+pub(crate) fn history_start(cursor: usize, height: usize) -> usize {
+    cursor.saturating_sub(height.saturating_sub(1))
+}
+
+fn history_row(
+    event: &crate::notifications::Notice,
+    selected: bool,
+    width: u16,
+    now: std::time::SystemTime,
+) -> String {
+    let marker = if selected { ">" } else { " " };
+    let time = crate::fuzzy_time::fuzzy_time(event.created, now);
+    let repeat = if event.occurrences > 1 {
+        format!(" ×{}", event.occurrences)
+    } else {
+        String::new()
+    };
+    let suffix = format!("{repeat} · {time}");
+    let title = if event.presentation.title == event.severity.label() {
+        event.presentation.title.clone()
+    } else {
+        format!("{} · {}", event.severity.label(), event.presentation.title)
+    };
+    let summary = format!("{marker} {title}: {}", event.presentation.message);
+    let summary = summary.replace('\n', " ");
+    if width > modal::width(&suffix) + 12 {
+        let available = width - modal::width(&suffix);
+        let clipped = modal::truncate(&super::clean(&summary), available);
+        format!(
+            "{clipped}{}{suffix}",
+            " ".repeat(usize::from(
+                available.saturating_sub(modal::width(&clipped))
+            ))
+        )
+    } else {
+        modal::truncate(&super::clean(&summary), width)
+    }
 }

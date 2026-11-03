@@ -144,6 +144,17 @@ impl Theme {
         }
     }
 
+    /// Use the theme's panel palette; monochrome keeps terminal defaults.
+    pub fn notification_style(&self) -> Style {
+        if self.level == ColorLevel::NoColor {
+            Style::default()
+        } else if self.level >= ColorLevel::Ansi256 {
+            self.style(Role::ActivePane)
+        } else {
+            Style::default().fg(Color::Gray).bg(Color::Black)
+        }
+    }
+
     fn cursor_style(&self, active: bool) -> Style {
         let style = match self.level {
             ColorLevel::NoColor => Style::default()

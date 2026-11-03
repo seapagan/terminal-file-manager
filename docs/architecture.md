@@ -479,14 +479,18 @@ Toasts reference those events through a bounded priority queue; expiry removes
 presentation entries while retaining session history. Operation notifications
 link to Jobs records for full evidence and recovery actions. Application events,
 including rejected requests, view-profile changes and filesystem-watch warnings,
-create no filesystem jobs. Repeated application messages group within two
-seconds. A newer result for a job replaces its pending toast while history keeps
-its earlier result notification.
+create no filesystem jobs. Concise toast titles/messages remain separate from
+retained diagnostic text. Within two seconds, matching failures on the same
+native operation targets share a toast across Job IDs, with occurrence counts;
+each Job keeps its own history link and evidence. A newer result for a job
+replaces its pending toast while history keeps its earlier result notification.
 
 The status composer orders structured current-context, selection, Jobs and
 history segments by priority, with shared render/hit-test geometry. It uses one
 row by default and at most two for critical information; short terminals and
 open modals preserve their content space. Critical incidents and unresolved
 outcomes remain independent of notification expiry. Notification history uses
-the existing measured modal shell and returns to the underlying surface on Esc.
+the existing measured modal shell for a compact selectable list. The detail
+toggle retains full diagnostics; Enter opens the selected Job's evidence. Esc
+returns to the underlying surface.
 Placement and expiry use the existing strict TOML settings and atomic save path.

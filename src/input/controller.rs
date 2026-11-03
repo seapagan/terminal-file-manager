@@ -215,7 +215,7 @@ impl Controller {
                 if !entry.enterable {
                     self.app.notify(
                         crate::notifications::Severity::Info,
-                        "Viewer unavailable until M6; files are never launched",
+                        "The file viewer is not available yet.",
                     );
                     return Vec::new();
                 }
@@ -517,9 +517,8 @@ fn next_sort(sort: Sort) -> Sort {
 
 fn unavailable(action: Action) -> Option<&'static str> {
     match action {
-        Action::Viewer | Action::Editor => {
-            Some("Viewer/editor unavailable until M6; files are never launched")
-        }
+        Action::Viewer => Some("The file viewer is not available yet."),
+        Action::Editor => Some("The file editor is not available yet."),
         Action::Path | Action::Zoxide | Action::OppositeZoxide | Action::ExitDirectory => {
             Some("Navigation integration/shell handoff unavailable until M5")
         }

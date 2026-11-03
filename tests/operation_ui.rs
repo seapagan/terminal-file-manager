@@ -282,13 +282,15 @@ fn notices_have_textual_severity_expire_and_leave_the_footer_visible() {
     use terminal_file_manager::operations::NoticeSeverity;
     let mut app = App::new("/controlled".into());
     app.notifications
-        .notify("Job 1 completed".into(), app.now, NoticeSeverity::Success);
+        .notify("File copied".into(), app.now, NoticeSeverity::Success);
     let (text, _) = draw(&app, 120, 25, ColorLevel::NoColor);
-    assert!(text.contains("Success: Job 1 completed — Alt+h details"));
+    assert!(text.contains("Success"));
+    assert!(text.contains("File copied"));
+    assert!(text.contains("Alt+h details"));
     assert!(text.contains("F8 Trash"));
     app.notifications.advance(Duration::from_secs(6));
     let (text, _) = draw(&app, 120, 25, ColorLevel::NoColor);
-    assert!(!text.contains("Success: Job 1 completed"));
+    assert!(!text.contains("File copied"));
 }
 
 #[test]

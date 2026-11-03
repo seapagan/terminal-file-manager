@@ -190,7 +190,7 @@ fn permanent_delete_requires_separate_confirmation_and_enter_cancels() {
         &[
             ("selected", "\x1bd"),
             ("1 file · 5 B", "D"),
-            ("1 file permanently deleted", "q"),
+            ("Permanent delete complete", "q"),
         ],
         false,
     );
@@ -208,7 +208,7 @@ fn completed_directory_delete_can_be_followed_by_a_real_create_dialog() {
         &[
             ("zzz-ready", "\x1bd"),
             ("1 file, 1 directory · 5 B", "D"),
-            ("permanently deleted", "\x1b[18~"),
+            ("Permanent delete complete", "\x1b[18~"),
             ("Directory name:", "after-delete\r"),
             ("after-delete/", "q"),
         ],
@@ -442,11 +442,15 @@ fn view_dialog_help_and_profile_editing_cross_the_native_terminal_parser() {
 fn notification_history_opens_from_the_native_keyboard_and_restores_the_browser() {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("notification-ready"), "preserved").unwrap();
+    // Put the return marker beneath the compact modal so closing it repaints the name.
+    for index in 0..9 {
+        fs::write(root.path().join(format!("a-{index}")), "owned").unwrap();
+    }
     drive(
         command(root.path(), root.path(), None),
         &[
             ("notification-ready", "\x1bOR"),
-            ("Viewer/editor unavailable", "\x1bh"),
+            ("The file viewer is not available yet.", "\x1bh"),
             ("Notifications", "\x1b"),
             ("notification-ready", "q"),
         ],

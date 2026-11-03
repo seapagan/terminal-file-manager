@@ -189,8 +189,10 @@ visibility option; operations use the visible selection.
 
 Toasts highlight successes, warnings and failures without moving keyboard focus.
 Click a toast or press **Alt+h** to read session notification history after the
-toast disappears. Use Up/Down or the Older/Newer buttons to choose an event;
-PgUp/PgDown or the wheel scrolls its details. Enter opens linked Jobs evidence.
+toast disappears. Use Up/Down, PgUp/PgDown or the wheel to select an event.
+Press **e** to read its full details; PgUp/PgDown scrolls, and **e** returns to
+the list. Enter opens linked Jobs evidence. Repeated failures share a toast
+with an occurrence count; each operation keeps its own history entry and Job.
 Esc returns to the previous view. History lasts until you exit `tfm`.
 
 The status area keeps current work and selection visible in one row, with a

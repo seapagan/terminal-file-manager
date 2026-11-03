@@ -22,6 +22,7 @@ pub(super) fn handle(c: &mut Controller, event: &Event, g: &Geometry) -> bool {
             c.app.notifications.open = true;
             c.app.notifications.cursor = toast.event;
             c.app.notifications.scroll = 0;
+            c.app.notifications.details = false;
         }
         return true;
     }
@@ -32,6 +33,7 @@ pub(super) fn open(c: &mut Controller) {
     c.app.notifications.open = true;
     c.app.notifications.cursor = c.app.notifications.latest_index().unwrap_or(0);
     c.app.notifications.scroll = 0;
+    c.app.notifications.details = false;
 }
 
 fn history(c: &mut Controller, event: &Event, g: &Geometry) {
@@ -77,36 +79,66 @@ fn history_mouse(
     {
         c.app.notifications.open = false;
     } else if layout.shell.body.contains((mouse.column, mouse.row).into()) {
-        match mouse.kind {
-            MouseEventKind::ScrollUp => {
-                c.app.notifications.scroll = c.app.notifications.scroll.saturating_sub(3)
+        history_body(c, mouse, layout, limit);
+    }
+}
+
+fn history_body(
+    c: &mut Controller,
+    mouse: &crossterm::event::MouseEvent,
+    layout: &crate::ui::HistoryLayout,
+    limit: usize,
+) {
+    match mouse.kind {
+        MouseEventKind::ScrollUp => history_key(c, KeyCode::PageUp, limit),
+        MouseEventKind::ScrollDown => history_key(c, KeyCode::PageDown, limit),
+        MouseEventKind::Down(MouseButton::Left) if !c.app.notifications.details => {
+            let index = layout.start + usize::from(mouse.row - layout.shell.body.y);
+            if index < c.app.notifications.history.len() {
+                c.app.notifications.cursor = index;
             }
-            MouseEventKind::ScrollDown => {
-                c.app.notifications.scroll = (c.app.notifications.scroll + 3).min(limit)
-            }
-            _ => {}
         }
+        _ => {}
     }
 }
 
 fn history_key(c: &mut Controller, key: KeyCode, limit: usize) {
-    let state = &mut c.app.notifications;
-    let previous = state.cursor;
     match key {
-        KeyCode::Esc => state.open = false,
-        KeyCode::Up => state.cursor = state.cursor.saturating_sub(1),
-        KeyCode::Down => {
-            state.cursor = (state.cursor + 1).min(state.history.len().saturating_sub(1))
+        KeyCode::Esc => c.app.notifications.open = false,
+        KeyCode::Char('e' | 'E') => {
+            let state = &mut c.app.notifications;
+            state.details = !state.details;
+            state.scroll = 0;
         }
-        KeyCode::Home => state.cursor = 0,
-        KeyCode::End => state.cursor = state.history.len().saturating_sub(1),
-        KeyCode::PageUp => state.scroll = state.scroll.saturating_sub(8),
-        KeyCode::PageDown => state.scroll = (state.scroll + 8).min(limit),
         KeyCode::Enter => open_job(c),
+        _ => navigate(&mut c.app.notifications, key, limit),
+    }
+}
+
+fn navigate(state: &mut crate::notifications::Notifications, key: KeyCode, limit: usize) {
+    let previous = state.cursor;
+    let last = state.history.len().saturating_sub(1);
+    match key {
+        KeyCode::Up => state.cursor = state.cursor.saturating_sub(1),
+        KeyCode::Down => state.cursor = (state.cursor + 1).min(last),
+        KeyCode::Home => state.cursor = 0,
+        KeyCode::End => state.cursor = last,
+        KeyCode::PageUp | KeyCode::PageDown => {
+            let (position, maximum) = if state.details {
+                (&mut state.scroll, limit)
+            } else {
+                (&mut state.cursor, last)
+            };
+            *position = if key == KeyCode::PageUp {
+                position.saturating_sub(8)
+            } else {
+                position.saturating_add(8).min(maximum)
+            };
+        }
         _ => {}
     }
-    if previous != c.app.notifications.cursor {
-        c.app.notifications.scroll = 0;
+    if previous != state.cursor {
+        state.scroll = 0;
     }
 }
 

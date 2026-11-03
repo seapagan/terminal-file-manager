@@ -1,4 +1,6 @@
 //! Session events own history; transient toast queues contain only event identities.
+mod presentation;
+pub use presentation::Presentation;
 use std::{
     collections::VecDeque,
     time::{Duration, SystemTime},
@@ -24,7 +26,7 @@ impl Severity {
     }
     pub fn role(self) -> crate::color::Role {
         match self {
-            Self::Info => crate::color::Role::Value,
+            Self::Info => crate::color::Role::Link,
             Self::Success => crate::color::Role::Status,
             Self::Warning => crate::color::Role::Warning,
             Self::Error => crate::color::Role::Error,
@@ -46,12 +48,22 @@ pub enum Placement {
 /// One retained event, optionally linking the authoritative operation evidence.
 pub struct Notice {
     pub text: String,
+    pub presentation: Presentation,
     pub severity: Severity,
     pub created: SystemTime,
     pub occurrences: usize,
     pub job: Option<u64>,
     expires: Duration,
     updated: Duration,
+    key: String,
+}
+
+impl Notice {
+    fn same_toast(&self, other: &Self) -> bool {
+        self.severity == other.severity
+            && self.key == other.key
+            && self.updated.abs_diff(other.updated) <= Duration::from_secs(2)
+    }
 }
 
 /// History is session-long; only the immediate presentation queue is bounded.
@@ -65,6 +77,7 @@ pub struct Notifications {
     pub open: bool,
     pub cursor: usize,
     pub scroll: usize,
+    pub details: bool,
 }
 
 impl Default for Notifications {
@@ -79,6 +92,7 @@ impl Default for Notifications {
             open: false,
             cursor: 0,
             scroll: 0,
+            details: false,
         }
     }
 }
@@ -91,12 +105,28 @@ impl Notifications {
 
     /// A job's final notification links to its existing record, including reconciliation.
     pub fn record(&mut self, text: String, now: SystemTime, severity: Severity, job: Option<u64>) {
+        let presentation = Presentation::application(&text, severity);
+        let key = text.clone();
+        self.publish(text, now, severity, job, presentation, key);
+    }
+
+    fn publish(
+        &mut self,
+        text: String,
+        now: SystemTime,
+        severity: Severity,
+        job: Option<u64>,
+        presentation: Presentation,
+        key: String,
+    ) {
         let duplicate = self.matching_event(&text, severity, job);
         let expires = self.clock.saturating_add(self.lifetime());
         let index = if let Some(index) = duplicate {
             let event = &mut self.history[index];
             event.occurrences = event.occurrences.saturating_add(1);
             event.text = text;
+            event.presentation = presentation;
+            event.key = key;
             event.severity = severity;
             event.created = now;
             event.expires = expires;
@@ -104,6 +134,8 @@ impl Notifications {
             index
         } else {
             self.history.push(Notice {
+                presentation,
+                key,
                 text,
                 severity,
                 created: now,
@@ -115,9 +147,17 @@ impl Notifications {
             self.history.len() - 1
         };
         self.latest = Some(index);
-        self.pending
-            .retain(|id| *id != index && (job.is_none() || self.history[*id].job != job));
+        let history = &self.history;
+        self.pending.retain(|id| {
+            *id != index
+                && (job.is_none() || history[*id].job != job)
+                && !history[*id].same_toast(&history[index])
+        });
         self.pending.push_back(index);
+        self.bound_pending();
+    }
+
+    fn bound_pending(&mut self) {
         if self.pending.len() > 16 {
             let lowest = self
                 .pending
@@ -177,6 +217,32 @@ impl Notifications {
         ids.sort_by_key(|id| std::cmp::Reverse(self.history[*id].severity));
         ids.truncate(3);
         ids
+    }
+
+    /// Presentation counts never merge the independently retained Job links.
+    pub fn toast_occurrences(&self, id: usize) -> usize {
+        self.history
+            .iter()
+            .filter(|event| self.history[id].same_toast(event))
+            .map(|event| event.occurrences)
+            .fold(0, usize::saturating_add)
+    }
+
+    pub(crate) fn record_job(
+        &mut self,
+        text: String,
+        now: SystemTime,
+        severity: Severity,
+        job: &crate::operations::Job,
+    ) {
+        self.publish(
+            text,
+            now,
+            severity,
+            Some(job.id),
+            Presentation::job(job),
+            presentation::job_key(job),
+        );
     }
 }
 

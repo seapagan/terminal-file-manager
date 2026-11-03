@@ -1,5 +1,26 @@
 # Acceptance gates
 
+## PM3-05 visual-testing corrections — 3 November 2026
+
+Toasts separate severity/title, a word-wrapped message and a details hint.
+The severity accent and panel background retain monochrome and colour-depth
+support. Bottom placements move down one row while preserving modal and safety
+controls. The Alt+h list shows selectable event summaries, relative times and
+repeat counts; **e** toggles full details, and Enter opens linked Jobs evidence.
+
+Repeated failures on the same operation targets share a toast across Job IDs.
+History retains each Job link, diagnostic record and recovery action. Different
+targets, operation kinds and errors remain distinct. Critical incidents and
+unknown outcomes keep their existing Jobs and exit safeguards.
+
+Regressions cover actual self-copy/move failures, file/directory collisions,
+permission presentation, grouped counts under queue pressure, per-Job evidence,
+list selection/paging/mouse input, detail scrolling, resize, Unicode word
+boundaries, all colour levels and existing native terminal round trips.
+Maintainer visual acceptance and serial independent cold reviews remain pending;
+PR #10 stays draft and unmerged. Exact QC and hosted results belong to the
+current controller checkpoint.
+
 ## PM3-05 implementation checkpoint — 2 November 2026
 
 The status and notification implementation includes retained session history.

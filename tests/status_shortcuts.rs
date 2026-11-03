@@ -64,7 +64,7 @@ fn literal_status_and_notice_text_are_never_interpreted_as_shortcut_templates() 
     );
     let text = draw(&c.app, 160);
     assert!(
-        text.contains("Error: Literal — F9 details — Alt+h details"),
+        text.contains("Literal — F9 details") && text.contains("Alt+h details"),
         "{text}"
     );
 }

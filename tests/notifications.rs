@@ -85,7 +85,7 @@ fn expired_application_event_is_retrievable_without_a_filesystem_job() {
     c.app.notifications.advance(Duration::from_secs(60));
     c.dispatch(Action::Notifications, &g);
     let (text, _) = draw(&c.app, 80, 24);
-    assert!(text.contains("Viewer/editor unavailable"), "{text}");
+    assert!(text.contains("file viewer is not available yet"), "{text}");
     key(&mut c, KeyCode::Esc);
     assert!(!c.app.notifications.open);
     assert!(!c.quit);
@@ -123,6 +123,7 @@ fn history_scroll_and_navigation_leave_panes_and_parent_surface_unchanged() {
     c.app.notifications.open = true;
     c.app.notifications.cursor = 1;
     c.app.operations.show_history = true;
+    key(&mut c, KeyCode::Char('e'));
     key(&mut c, KeyCode::PageDown);
     assert!(c.app.notifications.scroll > 0);
     key(&mut c, KeyCode::Home);
@@ -150,7 +151,7 @@ fn four_placements_reflow_and_toast_clicks_do_not_reach_the_listing() {
         c.app.notify(Severity::Error, "Owned failure");
         let (text, g) = draw(&c.app, 120, 24);
         let toast = &g.toasts[0];
-        assert!(text.contains("Error: Owned failure"));
+        assert!(text.contains("Owned failure"));
         assert_eq!(toast.area.x < 30, left);
         assert_eq!(toast.area.y < 10, top);
         c.handle(
@@ -184,6 +185,7 @@ fn modal_controls_are_never_covered_and_long_history_remains_readable() {
         }
     }
     c.app.notifications.open = true;
+    key(&mut c, KeyCode::Char('e'));
     let (text, g) = draw(&c.app, 40, 24);
     assert!(!text.contains('\u{1b}'));
     assert!(g.notification_history.unwrap().limit > 0);

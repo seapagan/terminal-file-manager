@@ -133,6 +133,16 @@ fn mixed_native_success_and_failure_never_claims_nothing_was_copied() {
         .unwrap();
         let record = execute(&plan, Default::default(), &false.into(), |_| Decision::Skip);
         let mut c = finish(plan, record);
+        assert_eq!(
+            c.app
+                .notifications
+                .history
+                .last()
+                .unwrap()
+                .presentation
+                .message,
+            "“invalid”: choose a different destination."
+        );
         assert!(c.app.status.contains("1 failed"));
         assert!(c.app.status.contains(if operation == Operation::Copy {
             "1 file copied"

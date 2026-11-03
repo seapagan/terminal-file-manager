@@ -28,7 +28,8 @@ fn collision_toast_names_the_file_and_history_routes_to_retained_jobs_evidence()
         .iter()
         .map(|cell| cell.symbol())
         .collect();
-    assert!(text.contains("Error: collision:"), "{text}");
+    assert!(text.contains("Create file failed"), "{text}");
+    assert!(text.contains("“collision” already exists."), "{text}");
     c.app.notifications.advance(Duration::from_secs(60));
     key(&mut c, "Alt+h");
     assert!(c.app.notifications.open);
@@ -41,4 +42,41 @@ fn collision_toast_names_the_file_and_history_routes_to_retained_jobs_evidence()
     );
     assert_eq!(c.app.operations.history.len(), 1);
     assert_eq!(c.app.notifications.history.len(), 1);
+}
+
+#[test]
+fn repeated_collisions_group_toasts_without_merging_jobs_or_their_evidence() {
+    let (root, mut c) = loaded();
+    fs::write(root.path().join("collision"), "preserved").unwrap();
+    for _ in 0..3 {
+        let plan = submit(&mut c, "collision");
+        finish(&mut c, &plan);
+    }
+    let notices = &c.app.notifications;
+    assert_eq!(notices.visible(), [2]);
+    assert_eq!(notices.toast_occurrences(2), 3);
+    assert_eq!(notices.history.len(), 3);
+    for (index, event) in notices.history.iter().enumerate() {
+        let job = &c.app.operations.history[index];
+        assert_eq!(event.job, Some(job.id));
+        assert!(job.can_retry());
+        let entry = &job.record.as_ref().unwrap().entries[0];
+        assert_eq!(
+            entry.destination.as_deref(),
+            Some(root.path().join("collision").as_path())
+        );
+        assert_eq!(entry.outcome, Outcome::Failed);
+        assert!(event.text.contains(&entry.detail));
+    }
+    for index in 0..3 {
+        c.app.notifications.open = true;
+        c.app.notifications.cursor = index;
+        key(&mut c, "Enter");
+        assert_eq!(c.app.operations.cursor, index);
+        assert!(c.app.operations.jobs_evidence);
+    }
+    assert_eq!(
+        fs::read(root.path().join("collision")).unwrap(),
+        b"preserved"
+    );
 }
