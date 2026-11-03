@@ -9,6 +9,9 @@ use terminal_file_manager::{
     ui,
 };
 
+#[path = "notification_ux/polish.rs"]
+mod polish;
+
 fn controller() -> Controller {
     Controller::new(
         App::new("owned-notifications".into()),
@@ -302,17 +305,17 @@ fn toast_surface_accent_heading_and_hint_respect_colour_capabilities() {
             let area = geometry.toasts[0].area;
             let buffer = terminal.backend().buffer();
             let accent = &buffer[(area.x, area.y + 1)];
-            let heading = &buffer[(area.x + 1, area.y + 1)];
-            let message = &buffer[(area.x + 1, area.y + 2)];
-            let hint = &buffer[(area.x + 1, area.bottom() - 2)];
-            assert_eq!(accent.symbol(), "▎");
+            let heading = &buffer[(area.x + 2, area.y + 1)];
+            let message = &buffer[(area.x + 2, area.y + 2)];
+            let hint = &buffer[(area.x + 2, area.bottom() - 2)];
+            assert_eq!(accent.symbol(), "▌");
             assert_eq!(
                 accent.fg,
                 theme.style(severity.role()).fg.unwrap_or(Color::Reset)
             );
             assert!(heading.modifier.contains(Modifier::BOLD));
             assert!(!message.modifier.contains(Modifier::BOLD));
-            assert!(hint.modifier.contains(Modifier::DIM));
+            assert!(hint.modifier.contains(Modifier::ITALIC));
             if level == NoColor {
                 assert_eq!((message.fg, message.bg), (Color::Reset, Color::Reset));
             } else {

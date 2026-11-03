@@ -144,14 +144,14 @@ impl Theme {
         }
     }
 
-    /// Use the theme's panel palette; monochrome keeps terminal defaults.
+    /// Notification cards use a neutral surface; monochrome keeps terminal defaults.
     pub fn notification_style(&self) -> Style {
         if self.level == ColorLevel::NoColor {
             Style::default()
         } else if self.level >= ColorLevel::Ansi256 {
-            self.style(Role::ActivePane)
+            self.pair((235, 235, 240), (67, 69, 82))
         } else {
-            Style::default().fg(Color::Gray).bg(Color::Black)
+            Style::default().fg(Color::White).bg(Color::DarkGray)
         }
     }
 

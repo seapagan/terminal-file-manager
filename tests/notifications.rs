@@ -248,7 +248,7 @@ fn semantic_severity_remains_textual_at_all_colour_depths() {
         })
         .unwrap();
         let area = g.toasts[0].area;
-        let cell = &t.backend().buffer()[(area.x + 1, area.y + 1)];
+        let cell = &t.backend().buffer()[(area.x + 2, area.y + 1)];
         assert_eq!(cell.symbol(), "E");
         assert_eq!(
             cell.fg,

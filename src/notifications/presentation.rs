@@ -9,9 +9,13 @@ pub struct Presentation {
 
 impl Presentation {
     pub(super) fn application(text: &str, severity: Severity) -> Self {
+        let summary = text
+            .strip_prefix("Pane 1: ")
+            .or_else(|| text.strip_prefix("Pane 2: "))
+            .unwrap_or(text);
         Self {
             title: severity.label().into(),
-            message: readable(text),
+            message: readable(summary),
         }
     }
 

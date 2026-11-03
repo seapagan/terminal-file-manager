@@ -33,25 +33,24 @@ pub(super) fn history(app: &App, area: Rect) -> Option<HistoryLayout> {
         return None;
     }
     let state = &app.notifications;
-    let desired = if state.details {
-        18
-    } else {
-        state.history.len().clamp(1, 10) as u16 + 7
-    };
-    let outer = super::centered(
-        area,
-        area.width.saturating_sub(2).min(88),
-        area.height.saturating_sub(4).min(desired),
-    );
+    let width = area.width.saturating_sub(2).min(88);
     let actions = history_actions(app);
     let spec = modal::Spec {
         title: "Notifications",
         help: false,
-        content_width: 0,
+        content_width: usize::from(width.saturating_sub(4)),
         pinned_rows: 1,
         footer_rows: 0,
         actions: &actions,
     };
+    let desired = if state.details {
+        18
+    } else {
+        spec.measure(area, |_| state.history.len().clamp(1, 10))
+            .outer
+            .height
+    };
+    let outer = super::centered(area, width, area.height.saturating_sub(4).min(desired));
     let shell = modal::Layout::viewport(&spec, outer);
     let rows = if state.details {
         history_text(app)
@@ -148,7 +147,7 @@ pub(super) fn toasts(app: &App, geometry: &super::Geometry) -> Vec<Toast> {
         if width < 16 || available.height < 3 {
             break;
         }
-        let rows = toast_rows(app, id, width.saturating_sub(2));
+        let rows = toast_rows(app, id, width.saturating_sub(4));
         let height = rows.len() as u16 + 2;
         let Some(area) = place(
             app.notifications.placement,
@@ -208,7 +207,16 @@ fn place(
                 area.bottom() - height - offset
             };
             let candidate = Rect::new(x, y, width, height);
-            if !occupied(candidate, geometry) && taken.iter().all(|t| !candidate.intersects(t.area))
+            if !occupied(candidate, geometry)
+                && taken.iter().all(|t| {
+                    let spaced = Rect::new(
+                        t.area.x,
+                        t.area.y.saturating_sub(1),
+                        t.area.width,
+                        t.area.height.saturating_add(2),
+                    );
+                    !candidate.intersects(spaced)
+                })
             {
                 return Some(candidate);
             }
@@ -268,13 +276,10 @@ pub(super) fn render(frame: &mut Frame, app: &App, g: &super::Geometry, theme: &
         let event = &app.notifications.history[toast.event];
         frame.render_widget(Clear, toast.area);
         let surface = theme.notification_style();
-        let block = ratatui::widgets::Block::bordered()
-            .style(surface)
-            .border_style(theme.style(Role::Muted));
-        frame.render_widget(block, toast.area);
+        frame.render_widget(Paragraph::new("").style(surface), toast.area);
         for y in toast.area.y..toast.area.bottom() {
             frame.buffer_mut()[(toast.area.x, y)]
-                .set_symbol("▎")
+                .set_symbol("▌")
                 .set_style(surface.patch(theme.style(event.severity.role())));
         }
         let last = toast.rows.len().saturating_sub(1);
@@ -288,7 +293,7 @@ pub(super) fn render(frame: &mut Frame, app: &App, g: &super::Geometry, theme: &
                         .style(event.severity.role())
                         .add_modifier(Modifier::BOLD)
                 } else if index == last {
-                    theme.style(Role::Muted)
+                    surface.add_modifier(Modifier::ITALIC)
                 } else {
                     theme.style(Role::Normal)
                 };
@@ -298,9 +303,9 @@ pub(super) fn render(frame: &mut Frame, app: &App, g: &super::Geometry, theme: &
         frame.render_widget(
             Paragraph::new(lines).style(surface),
             Rect::new(
-                toast.area.x + 1,
+                toast.area.x + 2,
                 toast.area.y + 1,
-                toast.area.width.saturating_sub(2),
+                toast.area.width.saturating_sub(4),
                 toast.area.height.saturating_sub(2),
             ),
         );
@@ -395,21 +400,24 @@ fn history_row(
     now: std::time::SystemTime,
 ) -> String {
     let marker = if selected { ">" } else { " " };
-    let time = crate::fuzzy_time::fuzzy_time(event.created, now);
+    let time = history_age(event.created, now);
     let repeat = if event.occurrences > 1 {
         format!(" ×{}", event.occurrences)
     } else {
         String::new()
     };
-    let suffix = format!("{repeat} · {time}");
-    let title = if event.presentation.title == event.severity.label() {
-        event.presentation.title.clone()
+    let suffix = format!("{repeat} {time}");
+    let summary = if event.presentation.title == event.severity.label() {
+        event.presentation.message.clone()
     } else {
-        format!("{} · {}", event.severity.label(), event.presentation.title)
+        format!(
+            "{}: {}",
+            event.presentation.title, event.presentation.message
+        )
     };
-    let summary = format!("{marker} {title}: {}", event.presentation.message);
+    let summary = format!("{marker} {} {summary}", event.severity.label());
     let summary = summary.replace('\n', " ");
-    if width > modal::width(&suffix) + 12 {
+    if width > modal::width(&suffix) {
         let available = width - modal::width(&suffix);
         let clipped = modal::truncate(&super::clean(&summary), available);
         format!(
@@ -421,4 +429,19 @@ fn history_row(
     } else {
         modal::truncate(&super::clean(&summary), width)
     }
+}
+
+fn history_age(created: std::time::SystemTime, now: std::time::SystemTime) -> String {
+    let (age, future) = now
+        .duration_since(created)
+        .map_or_else(|error| (error.duration(), true), |age| (age, false));
+    let seconds = age.as_secs();
+    let (amount, unit) = match seconds {
+        0 => return "now".into(),
+        1..60 => (seconds, "s"),
+        60..3600 => (seconds / 60, "m"),
+        3600..86400 => (seconds / 3600, "h"),
+        _ => (seconds / 86400, "d"),
+    };
+    format!("{}{amount}{unit}", if future { "in " } else { "" })
 }
