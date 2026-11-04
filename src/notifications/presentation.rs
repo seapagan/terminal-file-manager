@@ -92,6 +92,10 @@ fn failure(job: &Job, name: &str) -> String {
     let name = failed
         .filter(|_| !job.plan.operation.creates_entry())
         .map_or_else(|| name.to_owned(), |entry| display_name(&entry.source));
+    let directory = failed.is_some_and(|entry| entry.kind == crate::fs::EntryKind::Directory);
+    if let Some(message) = overlap_message(job.plan.operation, &name, detail, directory) {
+        return message;
+    }
     let reason = readable(detail);
     if reason == "Source and destination are the same." {
         format!("{name}: choose a different destination.")
@@ -102,6 +106,28 @@ fn failure(job: &Job, name: &str) -> String {
     } else {
         format!("{name}: {reason}")
     }
+}
+
+fn overlap_message(
+    operation: Operation,
+    name: &str,
+    detail: &str,
+    directory: bool,
+) -> Option<String> {
+    let verb = match operation {
+        Operation::Copy => "copy",
+        Operation::Move => "move",
+        _ => return None,
+    };
+    let relation = match detail {
+        "Source and destination are the same."
+        | "Source and destination are the same folder."
+        | "Source and destination refer to the same item." => "onto itself",
+        "Destination is inside the source folder." => "into one of its descendants",
+        _ => return None,
+    };
+    let kind = if directory { "directory " } else { "" };
+    Some(format!("Cannot {verb} {kind}{name} {relation}."))
 }
 
 fn readable(text: &str) -> String {

@@ -406,7 +406,9 @@ fn history_row(
     } else {
         String::new()
     };
-    let suffix = format!("{repeat} {time}");
+    let time_width = (width / 4).clamp(3, 8);
+    let time = modal::truncate(&time, time_width);
+    let suffix = format!("  {time:>column$}", column = usize::from(time_width));
     let summary = if event.presentation.title == event.severity.label() {
         event.presentation.message.clone()
     } else {
@@ -415,7 +417,7 @@ fn history_row(
             event.presentation.title, event.presentation.message
         )
     };
-    let summary = format!("{marker} {} {summary}", event.severity.label());
+    let summary = format!("{marker} {}{repeat} {summary}", event.severity.label());
     let summary = summary.replace('\n', " ");
     if width > modal::width(&suffix) {
         let available = width - modal::width(&suffix);

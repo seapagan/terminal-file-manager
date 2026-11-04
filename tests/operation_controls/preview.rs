@@ -1,6 +1,73 @@
 use super::*;
 
 #[test]
+fn successful_trash_and_delete_previews_do_not_publish_redundant_notifications() {
+    for action in [Action::Trash, Action::Delete] {
+        let (root, mut c) = controller();
+        c.app.notify(
+            terminal_file_manager::notifications::Severity::Warning,
+            "Retained warning",
+        );
+        let plan = pending_preview(&mut c, action, 41);
+        preview_dialog(&mut c).ready = false;
+        let mut queue = terminal_file_manager::operations::Queue::new().unwrap();
+        let id = queue.preview(plan).unwrap();
+        preview_dialog(&mut c).preview_id = Some(id);
+        let update = preview_result(&mut queue);
+        assert!(matches!(update, Update::Preview { .. }));
+        c.complete_operation(update);
+        assert!(preview_dialog(&mut c).ready);
+        assert_eq!(
+            preview_dialog(&mut c).plan.preview.as_ref().unwrap().files,
+            1
+        );
+        assert_eq!(c.app.notifications.history.len(), 1);
+        assert_eq!(c.app.notifications.history[0].text, "Retained warning");
+        assert!(c.app.operations.history.is_empty());
+        key(&mut c, KeyCode::Enter);
+        assert!(c.app.operations.dialog.is_none());
+        assert_eq!(fs::read(root.path().join("left/one")).unwrap(), b"one");
+    }
+}
+
+fn preview_result(queue: &mut terminal_file_manager::operations::Queue) -> Update {
+    loop {
+        let update = queue.next(Duration::from_secs(5)).unwrap();
+        if !matches!(update, Update::Started { .. }) {
+            return update;
+        }
+    }
+}
+
+#[test]
+fn failed_destructive_previews_retain_error_notifications_and_disable_confirmation() {
+    for action in [Action::Trash, Action::Delete] {
+        let (root, mut c) = controller();
+        let plan = pending_preview(&mut c, action, 41);
+        fs::remove_file(root.path().join("left/one")).unwrap();
+        let mut queue = terminal_file_manager::operations::Queue::new().unwrap();
+        let id = queue.preview(plan).unwrap();
+        preview_dialog(&mut c).preview_id = Some(id);
+        c.complete_operation(preview_result(&mut queue));
+        assert!(!preview_dialog(&mut c).ready);
+        assert!(preview_dialog(&mut c).error.is_some());
+        assert_eq!(c.app.notifications.history.len(), 1);
+        assert_eq!(
+            c.app.notifications.history[0].severity,
+            terminal_file_manager::notifications::Severity::Error
+        );
+        assert!(
+            c.app.notifications.history[0]
+                .text
+                .contains("confirmation disabled")
+        );
+        assert!(c.app.operations.history.is_empty());
+        assert!(c.app.operations.outbox.is_empty());
+        assert_eq!(fs::read(root.path().join("left/two")).unwrap(), b"two");
+    }
+}
+
+#[test]
 fn changed_destructive_scope_cancels_the_old_preview_before_replacing_it() {
     for (action, confirm) in [(Action::Delete, 'D'), (Action::Trash, 'T')] {
         let (root, mut controller) = controller();

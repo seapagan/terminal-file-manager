@@ -9,6 +9,8 @@ use terminal_file_manager::{
     ui,
 };
 
+#[path = "notification_ux/final_corrections.rs"]
+mod final_corrections;
 #[path = "notification_ux/polish.rs"]
 mod polish;
 
@@ -201,7 +203,14 @@ fn copy_and_move_to_self_use_concise_copy_without_altering_source_or_diagnostics
         assert!(event.presentation.title.ends_with("failed"));
         assert_eq!(
             event.presentation.message,
-            "“owned”: choose a different destination."
+            format!(
+                "Cannot {} “owned” onto itself.",
+                if operation == Operation::Copy {
+                    "copy"
+                } else {
+                    "move"
+                }
+            )
         );
         assert!(event.text.contains("Source and destination"));
         assert_eq!(std::fs::read(&path).unwrap(), b"preserved");

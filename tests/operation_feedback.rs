@@ -141,7 +141,14 @@ fn mixed_native_success_and_failure_never_claims_nothing_was_copied() {
                 .unwrap()
                 .presentation
                 .message,
-            "“invalid”: choose a different destination."
+            format!(
+                "Cannot {} “invalid” onto itself.",
+                if operation == Operation::Copy {
+                    "copy"
+                } else {
+                    "move"
+                }
+            )
         );
         assert!(c.app.status.contains("1 failed"));
         assert!(c.app.status.contains(if operation == Operation::Copy {

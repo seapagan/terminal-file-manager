@@ -43,8 +43,8 @@ fn history_summary_uses_every_cell_left_after_selection_severity_and_time() {
     c.app.notifications.open = true;
     let (_, geometry) = draw(&c, 80);
     let body = geometry.notification_history.unwrap().shell.body;
-    // "> Error " and " now" reserve twelve cells; the summary gets the rest.
-    let available = usize::from(body.width) - 12;
+    // Selection/severity, a two-cell gap and an eight-cell timestamp reserve eighteen cells.
+    let available = usize::from(body.width) - 18;
     let summary = "x".repeat(available);
     c.app.notifications.history[0]
         .presentation
@@ -75,11 +75,11 @@ fn history_wide_summaries_keep_the_timestamp_at_the_right_edge_on_resize() {
     let mut c = controller();
     c.app.notify(Severity::Error, "placeholder");
     c.app.notifications.open = true;
-    for width in [20, 40, 80, 120] {
+    for (width, time_width) in [(20, 3), (40, 8), (80, 8), (120, 8)] {
         let (_, geometry) = draw(&c, width);
         let body = geometry.notification_history.unwrap().shell.body;
         assert_eq!(body.height, 1, "width {width}");
-        let available = usize::from(body.width) - 12;
+        let available = usize::from(body.width - time_width) - 10;
         let summary = "界".repeat(available / 2) + if available % 2 == 1 { "z" } else { "" };
         c.app.notifications.history[0].presentation.message = summary;
         let (buffer, _) = draw(&c, width);
@@ -89,8 +89,8 @@ fn history_wide_summaries_keep_the_timestamp_at_the_right_edge_on_resize() {
                 "界"
             );
         }
-        let time = ratatui::layout::Rect::new(body.right() - 4, body.y, 4, 1);
-        assert_eq!(text(&buffer, time), " now");
+        let time = ratatui::layout::Rect::new(body.right() - time_width, body.y, time_width, 1);
+        assert_eq!(text(&buffer, time).trim(), "now");
         assert!(!text(&buffer, body).contains('…'));
     }
 }

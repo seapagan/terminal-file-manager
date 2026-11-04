@@ -93,10 +93,6 @@ impl Controller {
             dialog.plan = plan;
             dialog.ready = true;
             dialog.error = None;
-            self.app.notify(
-                crate::notifications::Severity::Info,
-                "Preview ready; review exact counts before confirming",
-            );
         }
     }
 
