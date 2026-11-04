@@ -19,13 +19,13 @@ fn elapsed_time_keeps_a_fixed_right_aligned_column_and_two_cell_gap() {
         c.app.now = created + Duration::from_secs(seconds);
         let (buffer, geometry) = draw(&c, 80);
         let body = geometry.notification_history.unwrap().shell.body;
-        let stamp = ratatui::layout::Rect::new(body.right() - 8, body.y, 8, 1);
-        assert_eq!(text(&buffer, stamp), format!("{expected:>8}"));
-        let gap = ratatui::layout::Rect::new(body.right() - 10, body.y, 2, 1);
+        let stamp = ratatui::layout::Rect::new(body.right() - 5, body.y, 5, 1);
+        assert_eq!(text(&buffer, stamp), format!("{expected:>5}"));
+        let gap = ratatui::layout::Rect::new(body.right() - 7, body.y, 2, 1);
         assert_eq!(text(&buffer, gap), "  ");
         let summary = text(
             &buffer,
-            ratatui::layout::Rect::new(body.x, body.y, body.width - 10, 1),
+            ratatui::layout::Rect::new(body.x, body.y, body.width - 7, 1),
         );
         if let Some(first) = &first {
             assert_eq!(&summary, first);

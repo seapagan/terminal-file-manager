@@ -22,7 +22,7 @@ impl Presentation {
     pub(super) fn job(job: &Job) -> Self {
         let action = action(job.plan.operation);
         let title = match job.state {
-            JobState::Completed => format!("{action} complete"),
+            JobState::Completed => success_title(job.plan.operation),
             JobState::Critical => "CRITICAL safety incident".into(),
             JobState::Unknown => "Outcome unknown".into(),
             JobState::Partial => format!("{action} partially complete"),
@@ -32,7 +32,7 @@ impl Presentation {
         };
         let name = target(job);
         let message = match job.state {
-            JobState::Completed => name,
+            JobState::Completed => success(job, name),
             JobState::Critical => {
                 "OS reported permanent deletion during Trash. Stop and report.".into()
             }
@@ -43,6 +43,27 @@ impl Presentation {
         };
         Self { title, message }
     }
+}
+
+fn success_title(operation: Operation) -> String {
+    match operation {
+        Operation::Trash | Operation::Delete => "Success".into(),
+        _ => format!("{} complete", action(operation)),
+    }
+}
+
+fn success(job: &Job, name: String) -> String {
+    let ending = match job.plan.operation {
+        Operation::Trash => "sent to Trash",
+        Operation::Delete => "permanently deleted",
+        _ => return name,
+    };
+    let name = if job.plan.operands.len() > 1 {
+        format!("{} items", job.plan.operands.len())
+    } else {
+        name
+    };
+    format!("{name} {ending}")
 }
 
 fn action(operation: Operation) -> &'static str {

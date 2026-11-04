@@ -406,7 +406,7 @@ fn history_row(
     } else {
         String::new()
     };
-    let time_width = (width / 4).clamp(3, 8);
+    let time_width = (width / 4).clamp(3, 5);
     let time = modal::truncate(&time, time_width);
     let suffix = format!("  {time:>column$}", column = usize::from(time_width));
     let summary = if event.presentation.title == event.severity.label() {

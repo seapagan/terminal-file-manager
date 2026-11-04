@@ -9,6 +9,8 @@ use terminal_file_manager::{
     ui,
 };
 
+#[path = "notification_ux/destructive_success.rs"]
+mod destructive_success;
 #[path = "notification_ux/final_corrections.rs"]
 mod final_corrections;
 #[path = "notification_ux/polish.rs"]

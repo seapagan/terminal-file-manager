@@ -43,8 +43,8 @@ fn history_summary_uses_every_cell_left_after_selection_severity_and_time() {
     c.app.notifications.open = true;
     let (_, geometry) = draw(&c, 80);
     let body = geometry.notification_history.unwrap().shell.body;
-    // Selection/severity, a two-cell gap and an eight-cell timestamp reserve eighteen cells.
-    let available = usize::from(body.width) - 18;
+    // Selection/severity, a two-cell gap and a five-cell timestamp reserve fifteen cells.
+    let available = usize::from(body.width) - 15;
     let summary = "x".repeat(available);
     c.app.notifications.history[0]
         .presentation
@@ -75,7 +75,7 @@ fn history_wide_summaries_keep_the_timestamp_at_the_right_edge_on_resize() {
     let mut c = controller();
     c.app.notify(Severity::Error, "placeholder");
     c.app.notifications.open = true;
-    for (width, time_width) in [(20, 3), (40, 8), (80, 8), (120, 8)] {
+    for (width, time_width) in [(20, 3), (40, 5), (80, 5), (120, 5)] {
         let (_, geometry) = draw(&c, width);
         let body = geometry.notification_history.unwrap().shell.body;
         assert_eq!(body.height, 1, "width {width}");

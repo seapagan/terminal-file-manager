@@ -190,7 +190,7 @@ fn permanent_delete_requires_separate_confirmation_and_enter_cancels() {
         &[
             ("selected", "\x1bd"),
             ("1 file · 5 B", "D"),
-            ("Permanent delete complete", "q"),
+            ("Success", "q"),
         ],
         false,
     );
@@ -208,7 +208,7 @@ fn completed_directory_delete_can_be_followed_by_a_real_create_dialog() {
         &[
             ("zzz-ready", "\x1bd"),
             ("1 file, 1 directory · 5 B", "D"),
-            ("Permanent delete complete", "\x1b[18~"),
+            ("Success", "\x1b[18~"),
             ("Directory name:", "after-delete\r"),
             ("after-delete/", "q"),
         ],
