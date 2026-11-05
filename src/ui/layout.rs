@@ -101,7 +101,7 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
         .into_iter()
         .filter_map(|(area, _, _, action)| action.map(|action| (area, action)))
         .collect();
-    geometry.toasts = super::notifications::toasts(app, &geometry);
+    geometry.toasts = super::notifications::toasts(app, area);
     geometry.modal_close = geometry
         .notification_history
         .as_ref()

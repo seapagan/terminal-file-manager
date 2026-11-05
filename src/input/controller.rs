@@ -170,7 +170,8 @@ impl Controller {
             | OwnerDisplay | MetadataPresentation | TogglePanes | Maximise | FocusPane
             | ToggleSidebar | Metadata | Help | Info | Viewer | Editor | Path | Zoxide
             | OppositeZoxide | ExitDirectory | Copy | Move | Mkdir | CreateFile | Trash
-            | Delete | Rename | Attributes | Jobs | Notifications | CopyQuick | MoveQuick => {}
+            | Delete | Rename | Attributes | Jobs | Notifications | DismissToast
+            | DismissToasts | CopyQuick | MoveQuick => {}
         }
         Vec::new()
     }

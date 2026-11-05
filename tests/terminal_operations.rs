@@ -105,7 +105,7 @@ fn mkdir_runs_from_the_real_dialog_and_restores_the_terminal() {
         &[
             ("sentinel", "\x1b[18~"),
             ("Create directory", "created-directory\r"),
-            ("1 directory created", "q"),
+            ("Create directory complete", "q"),
         ],
         true,
     );
@@ -126,7 +126,7 @@ fn create_file_shortcuts_cross_the_native_terminal_parser_and_restore_the_termin
             &[
                 ("sentinel", shortcut),
                 ("Create empty file", "created-empty\r"),
-                ("1 file created", "q"),
+                ("Create file complete", "q"),
             ],
             true,
         );
@@ -155,7 +155,7 @@ fn copy_and_move_replace_are_accessible_from_the_real_dual_pane_manager() {
         &[
             ("zzz-left-ready", "\t"),
             ("aaa-right-ready", "\x1b[Z\x1b[15~"),
-            ("1 file copied", "q"),
+            ("Copy complete", "q"),
         ],
         false,
     );
@@ -167,7 +167,7 @@ fn copy_and_move_replace_are_accessible_from_the_real_dual_pane_manager() {
             ("zzz-left-ready", "\t"),
             ("aaa-right-ready", "\x1b[Z\x1b[17~"),
             ("File already exists", "r"),
-            ("1 file moved", "q"),
+            ("Move complete", "q"),
         ],
         false,
     );
@@ -259,7 +259,7 @@ fn pattern_selection_alt_b_paste_mark_and_cancel_work_in_native_terminal() {
             ("Pattern selection", "\x1b[200~*\x1b[201~"),
             ("Matches: 1 / 1 selectable", "\r\r"),
             ("[*]", "\x1bb"),
-            ("Pattern selection", "\x1b[200~missing\x1b[201~\x1b"),
+            ("Pattern selection", "\x1bk\x1b[200~missing\x1b[201~\x1b"),
             ("cancelled", "q"),
         ],
         true,
@@ -308,13 +308,12 @@ fn pattern_overlong_native_input_requires_correction_before_apply() {
         ("overlong-ready.txt", "\x1bb"),
         ("Pattern selection", paste.as_str()),
         // The warning suffix is new output; earlier letters can reuse old cells.
-        ("Backspace to correct", "\x1bm\x1bu\x1br\r\x1bx"),
+        ("Backspace to correct", "\x1bk\x1bm\x1bu\x1br\r\x1bx"),
         // The new Regex anchor proves blocked actions left the form open.
         ("^", "\x1bw\x7f*\r\r"),
         ("[*]", "q"),
     ];
     let transcript = drive(command(root.path(), root.path(), None), &steps, false);
-    assert!(transcript.contains("Backspace to correct"));
     assert!(transcript.contains("[*]"));
     assert_eq!(
         fs::read(root.path().join("overlong-ready.txt")).unwrap(),
@@ -450,7 +449,7 @@ fn notification_history_opens_from_the_native_keyboard_and_restores_the_browser(
         command(root.path(), root.path(), None),
         &[
             ("notification-ready", "\x1bOR"),
-            ("The file viewer is not available yet.", "\x1bh"),
+            ("Alt+h details", "\x1bh"),
             ("Notifications", "\x1b"),
             ("notification-ready", "q"),
         ],

@@ -117,126 +117,51 @@ fn history_text(app: &App) -> String {
     )
 }
 
-pub(super) fn toasts(app: &App, geometry: &super::Geometry) -> Vec<Toast> {
-    if app.notifications.open || app.popup {
+pub(super) fn toasts(app: &App, terminal: Rect) -> Vec<Toast> {
+    if app.notifications.open {
         return Vec::new();
     }
-    let top = geometry
-        .panes
-        .iter()
-        .flatten()
-        .map(|r| r.y)
-        .min()
-        .unwrap_or(geometry.status.y)
-        .saturating_add(2);
-    let available = Rect::new(
-        geometry.status.x,
-        top,
-        geometry.status.width,
-        geometry.status.y.saturating_sub(top + 1),
+    let width = terminal.width.saturating_sub(2).min(60);
+    let budget = (u32::from(terminal.height) * 4 / 5) as u16;
+    let budget = budget.min(terminal.height.saturating_sub(2));
+    if width < 16 {
+        return Vec::new();
+    }
+    let left = matches!(
+        app.notifications.placement,
+        Placement::TopLeft | Placement::BottomLeft
     );
-    let mut result: Vec<Toast> = Vec::new();
+    let top = matches!(
+        app.notifications.placement,
+        Placement::TopLeft | Placement::TopRight
+    );
+    let x = if left {
+        terminal.x + 1
+    } else {
+        terminal.right().saturating_sub(width + 1)
+    };
+    let mut used = 0u16;
+    let mut result = Vec::new();
     for id in app.notifications.visible() {
-        if app.notifications.history[id]
-            .job
-            .is_some_and(|id| Some(id) == viewed_job(app))
-        {
-            continue;
-        }
-        let width = available.width.saturating_sub(2).min(60);
-        if width < 16 || available.height < 3 {
-            break;
-        }
         let rows = toast_rows(app, id, width.saturating_sub(4));
         let height = rows.len() as u16 + 2;
-        let Some(area) = place(
-            app.notifications.placement,
-            available,
-            width,
-            height,
-            geometry,
-            &result,
-        ) else {
-            continue;
+        let spacing = u16::from(!result.is_empty());
+        if used + spacing + height > budget {
+            break;
+        }
+        used += spacing + height;
+        let y = if top {
+            terminal.y + 1 + used - height
+        } else {
+            terminal.bottom() - 1 - used
         };
         result.push(Toast {
-            area,
+            area: Rect::new(x, y, width, height),
             event: id,
             rows,
         });
     }
     result
-}
-
-fn viewed_job(app: &App) -> Option<u64> {
-    app.operations
-        .show_history
-        .then(|| {
-            app.operations
-                .history
-                .get(app.operations.cursor)
-                .map(|job| job.id)
-        })
-        .flatten()
-}
-
-fn place(
-    placement: Placement,
-    area: Rect,
-    width: u16,
-    height: u16,
-    geometry: &super::Geometry,
-    taken: &[Toast],
-) -> Option<Rect> {
-    if height > area.height {
-        return None;
-    }
-    let left = area.x + 1;
-    let right = area.right().saturating_sub(width + 1);
-    let preferred_left = matches!(placement, Placement::TopLeft | Placement::BottomLeft);
-    let top = matches!(placement, Placement::TopLeft | Placement::TopRight);
-    for x in if preferred_left {
-        [left, right]
-    } else {
-        [right, left]
-    } {
-        for offset in 0..=area.height - height {
-            let y = if top {
-                area.y + offset
-            } else {
-                area.bottom() - height - offset
-            };
-            let candidate = Rect::new(x, y, width, height);
-            if !occupied(candidate, geometry)
-                && taken.iter().all(|t| {
-                    let spaced = Rect::new(
-                        t.area.x,
-                        t.area.y.saturating_sub(1),
-                        t.area.width,
-                        t.area.height.saturating_add(2),
-                    );
-                    !candidate.intersects(spaced)
-                })
-            {
-                return Some(candidate);
-            }
-        }
-    }
-    None
-}
-
-fn occupied(area: Rect, g: &super::Geometry) -> bool {
-    [
-        g.menu,
-        g.diagnostics,
-        g.help.as_ref().map(|h| h.outer),
-        g.pattern.as_ref().map(|p| p.shell.outer),
-        g.operation_layout.as_ref().map(|l| l.shell.outer),
-        g.context_help.as_ref().map(|h| h.shell.outer),
-    ]
-    .into_iter()
-    .flatten()
-    .any(|r| area.intersects(r))
 }
 
 fn toast_rows(app: &App, id: usize, width: u16) -> Vec<String> {
@@ -272,6 +197,8 @@ fn toast_rows(app: &App, id: usize, width: u16) -> Vec<String> {
 }
 
 pub(super) fn render(frame: &mut Frame, app: &App, g: &super::Geometry, theme: &Theme) {
+    app.notifications
+        .retain_toasts(&g.toasts.iter().map(|toast| toast.event).collect::<Vec<_>>());
     for toast in &g.toasts {
         let event = &app.notifications.history[toast.event];
         frame.render_widget(Clear, toast.area);

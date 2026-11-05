@@ -2,11 +2,12 @@
 mod presentation;
 pub use presentation::Presentation;
 use std::{
+    cell::RefCell,
     collections::VecDeque,
     time::{Duration, SystemTime},
 };
 
-/// Severity order also determines toast priority.
+/// Severity controls styling; presentation order is chronological.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Severity {
     Info,
@@ -34,7 +35,7 @@ impl Severity {
     }
 }
 
-/// Placement is relative to available content, excluding persistent controls.
+/// Placement is relative to the terminal, above underlying interfaces.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Placement {
@@ -66,10 +67,10 @@ impl Notice {
     }
 }
 
-/// History is session-long; only the immediate presentation queue is bounded.
+/// History is session-long; terminal geometry bounds transient presentation.
 pub struct Notifications {
     pub history: Vec<Notice>,
-    pending: VecDeque<usize>,
+    pending: RefCell<VecDeque<usize>>,
     clock: Duration,
     latest: Option<usize>,
     pub placement: Placement,
@@ -84,7 +85,7 @@ impl Default for Notifications {
     fn default() -> Self {
         Self {
             history: Vec::new(),
-            pending: VecDeque::new(),
+            pending: RefCell::new(VecDeque::new()),
             clock: Duration::ZERO,
             latest: None,
             placement: Placement::default(),
@@ -119,6 +120,7 @@ impl Notifications {
         presentation: Presentation,
         key: String,
     ) {
+        let follow = self.open && self.cursor == self.history.len().saturating_sub(1);
         let duplicate = self.matching_event(&text, severity, job);
         let expires = self.clock.saturating_add(self.lifetime());
         let index = if let Some(index) = duplicate {
@@ -147,26 +149,26 @@ impl Notifications {
             self.history.len() - 1
         };
         self.latest = Some(index);
+        if follow && duplicate.is_none() {
+            self.cursor = index;
+            self.scroll = 0;
+        }
+        self.present(index, job);
+    }
+
+    fn present(&mut self, index: usize, job: Option<u64>) {
+        if self.open {
+            self.dismiss_toasts();
+            return;
+        }
         let history = &self.history;
-        self.pending.retain(|id| {
+        let pending = self.pending.get_mut();
+        pending.retain(|id| {
             *id != index
                 && (job.is_none() || history[*id].job != job)
                 && !history[*id].same_toast(&history[index])
         });
-        self.pending.push_back(index);
-        self.bound_pending();
-    }
-
-    fn bound_pending(&mut self) {
-        if self.pending.len() > 16 {
-            let lowest = self
-                .pending
-                .iter()
-                .copied()
-                .min_by_key(|id| self.history[*id].severity)
-                .unwrap();
-            self.pending.retain(|id| *id != lowest);
-        }
+        pending.push_back(index);
     }
 
     fn matching_event(&self, text: &str, severity: Severity, job: Option<u64>) -> Option<usize> {
@@ -189,10 +191,10 @@ impl Notifications {
     /// Advance an injected monotonic clock. Expiry changes presentation only.
     pub fn advance(&mut self, elapsed: Duration) -> bool {
         self.clock = self.clock.max(elapsed);
-        let before = self.pending.len();
-        self.pending
-            .retain(|id| self.history[*id].expires > self.clock);
-        before != self.pending.len()
+        let pending = self.pending.get_mut();
+        let before = pending.len();
+        pending.retain(|id| self.history[*id].expires > self.clock);
+        before != pending.len()
     }
 
     /// Last published event, including a refreshed deduplication group.
@@ -202,21 +204,28 @@ impl Notifications {
 
     /// Hide transient presentations without removing retained events.
     pub fn dismiss_toasts(&mut self) {
-        self.pending.clear();
+        self.pending.get_mut().clear();
     }
 
-    /// Highest priority first; equally important recent events appear first.
+    /// Dismiss one visual group; independently retained events and Jobs survive.
+    pub fn dismiss_toast(&mut self, id: usize) {
+        self.pending.get_mut().retain(|event| *event != id);
+    }
+
+    /// Rendering retires displaced presentations so resizing cannot revive them.
+    pub(crate) fn retain_toasts(&self, visible: &[usize]) {
+        self.pending.borrow_mut().retain(|id| visible.contains(id));
+    }
+
+    /// Newest presentations first, nearest the configured corner.
     pub fn visible(&self) -> Vec<usize> {
-        let mut ids: Vec<_> = self
-            .pending
+        self.pending
+            .borrow()
             .iter()
             .rev()
             .copied()
             .filter(|id| self.history[*id].expires > self.clock)
-            .collect();
-        ids.sort_by_key(|id| std::cmp::Reverse(self.history[*id].severity));
-        ids.truncate(3);
-        ids
+            .collect()
     }
 
     /// Presentation counts never merge the independently retained Job links.
@@ -250,13 +259,13 @@ impl Notifications {
 mod tests {
     use super::*;
     #[test]
-    fn a_unique_burst_bounds_pending_presentations_without_discarding_history() {
+    fn a_unique_burst_retains_presentations_until_geometry_budgets_them() {
         let mut notices = Notifications::default();
         for index in 0..100 {
             notices.notify(index.to_string(), SystemTime::UNIX_EPOCH, Severity::Info);
         }
-        assert_eq!(notices.pending.len(), 16);
+        assert_eq!(notices.pending.borrow().len(), 100);
         assert_eq!(notices.history.len(), 100);
-        assert_eq!(notices.visible(), [99, 98, 97]);
+        assert_eq!(notices.visible(), (0..100).rev().collect::<Vec<_>>());
     }
 }

@@ -55,7 +55,7 @@ fn draw(app: &App, width: u16, height: u16) -> (String, ui::Geometry) {
     )
 }
 #[test]
-fn expiry_deduplication_and_priority_keep_all_session_evidence() {
+fn expiry_deduplication_and_chronology_keep_all_session_evidence() {
     let mut n = Notifications::default();
     let now = SystemTime::UNIX_EPOCH;
     n.notify("failure".into(), now, Severity::Error);
@@ -65,8 +65,8 @@ fn expiry_deduplication_and_priority_keep_all_session_evidence() {
     for i in 0..100 {
         n.notify(format!("info {i}"), now, Severity::Info);
     }
-    assert_eq!(n.visible()[0], 0);
-    assert!(n.visible().len() <= 3);
+    assert_eq!(n.visible()[0], 100);
+    assert_eq!(n.visible().len(), 101);
     n.advance(Duration::from_secs(5));
     assert!(n.visible().is_empty());
     assert_eq!(n.history.len(), 101);
@@ -106,7 +106,7 @@ fn toast_geometry_and_status_stay_bounded_on_resize() {
             for toast in &g.toasts {
                 assert!(toast.area.right() <= width && toast.area.bottom() <= height);
                 assert!(!toast.area.intersects(g.footer));
-                assert!(!toast.area.intersects(g.status));
+                assert!(toast.area.height <= height * 4 / 5);
             }
         }
     }
@@ -164,14 +164,15 @@ fn four_placements_reflow_and_toast_clicks_do_not_reach_the_listing() {
             &g,
             Duration::ZERO,
         );
-        assert!(c.app.notifications.open);
+        assert!(!c.app.notifications.open);
+        assert!(c.app.notifications.visible().is_empty());
         assert_eq!(c.app.active, 0);
         assert!(c.app.panes[0].cursor.is_none());
     }
 }
 
 #[test]
-fn modal_controls_are_never_covered_and_long_history_remains_readable() {
+fn foreground_toasts_cover_menus_and_long_history_remains_readable() {
     let mut c = controller();
     c.app.view_menu = Some(0);
     c.app.notify(
@@ -180,9 +181,12 @@ fn modal_controls_are_never_covered_and_long_history_remains_readable() {
     );
     for width in [20, 40, 80, 120] {
         let (_, g) = draw(&c.app, width, 24);
-        for toast in g.toasts {
-            assert!(!toast.area.intersects(g.menu.unwrap()));
-        }
+        assert!(!g.toasts.is_empty());
+        assert!(
+            g.toasts
+                .iter()
+                .any(|toast| toast.area.intersects(g.menu.unwrap()))
+        );
     }
     c.app.notifications.open = true;
     key(&mut c, KeyCode::Char('e'));
@@ -334,6 +338,7 @@ fn current_error_precedes_running_jobs_and_decorative_history_on_narrow_status()
         None,
     );
     c.app.notify(Severity::Error, "Important failure");
+    c.app.notifications.dismiss_toasts();
     let (text, g) = draw(&c.app, 20, 24);
     assert!(text.contains("Important failure"), "{text}");
     assert_eq!(g.status_controls[0].1, Action::Notifications);

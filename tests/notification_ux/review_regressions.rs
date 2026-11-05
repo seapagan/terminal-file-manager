@@ -1,5 +1,4 @@
 use super::*;
-use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use terminal_file_manager::{
     input::Action,
     operations::{Dialog, Operation, Plan},
@@ -39,17 +38,7 @@ fn linked_job_over_dialog() -> (tempfile::TempDir, Controller) {
     ));
     press(&mut c, KeyCode::Char('p'));
     let (_, geometry) = draw(&c, 80);
-    let toast = &geometry.toasts[0];
-    c.handle(
-        Event::Mouse(MouseEvent {
-            kind: MouseEventKind::Down(MouseButton::Left),
-            column: toast.area.x,
-            row: toast.area.y,
-            modifiers: KeyModifiers::NONE,
-        }),
-        &geometry,
-        Duration::ZERO,
-    );
+    c.dispatch(Action::Notifications, &geometry);
     press(&mut c, KeyCode::Enter);
     (root, c)
 }

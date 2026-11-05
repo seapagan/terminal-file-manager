@@ -11,23 +11,28 @@ impl App {
         self.notifications.notify(text, self.now, Severity::Error);
     }
 
-    pub(super) fn listing_notices(&self, pane: usize) -> Vec<String> {
+    pub(super) fn listing_notices(&self, pane: usize) -> Vec<(String, Severity)> {
         let state = &self.panes[pane];
         state
             .error
             .iter()
-            .chain(state.warnings.iter())
-            .cloned()
+            .map(|message| (message.clone(), Severity::Error))
+            .chain(
+                state
+                    .warnings
+                    .iter()
+                    .map(|message| (message.clone(), Severity::Warning)),
+            )
             .collect()
     }
 
-    pub(super) fn retain_listing_notices(&mut self, pane: usize, previous: &[String]) {
-        for message in self.listing_notices(pane) {
-            if !previous.contains(&message) {
+    pub(super) fn retain_listing_notices(&mut self, pane: usize, previous: &[(String, Severity)]) {
+        for (message, severity) in self.listing_notices(pane) {
+            if !previous.contains(&(message.clone(), severity)) {
                 self.notifications.notify(
                     format!("Pane {}: {message}", pane + 1),
                     self.now,
-                    Severity::Warning,
+                    severity,
                 );
             }
         }

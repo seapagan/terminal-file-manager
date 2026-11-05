@@ -15,6 +15,8 @@ mod destructive_success;
 mod final_corrections;
 #[path = "notification_ux/polish.rs"]
 mod polish;
+#[path = "notification_ux/redesign.rs"]
+mod redesign;
 #[path = "notification_ux/review_regressions.rs"]
 mod review_regressions;
 
@@ -156,7 +158,7 @@ fn toast_heading_message_and_hint_have_separate_word_wrapped_rows() {
         content.lines().any(|line| line.contains("Alt+h details")),
         "{content}"
     );
-    assert_eq!(toast.area.bottom(), geometry.status.y - 1);
+    assert_eq!(toast.area.bottom(), geometry.footer.y);
 }
 
 #[test]

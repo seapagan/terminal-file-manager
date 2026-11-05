@@ -1,12 +1,20 @@
 # Acceptance gates
 
-## PM3-05 visual-testing corrections — 3 November 2026
+## PM3-05 toast redesign — 5 November 2026
 
 Toasts separate severity/title, a word-wrapped message and a details hint.
 The severity accent and panel background retain monochrome and colour-depth
-support. Bottom placements move down one row while preserving modal and safety
-controls. The Alt+h list shows selectable event summaries, relative times and
+support. Toasts render above underlying interfaces, including modal and safety
+surfaces. Newer groups sit nearest the configured corner in chronological order;
+complete cards and spacing use up to 80% of terminal height. Overflow retires
+older presentations without losing history. Click dismisses one group, Alt+k
+dismisses the oldest visible group and Ctrl+Alt+k clears all active toasts.
+Dismissal shortcuts remain available inside dialogs and editors.
+The Alt+h list shows selectable event summaries, relative times and
 repeat counts; **e** toggles full details, and Enter opens linked Jobs evidence.
+Incoming events update the viewer live. It follows the newest entry while
+preserving older selections and their scroll position. History suppresses and
+consumes toast presentation, including events received while open.
 
 Repeated failures on the same operation targets share a toast across Job IDs.
 History retains each Job link, diagnostic record and recovery action. Different
@@ -31,7 +39,7 @@ Application notifications create no filesystem jobs. Toast expiry and queue
 pressure retain history, including earlier outcomes after reconciliation.
 
 Focused regressions cover injected expiry clocks, configuration round trips and
-bounds, priority/deduplication, bounded pending presentations, non-operation
+bounds, chronological grouping, height-based presentation capacity, non-operation
 history, mouse controls, widths 20–120, small heights, Unicode/control escaping,
 all colour depths, persistent safety warnings and parent-surface restoration.
 The Create File collision regression checks the visible filename/error, retained

@@ -475,8 +475,10 @@ wrapping; metadata and other shared text renderers keep their existing rules.
 ## Responsive status and session notifications
 
 The application owns notification events independently of filesystem jobs.
-Toasts reference those events through a bounded priority queue; expiry removes
-presentation entries while retaining session history. Operation notifications
+Toasts reference those events in chronological order, with newer groups nearest
+the configured terminal corner. Complete cards and spacing use at most 80% of
+terminal height. Rendering retires displaced presentation entries; they cannot
+return after dismissal or resize. Expiry and dismissal retain session history. Operation notifications
 link to Jobs records for full evidence and recovery actions. Application events,
 including rejected requests, view-profile changes and filesystem-watch warnings,
 create no filesystem jobs. Concise toast titles/messages remain separate from
@@ -492,5 +494,16 @@ open modals preserve their content space. Critical incidents and unresolved
 outcomes remain independent of notification expiry. Notification history uses
 the existing measured modal shell for a compact selectable list. The detail
 toggle retains full diagnostics; Enter opens the selected Job's evidence. Esc
-returns to the underlying surface.
+returns to the underlying surface. Incoming events update the open viewer and
+follow the newest selection without disturbing an older selection or its detail
+scroll. Opening history clears pending toasts; events received there remain in
+history without subsequent toast presentation.
+
+Toasts render above other interfaces, including critical-incident surfaces.
+Mouse hit-testing and configurable global dismissal actions run before modal
+input. A left click dismisses one visual group and consumes the event. Alt+k
+dismisses the oldest visible group; Ctrl+Alt+k clears all pending presentations.
+Neither action changes operation state, retained events or Jobs evidence.
+Passive per-entry metadata diagnostics stay inline; accepted worker failures
+and listing errors retain Error notifications. Watch recovery remains Info.
 Placement and expiry use the existing strict TOML settings and atomic save path.

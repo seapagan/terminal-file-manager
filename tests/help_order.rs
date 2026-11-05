@@ -58,7 +58,10 @@ fn sections_put_common_actions_before_specialised_or_unavailable_commands() {
             .starts_with(&[Copy, Move, Rename, Mkdir, CreateFile, Trash])
     );
     assert_eq!(section(HelpSection::Operations).last(), Some(&Delete));
-    assert_eq!(section(HelpSection::Jobs), vec![Jobs, Notifications]);
+    assert_eq!(
+        section(HelpSection::Jobs),
+        vec![Jobs, DismissToast, DismissToasts, Notifications]
+    );
     assert!(section(HelpSection::Panes).starts_with(&[FocusPane, TogglePanes]));
     assert!(section(HelpSection::Views).starts_with(&[Filter, Hidden, Sort, Reverse]));
     assert!(section(HelpSection::Views).ends_with(&[Viewer, Editor]));

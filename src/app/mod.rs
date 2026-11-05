@@ -403,13 +403,6 @@ impl App {
             return false;
         }
         let detail = &mut self.details[request.pane];
-        if let Some(error) = &entry.error {
-            self.notifications.notify(
-                format!("{}: {error}", entry.path.display()),
-                self.now,
-                crate::notifications::Severity::Error,
-            );
-        }
         detail.entry = Some(entry);
         detail.canonical = canonical;
         detail.canonical_pending = false;
@@ -509,6 +502,11 @@ impl App {
                     return false;
                 }
                 let mut entry = self.panes[request.pane].current().unwrap().clone();
+                self.notifications.notify(
+                    format!("{}: {error}", request.path.display()),
+                    self.now,
+                    crate::notifications::Severity::Error,
+                );
                 entry.error = Some(error);
                 self.complete_metadata(request, entry, None)
             }

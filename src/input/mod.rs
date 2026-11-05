@@ -91,6 +91,8 @@ pub enum Action {
     Attributes,
     Jobs,
     Notifications,
+    DismissToast,
+    DismissToasts,
     CopyQuick,
     MoveQuick,
     Path,

@@ -1,9 +1,16 @@
 //! The history overlay owns input without changing its underlying pane or Jobs state.
-use super::Controller;
+use super::{Action, Controller};
 use crate::ui::Geometry;
 use crossterm::event::{Event, KeyCode, KeyEventKind, MouseButton, MouseEventKind};
 
 pub(super) fn handle(c: &mut Controller, event: &Event, g: &Geometry) -> bool {
+    if let Event::Key(key) = event
+        && key.kind != KeyEventKind::Release
+        && let Some(action) = c.bindings.action(*key)
+        && dismiss(c, action, g)
+    {
+        return true;
+    }
     if super::operations::interrupt(event) {
         c.app.notifications.open = false;
         return false;
@@ -19,17 +26,28 @@ pub(super) fn handle(c: &mut Controller, event: &Event, g: &Geometry) -> bool {
             .find(|t| t.area.contains((mouse.column, mouse.row).into()))
     {
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
-            c.app.notifications.open = true;
-            c.app.notifications.cursor = toast.event;
-            c.app.notifications.scroll = 0;
-            c.app.notifications.details = false;
+            c.app.notifications.dismiss_toast(toast.event);
         }
         return true;
     }
     false
 }
 
+pub(super) fn dismiss(c: &mut Controller, action: Action, g: &Geometry) -> bool {
+    match action {
+        Action::DismissToast => {
+            if let Some(toast) = g.toasts.last() {
+                c.app.notifications.dismiss_toast(toast.event);
+            }
+        }
+        Action::DismissToasts => c.app.notifications.dismiss_toasts(),
+        _ => return false,
+    }
+    true
+}
+
 pub(super) fn open(c: &mut Controller) {
+    c.app.notifications.dismiss_toasts();
     c.app.notifications.open = true;
     c.app.notifications.cursor = c.app.notifications.latest_index().unwrap_or(0);
     c.app.notifications.scroll = 0;
