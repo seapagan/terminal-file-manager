@@ -1,6 +1,19 @@
 use super::tests::{collect_until_idle, counting_controller, hold_first_count};
 use super::*;
 
+#[test]
+fn open_notification_history_requests_clock_redraw_after_toast_expiry() {
+    let mut app = App::new("owned-history".into());
+    app.notify(crate::notifications::Severity::Info, "Retained event");
+    app.notifications.advance(Duration::from_secs(60));
+    app.notifications.open = true;
+    app.now = std::time::SystemTime::UNIX_EPOCH;
+    assert!(tick(&mut app));
+    app.notifications.open = false;
+    app.now = std::time::SystemTime::UNIX_EPOCH;
+    assert!(!tick(&mut app));
+}
+
 fn reconcile(controller: &mut Controller, pool: &mut Pool) {
     let request = controller.app.request_refresh(0).unwrap();
     pool.submit(request);

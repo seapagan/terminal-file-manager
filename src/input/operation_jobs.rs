@@ -87,7 +87,7 @@ impl Controller {
     }
 
     fn complete_preview(&mut self, id: u64, plan: crate::operations::Plan) {
-        if let Some(Dialog::Operation(dialog)) = &mut self.app.operations.dialog
+        if let Some(Dialog::Operation(dialog)) = self.app.operations.dialog_mut()
             && dialog.preview_id == Some(id)
         {
             dialog.plan = plan;
@@ -127,7 +127,6 @@ impl Controller {
             .find(|job| job.id == id)
         {
             job.finish(record, self.app.now);
-            self.app.status = notification_summary(job).into();
             let severity = match job.state {
                 JobState::Completed => crate::operations::NoticeSeverity::Success,
                 JobState::Failed | JobState::Unknown | JobState::Critical => {
@@ -136,6 +135,10 @@ impl Controller {
                 _ => crate::operations::NoticeSeverity::Warning,
             };
             let success = job.state == JobState::Completed;
+            self.app.status = crate::app::Status::Notice {
+                text: notification_summary(job),
+                severity,
+            };
             for pane in &mut self.app.panes {
                 pane.finish_creation(id, success);
             }
@@ -151,7 +154,7 @@ impl Controller {
         Vec::new()
     }
     fn failed_preview(&mut self, id: u64, record: &crate::operations::Record) -> bool {
-        if let Some(Dialog::Operation(dialog)) = &mut self.app.operations.dialog
+        if let Some(Dialog::Operation(dialog)) = self.app.operations.dialog_mut()
             && dialog.preview_id == Some(id)
         {
             dialog.ready = false;
@@ -234,6 +237,10 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
 
 fn history_key(controller: &mut Controller, key: KeyCode) {
     let state = &mut controller.app.operations;
+    if state.suspended_dialog.is_some() && matches!(key, KeyCode::Char('r' | 'R') | KeyCode::Enter)
+    {
+        return;
+    }
     if state.waiting_exit.is_some() && matches!(key, KeyCode::Char('r' | 'R' | 'x' | 'X')) {
         return;
     }

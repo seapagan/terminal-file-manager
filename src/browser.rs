@@ -147,6 +147,7 @@ fn tick(app: &mut App) -> bool {
         app.help_landing = None;
     }
     help_expired
+        || app.notifications.open
         || app.operations.active()
         || app.panes.iter().any(|pane| pane.fuzzy_timestamps)
         || app

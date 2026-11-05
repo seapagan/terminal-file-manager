@@ -15,6 +15,9 @@ pub(super) fn action(controller: &mut Controller, action: Action, geometry: &Geo
         state.show_history = !state.show_history;
         state.jobs_evidence = false;
         state.scroll = 0;
+        if !state.show_history {
+            state.resume_dialog();
+        }
         return true;
     }
     let Some(operation) = operation_for(action) else {
@@ -231,7 +234,11 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
     if editing_surface(controller) {
         return false;
     }
-    super::operation_jobs::handle(controller, event, geometry)
+    let handled = super::operation_jobs::handle(controller, event, geometry);
+    if !controller.app.operations.show_history {
+        controller.app.operations.resume_dialog();
+    }
+    handled
 }
 
 fn handle_dialog(controller: &mut Controller, dialog: Dialog, event: &Event, geometry: &Geometry) {

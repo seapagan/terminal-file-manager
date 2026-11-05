@@ -170,22 +170,22 @@ pub(super) fn render(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
 
 fn context(app: &App, width: u16) -> Segment {
     let text = super::status_text(app, &app.status, width);
-    let event = app
-        .notifications
-        .latest_index()
-        .and_then(|index| app.notifications.history.get(index))
-        .filter(|event| event.text == *app.status);
+    let severity = match app.status {
+        crate::app::Status::Notice { severity, .. } => Some(severity),
+        crate::app::Status::JobsDetails(_) => Some(crate::notifications::Severity::Error),
+        _ => None,
+    };
     Segment {
         compact: text.clone(),
         full: text,
-        role: event.map_or(Role::Status, |event| event.severity.role()),
+        role: severity.map_or(Role::Status, crate::notifications::Severity::role),
         action: if matches!(app.status, crate::app::Status::JobsDetails(_)) {
             Some(Action::Jobs)
         } else {
-            event.map(|_| Action::Notifications)
+            severity.map(|_| Action::Notifications)
         },
         priority: if matches!(app.status, crate::app::Status::JobsDetails(_))
-            || event.is_some_and(|event| event.severity >= crate::notifications::Severity::Warning)
+            || severity.is_some_and(|severity| severity >= crate::notifications::Severity::Warning)
         {
             Priority::Notice
         } else {
@@ -211,4 +211,27 @@ fn selection(count: crate::app::SelectionCounts) -> Option<Segment> {
         });
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::notifications::Severity;
+
+    #[test]
+    fn status_severity_survives_unrelated_events_and_resets_with_new_status() {
+        let mut app = App::new("owned-status".into());
+        app.notify(Severity::Error, "Current failure");
+        app.notifications
+            .notify("Watch recovered".into(), app.now, Severity::Info);
+        let current = context(&app, 20);
+        assert!(matches!(current.role, Role::Error));
+        assert!(current.priority == Priority::Notice);
+        assert_eq!(current.action, Some(Action::Notifications));
+        app.status = "Current failure".into();
+        let current = context(&app, 20);
+        assert!(matches!(current.role, Role::Status));
+        assert!(current.priority == Priority::Hint);
+        assert_eq!(current.action, None);
+    }
 }

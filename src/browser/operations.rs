@@ -29,7 +29,7 @@ pub(super) fn submit(controller: &mut Controller, queue: &mut Queue) {
                 .submit(plan.clone(), options)
                 .map(|id| controller.register_operation(id, plan, options, None)),
             Intent::Preview(plan) => queue.preview(plan).map(|id| {
-                if let Some(Dialog::Operation(dialog)) = &mut controller.app.operations.dialog {
+                if let Some(Dialog::Operation(dialog)) = controller.app.operations.dialog_mut() {
                     dialog.preview_id = Some(id);
                 }
             }),

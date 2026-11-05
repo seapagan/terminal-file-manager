@@ -149,7 +149,10 @@ fn history(app: &App, narrow: bool) -> Vec<Button> {
         if app.operations.waiting_exit.is_none() && job.can_reconcile() {
             buttons.push(("x Reconcile", KeyCode::Char('x')));
         }
-        if app.operations.waiting_exit.is_none() && job.can_retry() {
+        if app.operations.waiting_exit.is_none()
+            && app.operations.suspended_dialog.is_none()
+            && job.can_retry()
+        {
             buttons.push((
                 if narrow {
                     "r Retry"
@@ -170,6 +173,7 @@ fn history(app: &App, narrow: bool) -> Vec<Button> {
             .conflicts
             .iter()
             .any(|conflict| conflict.id == job.id)
+            && app.operations.suspended_dialog.is_none()
         {
             buttons.push(("Enter Conflict", KeyCode::Enter));
         }

@@ -124,7 +124,10 @@ impl App {
     /// Publish a meaningful message once for status, toast and session history.
     pub fn notify(&mut self, severity: crate::notifications::Severity, text: impl Into<String>) {
         let text = text.into();
-        self.status = text.clone().into();
+        self.status = Status::Notice {
+            text: text.clone(),
+            severity,
+        };
         self.notifications.notify(text, self.now, severity);
     }
 

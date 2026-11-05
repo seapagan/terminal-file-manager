@@ -15,6 +15,8 @@ mod destructive_success;
 mod final_corrections;
 #[path = "notification_ux/polish.rs"]
 mod polish;
+#[path = "notification_ux/review_regressions.rs"]
+mod review_regressions;
 
 fn controller() -> Controller {
     Controller::new(

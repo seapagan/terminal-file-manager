@@ -36,7 +36,7 @@ fn status_text(app: &App, status: &crate::app::Status, width: u16) -> String {
             app.shortcut(crate::input::Action::Help, "?"),
             app.shortcut_hint(crate::input::Action::Jobs, "F9")
         ),
-        crate::app::Status::Text(text) => clean(text),
+        crate::app::Status::Text(text) | crate::app::Status::Notice { text, .. } => clean(text),
         crate::app::Status::JobsDetails(text) => details_text(app, text, width),
     }
 }

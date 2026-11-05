@@ -157,6 +157,8 @@ pub struct PendingConflict {
 #[derive(Default)]
 pub struct State {
     pub dialog: Option<Dialog>,
+    /// Linked Jobs temporarily owns input; the pending dialog and viewport survive.
+    pub suspended_dialog: Option<Box<(Dialog, usize)>>,
     pub outbox: Vec<Intent>,
     pub history: Vec<Job>,
     pub conflicts: VecDeque<PendingConflict>,
@@ -173,6 +175,22 @@ pub struct State {
 }
 
 impl State {
+    pub(crate) fn dialog_mut(&mut self) -> Option<&mut Dialog> {
+        self.dialog.as_mut().or_else(|| {
+            self.suspended_dialog
+                .as_deref_mut()
+                .map(|(dialog, _)| dialog)
+        })
+    }
+
+    pub(crate) fn resume_dialog(&mut self) {
+        if let Some(suspended) = self.suspended_dialog.take() {
+            let (dialog, scroll) = *suspended;
+            self.dialog = Some(dialog);
+            self.scroll = scroll;
+        }
+    }
+
     pub fn active(&self) -> bool {
         self.history.iter().any(Job::active)
     }

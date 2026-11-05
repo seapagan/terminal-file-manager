@@ -166,6 +166,9 @@ fn open_job(c: &mut Controller) {
         && let Some(index) = c.app.operations.history.iter().position(|job| job.id == id)
     {
         c.app.notifications.open = false;
+        if let Some(dialog) = c.app.operations.dialog.take() {
+            c.app.operations.suspended_dialog = Some(Box::new((dialog, c.app.operations.scroll)));
+        }
         c.app.operations.show_history = true;
         c.app.operations.jobs_evidence = true;
         c.app.operations.cursor = index;

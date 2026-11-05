@@ -3,6 +3,10 @@
 pub enum Status {
     Welcome,
     Text(String),
+    Notice {
+        text: String,
+        severity: crate::notifications::Severity,
+    },
     JobsDetails(String),
 }
 
@@ -21,7 +25,7 @@ impl std::ops::Deref for Status {
     fn deref(&self) -> &str {
         match self {
             Self::Welcome => super::WELCOME,
-            Self::Text(text) | Self::JobsDetails(text) => text,
+            Self::Text(text) | Self::JobsDetails(text) | Self::Notice { text, .. } => text,
         }
     }
 }
