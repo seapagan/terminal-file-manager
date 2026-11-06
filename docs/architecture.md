@@ -474,6 +474,12 @@ wrapping; metadata and other shared text renderers keep their existing rules.
 
 ## Responsive status and session notifications
 
+PM3-05 is complete and merged through [PR #10](https://github.com/seapagan/terminal-file-manager/pull/10)
+at `1ece1a1`, with final feature head `b924083`. The [acceptance record](acceptance.md#pm3-05-accepted-and-merged--6-november-2026)
+records completed independent reviews, maintainer acceptance and feature/merge
+verification. Path navigation and the internal file-operation clipboard remain
+separate future consumers of this status owner; snapshot testing remains deferred.
+
 The application owns notification events independently of filesystem jobs.
 Toasts reference those events in chronological order, with newer groups nearest
 the configured terminal corner. Complete cards and spacing use at most 80% of

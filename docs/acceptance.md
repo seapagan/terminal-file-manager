@@ -1,5 +1,63 @@
 # Acceptance gates
 
+## PM3-05 accepted and merged — 6 November 2026
+
+The maintainer accepted Status & Notifications and merged [PR #10](https://github.com/seapagan/terminal-file-manager/pull/10)
+at **20:27:57 UTC** as
+[`1ece1a124e9aab2169c3ac47a3180103c18db045`](https://github.com/seapagan/terminal-file-manager/commit/1ece1a124e9aab2169c3ac47a3180103c18db045).
+The final GPG-signed/Signed-off-by feature head was
+[`b9240833109d2d7305850fcc5f1f4e12e006d466`](https://github.com/seapagan/terminal-file-manager/commit/b9240833109d2d7305850fcc5f1f4e12e006d466).
+The merge retains the feature head's source, tests and documentation unchanged.
+PM3-05 is **Complete**; no review, visual-acceptance or merge gate remains.
+
+The maintainer confirms all three independent cold reviews and final visual
+acceptance. These external reviews are separate from GitHub's formal review
+list, which is empty. No per-platform or terminal-specific manual acceptance
+matrix was supplied; native automated results below cover all three platforms.
+
+| Independent review | Final disposition and remediation |
+| --- | --- |
+| Codex | Three findings corrected in `46c0abc`: suspend/restore the operation dialog while linked Jobs owns input, retain typed current-status severity, and redraw live history timestamps after toast expiry. |
+| DeepSeek | Second-review dispositions retained with `ef3b09d`: correct expiry fixtures, keep passive metadata errors inline, preserve listing Error severity, reuse dismissal, consume foreground toast clicks before modal input, and protect both history-follow directions. History/status overlap was not reproduced and gained a regression; watch recovery remains informational. |
+| Claude | Ten findings dispositioned in `b924083`: move overflow retirement out of rendering; correct operation targets and diagnostic rewriting; route pattern/profile status through `App::notify()`; index event lookup and two-second group counts; remove duplicate critical hints; share measured status segments; centralize toast settings. Existing metadata routing and unchanged listing-warning suppression were retained with recovery/exception regressions. |
+
+The accepted implementation provides one persistent status row, at most two for
+critical information, chronological foreground toasts, four placement settings,
+1–60-second expiry (default five), global dismissal and live Alt+h history.
+Newest cards take priority within the 80% height budget. Overflow and tiny-terminal
+presentations retire permanently; unlimited session history and independent Jobs
+evidence survive expiry, dismissal and resize. Critical incidents, unknown
+outcomes, reconciliation, safe exit and underlying modal edits retain their
+existing safety contracts.
+
+| Evidence revision | Rust CI | Linux passed/skipped | macOS passed/skipped | Windows passed/skipped |
+| --- | --- | --- | --- | --- |
+| Final feature head `b924083` | [42269430925](https://github.com/seapagan/terminal-file-manager/actions/runs/42269430925) | 947 / 2 | 924 / 2 | 892 / 3 |
+| Accepted merge `1ece1a1` | [42288581768](https://github.com/seapagan/terminal-file-manager/actions/runs/42288581768) | 947 / 2 | 924 / 2 | 892 / 3 |
+
+Both revisions passed all five workflows, native doctests, exact MSRV and combined
+coverage. The feature head passed **19/19 checks**, including all three Codacy
+checks: zero new issues, 97.60% diff coverage and +0.27 percentage-point variation.
+The merge passed **14 checks**; its two PR-only report jobs skipped as designed.
+No merge-head Codacy check records exist; feature-head Codacy results are not
+substituted for merge-head results.
+
+Final feature delivery passed elevated
+`RUSTUP_TOOLCHAIN=1.95.0 cargo make verify` in 106.61 seconds, including mandatory
+Windows MSVC xwin check/Clippy/build, and clean `cargo make verify-postcommit`
+in 71.13 seconds, including exact MSRV and strict 290-file packages.
+The preceding toast-redesign delivery also passed applicable `verify-infra`
+checks, including 169 Python tests; infrastructure did not change in the final
+Claude corrections. Seventeen existing Lizard NLOC parser-span advisories and
+nonblocking uploader Node deprecation warnings remain; thresholds and
+suppressions are unchanged.
+
+**Next:** PM3-06 path navigation is **Ready**, awaiting a separate scope/branch
+assignment. PM3-07 clipboard remains **Not started** until PM3-06 completes;
+its status-framework prerequisite is satisfied. M3-GATE remains **Not started**
+and still requires completion of PM3-06 and PM3-07. Snapshot testing remains a separately deferred
+proposal, not an outstanding PM3-05 acceptance condition.
+
 ## PM3-05 review corrections — 6 November 2026
 
 The runtime retires overflow and tiny-terminal toast presentations before drawing.
@@ -45,9 +103,9 @@ Regressions cover actual self-copy/move failures, file/directory collisions,
 permission presentation, grouped counts under queue pressure, per-Job evidence,
 list selection/paging/mouse input, detail scrolling, resize, Unicode word
 boundaries, all colour levels and existing native terminal round trips.
-Maintainer visual acceptance and serial independent cold reviews remain pending;
-PR #10 stays draft and unmerged. Exact QC and hosted results belong to the
-current controller checkpoint.
+The maintainer accepted this redesign and the subsequent review corrections.
+Final review, merge and verification evidence appears in the completed PM3-05
+record above.
 
 ## PM3-05 implementation checkpoint — 2 November 2026
 
@@ -66,9 +124,8 @@ The Create File collision regression checks the visible filename/error, retained
 Jobs evidence and unchanged existing bytes. A native PTY/ConPTY case opens
 history from an application notification and returns to the browser before quit.
 Existing operation, critical-incident, reconciliation and safe-exit regressions
-remain in place. Exact delivery and hosted evidence belong to the current
-controller checkpoint; maintainer visual acceptance and serial independent
-reviews remain outstanding. This checkpoint does not accept or merge PM3-05.
+remain in place. The completed PM3-05 record above supersedes this dated
+implementation checkpoint and records final review, acceptance and merge evidence.
 
 ## PM3-04 accepted and merged — 1 November 2026
 
