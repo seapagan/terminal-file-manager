@@ -137,7 +137,8 @@ fn invalid_attributes_and_oversized_paste_never_submit_an_operation() {
     assert!(
         matches!(&controller.app.operations.dialog, Some(Dialog::Operation(dialog)) if dialog.text == before)
     );
-    assert!(controller.app.status.contains("rejected"));
+    assert!(controller.app.status.contains("paste was not added"));
+    assert!(controller.app.notifications.history.is_empty());
     assert!(controller.app.operations.outbox.is_empty());
     assert_eq!(
         fs::read(root.path().join("left/source")).unwrap(),

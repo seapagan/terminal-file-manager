@@ -294,7 +294,7 @@ define_commands! {
     ),
     (Action::DismissToast, HelpSection::Jobs, "Dismiss oldest visible toast; available in all interfaces"),
     (Action::DismissToasts, HelpSection::Jobs, "Dismiss all active toasts; keep notification history and Jobs evidence"),
-    (Action::Notifications, HelpSection::Jobs, "Read session notification history; Enter opens linked Jobs evidence"),
+    (Action::Notifications, HelpSection::Jobs, "Read noteworthy events and file-operation results; Enter opens linked Jobs evidence"),
     (Action::Help, HelpSection::Application, "Help"),
     (
         Action::Cancel,

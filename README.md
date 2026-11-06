@@ -189,7 +189,10 @@ visibility option; operations use the visible selection.
 
 ## Notifications and status
 
-Toasts highlight successes, warnings and failures without moving keyboard focus.
+Toasts highlight file-operation results, background failures and important safety
+or navigation problems without moving keyboard focus. Routine actions, pattern
+marking, profile changes and input corrections use the status area or the open
+form. They do not add entries to notification history.
 Toasts appear above dialogs and other interfaces. Newer notifications sit nearest
 your chosen corner; complete cards and gaps use up to 80% of terminal height.
 When space runs out, older toasts leave the stack and remain in history.

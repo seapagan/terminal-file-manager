@@ -99,10 +99,8 @@ fn destructive(
         return true;
     }
     if !dialog.ready || dialog.plan.preview.is_none() || dialog.error.is_some() {
-        controller.app.notify(
-            crate::notifications::Severity::Warning,
-            "Recursive preview pending or failed; confirmation disabled",
-        );
+        controller.app.status =
+            "Cannot confirm until the folder count finishes without errors".into();
         return true;
     }
     submit(controller, dialog, geometry)
@@ -129,9 +127,7 @@ fn submit(
         && let Some(message) = dialog.name_error()
     {
         dialog.error = Some(message.into());
-        controller
-            .app
-            .notify(crate::notifications::Severity::Error, message);
+        controller.app.status = message.into();
         return true;
     }
     let approval = match dialog.plan.operation {
@@ -144,10 +140,7 @@ fn submit(
         && (!dialog.ready || dialog.plan.preview.is_none() || dialog.error.is_some()))
         || approval.is_some_and(|key| !geometry.operation_enabled(key))
     {
-        controller.app.notify(
-            crate::notifications::Severity::Warning,
-            "Approval disabled; check the form or enlarge the terminal",
-        );
+        controller.app.status = "Cannot confirm; check the form or enlarge the terminal".into();
         return true;
     }
     match prepare(controller, dialog) {
@@ -198,7 +191,11 @@ fn prepare(controller: &mut Controller, dialog: &mut OperationDialog) -> io::Res
             return Ok(false);
         }
     }
-    apply_fields(dialog)?;
+    if let Err(error) = apply_fields(dialog) {
+        dialog.error = Some(error.to_string());
+        controller.app.status = error.to_string().into();
+        return Ok(false);
+    }
     Ok(true)
 }
 
@@ -231,20 +228,21 @@ fn apply_fields(dialog: &mut OperationDialog) -> io::Result<()> {
         }
         Operation::Permissions(_) => {
             let mode = u32::from_str_radix(dialog.text.trim().trim_start_matches("0o"), 8)
-                .map_err(io::Error::other)?;
+                .map_err(|_| {
+                    io::Error::other("Enter permissions as octal digits from 0000 to 7777")
+                })?;
             if mode > 0o7777 {
-                return Err(io::Error::other("Unix mode must be 0000..7777"));
+                return Err(io::Error::other(
+                    "Enter permissions as octal digits from 0000 to 7777",
+                ));
             }
             dialog.plan.operation = Operation::Permissions(mode);
         }
         Operation::ReadOnly(_) => {
-            dialog.plan.operation = Operation::ReadOnly(
-                dialog
-                    .text
-                    .trim()
-                    .parse::<bool>()
-                    .map_err(io::Error::other)?,
-            );
+            dialog.plan.operation =
+                Operation::ReadOnly(dialog.text.trim().parse::<bool>().map_err(|_| {
+                    io::Error::other("Enter true for read-only or false for writable")
+                })?);
         }
         _ => {}
     }
@@ -254,7 +252,7 @@ fn apply_fields(dialog: &mut OperationDialog) -> io::Result<()> {
 fn rename_target(dialog: &OperationDialog) -> io::Result<PathBuf> {
     if !dialog.edited && dialog.plan.operands[0].name.to_str().is_none() {
         return Err(io::Error::other(
-            "Native name is display only; Ctrl+a and enter a replacement filename",
+            "Displayed name cannot be reused; use Ctrl+a and type a replacement filename",
         ));
     }
     validate_name(&dialog.text)?;
@@ -272,7 +270,7 @@ fn target(dialog: &OperationDialog) -> io::Result<PathBuf> {
 fn typed_path(dialog: &OperationDialog) -> io::Result<PathBuf> {
     if dialog.text.is_empty() || dialog.text.contains('\0') {
         return Err(io::Error::other(
-            "Enter an explicit nonempty path without NUL",
+            "Enter a destination path without null characters",
         ));
     }
     let path = PathBuf::from(&dialog.text);
@@ -290,7 +288,7 @@ fn validate_name(text: &str) -> io::Result<()> {
         || !matches!(path.components().next(), Some(Component::Normal(_)))
     {
         Err(io::Error::other(
-            "Enter one native filename; use Move to change directories",
+            "Enter one filename; use Move to change directories",
         ))
     } else {
         Ok(())
@@ -307,10 +305,7 @@ fn field(dialog: &mut OperationDialog) -> &mut String {
 
 fn append(controller: &mut Controller, dialog: &mut OperationDialog, text: &str) {
     if field(dialog).len().saturating_add(text.len()) > 65_536 {
-        controller.app.notify(
-            crate::notifications::Severity::Warning,
-            "Input too long; pasted input rejected",
-        );
+        controller.app.status = "Input too long; paste was not added".into();
         return;
     }
     dialog.error = None;

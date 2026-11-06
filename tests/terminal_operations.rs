@@ -286,7 +286,7 @@ fn pattern_alt_controls_and_literal_letters_cross_the_native_terminal_parser() {
             ("cancelled", "\x1bb"),
             ("Pattern selection", "\x1b[200~*\x1b[201~"),
             ("Matches: 1 / 1 selectable", "\x1bs\x1bw\x1bu"),
-            ("visible marks updated", "q"),
+            ("0 visible entries", "q"),
         ],
         false,
     );
@@ -357,7 +357,7 @@ fn context_f1_and_literal_question_marks_cross_the_native_terminal_parser() {
             ("ok", "\x1bb"),
             ("Pattern selection", "?\x1bOP"),
             ("Pattern Help", "\r\x1bm\x1b"),
-            ("selects; Enter activates. Esc cancels.", "?\x1bm"),
+            ("Esc cancels.", "?\x1bm"),
             ("[*]", "q"),
         ],
         false,
@@ -377,7 +377,7 @@ fn help_synonyms_choose_document_and_context_in_a_native_terminal() {
             ("help-keys-sentinel", "\x1bb"),
             ("Pattern selection", "\t?"),
             ("Pattern Help", "\x1b"),
-            ("selects; Enter activates. Esc cancels.", "\x1b"),
+            ("Esc cancels.", "\x1b"),
             ("cancelled", "q"),
         ],
         false,
@@ -448,8 +448,9 @@ fn notification_history_opens_from_the_native_keyboard_and_restores_the_browser(
     drive(
         command(root.path(), root.path(), None),
         &[
-            ("notification-ready", "\x1bOR"),
-            ("Alt+h details", "\x1bh"),
+            ("notification-ready", "\x1bn"),
+            ("File name:", "notification-ready\r"),
+            ("Create file failed", "\x1bh"),
             ("Notifications", "\x1b"),
             ("notification-ready", "q"),
         ],

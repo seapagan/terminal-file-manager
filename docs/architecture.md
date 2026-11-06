@@ -487,8 +487,12 @@ terminal height. Before drawing, the runtime retires displaced presentations and
 presentations that cannot fit a tiny terminal; they cannot return after dismissal
 or resize. Rendering only reads state. Expiry and dismissal retain session history. Operation notifications
 link to Jobs records for full evidence and recovery actions. Application events,
-including rejected requests, view-profile changes and filesystem-watch warnings,
-create no filesystem jobs. Concise toast titles/messages remain separate from
+including safety-related rejected requests and filesystem-watch warnings,
+create no filesystem jobs. Routine input feedback, pattern marking and profile
+changes use existing status or inline form fields without recording an event.
+Pre-submission name/path validation and disabled controls stay contextual;
+changed operation scope, failed previews and queue rejections remain retained
+notifications. Concise toast titles/messages remain separate from
 retained diagnostic text. Within two seconds, matching failures on the same
 native operation targets share a toast across Job IDs, with occurrence counts;
 each Job keeps its own history link and evidence. Repeats extend the same group
