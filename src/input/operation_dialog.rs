@@ -268,9 +268,12 @@ fn target(dialog: &OperationDialog) -> io::Result<PathBuf> {
 }
 
 fn typed_path(dialog: &OperationDialog) -> io::Result<PathBuf> {
-    if dialog.text.is_empty() || dialog.text.contains('\0') {
+    if dialog.text.is_empty() {
+        return Err(io::Error::other("Enter a destination path"));
+    }
+    if dialog.text.contains('\0') {
         return Err(io::Error::other(
-            "Enter a destination path without null characters",
+            "Destination paths cannot contain null characters",
         ));
     }
     let path = PathBuf::from(&dialog.text);

@@ -210,3 +210,64 @@ fn pending_listing_waits_without_notifying_or_opening_an_operation() {
     assert!(c.app.operations.dialog.is_none());
     assert!(c.app.operations.outbox.is_empty());
 }
+
+fn assert_destination_validation(input: &str, message: &str) {
+    use ratatui::{Terminal, backend::TestBackend};
+    use terminal_file_manager::color::Theme;
+    for action in [Action::Copy, Action::Move] {
+        let (root, mut c) = loaded();
+        dispatch(&mut c, action);
+        let Some(Dialog::Operation(dialog)) = &c.app.operations.dialog else {
+            panic!("no dialog")
+        };
+        let original = dialog.plan.destination.clone();
+        let g = ui::geometry(&c.app, Rect::new(0, 0, 100, 30));
+        c.handle(
+            Event::Key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL)),
+            &g,
+            Duration::ZERO,
+        );
+        c.handle(Event::Paste(input.into()), &g, Duration::ZERO);
+        key(&mut c, KeyCode::Enter);
+        let Some(Dialog::Operation(dialog)) = &c.app.operations.dialog else {
+            panic!("invalid input closed dialog")
+        };
+        assert_eq!(dialog.error.as_deref(), Some(message));
+        assert_eq!(dialog.plan.destination, original);
+        assert_eq!(c.app.status.to_string(), message);
+        assert!(c.app.operations.outbox.is_empty());
+        assert_retained(&c);
+        let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+        terminal
+            .draw(|frame| {
+                ui::render(
+                    frame,
+                    &c.app,
+                    &Theme::new(colored_text::ColorLevel::NoColor),
+                );
+            })
+            .unwrap();
+        let text: String = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect();
+        assert!(text.contains(message), "{text}");
+        assert_eq!(std::fs::read(root.path().join("file")).unwrap(), b"owned");
+    }
+}
+
+#[test]
+fn empty_destination_requests_a_path_without_notifying() {
+    assert_destination_validation("", "Enter a destination path");
+}
+
+#[test]
+fn nul_destination_explains_the_invalid_character_without_notifying() {
+    assert_destination_validation(
+        "bad\0path",
+        "Destination paths cannot contain null characters",
+    );
+}
