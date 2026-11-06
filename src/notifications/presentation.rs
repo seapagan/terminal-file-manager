@@ -56,6 +56,21 @@ fn success(job: &Job, name: String) -> String {
     let ending = match job.plan.operation {
         Operation::Trash => "sent to Trash",
         Operation::Delete => "permanently deleted",
+        Operation::Rename => {
+            return job.plan.destination.as_deref().map_or(name, display_name);
+        }
+        Operation::Copy | Operation::Move => {
+            let name = job
+                .plan
+                .incoming_name
+                .as_deref()
+                .filter(|_| job.plan.operands.len() == 1)
+                .map_or(name, |name| display_name(std::path::Path::new(name)));
+            return job.plan.destination.as_deref().map_or_else(
+                || name.clone(),
+                |destination| format!("{name} to {}", display_name(destination)),
+            );
+        }
         _ => return name,
     };
     let name = if job.plan.operands.len() > 1 {
@@ -152,27 +167,25 @@ fn overlap_message(
 }
 
 fn readable(text: &str) -> String {
-    if text.starts_with("Source and destination ") {
-        return "Source and destination are the same.".into();
-    }
-    if text.starts_with("Permission denied") || text.starts_with("Access is denied") {
-        return "Permission denied.".into();
-    }
-    if [
-        "File exists",
-        "The file exists",
-        "Is a directory",
-        "Cannot create a file when that file already exists",
-        "Rename destination exists",
-    ]
-    .iter()
-    .any(|prefix| text.starts_with(prefix))
-    {
-        return "An entry already exists.".into();
+    let summary = without_os_code(text);
+    match summary {
+        "Source and destination are the same."
+        | "Source and destination are the same folder."
+        | "Source and destination refer to the same item." => {
+            return "Source and destination are the same.".into();
+        }
+        "Permission denied" | "Access is denied." => return "Permission denied.".into(),
+        "File exists"
+        | "The file exists."
+        | "Cannot create a file when that file already exists."
+        | "Rename destination exists; choose a different name" => {
+            return "An entry already exists.".into();
+        }
+        _ => {}
     }
     text.lines()
         .map(|line| {
-            let line = line.split(" (os error ").next().unwrap_or(line);
+            let line = without_os_code(line);
             line.split_whitespace()
                 .map(|word| {
                     if word.starts_with('/') || word.as_bytes().get(1..3) == Some(b":\\") {
@@ -186,6 +199,15 @@ fn readable(text: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn without_os_code(text: &str) -> &str {
+    text.rsplit_once(" (os error ")
+        .filter(|(_, code)| {
+            code.strip_suffix(')')
+                .is_some_and(|code| code.parse::<i32>().is_ok())
+        })
+        .map_or(text, |(message, _)| message)
 }
 
 pub(super) fn job_key(job: &Job) -> String {
@@ -221,10 +243,13 @@ mod tests {
         for detail in [
             "File exists (os error 17)",
             "The file exists. (os error 80)",
-            "Is a directory (os error 21)",
             "Cannot create a file when that file already exists. (os error 183)",
         ] {
             assert_eq!(readable(detail), "An entry already exists.");
         }
     }
 }
+
+#[cfg(test)]
+#[path = "presentation_review_tests.rs"]
+mod review_tests;

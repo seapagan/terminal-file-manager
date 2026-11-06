@@ -2,13 +2,12 @@
 mod presentation;
 pub use presentation::Presentation;
 use std::{
-    cell::RefCell,
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     time::{Duration, SystemTime},
 };
 
 /// Severity controls styling; presentation order is chronological.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Severity {
     Info,
     Success,
@@ -56,21 +55,26 @@ pub struct Notice {
     pub job: Option<u64>,
     expires: Duration,
     updated: Duration,
-    key: String,
+    group: usize,
 }
 
-impl Notice {
-    fn same_toast(&self, other: &Self) -> bool {
-        self.severity == other.severity
-            && self.key == other.key
-            && self.updated.abs_diff(other.updated) <= Duration::from_secs(2)
-    }
+struct ToastGroup {
+    updated: Duration,
+    occurrences: usize,
+}
+
+#[derive(Default)]
+struct Indexes {
+    events: HashMap<(Option<u64>, Severity, String), usize>,
+    latest_groups: HashMap<(Severity, String), usize>,
+    groups: Vec<ToastGroup>,
 }
 
 /// History is session-long; terminal geometry bounds transient presentation.
 pub struct Notifications {
     pub history: Vec<Notice>,
-    pending: RefCell<VecDeque<usize>>,
+    pending: VecDeque<usize>,
+    indexes: Box<Indexes>,
     clock: Duration,
     latest: Option<usize>,
     pub placement: Placement,
@@ -85,7 +89,8 @@ impl Default for Notifications {
     fn default() -> Self {
         Self {
             history: Vec::new(),
-            pending: RefCell::new(VecDeque::new()),
+            pending: VecDeque::new(),
+            indexes: Box::default(),
             clock: Duration::ZERO,
             latest: None,
             placement: Placement::default(),
@@ -121,14 +126,16 @@ impl Notifications {
         key: String,
     ) {
         let follow = self.open && self.cursor == self.history.len().saturating_sub(1);
-        let duplicate = self.matching_event(&text, severity, job);
+        let event_key = (job, severity, text.clone());
+        let duplicate = self.matching_event(&event_key);
+        let group = self.toast_group(severity, key);
         let expires = self.clock.saturating_add(self.lifetime());
         let index = if let Some(index) = duplicate {
             let event = &mut self.history[index];
             event.occurrences = event.occurrences.saturating_add(1);
             event.text = text;
             event.presentation = presentation;
-            event.key = key;
+            event.group = group;
             event.severity = severity;
             event.created = now;
             event.expires = expires;
@@ -137,7 +144,7 @@ impl Notifications {
         } else {
             self.history.push(Notice {
                 presentation,
-                key,
+                group,
                 text,
                 severity,
                 created: now,
@@ -148,6 +155,7 @@ impl Notifications {
             });
             self.history.len() - 1
         };
+        self.indexes.events.insert(event_key, index);
         self.latest = Some(index);
         if follow && duplicate.is_none() {
             self.cursor = index;
@@ -162,26 +170,39 @@ impl Notifications {
             return;
         }
         let history = &self.history;
-        let pending = self.pending.get_mut();
+        let pending = &mut self.pending;
         pending.retain(|id| {
             *id != index
                 && (job.is_none() || history[*id].job != job)
-                && !history[*id].same_toast(&history[index])
+                && history[*id].group != history[index].group
         });
         pending.push_back(index);
     }
 
-    fn matching_event(&self, text: &str, severity: Severity, job: Option<u64>) -> Option<usize> {
-        self.history.iter().rposition(|event| {
-            if let Some(id) = job {
-                event.job == Some(id) && event.text == text && event.severity == severity
-            } else {
-                event.job.is_none()
-                    && event.text == text
-                    && event.severity == severity
-                    && self.clock.saturating_sub(event.updated) <= Duration::from_secs(2)
-            }
+    fn matching_event(&self, key: &(Option<u64>, Severity, String)) -> Option<usize> {
+        self.indexes.events.get(key).copied().filter(|index| {
+            key.0.is_some()
+                || self.clock.saturating_sub(self.history[*index].updated) <= Duration::from_secs(2)
         })
+    }
+
+    fn toast_group(&mut self, severity: Severity, key: String) -> usize {
+        let key = (severity, key);
+        if let Some(&id) = self.indexes.latest_groups.get(&key)
+            && self.clock.saturating_sub(self.indexes.groups[id].updated) <= Duration::from_secs(2)
+        {
+            self.indexes.groups[id].updated = self.clock;
+            self.indexes.groups[id].occurrences =
+                self.indexes.groups[id].occurrences.saturating_add(1);
+            return id;
+        }
+        let id = self.indexes.groups.len();
+        self.indexes.groups.push(ToastGroup {
+            updated: self.clock,
+            occurrences: 1,
+        });
+        self.indexes.latest_groups.insert(key, id);
+        id
     }
 
     fn lifetime(&self) -> Duration {
@@ -191,7 +212,7 @@ impl Notifications {
     /// Advance an injected monotonic clock. Expiry changes presentation only.
     pub fn advance(&mut self, elapsed: Duration) -> bool {
         self.clock = self.clock.max(elapsed);
-        let pending = self.pending.get_mut();
+        let pending = &mut self.pending;
         let before = pending.len();
         pending.retain(|id| self.history[*id].expires > self.clock);
         before != pending.len()
@@ -204,23 +225,22 @@ impl Notifications {
 
     /// Hide transient presentations without removing retained events.
     pub fn dismiss_toasts(&mut self) {
-        self.pending.get_mut().clear();
+        self.pending.clear();
     }
 
     /// Dismiss one visual group; independently retained events and Jobs survive.
     pub fn dismiss_toast(&mut self, id: usize) {
-        self.pending.get_mut().retain(|event| *event != id);
+        self.pending.retain(|event| *event != id);
     }
 
-    /// Rendering retires displaced presentations so resizing cannot revive them.
-    pub(crate) fn retain_toasts(&self, visible: &[usize]) {
-        self.pending.borrow_mut().retain(|id| visible.contains(id));
+    /// Retire displaced presentations during update so resizing cannot revive them.
+    pub(crate) fn retain_toasts(&mut self, visible: &[usize]) {
+        self.pending.retain(|id| visible.contains(id));
     }
 
     /// Newest presentations first, nearest the configured corner.
     pub fn visible(&self) -> Vec<usize> {
         self.pending
-            .borrow()
             .iter()
             .rev()
             .copied()
@@ -230,11 +250,7 @@ impl Notifications {
 
     /// Presentation counts never merge the independently retained Job links.
     pub fn toast_occurrences(&self, id: usize) -> usize {
-        self.history
-            .iter()
-            .filter(|event| self.history[id].same_toast(event))
-            .map(|event| event.occurrences)
-            .fold(0, usize::saturating_add)
+        self.indexes.groups[self.history[id].group].occurrences
     }
 
     pub(crate) fn record_job(
@@ -259,12 +275,81 @@ impl Notifications {
 mod tests {
     use super::*;
     #[test]
+    fn indexed_application_groups_extend_at_two_seconds_and_split_afterward() {
+        let mut notices = Notifications::default();
+        for millis in [0, 2000, 4000] {
+            notices.advance(Duration::from_millis(millis));
+            notices.notify("same".into(), SystemTime::UNIX_EPOCH, Severity::Warning);
+        }
+        assert_eq!(notices.history.len(), 1);
+        assert_eq!(notices.history[0].occurrences, 3);
+        assert_eq!(notices.toast_occurrences(0), 3);
+        notices.advance(Duration::from_millis(6001));
+        notices.notify("same".into(), SystemTime::UNIX_EPOCH, Severity::Warning);
+        assert_eq!(notices.history.len(), 2);
+        assert_eq!(notices.toast_occurrences(1), 1);
+        assert_eq!(notices.toast_occurrences(0), 3);
+        notices.notify("same".into(), SystemTime::UNIX_EPOCH, Severity::Error);
+        assert_eq!(notices.visible(), [2, 1, 0]);
+    }
+
+    #[test]
+    fn repeating_a_job_after_the_group_window_keeps_evidence_but_starts_a_new_count() {
+        let mut notices = Notifications::default();
+        notices.record(
+            "same".into(),
+            SystemTime::UNIX_EPOCH,
+            Severity::Error,
+            Some(7),
+        );
+        notices.advance(Duration::from_secs(3));
+        notices.record(
+            "same".into(),
+            SystemTime::UNIX_EPOCH,
+            Severity::Error,
+            Some(7),
+        );
+        assert_eq!(notices.history.len(), 1);
+        assert_eq!(notices.history[0].job, Some(7));
+        assert_eq!(notices.history[0].occurrences, 2);
+        assert_eq!(notices.toast_occurrences(0), 1);
+        assert_eq!(notices.visible(), [0]);
+    }
+
+    #[test]
+    fn adjacent_two_second_repeats_form_one_transitive_toast_group() {
+        let mut notices = Notifications::default();
+        for (id, millis) in [(1, 0), (2, 1500), (3, 3000)] {
+            notices.advance(Duration::from_millis(millis));
+            notices.record(
+                "same failure".into(),
+                SystemTime::UNIX_EPOCH,
+                Severity::Error,
+                Some(id),
+            );
+        }
+        assert_eq!(notices.visible(), [2]);
+        assert_eq!(notices.toast_occurrences(2), 3);
+        assert_eq!(notices.history.len(), 3);
+        notices.advance(Duration::from_millis(5001));
+        notices.record(
+            "same failure".into(),
+            SystemTime::UNIX_EPOCH,
+            Severity::Error,
+            Some(4),
+        );
+        assert_eq!(notices.visible(), [3, 2]);
+        assert_eq!(notices.toast_occurrences(3), 1);
+        assert_eq!(notices.toast_occurrences(2), 3);
+    }
+
+    #[test]
     fn a_unique_burst_retains_presentations_until_geometry_budgets_them() {
         let mut notices = Notifications::default();
         for index in 0..100 {
             notices.notify(index.to_string(), SystemTime::UNIX_EPOCH, Severity::Info);
         }
-        assert_eq!(notices.pending.borrow().len(), 100);
+        assert_eq!(notices.pending.len(), 100);
         assert_eq!(notices.history.len(), 100);
         assert_eq!(notices.visible(), (0..100).rev().collect::<Vec<_>>());
     }

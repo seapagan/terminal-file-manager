@@ -501,6 +501,7 @@ impl App {
                 if !self.detail_matches(request) {
                     return false;
                 }
+                // Ordinary inspection diagnostics arrive in Entry.error via complete_metadata.
                 let mut entry = self.panes[request.pane].current().unwrap().clone();
                 self.notifications.notify(
                     format!("{}: {error}", request.path.display()),

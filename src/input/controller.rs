@@ -26,8 +26,7 @@ pub struct Controller {
 impl Controller {
     /// Own the authoritative app and validated keymap.
     pub fn new(mut app: App, bindings: Bindings, preferences: Settings) -> Self {
-        app.notifications.placement = preferences.toast_placement;
-        app.notifications.expiry_seconds = preferences.toast_expiry_seconds;
+        preferences.apply_notifications(&mut app);
         app.help_rows = bindings.help_entries();
         app.metadata_presentation = preferences.metadata_presentation;
         app.profile_names = preferences.profiles.keys().cloned().collect();

@@ -197,8 +197,6 @@ fn toast_rows(app: &App, id: usize, width: u16) -> Vec<String> {
 }
 
 pub(super) fn render(frame: &mut Frame, app: &App, g: &super::Geometry, theme: &Theme) {
-    app.notifications
-        .retain_toasts(&g.toasts.iter().map(|toast| toast.event).collect::<Vec<_>>());
     for toast in &g.toasts {
         let event = &app.notifications.history[toast.event];
         frame.render_widget(Clear, toast.area);

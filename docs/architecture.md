@@ -477,14 +477,18 @@ wrapping; metadata and other shared text renderers keep their existing rules.
 The application owns notification events independently of filesystem jobs.
 Toasts reference those events in chronological order, with newer groups nearest
 the configured terminal corner. Complete cards and spacing use at most 80% of
-terminal height. Rendering retires displaced presentation entries; they cannot
-return after dismissal or resize. Expiry and dismissal retain session history. Operation notifications
+terminal height. Before drawing, the runtime retires displaced presentations and
+presentations that cannot fit a tiny terminal; they cannot return after dismissal
+or resize. Rendering only reads state. Expiry and dismissal retain session history. Operation notifications
 link to Jobs records for full evidence and recovery actions. Application events,
 including rejected requests, view-profile changes and filesystem-watch warnings,
 create no filesystem jobs. Concise toast titles/messages remain separate from
 retained diagnostic text. Within two seconds, matching failures on the same
 native operation targets share a toast across Job IDs, with occurrence counts;
-each Job keeps its own history link and evidence. A newer result for a job
+each Job keeps its own history link and evidence. Repeats extend the same group
+when each arrives within two seconds of its predecessor. Indexed event lookup
+and stored group counts avoid scanning session history during publication or
+toast rendering. History remains unlimited for the session. A newer result for a job
 replaces its pending toast while history keeps its earlier result notification.
 
 The status composer orders structured current-context, selection, Jobs and

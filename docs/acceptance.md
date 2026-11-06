@@ -1,5 +1,25 @@
 # Acceptance gates
 
+## PM3-05 review corrections — 6 November 2026
+
+The runtime retires overflow and tiny-terminal toast presentations before drawing.
+Rendering leaves notification state unchanged. Enlarging the terminal or dismissing
+cards does not revive retired presentations; history and Jobs retain their evidence.
+
+Rename success identifies the resulting name; Copy/Move identify the destination
+and selection scope. Concise diagnostics preserve directory/type errors and
+unrelated source/destination failures. Pattern and profile notifications retain
+typed status severity. Wrapped critical status carries one details hint, with
+both rows routing to Jobs. Rendering and mouse input share measured status segments.
+
+Focused regressions cover chained two-second groups and stable counts, independent
+Job links, overflow and tiny-terminal retirement, read-only rendering, operation
+success/error copy, inline metadata errors versus exceptional worker failures,
+unchanged listing warnings versus recovery and renewed failure, typed pattern/profile
+status, cancellation, and startup/preference toast settings. History remains
+unlimited. Existing global dismissal, live history, modal and operation-safety
+regressions remain required. Exact gate results belong to the controller checkpoint.
+
 ## PM3-05 toast redesign — 5 November 2026
 
 Toasts separate severity/title, a word-wrapped message and a details hint.

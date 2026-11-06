@@ -117,8 +117,7 @@ impl Settings {
 
     /// Apply startup/view preferences without replacing native locations.
     pub fn apply(&self, app: &mut App) {
-        app.notifications.placement = self.toast_placement;
-        app.notifications.expiry_seconds = self.toast_expiry_seconds;
+        self.apply_notifications(app);
         app.sidebar = self.sidebar;
         app.dual = self.two_panes;
         app.split_percent = self.split_percent;
@@ -140,6 +139,12 @@ impl Settings {
             pane.columns = self.columns.clone();
             pane.resort();
         }
+    }
+
+    /// Startup and explicit preference application share notification settings.
+    pub(crate) fn apply_notifications(&self, app: &mut App) {
+        app.notifications.placement = self.toast_placement;
+        app.notifications.expiry_seconds = self.toast_expiry_seconds;
     }
 
     /// Capture only the explicit change; pane switches never choose restart defaults.

@@ -19,6 +19,7 @@ pub struct Geometry {
     pub sidebar: Option<Rect>,
     pub status: Rect,
     pub status_controls: Vec<(Rect, crate::input::Action)>,
+    pub(super) status_segments: Vec<super::status::Control>,
     pub toasts: Vec<super::Toast>,
     pub notification_history: Option<super::HistoryLayout>,
     pub footer: Rect,
@@ -97,9 +98,11 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
     let bounds = super::overlay_bounds(app, area);
     scroll_limits(app, &mut geometry, bounds);
     geometry.notification_history = super::notifications::history(app, bounds);
-    geometry.status_controls = super::status::controls(app, geometry.status)
-        .into_iter()
-        .filter_map(|(area, _, _, action)| action.map(|action| (area, action)))
+    geometry.status_segments = super::status::controls(app, geometry.status);
+    geometry.status_controls = geometry
+        .status_segments
+        .iter()
+        .filter_map(|(area, _, _, action)| action.map(|action| (*area, action)))
         .collect();
     geometry.toasts = super::notifications::toasts(app, area);
     geometry.modal_close = geometry
@@ -123,6 +126,7 @@ fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
     Geometry {
         notification_history: None,
         status_controls: Vec::new(),
+        status_segments: Vec::new(),
         toasts: Vec::new(),
         context_help: super::help::context::layout(app, bounds),
         context_control,

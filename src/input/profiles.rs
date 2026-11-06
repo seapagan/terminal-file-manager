@@ -100,10 +100,9 @@ fn choose(controller: &mut Controller) {
     controller.preferences.capture_view(&view);
     controller.preferences_changed = true;
     controller.app.profile_menu = None;
-    controller.app.notifications.notify(
-        format!("View profile {name} applied"),
-        controller.app.now,
+    controller.app.notify(
         crate::notifications::Severity::Info,
+        format!("View profile {name} applied"),
     );
 }
 
@@ -131,12 +130,9 @@ fn edit(controller: &mut Controller, key: KeyEvent) {
 fn save(controller: &mut Controller) {
     let name = controller.app.profile_name.as_ref().unwrap().clone();
     if let Err(error) = validate_profile_name(&name) {
-        controller.app.status = error.clone().into();
-        controller.app.notifications.notify(
-            error,
-            controller.app.now,
-            crate::notifications::Severity::Error,
-        );
+        controller
+            .app
+            .notify(crate::notifications::Severity::Error, error);
         return;
     }
     let pane = &mut controller.app.panes[controller.app.active];
@@ -156,10 +152,9 @@ fn save(controller: &mut Controller) {
     controller.app.profile_name = None;
     controller.app.profile_menu = None;
     controller.app.profile_names = controller.preferences.profiles.keys().cloned().collect();
-    controller.app.notifications.notify(
-        format!("View profile {name} saved in session; preferences save on exit"),
-        controller.app.now,
+    controller.app.notify(
         crate::notifications::Severity::Success,
+        format!("View profile {name} saved in session; preferences save on exit"),
     );
 }
 
@@ -196,5 +191,68 @@ pub(super) fn mouse(
             choose(controller);
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod notification_tests {
+    use super::*;
+    use crate::{app::Status, input::Bindings, notifications::Severity};
+
+    fn controller() -> Controller {
+        Controller::new(
+            crate::app::App::new(".".into()),
+            Bindings::new(&Default::default()).unwrap(),
+            Default::default(),
+        )
+    }
+
+    fn assert_notice(controller: &Controller, severity: Severity) {
+        let Status::Notice {
+            text,
+            severity: actual,
+        } = &controller.app.status
+        else {
+            panic!("profile notification must retain typed status");
+        };
+        assert_eq!(*actual, severity);
+        assert_eq!(controller.app.notifications.history.len(), 1);
+        let event = &controller.app.notifications.history[0];
+        assert_eq!(event.text, *text);
+        assert_eq!(event.severity, severity);
+    }
+
+    #[test]
+    fn profile_apply_keeps_typed_info_and_one_history_event() {
+        let mut controller = controller();
+        open(&mut controller);
+        choose(&mut controller);
+        assert_notice(&controller, Severity::Info);
+        assert!(controller.app.profile_menu.is_none());
+    }
+
+    #[test]
+    fn profile_save_success_and_error_keep_typed_status_and_one_history_event() {
+        for (name, severity) in [("Saved", Severity::Success), ("", Severity::Error)] {
+            let mut controller = controller();
+            open(&mut controller);
+            controller.app.profile_name = Some(name.into());
+            save(&mut controller);
+            assert_notice(&controller, severity);
+            assert_eq!(
+                controller.app.profile_name.is_none(),
+                severity == Severity::Success
+            );
+        }
+    }
+
+    #[test]
+    fn profile_cancel_does_not_publish_a_notification() {
+        let mut controller = controller();
+        let status = controller.app.status.clone();
+        open(&mut controller);
+        menu_key(&mut controller, KeyCode::Esc);
+        assert_eq!(controller.app.status, status);
+        assert!(controller.app.notifications.history.is_empty());
     }
 }

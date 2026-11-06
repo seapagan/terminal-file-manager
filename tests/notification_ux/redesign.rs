@@ -2,7 +2,12 @@ use super::*;
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use terminal_file_manager::{input::Action, notifications::Placement};
 
-fn draw_size(c: &Controller, width: u16, height: u16) -> (ratatui::buffer::Buffer, ui::Geometry) {
+fn draw_size(
+    c: &mut Controller,
+    width: u16,
+    height: u16,
+) -> (ratatui::buffer::Buffer, ui::Geometry) {
+    ui::prepare_notifications(&mut c.app, ratatui::layout::Rect::new(0, 0, width, height));
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
     let mut geometry = ui::geometry(&c.app, terminal.size().unwrap().into());
     terminal
@@ -46,7 +51,7 @@ fn chronological_cards_stack_outward_from_each_corner_regardless_of_severity() {
         ] {
             c.app.notify(severity, message);
         }
-        let (buffer, g) = draw_size(&c, 120, 40);
+        let (buffer, g) = draw_size(&mut c, 120, 40);
         assert_eq!(
             g.toasts.iter().map(|t| t.event).collect::<Vec<_>>(),
             [2, 1, 0]
@@ -71,17 +76,20 @@ fn height_budget_favours_newest_and_overflow_never_returns_after_dismissal_or_re
     for i in 0..40 {
         c.app.notify(Severity::Info, format!("Event {i}"));
     }
-    let (_, tall) = draw_size(&c, 120, 200);
+    let (_, tall) = draw_size(&mut c, 120, 200);
     assert!(tall.toasts.len() > 16);
-    let (_, small) = draw_size(&c, 120, 40);
+    let (_, small) = draw_size(&mut c, 120, 40);
     assert!(small.toasts.len() > 3);
     let occupied =
         small.toasts.iter().map(|t| t.area.height).sum::<u16>() + small.toasts.len() as u16 - 1;
     assert!(occupied <= 32);
     assert_eq!(small.toasts[0].event, 39);
-    assert_eq!(draw_size(&c, 120, 200).1.toasts.len(), small.toasts.len());
+    assert_eq!(
+        draw_size(&mut c, 120, 200).1.toasts.len(),
+        small.toasts.len()
+    );
     c.app.notifications.dismiss_toasts();
-    assert!(draw_size(&c, 120, 200).1.toasts.is_empty());
+    assert!(draw_size(&mut c, 120, 200).1.toasts.is_empty());
     assert_eq!(c.app.notifications.history.len(), 40);
 }
 
@@ -91,7 +99,7 @@ fn history_never_covers_either_critical_status_row_on_narrow_terminals() {
     c.app.notifications.open = true;
     c.app.notifications.details = true;
     c.app.notifications.history[0].text = "detail ".repeat(200);
-    let (buffer, g) = draw_size(&c, 20, 18);
+    let (buffer, g) = draw_size(&mut c, 20, 18);
     assert_eq!(g.status.height, 2);
     assert!(
         !g.notification_history

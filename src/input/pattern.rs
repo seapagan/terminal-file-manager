@@ -245,25 +245,19 @@ fn activate(controller: &mut Controller, target: PatternControl, move_focus: boo
         PatternControl::Apply(operation) => {
             match state.apply(&mut controller.app.panes[state.pane], operation) {
                 Ok(preview) => {
-                    controller.app.status = format!(
-                        "Pattern selection: {} matches; visible marks updated",
-                        preview.matches
-                    )
-                    .into();
-                    controller.app.notifications.notify(
-                        controller.app.status.to_string(),
-                        controller.app.now,
+                    controller.app.notify(
                         crate::notifications::Severity::Success,
+                        format!(
+                            "Pattern selection: {} matches; visible marks updated",
+                            preview.matches
+                        ),
                     );
                     return;
                 }
                 Err(error) => {
-                    controller.app.status = error.clone().into();
-                    controller.app.notifications.notify(
-                        error,
-                        controller.app.now,
-                        crate::notifications::Severity::Error,
-                    );
+                    controller
+                        .app
+                        .notify(crate::notifications::Severity::Error, error);
                 }
             }
         }
@@ -332,5 +326,74 @@ fn mouse_input(
             }
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod notification_tests {
+    use super::*;
+    use crate::{app::Status, input::Bindings, notifications::Severity};
+
+    fn controller() -> (tempfile::TempDir, Controller) {
+        let root = tempfile::tempdir().unwrap();
+        let mut app = crate::app::App::new(root.path().into());
+        let snapshot = crate::fs::list(
+            root.path(),
+            &crate::fs::IgnoreContext::isolated(),
+            &std::sync::atomic::AtomicBool::new(false),
+        )
+        .unwrap();
+        assert!(app.complete_listing(0, 1, Ok(snapshot)));
+        let controller = Controller::new(
+            app,
+            Bindings::new(&Default::default()).unwrap(),
+            Default::default(),
+        );
+        (root, controller)
+    }
+
+    fn assert_notice(controller: &Controller, severity: Severity) {
+        let Status::Notice {
+            text,
+            severity: actual,
+        } = &controller.app.status
+        else {
+            panic!("pattern notification must retain typed status");
+        };
+        assert_eq!(*actual, severity);
+        assert_eq!(controller.app.notifications.history.len(), 1);
+        let event = &controller.app.notifications.history[0];
+        assert_eq!(event.text, *text);
+        assert_eq!(event.severity, severity);
+    }
+
+    #[test]
+    fn pattern_success_and_error_keep_typed_status_and_one_history_event() {
+        for (expression, severity) in [("*", Severity::Success), ("", Severity::Error)] {
+            let (_root, mut controller) = controller();
+            open(&mut controller);
+            controller
+                .app
+                .pattern
+                .as_mut()
+                .unwrap()
+                .set_expression(expression.into());
+            activate(
+                &mut controller,
+                PatternControl::Apply(crate::app::PatternOperation::Mark),
+                true,
+            );
+            assert_notice(&controller, severity);
+        }
+    }
+
+    #[test]
+    fn pattern_cancel_remains_status_only() {
+        let (_root, mut controller) = controller();
+        open(&mut controller);
+        activate(&mut controller, PatternControl::Cancel, true);
+        assert!(matches!(controller.app.status, Status::Text(_)));
+        assert!(controller.app.notifications.history.is_empty());
+        assert!(controller.app.pattern.is_none());
     }
 }

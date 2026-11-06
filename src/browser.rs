@@ -109,6 +109,7 @@ fn drive(
         submit_refreshes(&mut controller.app, pool);
         dirty |= schedule_metadata(controller, pool, &mut metadata);
         if dirty {
+            ui::prepare_notifications(&mut controller.app, terminal.size()?.into());
             terminal.draw(|frame| {
                 geometry = ui::render(frame, &controller.app, theme);
             })?;

@@ -70,6 +70,15 @@ pub fn clean(text: &str) -> String {
     output
 }
 
+/// Apply the terminal's presentation budget before drawing. Retired toasts stay in history.
+pub fn prepare_notifications(app: &mut App, area: Rect) {
+    let visible = notifications::toasts(app, area)
+        .iter()
+        .map(|toast| toast.event)
+        .collect::<Vec<_>>();
+    app.notifications.retain_toasts(&visible);
+}
+
 /// Draw a frame using the same geometry used by mouse hit testing.
 pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     let mut geometry = geometry(app, frame.area());
@@ -84,7 +93,7 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     if let Some(area) = geometry.sidebar {
         metadata::render(frame, app, area, theme, false);
     }
-    status::render(frame, app, geometry.status, theme);
+    status::render(frame, &geometry.status_segments, theme);
     footer::render(frame, geometry.footer, &geometry.footer_controls, theme);
     if app.popup {
         metadata::render(frame, app, overlay_bounds(app, frame.area()), theme, true);
