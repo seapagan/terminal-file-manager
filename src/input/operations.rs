@@ -6,21 +6,25 @@ use crate::{
 use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind};
 
 pub(super) fn action(controller: &mut Controller, action: Action, geometry: &Geometry) -> bool {
+    if action == Action::Notifications {
+        super::notifications::open(controller);
+        return true;
+    }
     if action == Action::Jobs {
         let state = &mut controller.app.operations;
         state.show_history = !state.show_history;
         state.jobs_evidence = false;
         state.scroll = 0;
+        if !state.show_history {
+            state.resume_dialog();
+        }
         return true;
     }
     let Some(operation) = operation_for(action) else {
         return false;
     };
     if let Err(error) = open(controller, action, operation, geometry) {
-        controller.app.status = controller
-            .app
-            .operations
-            .fail(error.to_string(), controller.app.now);
+        controller.app.reject_operation(error.to_string());
     }
     true
 }
@@ -230,7 +234,11 @@ pub(super) fn handle(controller: &mut Controller, event: &Event, geometry: &Geom
     if editing_surface(controller) {
         return false;
     }
-    super::operation_jobs::handle(controller, event, geometry)
+    let handled = super::operation_jobs::handle(controller, event, geometry);
+    if !controller.app.operations.show_history {
+        controller.app.operations.resume_dialog();
+    }
+    handled
 }
 
 fn handle_dialog(controller: &mut Controller, dialog: Dialog, event: &Event, geometry: &Geometry) {

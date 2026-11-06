@@ -6,6 +6,7 @@ mod diagnostics;
 mod divider;
 mod help;
 mod metadata;
+mod notifications;
 mod operation_dialog;
 mod operation_exit;
 mod operation_jobs;
@@ -89,6 +90,9 @@ pub enum Action {
     Rename,
     Attributes,
     Jobs,
+    Notifications,
+    DismissToast,
+    DismissToasts,
     CopyQuick,
     MoveQuick,
     Path,

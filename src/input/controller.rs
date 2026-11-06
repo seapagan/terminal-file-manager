@@ -26,6 +26,7 @@ pub struct Controller {
 impl Controller {
     /// Own the authoritative app and validated keymap.
     pub fn new(mut app: App, bindings: Bindings, preferences: Settings) -> Self {
+        preferences.apply_notifications(&mut app);
         app.help_rows = bindings.help_entries();
         app.metadata_presentation = preferences.metadata_presentation;
         app.profile_names = preferences.profiles.keys().cloned().collect();
@@ -108,7 +109,8 @@ impl Controller {
             return Vec::new();
         }
         if let Some(reason) = unavailable(action) {
-            self.app.status = reason.into();
+            self.app
+                .notify(crate::notifications::Severity::Info, reason);
             return Vec::new();
         }
         if self.application_action(action, geometry) {
@@ -167,7 +169,8 @@ impl Controller {
             | OwnerDisplay | MetadataPresentation | TogglePanes | Maximise | FocusPane
             | ToggleSidebar | Metadata | Help | Info | Viewer | Editor | Path | Zoxide
             | OppositeZoxide | ExitDirectory | Copy | Move | Mkdir | CreateFile | Trash
-            | Delete | Rename | Attributes | Jobs | CopyQuick | MoveQuick => {}
+            | Delete | Rename | Attributes | Jobs | Notifications | DismissToast
+            | DismissToasts | CopyQuick | MoveQuick => {}
         }
         Vec::new()
     }
@@ -210,8 +213,10 @@ impl Controller {
                     return Vec::new();
                 };
                 if !entry.enterable {
-                    self.app.status =
-                        "Viewer unavailable until M6; files are never launched".into();
+                    self.app.notify(
+                        crate::notifications::Severity::Info,
+                        "The file viewer is not available yet.",
+                    );
                     return Vec::new();
                 }
                 entry.path.clone()
@@ -335,7 +340,10 @@ impl Controller {
             requests.push(request);
             self.app.popup |= geometry.sidebar.is_none();
         } else {
-            self.app.status = "Directory totals require a visible directory".into();
+            self.app.notify(
+                crate::notifications::Severity::Info,
+                "Directory totals require a visible directory",
+            );
         }
         requests
     }
@@ -448,7 +456,7 @@ impl Controller {
             );
             return true;
         }
-        false
+        super::notifications::status_click(self, &Event::Mouse(event), geometry)
     }
 
     fn mouse(&mut self, event: MouseEvent, geometry: &Geometry, now: Duration) -> Vec<Request> {
@@ -509,9 +517,8 @@ fn next_sort(sort: Sort) -> Sort {
 
 fn unavailable(action: Action) -> Option<&'static str> {
     match action {
-        Action::Viewer | Action::Editor => {
-            Some("Viewer/editor unavailable until M6; files are never launched")
-        }
+        Action::Viewer => Some("The file viewer is not available yet."),
+        Action::Editor => Some("The file editor is not available yet."),
         Action::Path | Action::Zoxide | Action::OppositeZoxide | Action::ExitDirectory => {
             Some("Navigation integration/shell handoff unavailable until M5")
         }

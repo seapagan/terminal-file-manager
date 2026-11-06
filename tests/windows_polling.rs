@@ -244,7 +244,7 @@ fn windows_manual_navigation_discards_old_results_and_refresh_still_works() {
     browser.refresh(0);
     browser.until(|app| app.panes[0].current().is_some_and(|e| e.name == "manual"));
     assert_eq!(browser.app.panes[1].path, root.path());
-    assert!(browser.app.operations.notices.is_empty());
+    assert!(browser.app.notifications.history.is_empty());
 }
 
 #[test]
@@ -279,7 +279,7 @@ fn windows_manual_external_changes_wait_for_refresh_and_hidden_panes_stay_indepe
     );
     browser.refresh(1);
     browser.until(|app| app.panes[1].entries.len() == 3);
-    assert!(browser.app.operations.notices.is_empty());
+    assert!(browser.app.notifications.history.is_empty());
 }
 
 #[test]
@@ -421,7 +421,7 @@ fn measure(entries: usize) {
     let idle_wall = idle.elapsed();
     let idle_after = counters(std::process::id());
     assert!(!browser.app.dual);
-    assert!(browser.app.operations.notices.is_empty());
+    assert!(browser.app.notifications.history.is_empty());
     assert!(browser.starts.iter().all(Vec::is_empty));
     assert_eq!(browser.pool.active_count(), 0);
     eprintln!(

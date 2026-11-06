@@ -99,7 +99,10 @@ fn destructive(
         return true;
     }
     if !dialog.ready || dialog.plan.preview.is_none() || dialog.error.is_some() {
-        controller.app.status = "Recursive preview pending or failed; confirmation disabled".into();
+        controller.app.notify(
+            crate::notifications::Severity::Warning,
+            "Recursive preview pending or failed; confirmation disabled",
+        );
         return true;
     }
     submit(controller, dialog, geometry)
@@ -126,7 +129,9 @@ fn submit(
         && let Some(message) = dialog.name_error()
     {
         dialog.error = Some(message.into());
-        controller.app.status = message.into();
+        controller
+            .app
+            .notify(crate::notifications::Severity::Error, message);
         return true;
     }
     let approval = match dialog.plan.operation {
@@ -139,7 +144,10 @@ fn submit(
         && (!dialog.ready || dialog.plan.preview.is_none() || dialog.error.is_some()))
         || approval.is_some_and(|key| !geometry.operation_enabled(key))
     {
-        controller.app.status = "Approval disabled; check the form or enlarge the terminal".into();
+        controller.app.notify(
+            crate::notifications::Severity::Warning,
+            "Approval disabled; check the form or enlarge the terminal",
+        );
         return true;
     }
     match prepare(controller, dialog) {
@@ -155,7 +163,10 @@ fn submit(
         Ok(false) => true,
         Err(error) => {
             dialog.error = Some(error.to_string());
-            controller.app.status = "Operation not started; review the dialog details".into();
+            controller.app.notify(
+                crate::notifications::Severity::Error,
+                format!("Operation not started: {error}"),
+            );
             true
         }
     }
@@ -180,8 +191,10 @@ fn prepare(controller: &mut Controller, dialog: &mut OperationDialog) -> io::Res
                     .outbox
                     .push(Intent::Preview(dialog.plan.clone()));
             }
-            controller.app.status =
-                "Selection changed; review the displayed scope and approve again".into();
+            controller.app.notify(
+                crate::notifications::Severity::Warning,
+                "Selection changed; review the displayed scope and approve again",
+            );
             return Ok(false);
         }
     }
@@ -294,7 +307,10 @@ fn field(dialog: &mut OperationDialog) -> &mut String {
 
 fn append(controller: &mut Controller, dialog: &mut OperationDialog, text: &str) {
     if field(dialog).len().saturating_add(text.len()) > 65_536 {
-        controller.app.status = "Input too long; pasted input rejected".into();
+        controller.app.notify(
+            crate::notifications::Severity::Warning,
+            "Input too long; pasted input rejected",
+        );
         return;
     }
     dialog.error = None;

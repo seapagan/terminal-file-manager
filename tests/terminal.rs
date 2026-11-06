@@ -19,7 +19,7 @@ fn browser_starts_at_cwd_and_explicit_path_and_restores_terminal() {
             command,
             &[
                 ("browser-sentinel", "\r"),
-                ("Viewer unavailable until M6", "\u{1b}p"),
+                ("The file viewer is not available yet.", "\u{1b}p"),
                 ("Pane 2", "q"),
             ],
             true,
@@ -430,7 +430,7 @@ fn diagnostics_uses_startup_capability_in_a_controlled_real_terminal() {
                 // Exact values are checked in the diagnostics buffer tests;
                 // differential output may reuse <unset> from the previous row.
                 ("VTE_VERSION", "\u{1b}[24~\r"),
-                ("Viewer unavailable until M6", "q"),
+                ("The file viewer is not available yet.", "q"),
             ],
             true,
         );

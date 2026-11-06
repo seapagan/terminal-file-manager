@@ -133,6 +133,9 @@ review the new matches. Enlarge the terminal if the controls cannot fit.
 | F8 / Alt+t | Preview and move the selection to native Trash |
 | Shift+F8 / Alt+d | Preview permanent deletion; Enter cancels |
 | F9 / Alt+j | Jobs, progress and retained results |
+| Alt+h | Session notification history |
+| Alt+k | Dismiss oldest visible toast |
+| Ctrl+Alt+k | Dismiss all toasts |
 
 Create a file or directory in the active pane by entering one name. Existing
 entries stay intact. Press **Shift+F7** or **Alt+n** to create an empty file,
@@ -183,6 +186,31 @@ between **Hidden: Hide** and **Hidden: Show**. A small `h` beside an entry's typ
 marks it as hidden. `tfm` dims Git-ignored entries by default; choose `hide`
 or `off` if you prefer. It retains marks on entries hidden by a filter or
 visibility option; operations use the visible selection.
+
+## Notifications and status
+
+Toasts highlight successes, warnings and failures without moving keyboard focus.
+Toasts appear above dialogs and other interfaces. Newer notifications sit nearest
+your chosen corner; complete cards and gaps use up to 80% of terminal height.
+When space runs out, older toasts leave the stack and remain in history.
+Click a toast to dismiss its whole group. **Alt+k** dismisses the oldest visible
+group; **Ctrl+Alt+k** dismisses all toasts. Both shortcuts work inside dialogs
+and editors without changing your work. You can remap them in `[bindings]` as
+`dismiss-toast` and `dismiss-toasts`.
+
+Press **Alt+h** to read session notification history after a toast disappears. Use Up/Down, PgUp/PgDown or the wheel to select an event.
+Press **e** to read its full details; PgUp/PgDown scrolls, and **e** returns to
+the list. Enter opens linked Jobs evidence. Repeated failures share a toast
+with an occurrence count; each operation keeps its own history entry and Job.
+The history viewer updates as notifications arrive. It follows new entries while
+you view the newest event and preserves your position when you inspect older
+events. While history is open, incoming notifications appear there without
+queuing toasts for later. Esc returns to the previous view. History lasts until
+you exit `tfm`.
+
+The status area keeps current work and selection visible in one row, with a
+second row for critical information when space permits. Critical incidents and
+unknown outcomes remain visible and available in Jobs after toast expiry.
 
 ## Views and metadata
 
@@ -247,6 +275,8 @@ fuzzy_timestamps = true
 owner_display = "names" # or "numeric"
 ignore = "dim" # "dim", "hide" or "off"
 mouse = true
+toast_placement = "bottom-right" # top-left, top-right, bottom-left, bottom-right
+toast_expiry_seconds = 5 # Range: 1–60; history survives expiry
 
 [columns]
 size = true

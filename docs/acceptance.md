@@ -1,5 +1,75 @@
 # Acceptance gates
 
+## PM3-05 review corrections — 6 November 2026
+
+The runtime retires overflow and tiny-terminal toast presentations before drawing.
+Rendering leaves notification state unchanged. Enlarging the terminal or dismissing
+cards does not revive retired presentations; history and Jobs retain their evidence.
+
+Rename success identifies the resulting name; Copy/Move identify the destination
+and selection scope. Concise diagnostics preserve directory/type errors and
+unrelated source/destination failures. Pattern and profile notifications retain
+typed status severity. Wrapped critical status carries one details hint, with
+both rows routing to Jobs. Rendering and mouse input share measured status segments.
+
+Focused regressions cover chained two-second groups and stable counts, independent
+Job links, overflow and tiny-terminal retirement, read-only rendering, operation
+success/error copy, inline metadata errors versus exceptional worker failures,
+unchanged listing warnings versus recovery and renewed failure, typed pattern/profile
+status, cancellation, and startup/preference toast settings. History remains
+unlimited. Existing global dismissal, live history, modal and operation-safety
+regressions remain required. Exact gate results belong to the controller checkpoint.
+
+## PM3-05 toast redesign — 5 November 2026
+
+Toasts separate severity/title, a word-wrapped message and a details hint.
+The severity accent and panel background retain monochrome and colour-depth
+support. Toasts render above underlying interfaces, including modal and safety
+surfaces. Newer groups sit nearest the configured corner in chronological order;
+complete cards and spacing use up to 80% of terminal height. Overflow retires
+older presentations without losing history. Click dismisses one group, Alt+k
+dismisses the oldest visible group and Ctrl+Alt+k clears all active toasts.
+Dismissal shortcuts remain available inside dialogs and editors.
+The Alt+h list shows selectable event summaries, relative times and
+repeat counts; **e** toggles full details, and Enter opens linked Jobs evidence.
+Incoming events update the viewer live. It follows the newest entry while
+preserving older selections and their scroll position. History suppresses and
+consumes toast presentation, including events received while open.
+
+Repeated failures on the same operation targets share a toast across Job IDs.
+History retains each Job link, diagnostic record and recovery action. Different
+targets, operation kinds and errors remain distinct. Critical incidents and
+unknown outcomes keep their existing Jobs and exit safeguards.
+
+Regressions cover actual self-copy/move failures, file/directory collisions,
+permission presentation, grouped counts under queue pressure, per-Job evidence,
+list selection/paging/mouse input, detail scrolling, resize, Unicode word
+boundaries, all colour levels and existing native terminal round trips.
+Maintainer visual acceptance and serial independent cold reviews remain pending;
+PR #10 stays draft and unmerged. Exact QC and hosted results belong to the
+current controller checkpoint.
+
+## PM3-05 implementation checkpoint — 2 November 2026
+
+The status and notification implementation includes retained session history.
+Alt+h and the status history segment open a measured Notifications modal;
+Older/Newer, Up/Down and Home/End choose events, while PageUp/PageDown and the
+wheel scroll complete details. Enter opens the corresponding Jobs evidence.
+Application notifications create no filesystem jobs. Toast expiry and queue
+pressure retain history, including earlier outcomes after reconciliation.
+
+Focused regressions cover injected expiry clocks, configuration round trips and
+bounds, chronological grouping, height-based presentation capacity, non-operation
+history, mouse controls, widths 20–120, small heights, Unicode/control escaping,
+all colour depths, persistent safety warnings and parent-surface restoration.
+The Create File collision regression checks the visible filename/error, retained
+Jobs evidence and unchanged existing bytes. A native PTY/ConPTY case opens
+history from an application notification and returns to the browser before quit.
+Existing operation, critical-incident, reconciliation and safe-exit regressions
+remain in place. Exact delivery and hosted evidence belong to the current
+controller checkpoint; maintainer visual acceptance and serial independent
+reviews remain outstanding. This checkpoint does not accept or merge PM3-05.
+
 ## PM3-04 accepted and merged — 1 November 2026
 
 The maintainer accepted the completed Help work and merged

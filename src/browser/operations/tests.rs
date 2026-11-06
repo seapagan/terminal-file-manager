@@ -447,7 +447,7 @@ fn affirmative_delete_retry_counts_then_removes_only_unfinished_operands() {
         fs::read(root.path().join("source")).unwrap(),
         b"new occupant of completed path"
     );
-    let notice = controller.app.operations.notices.back().unwrap();
+    let notice = controller.app.notifications.history.last().unwrap();
     assert_eq!(notice.severity, crate::operations::NoticeSeverity::Success);
     assert_eq!(
         notice.text,

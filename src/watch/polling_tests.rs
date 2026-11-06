@@ -23,7 +23,7 @@ fn manual_policy_never_schedules_hidden_or_visible_panes_at_any_deadline() {
     );
     assert!(app.panes.iter().all(|pane| pane.entries.is_empty()));
     assert!(!app.dual);
-    assert!(app.operations.notices.is_empty());
+    assert!(app.notifications.history.is_empty());
     assert!(runtime.slots.iter().all(|slot| slot.worker.is_none()));
 }
 
@@ -58,7 +58,7 @@ fn manual_mode_ignores_native_error_hints_without_warning_or_retry() {
     for seconds in [0, 2, 30, 300] {
         assert!(!runtime.poll(&mut app, &mut pool, Duration::from_secs(seconds)));
     }
-    assert!(app.operations.notices.is_empty());
+    assert!(app.notifications.history.is_empty());
     assert_eq!(pool.active_count(), 0);
     assert!(runtime.slots.iter().all(|slot| !slot.failed));
 }
@@ -104,5 +104,5 @@ fn windows_default_has_no_native_owner_or_automatic_listing() {
     runtime.poll(&mut app, &mut pool, Duration::from_secs(300));
     assert!(runtime.slots.iter().all(|slot| slot.worker.is_none()));
     assert_eq!(pool.active_count(), 0);
-    assert!(app.operations.notices.is_empty());
+    assert!(app.notifications.history.is_empty());
 }

@@ -100,6 +100,7 @@ fn drive(
     let mut watches = crate::watch::Runtime::default();
     let mut geometry = ui::geometry(&controller.app, terminal.size()?.into());
     while !controller.quit {
+        dirty |= controller.app.notifications.advance(started.elapsed());
         dirty |= tick(&mut controller.app);
         dirty |= ui::animate_preview(&mut controller.app, started.elapsed());
         dirty |= collect(controller, pool);
@@ -108,6 +109,7 @@ fn drive(
         submit_refreshes(&mut controller.app, pool);
         dirty |= schedule_metadata(controller, pool, &mut metadata);
         if dirty {
+            ui::prepare_notifications(&mut controller.app, terminal.size()?.into());
             terminal.draw(|frame| {
                 geometry = ui::render(frame, &controller.app, theme);
             })?;
@@ -145,14 +147,8 @@ fn tick(app: &mut App) -> bool {
     if help_expired {
         app.help_landing = None;
     }
-    let expired = app
-        .operations
-        .notices
-        .iter()
-        .any(|notice| notice.expires <= now);
-    app.operations.notices.retain(|notice| notice.expires > now);
-    expired
-        || help_expired
+    help_expired
+        || app.notifications.open
         || app.operations.active()
         || app.panes.iter().any(|pane| pane.fuzzy_timestamps)
         || app

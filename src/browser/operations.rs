@@ -29,7 +29,7 @@ pub(super) fn submit(controller: &mut Controller, queue: &mut Queue) {
                 .submit(plan.clone(), options)
                 .map(|id| controller.register_operation(id, plan, options, None)),
             Intent::Preview(plan) => queue.preview(plan).map(|id| {
-                if let Some(Dialog::Operation(dialog)) = &mut controller.app.operations.dialog {
+                if let Some(Dialog::Operation(dialog)) = controller.app.operations.dialog_mut() {
                     dialog.preview_id = Some(id);
                 }
             }),
@@ -44,10 +44,7 @@ pub(super) fn submit(controller: &mut Controller, queue: &mut Queue) {
                 .map(|id| controller.register_operation(id, plan, options, Some(parent))),
         };
         if let Err(error) = result {
-            controller.app.status = controller
-                .app
-                .operations
-                .fail(error.to_string(), controller.app.now);
+            controller.app.reject_operation(error.to_string());
         }
     }
 }

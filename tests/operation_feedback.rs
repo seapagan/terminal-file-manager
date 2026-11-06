@@ -133,6 +133,23 @@ fn mixed_native_success_and_failure_never_claims_nothing_was_copied() {
         .unwrap();
         let record = execute(&plan, Default::default(), &false.into(), |_| Decision::Skip);
         let mut c = finish(plan, record);
+        assert_eq!(
+            c.app
+                .notifications
+                .history
+                .last()
+                .unwrap()
+                .presentation
+                .message,
+            format!(
+                "Cannot {} “invalid” onto itself.",
+                if operation == Operation::Copy {
+                    "copy"
+                } else {
+                    "move"
+                }
+            )
+        );
         assert!(c.app.status.contains("1 failed"));
         assert!(c.app.status.contains(if operation == Operation::Copy {
             "1 file copied"
@@ -200,8 +217,7 @@ fn grouped_causes_and_all_outcomes_remain_distinct_with_full_evidence() {
 fn rejected_request_notice_keeps_its_reason_and_does_not_invent_a_job() {
     let root = tempfile::tempdir().unwrap();
     let mut app = App::new(root.path().into());
-    app.operations
-        .fail("Destination is unavailable.".into(), app.now);
+    app.reject_operation("Destination is unavailable.".into());
     let text = draw(&app);
     assert!(text.contains("Not started: Destination is unavailable."));
     assert!(app.operations.history.is_empty());

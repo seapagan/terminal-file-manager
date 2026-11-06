@@ -192,7 +192,7 @@ fn acknowledged_outcomes_have_matching_notice_severity_and_observed_counts() {
     for (outcomes, severity, text) in cases {
         let (_root, mut controller) = fixture();
         install_outcome(&mut controller, &outcomes);
-        let notice = controller.app.operations.notices.back().unwrap();
+        let notice = controller.app.notifications.history.last().unwrap();
         assert_eq!(notice.severity, severity);
         assert!(notice.text.contains(text), "{}", notice.text);
         assert!(controller.app.status.contains(text));
@@ -212,7 +212,16 @@ fn acknowledged_outcomes_have_matching_notice_severity_and_observed_counts() {
 fn a_critical_acknowledgement_never_becomes_an_expiring_completion_notice() {
     let (_root, mut controller) = fixture();
     install_outcome(&mut controller, &[Outcome::SafetyIncident]);
-    assert!(controller.app.operations.notices.is_empty());
+    assert_eq!(
+        controller
+            .app
+            .notifications
+            .history
+            .last()
+            .unwrap()
+            .severity,
+        NoticeSeverity::Error
+    );
     assert!(controller.app.operations.incidents());
     assert!(controller.app.status.contains("CRITICAL SAFETY INCIDENT"));
 }

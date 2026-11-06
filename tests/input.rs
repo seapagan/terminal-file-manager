@@ -64,7 +64,8 @@ fn filter_accept_cancel_paste_and_quit_do_not_confuse_actions_with_text() {
 fn files_explain_viewer_unavailability_and_copy_opens_a_frozen_dialog() {
     let (_root, mut controller) = controller();
     key(&mut controller, "Enter");
-    assert!(controller.app.status.contains("M6"));
+    let status = &controller.app.status;
+    assert!(status.contains("file viewer is not available yet"));
     key(&mut controller, "F5");
     assert!(controller.app.operations.dialog.is_some());
     assert!(controller.app.operations.outbox.is_empty());
@@ -259,7 +260,8 @@ fn wheel_does_not_change_focus_and_double_click_never_launches_files() {
         &geometry,
         Duration::from_millis(200),
     );
-    assert!(controller.app.status.contains("M6"));
+    let status = &controller.app.status;
+    assert!(status.contains("file viewer is not available yet"));
 }
 
 #[test]

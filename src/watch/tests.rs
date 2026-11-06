@@ -138,7 +138,7 @@ fn repeated_errors_are_bounded_and_fallback_recovers_without_warning_spam() {
         finish(&mut app, &mut pool);
     }
     assert!(app.panes[0].generation <= 4);
-    assert_eq!(app.operations.notices.len(), 1);
+    assert_eq!(app.notifications.history.len(), 1);
     assert!(runtime.slots[0].failed);
     std::fs::write(root.path().join("fallback"), "data").unwrap();
     runtime.poll(&mut app, &mut pool, Duration::from_secs(6));
@@ -150,7 +150,7 @@ fn repeated_errors_are_bounded_and_fallback_recovers_without_warning_spam() {
         .store(READY, Ordering::Release);
     runtime.poll(&mut app, &mut pool, Duration::from_secs(7));
     assert!(!runtime.slots[0].failed);
-    assert_eq!(app.operations.notices.len(), 2);
+    assert_eq!(app.notifications.history.len(), 2);
 }
 
 #[test]
@@ -209,6 +209,6 @@ fn recovery_before_the_next_ui_poll_does_not_leave_fallback_stuck() {
     runtime.slots[0].signals.publish(READY | DIRTY);
     runtime.poll(&mut app, &mut pool, Duration::from_secs(1));
     assert!(!runtime.slots[0].failed);
-    assert_eq!(app.operations.notices.len(), 1);
-    assert!(app.operations.notices[0].text.contains("recovered"));
+    assert_eq!(app.notifications.history.len(), 1);
+    assert!(app.notifications.history[0].text.contains("recovered"));
 }

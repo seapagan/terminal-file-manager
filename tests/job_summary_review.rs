@@ -187,8 +187,11 @@ fn rejected_request_retains_raw_evidence_and_clips_status_with_details_hint() {
     let (_root, mut c, _) = fixture();
     c.app.operations.show_history = false;
     let detail = format!("multiline\n\u{1b}\u{202e} {} END", "long-error ".repeat(80));
-    c.app.status = c.app.operations.fail(detail.clone(), c.app.now);
+    c.app.reject_operation(detail.clone());
     c.app.now += std::time::Duration::from_secs(6);
+    c.app
+        .notifications
+        .advance(std::time::Duration::from_secs(6));
     let text = draw(&c.app, 80);
     assert!(text.contains("F9 details"), "{text}");
     assert!(!text.contains('\u{1b}'));

@@ -18,6 +18,10 @@ pub struct Geometry {
     pub divider: Option<Rect>,
     pub sidebar: Option<Rect>,
     pub status: Rect,
+    pub status_controls: Vec<(Rect, crate::input::Action)>,
+    pub(super) status_segments: Vec<super::status::Control>,
+    pub toasts: Vec<super::Toast>,
+    pub notification_history: Option<super::HistoryLayout>,
     pub footer: Rect,
     pub footer_controls: Vec<super::FooterControl>,
     pub menu: Option<Rect>,
@@ -67,7 +71,8 @@ impl Geometry {
 
 /// Width-driven layout never depends on a directory's longest filename.
 pub fn geometry(app: &App, area: Rect) -> Geometry {
-    let height = area.height.saturating_sub(2);
+    let status_rows = super::status::rows(app, area);
+    let height = area.height.saturating_sub(1 + status_rows);
     let body = Rect::new(area.x, area.y, area.width, height);
     let mut geometry = initial_geometry(app, area, height);
     geometry.footer_controls = super::footer::controls(app, geometry.footer);
@@ -90,25 +95,43 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
     } else {
         geometry.panes[app.active] = Some(body);
     }
-    scroll_limits(app, &mut geometry, area);
-    geometry.modal_close = close_control(app, &geometry);
+    let bounds = super::overlay_bounds(app, area);
+    scroll_limits(app, &mut geometry, bounds);
+    geometry.notification_history = super::notifications::history(app, bounds);
+    geometry.status_segments = super::status::controls(app, geometry.status);
+    geometry.status_controls = geometry
+        .status_segments
+        .iter()
+        .filter_map(|(area, _, _, action)| action.map(|action| (*area, action)))
+        .collect();
+    geometry.toasts = super::notifications::toasts(app, area);
+    geometry.modal_close = geometry
+        .notification_history
+        .as_ref()
+        .and_then(|h| h.shell.close)
+        .or_else(|| close_control(app, &geometry));
     geometry
 }
 
 fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
+    let bounds = super::overlay_bounds(app, area);
     let (operation_controls, operation_scroll_limit, operation_layout) =
-        super::operations::geometry(app, area);
-    let pattern = super::pattern::layout(app, area);
-    let menu_layout = menu_layout(app, area);
+        super::operations::geometry(app, bounds);
+    let pattern = super::pattern::layout(app, bounds);
+    let menu_layout = menu_layout(app, bounds);
     let context_control = menu_layout
         .as_ref()
         .and_then(|shell| shell.help)
         .or_else(|| context_control(app, operation_layout.as_ref(), pattern.as_ref()));
     Geometry {
-        context_help: super::help::context::layout(app, area),
+        notification_history: None,
+        status_controls: Vec::new(),
+        status_segments: Vec::new(),
+        toasts: Vec::new(),
+        context_help: super::help::context::layout(app, bounds),
         context_control,
         modal_close: None,
-        help: super::help::layout(app, area),
+        help: super::help::layout(app, bounds),
         pattern,
         operation_layout,
         operation_controls,
@@ -124,13 +147,13 @@ fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
         footer_controls: Vec::new(),
         menu: menu_layout.as_ref().map(|shell| shell.outer),
         menu_layout,
-        diagnostics: app.diagnostics.then(|| super::diagnostics::area(area)),
+        diagnostics: app.diagnostics.then(|| super::diagnostics::area(bounds)),
         diagnostics_scroll_limit: 0,
         status: Rect::new(
             area.x,
             area.y + height,
             area.width,
-            u16::from(area.height >= 2),
+            super::status::rows(app, area),
         ),
         footer: Rect::new(
             area.x,

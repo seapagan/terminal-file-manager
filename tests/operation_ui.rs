@@ -281,14 +281,16 @@ fn notices_have_textual_severity_expire_and_leave_the_footer_visible() {
     use std::time::Duration;
     use terminal_file_manager::operations::NoticeSeverity;
     let mut app = App::new("/controlled".into());
-    app.operations
-        .notify("Job 1 completed".into(), app.now, NoticeSeverity::Success);
+    app.notifications
+        .notify("File copied".into(), app.now, NoticeSeverity::Success);
     let (text, _) = draw(&app, 120, 25, ColorLevel::NoColor);
-    assert!(text.contains("Success: Job 1 completed — F9 details"));
+    assert!(text.contains("Success"));
+    assert!(text.contains("File copied"));
+    assert!(text.contains("Alt+h details"));
     assert!(text.contains("F8 Trash"));
-    app.now += Duration::from_secs(6);
+    app.notifications.advance(Duration::from_secs(6));
     let (text, _) = draw(&app, 120, 25, ColorLevel::NoColor);
-    assert!(!text.contains("Success: Job 1 completed"));
+    assert!(!text.contains("File copied"));
 }
 
 #[test]
@@ -383,11 +385,8 @@ fn preview_failure_keeps_its_reason_and_never_claims_counting_or_success() {
 fn failed_request_evidence_survives_transient_expiry_without_a_job() {
     use std::time::Duration;
     let mut app = App::new("/controlled".into());
-    app.operations.fail(
-        "Destination could not be inspected: access denied".into(),
-        app.now,
-    );
-    app.now += Duration::from_secs(6);
+    app.reject_operation("Destination could not be inspected: access denied".into());
+    app.notifications.advance(Duration::from_secs(6));
     app.operations.show_history = true;
     let (text, _) = draw(&app, 120, 30, ColorLevel::NoColor);
     assert!(text.contains("Latest request not started"));

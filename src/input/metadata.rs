@@ -10,6 +10,10 @@ use std::time::Duration;
 impl Controller {
     /// Normalize terminal input. Clock/geometry are explicit deterministic inputs.
     pub fn handle(&mut self, event: Event, geometry: &Geometry, now: Duration) -> Vec<Request> {
+        self.app.notifications.advance(now);
+        if super::notifications::handle(self, &event, geometry) {
+            return Vec::new();
+        }
         let closing = close_hit(&event, geometry.modal_close);
         if closing && metadata_owns_close(&self.app, geometry) {
             return self.dispatch(Action::Cancel, geometry);
@@ -57,6 +61,9 @@ impl Controller {
 
     /// Keyboard and clickable controls share this dispatcher and availability policy.
     pub fn dispatch(&mut self, action: Action, geometry: &Geometry) -> Vec<Request> {
+        if super::notifications::dismiss(self, action, geometry) {
+            return Vec::new();
+        }
         self.sync_metadata(geometry);
         let requests = self.dispatch_action(action, geometry);
         self.sync_metadata(geometry);

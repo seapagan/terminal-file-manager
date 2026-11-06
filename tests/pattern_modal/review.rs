@@ -138,6 +138,14 @@ fn clipped_enter_reports_geometry_and_resize_discards_ineligible_action_focus() 
     );
     event(&mut c, Event::Key(KeyCode::Enter.into()), (70, 15));
     assert!(c.app.status.contains("enlarge terminal"));
+    event(
+        &mut c,
+        Event::Key(KeyEvent::new(
+            KeyCode::Char('k'),
+            KeyModifiers::CONTROL | KeyModifiers::ALT,
+        )),
+        (70, 15),
+    );
     let (text, _) = rendered(&c, 70, 15, ColorLevel::NoColor);
     assert!(text.contains("scroll up or enlarge terminal"));
     assert!(c.app.panes[0].marks.is_empty());
