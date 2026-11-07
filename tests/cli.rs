@@ -168,7 +168,7 @@ fn malformed_config_errors_preserve_diagnostic_lines() {
 #[test]
 fn cli_diagnostic_colours_distinguish_structure_from_source_and_explanation() {
     let root = tempfile::tempdir().unwrap();
-    let config = root.path().join("config/tfm/config.toml");
+    let config = root.path().join("config").join("tfm").join("config.toml");
     std::fs::create_dir_all(config.parent().unwrap()).unwrap();
     std::fs::write(&config, "restore_session =\n").unwrap();
     let stderr = coloured_config_error(root.path(), &[("FORCE_COLOR", "1")]);
@@ -176,7 +176,10 @@ fn cli_diagnostic_colours_distinguish_structure_from_source_and_explanation() {
         stderr.starts_with("\u{1b}[1;31mtfm:\u{1b}[0m "),
         "{stderr:?}"
     );
-    assert!(stderr.contains(&format!("\u{1b}[36m{}\u{1b}[0m: ", config.display())));
+    assert!(
+        stderr.contains(&format!("\u{1b}[36m{}\u{1b}[0m: ", config.display())),
+        "{stderr:?}"
+    );
     assert!(stderr.contains("\u{1b}[1;31mTOML parse error at line 1, column 18\u{1b}[0m"));
     assert!(stderr.contains("\u{1b}[2m1 |\u{1b}[0m restore_session =\n"));
     assert!(stderr.contains("\u{1b}[2m  |\u{1b}[0m"));
@@ -190,7 +193,7 @@ fn cli_diagnostic_colours_distinguish_structure_from_source_and_explanation() {
 #[test]
 fn cli_diagnostics_follow_library_colour_policy_without_changing_content() {
     let root = tempfile::tempdir().unwrap();
-    let config = root.path().join("config/tfm/config.toml");
+    let config = root.path().join("config").join("tfm").join("config.toml");
     std::fs::create_dir_all(config.parent().unwrap()).unwrap();
     std::fs::write(&config, "restore_session =\n").unwrap();
     let plain = coloured_config_error(root.path(), &[]);
