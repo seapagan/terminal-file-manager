@@ -67,6 +67,61 @@ fn type_name(c: &mut Controller, name: &str) {
     }
 }
 
+fn area_text(buffer: &Buffer, area: Rect) -> String {
+    (area.y..area.bottom())
+        .flat_map(|y| (area.x..area.right()).map(move |x| buffer[(x, y)].symbol()))
+        .collect::<String>()
+        .split_whitespace()
+        .collect()
+}
+
+#[test]
+fn profile_validation_is_rendered_inside_the_editor_under_status_pressure() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(root.path().join("marked"), "fixture").unwrap();
+    let mut c = editor();
+    c.app.panes[0].path = root.path().into();
+    c.app.complete_listing(
+        0,
+        1,
+        Ok(terminal_file_manager::fs::list(
+            root.path(),
+            &terminal_file_manager::fs::IgnoreContext::isolated(),
+            &false.into(),
+        )
+        .unwrap()),
+    );
+    c.app.panes[0].select_all();
+    assert_eq!(c.app.panes[0].marks.len(), 1);
+    c.app.notify(
+        terminal_file_manager::notifications::Severity::Error,
+        "Retained failure",
+    );
+    c.app.notifications.dismiss_toasts();
+    let status = c.app.status.clone();
+    for name in ["", " padded "] {
+        c.app.profile_name = Some(name.into());
+        key(&mut c, KeyCode::Enter, 120, 24);
+        let expected = terminal_file_manager::settings::validate_profile_name(name).unwrap_err();
+        for width in [120, 40, 32, 24, 120] {
+            let (buffer, geometry) = draw(&c, width, 24);
+            let body = geometry.menu_layout.unwrap().body;
+            let text = area_text(&buffer, body);
+            assert!(
+                text.contains(&expected.split_whitespace().collect::<String>()),
+                "width {width}: {text}"
+            );
+            assert!(text.contains("Name:"));
+            assert_eq!(c.app.profile_name.as_deref(), Some(name));
+        }
+        assert_eq!(c.app.status, status);
+        assert_eq!(c.app.notifications.history.len(), 1);
+        assert!(c.app.notifications.visible().is_empty());
+        assert!(!c.preferences_changed);
+        assert!(c.app.operations.outbox.is_empty());
+    }
+}
+
 #[test]
 fn invalid_profile_submission_can_be_corrected_with_unicode_and_saved_explicitly() {
     let root = tempfile::tempdir().unwrap();
@@ -78,18 +133,28 @@ fn invalid_profile_submission_can_be_corrected_with_unicode_and_saved_explicitly
             key(&mut c, KeyCode::Char(character), 120, 24);
         }
         key(&mut c, KeyCode::Enter, 120, 24);
-        assert!(c.app.status.contains("profile name must be"));
+        assert!(
+            c.app
+                .profile_error
+                .as_ref()
+                .unwrap()
+                .contains("profile name must be")
+        );
         assert!(c.app.profile_name.is_some() && c.app.profile_menu.is_some());
         assert_eq!(c.preferences.profiles, original);
         assert!(!c.preferences_changed);
     }
     key(&mut c, KeyCode::Backspace, 120, 24);
+    assert!(c.app.profile_error.is_none());
+    let (buffer, geometry) = draw(&c, 32, 24);
+    assert!(!area_text(&buffer, geometry.menu_layout.unwrap().body).contains("profilename"));
     type_name(&mut c, "Wé");
     key(&mut c, KeyCode::Backspace, 120, 24);
     type_name(&mut c, "界");
     assert_eq!(c.app.profile_name.as_deref(), Some("W界"));
     key(&mut c, KeyCode::Enter, 120, 24);
     assert!(c.app.profile_name.is_none() && c.app.profile_menu.is_none());
+    assert!(c.app.profile_error.is_none());
     assert_eq!(c.preferences.profiles["W界"], view);
     assert_eq!(c.app.panes[0].profile.as_deref(), Some("W界"));
     assert!(c.app.panes[1].profile.is_none());
@@ -115,9 +180,17 @@ fn cancelling_profile_name_editing_preserves_views_profiles_and_persistence_stat
         .panes
         .each_ref()
         .map(terminal_file_manager::view::ViewSettings::capture);
-    type_name(&mut c, "Draft界");
+    type_name(&mut c, "Draft界 ");
+    key(&mut c, KeyCode::Enter, 32, 24);
+    assert!(c.app.profile_error.is_some());
     key(&mut c, KeyCode::Esc, 120, 24);
     assert!(c.app.profile_name.is_none() && c.app.profile_menu.is_some());
+    assert!(c.app.profile_error.is_none());
+    key(&mut c, KeyCode::Enter, 32, 24);
+    assert_eq!(c.app.profile_name.as_deref(), Some(""));
+    let (buffer, geometry) = draw(&c, 32, 24);
+    assert!(!area_text(&buffer, geometry.menu_layout.unwrap().body).contains("profilename"));
+    key(&mut c, KeyCode::Esc, 32, 24);
     key(&mut c, KeyCode::Esc, 120, 24);
     assert!(c.app.profile_menu.is_none());
     assert_eq!(toml::to_string(&c.preferences).unwrap(), original);

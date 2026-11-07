@@ -1,5 +1,13 @@
 # TODO
 
+## Automatic minimal layout for constrained terminals
+
+Explore an automatic minimal layout that removes decorative borders, secondary
+status information and shortcut hints. Prioritise the file list, navigation,
+marking and essential file operations, with support for future viewing.
+Keep critical warnings and safety controls accessible. Define activation rules
+in a separately approved scope; this is outside the current milestone.
+
 ## Pre-v1 compatibility
 
 Enable permission changes for unreadable owned files and directories on macOS

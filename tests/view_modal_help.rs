@@ -145,11 +145,13 @@ fn title_buttons_use_shared_semantic_cells_at_all_colour_levels() {
         ColorLevel::Ansi256,
         ColorLevel::TrueColor,
     ] {
-        for c in [
+        for c in vec![
             controller_with_menu("V"),
             controller_with_menu("Alt+v"),
             editor(),
-        ] {
+        ]
+        .into_boxed_slice()
+        {
             let (buffer, g) = draw(&c, bounds, level);
             let shell = g.menu_layout.unwrap();
             assert_eq!(g.context_control, shell.help);
@@ -256,11 +258,13 @@ fn mouse_help_and_close_keep_view_changes_and_do_not_change_another_row() {
 
 #[test]
 fn narrow_resize_keeps_f1_access_and_never_hits_padding_or_hints() {
-    for mut c in [
+    for mut c in vec![
         controller_with_menu("V"),
         controller_with_menu("Alt+v"),
         editor(),
-    ] {
+    ]
+    .into_boxed_slice()
+    {
         for (width, height) in [
             (120, 32),
             (40, 14),

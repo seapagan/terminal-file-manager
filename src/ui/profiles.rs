@@ -31,12 +31,8 @@ pub(super) fn layout(app: &App, bounds: Rect) -> modal::Layout<()> {
     };
     let mut shell =
         super::view::measure(bounds, title(app), width, app.profile_names.len() + 2, hint);
-    if let Some(name) = &app.profile_name {
-        let count = super::text::wrap_value(
-            &format!("Name: {}", super::clean(name)),
-            usize::from(shell.body.width),
-        )
-        .len();
+    if app.profile_name.is_some() {
+        let count = save_rows(app, usize::from(shell.body.width)).len();
         shell = super::view::measure(bounds, title(app), width, count, hint);
     }
     shell
@@ -44,15 +40,12 @@ pub(super) fn layout(app: &App, bounds: Rect) -> modal::Layout<()> {
 
 pub(super) fn render(frame: &mut Frame, app: &App, shell: &modal::Layout<()>, theme: &Theme) {
     modal::render_measured(frame, shell, title(app), theme, Role::Header);
-    let hint = if let Some(name) = &app.profile_name {
-        let lines = super::text::wrap_value(
-            &format!("Name: {}", super::clean(name)),
-            usize::from(shell.body.width),
-        );
-        frame.render_widget(
-            Paragraph::new(lines.join("\n")).style(theme.style(Role::Value)),
-            shell.body,
-        );
+    let hint = if app.profile_name.is_some() {
+        let lines: Vec<_> = save_rows(app, usize::from(shell.body.width))
+            .into_iter()
+            .map(|(role, text)| Line::styled(text, theme.style(role)))
+            .collect();
+        frame.render_widget(Paragraph::new(lines), shell.body);
         SAVE_HINT
     } else {
         let start = app
@@ -67,6 +60,27 @@ pub(super) fn render(frame: &mut Frame, app: &App, shell: &modal::Layout<()>, th
             .style(theme.style(Role::Key)),
         shell.footer,
     );
+}
+
+fn save_rows(app: &App, width: usize) -> Vec<(Role, String)> {
+    let mut rows: Vec<_> = super::text::wrap_value(
+        &format!(
+            "Name: {}",
+            super::clean(app.profile_name.as_deref().unwrap_or_default())
+        ),
+        width,
+    )
+    .into_iter()
+    .map(|text| (Role::Value, text))
+    .collect();
+    if let Some(error) = &app.profile_error {
+        rows.extend(
+            super::text::wrap_words(error, width)
+                .into_iter()
+                .map(|text| (Role::Error, text)),
+        );
+    }
+    rows
 }
 
 fn render_rows(frame: &mut Frame, app: &App, area: Rect, start: usize, theme: &Theme) {

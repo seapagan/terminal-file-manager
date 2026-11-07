@@ -71,6 +71,7 @@ pub struct App {
     pub profile_menu: Option<usize>,
     pub profile_choice: usize,
     pub profile_name: Option<String>,
+    pub profile_error: Option<String>,
     pub profile_names: Vec<String>,
     pub metadata_presentation: crate::settings::MetadataPresentation,
     pub help_rows: Vec<crate::input::HelpEntry>,
@@ -107,6 +108,7 @@ impl App {
             profile_menu: None,
             profile_choice: 0,
             profile_name: None,
+            profile_error: None,
             profile_names: Vec::new(),
             metadata_presentation: crate::settings::MetadataPresentation::default(),
             help_rows: crate::input::Bindings::new(&Default::default())

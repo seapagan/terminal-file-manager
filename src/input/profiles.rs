@@ -9,6 +9,7 @@ pub(super) fn open(controller: &mut Controller) {
     controller.app.profile_choice = 0;
     controller.app.profile_names = controller.preferences.profiles.keys().cloned().collect();
     controller.app.profile_name = None;
+    controller.app.profile_error = None;
     controller.app.view_menu = None;
     controller.app.popup = false;
     controller.app.close_help();
@@ -73,6 +74,7 @@ fn choose(controller: &mut Controller) {
     let index = controller.app.profile_menu.expect("profile selector");
     let count = controller.app.profile_names.len();
     if index == count + 1 {
+        controller.app.profile_error = None;
         controller.app.profile_name = Some(
             controller.app.panes[controller.app.active]
                 .profile
@@ -105,9 +107,13 @@ fn choose(controller: &mut Controller) {
 
 fn edit(controller: &mut Controller, key: KeyEvent) {
     match key.code {
-        KeyCode::Esc => controller.app.profile_name = None,
+        KeyCode::Esc => {
+            controller.app.profile_name = None;
+            controller.app.profile_error = None;
+        }
         KeyCode::Backspace => {
             controller.app.profile_name.as_mut().unwrap().pop();
+            controller.app.profile_error = None;
         }
         KeyCode::Char(c)
             if !key
@@ -117,6 +123,7 @@ fn edit(controller: &mut Controller, key: KeyEvent) {
             let name = controller.app.profile_name.as_mut().unwrap();
             if name.chars().count() < 64 && !c.is_control() {
                 name.push(c);
+                controller.app.profile_error = None;
             }
         }
         KeyCode::Enter => save(controller),
@@ -127,7 +134,7 @@ fn edit(controller: &mut Controller, key: KeyEvent) {
 fn save(controller: &mut Controller) {
     let name = controller.app.profile_name.as_ref().unwrap().clone();
     if let Err(error) = validate_profile_name(&name) {
-        controller.app.status = error.into();
+        controller.app.profile_error = Some(error);
         return;
     }
     let pane = &mut controller.app.panes[controller.app.active];
@@ -144,6 +151,7 @@ fn save(controller: &mut Controller) {
         }
     }
     controller.preferences_changed = true;
+    controller.app.profile_error = None;
     controller.app.profile_name = None;
     controller.app.profile_menu = None;
     controller.app.profile_names = controller.preferences.profiles.keys().cloned().collect();
@@ -218,7 +226,7 @@ mod notification_tests {
     }
 
     #[test]
-    fn profile_save_and_validation_use_status_without_notifying() {
+    fn profile_save_and_validation_do_not_notify() {
         for name in ["Saved", ""] {
             let mut c = controller();
             open(&mut c);
@@ -226,7 +234,7 @@ mod notification_tests {
             save(&mut c);
             assert_retained(&c);
             assert_eq!(c.app.profile_name.is_none(), !name.is_empty());
-            assert!(!c.app.status.is_empty());
+            assert_eq!(c.app.profile_error.is_some(), name.is_empty());
         }
     }
 
