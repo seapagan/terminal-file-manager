@@ -188,8 +188,12 @@ jobs:
               rustup target add "$TARGET"
               cargo build --release --locked --target "$TARGET"
               command -v timeout
-              output=$(timeout 10 "target/$TARGET/release/tfm" --version)
-              test "$output" = "tfm $CRATE_VERSION"
+              output=$(NO_COLOR=1 timeout 10 "target/$TARGET/release/tfm" --version)
+              first_line=$(printf "%s\n" "$output" | sed -n "1p")
+              case "$first_line" in
+                "tfm $CRATE_VERSION"|"tfm $CRATE_VERSION"[[:space:]]*) ;;
+                *) echo "unexpected version: $first_line" >&2; exit 1 ;;
+              esac
             '
 
       - name: Verify unstripped ELF compatibility
@@ -234,8 +238,12 @@ jobs:
             "$BUILD_IMAGE" \
             /bin/bash -ceu '
               command -v timeout
-              output=$(timeout 10 "target/$TARGET/release/tfm" --version)
-              test "$output" = "tfm $CRATE_VERSION"
+              output=$(NO_COLOR=1 timeout 10 "target/$TARGET/release/tfm" --version)
+              first_line=$(printf "%s\n" "$output" | sed -n "1p")
+              case "$first_line" in
+                "tfm $CRATE_VERSION"|"tfm $CRATE_VERSION"[[:space:]]*) ;;
+                *) echo "unexpected version: $first_line" >&2; exit 1 ;;
+              esac
             '
 
       # ----- macOS: native runner builds ----------------------------------
@@ -341,21 +349,25 @@ jobs:
       - name: Smoke-test version output (Unix)
         if: matrix.kind != 'windows'
         run: |
-          output=$(eval '"target/$TARGET/release/tfm" --version')
+          output=$(NO_COLOR=1 "target/$TARGET/release/tfm" --version)
+          first_line=$(printf '%s\n' "$output" | sed -n "1p")
           expected="tfm $CRATE_VERSION"
-          if [ "$output" != "$expected" ]; then
-            echo "error: expected '$expected', got '$output'" >&2
-            exit 1
-          fi
+          case "$first_line" in
+            "$expected"|"$expected"[[:space:]]*) ;;
+            *) echo "error: expected '$expected', got '$first_line'" >&2; exit 1 ;;
+          esac
 
       - name: Smoke-test version output (Windows)
         if: matrix.kind == 'windows'
         shell: pwsh
+        env:
+          NO_COLOR: '1'
         run: |
-          $output = & "target/$env:TARGET/release/tfm.exe" --version
+          $output = @(& "target/$env:TARGET/release/tfm.exe" --version)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $expected = "tfm $env:CRATE_VERSION"
-          if ($output -ne $expected) {
-            Write-Error "expected '$expected', got '$output'"
+          if ($output.Count -eq 0 -or $output[0] -cnotmatch ('^' + [regex]::Escape($expected) + '(?:\s|$)')) {
+            Write-Error "expected '$expected', got '$($output | Select-Object -First 1)'"
             exit 1
           }
 

@@ -277,7 +277,11 @@ function Assert-CandidateVersion([string]$Exe, [string]$Version) {
     # Synchronous on PS5.1/7+: no external supervisor or process-tree promise.
     $reported = $null
     $global:LASTEXITCODE = 1
-    try { $reported = @((& $Exe --version) 2>$null) }
+    $savedNoColor = $env:NO_COLOR
+    try {
+        $env:NO_COLOR = '1'
+        $reported = @((& $Exe --version) 2>$null)
+    }
     catch [Management.Automation.ApplicationFailedException] {
         Die -Message 'candidate failed --version validation'
     }
@@ -290,11 +294,17 @@ function Assert-CandidateVersion([string]$Exe, [string]$Version) {
         if ($_.FullyQualifiedErrorId -ne 'ProgramExitedWithNonZeroCode') { throw }
         Die -Message 'candidate failed --version validation'
     }
-    if ($global:LASTEXITCODE -ne 0 -or $null -eq $reported -or $reported.Count -ne 1) {
+    finally {
+        if ($null -eq $savedNoColor) { Remove-Item -Path Env:NO_COLOR -ErrorAction SilentlyContinue }
+        else { $env:NO_COLOR = $savedNoColor }
+    }
+    if ($global:LASTEXITCODE -ne 0 -or $null -eq $reported -or $reported.Count -lt 1) {
         Die -Message 'candidate failed --version validation'
     }
     $expected = "tfm $($Version -replace '^v', '')"
-    if ($reported[0] -cne $expected) { Die -Message "reported version does not match ${Version}: $reported" }
+    if ($reported[0] -cnotmatch ('^' + [regex]::Escape($expected) + '(?:\s|$)')) {
+        Die -Message "reported version does not match ${Version}: $($reported[0])"
+    }
 }
 
 function Get-PathItem([string]$Path) {

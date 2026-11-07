@@ -46,6 +46,7 @@ function Assert-PromptVersion([string]$Path) {
     $psi = New-Object -TypeName Diagnostics.ProcessStartInfo
     $psi.FileName = $Path
     $psi.Arguments = '--version'
+    $psi.EnvironmentVariables['NO_COLOR'] = '1'
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
@@ -58,7 +59,9 @@ function Assert-PromptVersion([string]$Path) {
             $process.WaitForExit()
             throw 'real tfm --version did not terminate within ten seconds'
         }
-        if ($process.ExitCode -ne 0 -or $stdout.GetAwaiter().GetResult().TrimEnd("`r", "`n") -ne "tfm $Version" -or $stderr.GetAwaiter().GetResult()) {
+        $firstLine = ($stdout.GetAwaiter().GetResult() -split "\r?\n", 2)[0]
+        $expected = '^tfm ' + [regex]::Escape($Version) + '(?:\s|$)'
+        if ($process.ExitCode -ne 0 -or $firstLine -cnotmatch $expected -or $stderr.GetAwaiter().GetResult()) {
             throw 'incorrect real tfm version or exit status'
         }
     } finally { $process.Dispose() }

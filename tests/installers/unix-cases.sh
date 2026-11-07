@@ -209,6 +209,33 @@ assert_output "reported version does not match $TEST_RELEASE_TAG"
 assert_no_binary
 pass
 
+for suffix in '' ' (release build)'; do
+    reset_env
+    TEST_CANDIDATE_SUFFIX=$suffix
+    TEST_CANDIDATE_TRAILER='Additional information
+Arbitrary licence details'
+    FORCE_COLOR=1
+    export TEST_CANDIDATE_SUFFIX TEST_CANDIDATE_TRAILER FORCE_COLOR
+    run_install || fail 'multiline version output was rejected'
+    assert_target_named x86_64-unknown-linux-gnu
+    assert_tmp_cleaned
+    pass
+done
+
+for wrong in "${TEST_RELEASE_VERSION}0" "$TEST_RELEASE_VERSION-dev" '0.0.0'; do
+    reset_env
+    TEST_CANDIDATE_VERSION=$wrong
+    TEST_CANDIDATE_TRAILER="tfm $TEST_RELEASE_VERSION"
+    export TEST_CANDIDATE_VERSION TEST_CANDIDATE_TRAILER
+    mkdir -p "$TFM_INSTALL_DIR"
+    printf 'old tfm\n' >"$TFM_INSTALL_DIR/tfm"
+    assert_fails 'wrong first-line version was accepted'
+    assert_output "reported version does not match $TEST_RELEASE_TAG"
+    assert_old_binary
+    assert_tmp_cleaned
+    pass
+done
+
 reset_env
 bad_archive=$root/bad-archive
 mkdir "$bad_archive"
@@ -233,8 +260,7 @@ TFM_INSTALL_DIR=$root/success-bin
 export TFM_INSTALL_DIR
 run_install || fail 'successful replacement failed'
 test -x "$TFM_INSTALL_DIR/tfm" || fail 'installed binary is not executable'
-test "$("$TFM_INSTALL_DIR/tfm" --version)" = "tfm $TEST_RELEASE_VERSION" || \
-    fail 'installed candidate is wrong'
+assert_installed_version
 test ! -e "$TFM_INSTALL_DIR/README.md" || fail 'README was installed'
 test ! -e "$TFM_INSTALL_DIR/LICENSE-MIT" || fail 'licence was installed'
 pass
@@ -271,8 +297,7 @@ reset_env
 mkdir -p "$TFM_INSTALL_DIR"
 printf 'old tfm\n' >"$TFM_INSTALL_DIR/tfm"
 run_install || fail 'replacement of existing binary failed'
-test "$("$TFM_INSTALL_DIR/tfm" --version)" = "tfm $TEST_RELEASE_VERSION" || \
-    fail 'existing binary was not replaced'
+assert_installed_version
 pass
 
 reset_env

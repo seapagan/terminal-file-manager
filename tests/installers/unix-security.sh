@@ -165,6 +165,7 @@ fn main() {
     let version = std::env::var("TEST_CANDIDATE_VERSION").unwrap_or("99.88.77".into());
     let code = std::env::var("TEST_CANDIDATE_EXIT").unwrap_or("0".into());
     println!("tfm {version}");
+    println!("Additional fixture information\nLicence details may change");
     std::process::exit(code.parse().unwrap());
 }
 EOF

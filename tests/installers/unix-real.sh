@@ -51,9 +51,13 @@ export PATH
 for installation in fresh reinstall; do
     sh "$repo/install.sh" >"$root/output" 2>&1 || { cat "$root/output"; exit 1; }
     cmp "$binary" "$TFM_INSTALL_DIR/tfm"
-    output=$(perl -e 'alarm 10; exec @ARGV or die "could not execute version process"' \
+    output=$(NO_COLOR=1 perl -e 'alarm 10; exec @ARGV or die "could not execute version process"' \
         "$TFM_INSTALL_DIR/tfm" --version)
-    test "$output" = "tfm $version"
+    first_line=$(printf '%s\n' "$output" | sed -n '1p')
+    case "$first_line" in
+        "tfm $version"|"tfm $version"[[:space:]]*) ;;
+        *) echo 'incorrect installed version' >&2; exit 1 ;;
+    esac
     test -z "$(find "$root/tmp" -mindepth 1 -print)"
     echo "Real archive $target: $installation passed"
 done
