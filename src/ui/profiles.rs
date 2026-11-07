@@ -42,23 +42,15 @@ fn save_layout(bounds: Rect) -> modal::Layout<()> {
         bounds,
         "Save profile",
         SAVE_CONTENT_WIDTH,
-        name_rows(width) + 1 + feedback,
+        1 + 1 + feedback + 1,
         SAVE_HINT,
     )
-}
-
-fn name_rows(width: usize) -> usize {
-    // Reserve the label and 64 two-cell characters before the user starts typing.
-    (6_usize + 64 * 2).div_ceil(width.max(1))
 }
 
 pub(super) fn render(frame: &mut Frame, app: &App, shell: &modal::Layout<()>, theme: &Theme) {
     modal::render_measured(frame, shell, title(app), theme, Role::Header);
     let hint = if app.profile_name.is_some() {
-        let lines: Vec<_> = save_rows(app, usize::from(shell.body.width))
-            .into_iter()
-            .map(|(role, text)| Line::styled(text, theme.style(role)))
-            .collect();
+        let lines = save_lines(app, shell.body.width, theme);
         frame.render_widget(Paragraph::new(lines), shell.body);
         SAVE_HINT
     } else {
@@ -76,29 +68,20 @@ pub(super) fn render(frame: &mut Frame, app: &App, shell: &modal::Layout<()>, th
     );
 }
 
-fn save_rows(app: &App, width: usize) -> Vec<(Role, String)> {
-    let mut rows: Vec<_> = super::text::wrap_value(
-        &format!(
-            "Name: {}",
-            super::clean(app.profile_name.as_deref().unwrap_or_default())
-        ),
-        width,
-    )
-    .into_iter()
-    .map(|text| (Role::Value, text))
-    .collect();
-    // Escaped invalid characters may be wider; retain the editing end in the fixed field.
-    rows.drain(..rows.len().saturating_sub(name_rows(width)));
-    rows.resize(name_rows(width), (Role::Value, String::new()));
-    rows.push((Role::Normal, String::new()));
+fn save_lines(app: &App, width: u16, theme: &Theme) -> Vec<Line<'static>> {
+    let name = super::clean(app.profile_name.as_deref().unwrap_or_default());
+    let mut rows = vec![
+        modal::Row::field("Name", &name, (), true).line(width, theme),
+        Line::default(),
+    ];
     let (feedback, role) = app
         .profile_error
         .as_deref()
-        .map_or((SAVE_GUIDANCE, Role::Muted), |error| (error, Role::Error));
+        .map_or((SAVE_GUIDANCE, Role::Value), |error| (error, Role::Error));
     rows.extend(
-        super::text::wrap_words(feedback, width)
+        super::text::wrap_words(feedback, usize::from(width))
             .into_iter()
-            .map(|text| (role, text)),
+            .map(|text| Line::styled(text, theme.style(role))),
     );
     rows
 }
