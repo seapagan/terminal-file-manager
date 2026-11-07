@@ -24,6 +24,11 @@ fn main() -> ExitCode {
 }
 
 fn failure(error: &str) -> ExitCode {
-    eprintln!("tfm: {}", terminal_file_manager::ui::clean(error));
+    let diagnostic = error
+        .split('\n')
+        .map(terminal_file_manager::ui::clean)
+        .collect::<Vec<_>>()
+        .join("\n");
+    eprintln!("tfm: {diagnostic}");
     ExitCode::from(2)
 }

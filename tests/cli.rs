@@ -150,6 +150,42 @@ fn isolated_session_command(root: &std::path::Path) -> Command {
 }
 
 #[test]
+fn malformed_config_errors_preserve_diagnostic_lines() {
+    let root = tempfile::tempdir().unwrap();
+    let config = root.path().join("config/tfm/config.toml");
+    std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+    std::fs::write(&config, "restore_session =\n").unwrap();
+    let output = isolated_session_command(root.path()).output().unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.starts_with("tfm: "));
+    assert!(stderr.contains("TOML parse error"), "{stderr}");
+    assert!(stderr.contains("\n1 | restore_session =\n"), "{stderr}");
+    assert!(stderr.contains("\n  |"), "{stderr}");
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_errors_preserve_line_breaks_and_escape_unsafe_characters() {
+    let root = tempfile::tempdir().unwrap();
+    let name = "missing\n\nλ界\\n\r\n\t\u{7}\u{1b}[31m\u{85}\u{202e}\u{2069}\u{2028}\u{2029}\n";
+    let output = isolated_session_command(root.path())
+        .arg(name)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.starts_with("tfm: "));
+    assert!(
+        stderr.contains("missing\n\nλ界\\n\\r\n\\t\\u{7}\\u{1b}[31m\\u{85}\\u{202e}\\u{2069}\\u{2028}\\u{2029}\n"),
+        "{stderr}"
+    );
+    assert!(stderr.chars().all(|c| !c.is_control() || c == '\n'));
+}
+
+#[test]
 fn explicit_headless_session_save_and_restore_failures_preserve_intent() {
     use terminal_file_manager::session::SessionStore;
     let root = tempfile::tempdir().unwrap();
