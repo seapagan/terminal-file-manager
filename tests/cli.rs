@@ -3,38 +3,65 @@
 use std::process::{Command, Output};
 
 fn tfm(arguments: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_tfm"))
+    let root = tempfile::tempdir().unwrap();
+    isolated_session_command(root.path())
         .args(arguments)
         .output()
         .expect("tfm must execute")
 }
 
+#[path = "cli/help.rs"]
+mod help;
+
 #[test]
-fn help_describes_local_operations_and_safe_exit() {
-    for arguments in [&["--help"][..], &["-h"][..]] {
-        let output = tfm(arguments);
-        assert!(output.status.success());
-        let text = String::from_utf8(output.stdout).expect("help is UTF-8");
-        assert!(text.contains("Usage: tfm"));
-        assert!(text.contains("F5/F6 copy/move"));
-        assert!(text.contains("F8 Trash"));
-        assert!(text.contains("quit safely"));
-        assert!(text.contains("DIRECTORY"));
-        assert!(output.stderr.is_empty());
+fn version_uses_the_executable_name_and_manifest_version() {
+    let expected = format!(
+        "tfm {}\nCopyright © 2026 Grant Ramsay\nLicensed under {}\n",
+        env!("CARGO_PKG_VERSION"),
+        env!("CARGO_PKG_LICENSE")
+    );
+    for argument in ["--version", "-V"] {
+        assert_eq!(version_output(argument, &[]), expected);
     }
 }
 
 #[test]
-fn version_uses_the_executable_name_and_manifest_version() {
+fn version_colours_only_the_name_and_licence_identifiers() {
+    let sgr = regex::Regex::new("\u{1b}\\[[0-9;]*m").unwrap();
+    let licence = env!("CARGO_PKG_LICENSE")
+        .split_whitespace()
+        .map(|token| match token {
+            "OR" | "AND" => token.to_owned(),
+            _ => format!("\u{1b}[32m{token}\u{1b}[0m"),
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
     for argument in ["--version", "-V"] {
-        let output = tfm(&[argument]);
-        assert!(output.status.success());
+        let plain = version_output(argument, &[("NO_COLOR", "1"), ("FORCE_COLOR", "1")]);
+        assert!(!plain.contains('\u{1b}'));
+        let coloured = version_output(argument, &[("FORCE_COLOR", "1")]);
         assert_eq!(
-            output.stdout,
-            concat!("tfm ", env!("CARGO_PKG_VERSION"), "\n").as_bytes()
+            coloured,
+            format!(
+                "\u{1b}[1;36mtfm\u{1b}[0m {}\nCopyright © 2026 Grant Ramsay\nLicensed under {licence}\n",
+                env!("CARGO_PKG_VERSION")
+            )
         );
-        assert!(output.stderr.is_empty());
+        assert_eq!(sgr.replace_all(&coloured, ""), plain);
     }
+}
+
+fn version_output(argument: &str, policy: &[(&str, &str)]) -> String {
+    let root = tempfile::tempdir().unwrap();
+    let mut command = isolated_session_command(root.path());
+    let output = command
+        .arg(argument)
+        .envs(policy.iter().copied())
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    String::from_utf8(output.stdout).unwrap()
 }
 
 #[test]
@@ -122,11 +149,9 @@ fn explicit_missing_path_reports_failure_without_fallback() {
 fn noninteractive_startup_fails_clearly_without_creating_config() {
     let root = tempfile::tempdir().unwrap();
     let config = root.path().join("settings");
-    let output = Command::new(env!("CARGO_BIN_EXE_tfm"))
-        .current_dir(root.path())
+    let output = isolated_session_command(root.path())
         .env("XDG_CONFIG_HOME", &config)
         .env("APPDATA", &config)
-        .env("HOME", root.path())
         .output()
         .unwrap();
     assert_eq!(output.status.code(), Some(2));
@@ -140,6 +165,16 @@ fn noninteractive_startup_fails_clearly_without_creating_config() {
 
 fn isolated_session_command(root: &std::path::Path) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_tfm"));
+    for key in [
+        "NO_COLOR",
+        "FORCE_COLOR",
+        "CLICOLOR_FORCE",
+        "CLICOLOR",
+        "TERM",
+        "COLORTERM",
+    ] {
+        command.env_remove(key);
+    }
     command
         .current_dir(root)
         .env("HOME", root)
@@ -147,6 +182,118 @@ fn isolated_session_command(root: &std::path::Path) -> Command {
         .env("XDG_CONFIG_HOME", root.join("config"))
         .env("APPDATA", root.join("config"));
     command
+}
+
+#[test]
+fn malformed_config_errors_preserve_diagnostic_lines() {
+    let root = tempfile::tempdir().unwrap();
+    let config = root.path().join("config/tfm/config.toml");
+    std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+    std::fs::write(&config, "restore_session =\n").unwrap();
+    let output = isolated_session_command(root.path()).output().unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.starts_with("tfm: "));
+    assert!(stderr.contains("TOML parse error"), "{stderr}");
+    assert!(stderr.contains("\n1 | restore_session =\n"), "{stderr}");
+    assert!(stderr.contains("\n  |"), "{stderr}");
+}
+
+#[test]
+fn cli_diagnostic_colours_distinguish_structure_from_source_and_explanation() {
+    let root = tempfile::tempdir().unwrap();
+    let config = root.path().join("config").join("tfm").join("config.toml");
+    std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+    std::fs::write(&config, "restore_session =\n").unwrap();
+    let stderr = coloured_config_error(root.path(), &[("FORCE_COLOR", "1")]);
+    assert!(
+        stderr.starts_with("\u{1b}[1;31mtfm:\u{1b}[0m "),
+        "{stderr:?}"
+    );
+    assert!(
+        stderr.contains(&format!("\u{1b}[36m{}\u{1b}[0m: ", config.display())),
+        "{stderr:?}"
+    );
+    assert!(stderr.contains("\u{1b}[1;31mTOML parse error at line 1, column 18\u{1b}[0m"));
+    assert!(stderr.contains("\u{1b}[2m1 |\u{1b}[0m restore_session =\n"));
+    assert!(stderr.contains("\u{1b}[2m  |\u{1b}[0m"));
+    assert!(stderr.contains("\u{1b}[91m                  ^\u{1b}[0m"));
+    assert!(
+        stderr
+            .contains("\u{1b}[33mstring values must be quoted\u{1b}[0m, expected literal string\n")
+    );
+}
+
+#[test]
+fn cli_diagnostics_follow_library_colour_policy_without_changing_content() {
+    let root = tempfile::tempdir().unwrap();
+    let config = root.path().join("config").join("tfm").join("config.toml");
+    std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+    std::fs::write(&config, "restore_session =\n").unwrap();
+    let plain = coloured_config_error(root.path(), &[]);
+    assert!(!plain.contains('\u{1b}'));
+    for policy in [
+        vec![("NO_COLOR", "1"), ("FORCE_COLOR", "1")],
+        vec![("FORCE_COLOR", "0")],
+        vec![("CLICOLOR", "0")],
+        vec![("TERM", "dumb")],
+    ] {
+        assert_eq!(coloured_config_error(root.path(), &policy), plain);
+    }
+    let forced = coloured_config_error(root.path(), &[("FORCE_COLOR", "1")]);
+    let sgr = regex::Regex::new("\u{1b}\\[[0-9;]*m").unwrap();
+    assert_eq!(sgr.replace_all(&forced, ""), plain);
+}
+
+#[test]
+fn cli_diagnostics_colour_only_explicit_valid_option_lists_green() {
+    let root = tempfile::tempdir().unwrap();
+    let config = root.path().join("config").join("tfm").join("config.toml");
+    std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+    let sgr = regex::Regex::new("\u{1b}\\[[0-9;]*m").unwrap();
+    for (setting, options) in [
+        ("metadata_presentation", "`sidebar` or `popup`"),
+        ("grouping", "`first`, `last`, `mixed`"),
+    ] {
+        std::fs::write(&config, format!("{setting} = 'invalid'\n")).unwrap();
+        let plain = coloured_config_error(root.path(), &[("NO_COLOR", "1")]);
+        let forced = coloured_config_error(root.path(), &[("FORCE_COLOR", "1")]);
+        assert!(
+            forced.contains(&format!("\u{1b}[32m{options}\u{1b}[0m")),
+            "{forced:?}"
+        );
+        assert_eq!(sgr.replace_all(&forced, ""), plain);
+        assert!(!plain.contains('\u{1b}'));
+    }
+}
+
+fn coloured_config_error(root: &std::path::Path, policy: &[(&str, &str)]) -> String {
+    let mut command = isolated_session_command(root);
+    let output = command.envs(policy.iter().copied()).output().unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    String::from_utf8(output.stderr).unwrap()
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_errors_preserve_line_breaks_and_escape_unsafe_characters() {
+    let root = tempfile::tempdir().unwrap();
+    let name = "missing\n\nλ界\\n\r\n\t\u{7}\u{1b}[31m\u{85}\u{202e}\u{2069}\u{2028}\u{2029}\n";
+    let output = isolated_session_command(root.path())
+        .arg(name)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.starts_with("tfm: "));
+    assert!(
+        stderr.contains("missing\n\nλ界\\n\\r\n\\t\\u{7}\\u{1b}[31m\\u{85}\\u{202e}\\u{2069}\\u{2028}\\u{2029}\n"),
+        "{stderr}"
+    );
+    assert!(stderr.chars().all(|c| !c.is_control() || c == '\n'));
 }
 
 #[test]

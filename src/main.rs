@@ -1,5 +1,7 @@
 use std::process::ExitCode;
 
+mod cli_diagnostics;
+
 fn main() -> ExitCode {
     let arguments: Vec<_> = std::env::args_os().skip(1).collect();
     match terminal_file_manager::run(&arguments) {
@@ -24,6 +26,6 @@ fn main() -> ExitCode {
 }
 
 fn failure(error: &str) -> ExitCode {
-    eprintln!("tfm: {}", terminal_file_manager::ui::clean(error));
+    eprintln!("{}", cli_diagnostics::render(error));
     ExitCode::from(2)
 }

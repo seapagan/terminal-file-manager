@@ -8,11 +8,9 @@ trap 'rm -rf "$root"' 0 1 2 3 15
 binary=$repo/target/release/tfm
 test -f "$binary" || { echo 'hook tests require cargo make release-build' >&2; exit 1; }
 command -v perl >/dev/null
-output=$(perl -e 'alarm 10; exec @ARGV or die "version execution failed"' "$binary" --version)
-case "$output" in
-    'tfm '*) CRATE_VERSION=${output#tfm } ;;
-    *) echo 'unexpected version output' >&2; exit 1 ;;
-esac
+output=$(NO_COLOR=1 perl -e 'alarm 10; exec @ARGV or die "version execution failed"' "$binary" --version)
+CRATE_VERSION=$(printf '%s\n' "$output" | awk 'NR == 1 && $1 == "tfm" && $2 ~ /^[0-9]+\.[0-9]+\.[0-9]+$/ { print $2 }')
+test -n "$CRATE_VERSION" || { echo 'unexpected version output' >&2; exit 1; }
 case "$(uname -m)" in
     x86_64) arch=x86_64 ;;
     aarch64|arm64) arch=aarch64 ;;

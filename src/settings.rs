@@ -268,7 +268,7 @@ pub fn config_path() -> Option<PathBuf> {
         .map(PathBuf::from)
         .filter(|path| path.is_absolute())
         .or_else(default_unix_config)?;
-    Some(base.join("tfm/config.toml"))
+    Some(base.join("tfm").join("config.toml"))
 }
 
 #[cfg(unix)]

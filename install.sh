@@ -252,12 +252,14 @@ validate_candidate() {
     chmod 755 "$candidate" || die 'release tfm is not executable'
     # POSIX sh has no portable deadline facility. Validation is synchronous;
     # native release/installer acceptance must prove prompt --version termination.
-    if ! "$candidate" --version >"$tmp_dir/version"; then
+    if ! NO_COLOR=1 "$candidate" --version >"$tmp_dir/version"; then
         die 'candidate failed --version validation; temporary-directory execution restrictions (such as noexec) are a possible cause. Try setting TMPDIR to an executable location.'
     fi
-    printf 'tfm %s\n' "${version#v}" >"$tmp_dir/expected-version"
-    cmp -s "$tmp_dir/version" "$tmp_dir/expected-version" ||
-        die "reported version does not match $version: $(cat "$tmp_dir/version")"
+    reported=$(sed -n '1p' "$tmp_dir/version")
+    case "$reported" in
+        "tfm ${version#v}"|"tfm ${version#v}"[[:blank:]]*) ;;
+        *) die "reported version does not match $version: $reported" ;;
+    esac
 }
 
 # Walk each lexical component before creating anything. Reject links rather
