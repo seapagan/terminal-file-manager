@@ -61,11 +61,13 @@ fn operation_key(
         }
         KeyCode::Backspace => {
             field(dialog).pop();
+            dialog.error = None;
             dialog.edited |= dialog.field == 0;
             true
         }
         KeyCode::Char('a') if key.modifiers == KeyModifiers::CONTROL => {
             field(dialog).clear();
+            dialog.error = None;
             dialog.edited |= dialog.field == 0;
             true
         }
@@ -99,8 +101,12 @@ fn destructive(
         return true;
     }
     if !dialog.ready || dialog.plan.preview.is_none() || dialog.error.is_some() {
-        controller.app.status =
-            "Cannot confirm until the folder count finishes without errors".into();
+        controller.app.status = if dialog.error.is_some() {
+            "Cannot confirm; folder count failed. Cancel and reopen to retry"
+        } else {
+            "Cannot confirm until the folder count finishes without errors"
+        }
+        .into();
         return true;
     }
     submit(controller, dialog, geometry)

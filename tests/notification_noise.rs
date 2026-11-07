@@ -107,6 +107,8 @@ fn pending_destructive_preview_disables_approval_without_notifying() {
         panic!("dialog closed")
     };
     assert!(!dialog.ready);
+    assert!(c.app.status.contains("count"));
+    assert!(!c.app.status.contains("failed"));
     assert!(c.app.operations.outbox.is_empty());
     assert_retained(&c);
 }
@@ -123,15 +125,90 @@ fn failed_preview_keeps_error_visible_and_retained_without_a_job() {
         id: 42,
         record: Record::default(),
     });
+    c.app.operations.outbox.clear();
+    for event in [
+        KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
+        KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL),
+        KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE),
+        KeyEvent::new(KeyCode::Char('D'), KeyModifiers::NONE),
+    ] {
+        let g = ui::geometry(&c.app, Rect::new(0, 0, 100, 30));
+        c.handle(Event::Key(event), &g, Duration::ZERO);
+    }
     let Some(Dialog::Operation(dialog)) = &c.app.operations.dialog else {
         panic!("dialog closed")
     };
     assert!(!dialog.ready);
     assert!(dialog.error.is_some());
+    assert!(c.app.status.contains("failed"));
+    assert!(!c.app.status.contains("wait"));
+    assert!(!c.app.status.contains("until"));
+    assert!(c.app.operations.outbox.is_empty());
     assert_eq!(c.app.notifications.history.len(), 2);
     assert_eq!(c.app.notifications.history[1].severity, Severity::Error);
     assert_eq!(c.app.notifications.history[1].job, None);
     assert!(c.app.operations.history.is_empty());
+}
+
+#[test]
+fn field_edits_clear_validation_errors_without_submitting() {
+    for (code, modifiers) in [
+        (KeyCode::Backspace, KeyModifiers::NONE),
+        (KeyCode::Char('a'), KeyModifiers::CONTROL),
+    ] {
+        for action in [Action::Rename, Action::Copy] {
+            let (_root, mut c) = loaded();
+            dispatch(&mut c, action);
+            let Some(Dialog::Operation(dialog)) = &mut c.app.operations.dialog else {
+                panic!("no dialog")
+            };
+            if action == Action::Copy {
+                dialog.field = 1;
+                dialog.incoming = "../invalid".into();
+            } else {
+                dialog.text = "../invalid".into();
+            }
+            let initial_len = dialog.text.len() + dialog.incoming.len();
+            key(&mut c, KeyCode::Enter);
+            let Some(Dialog::Operation(dialog)) = &c.app.operations.dialog else {
+                panic!("dialog closed")
+            };
+            assert!(dialog.error.is_some());
+            let g = ui::geometry(&c.app, Rect::new(0, 0, 100, 30));
+            c.handle(
+                Event::Key(KeyEvent::new(code, modifiers)),
+                &g,
+                Duration::ZERO,
+            );
+            let Some(Dialog::Operation(dialog)) = &c.app.operations.dialog else {
+                panic!("dialog closed")
+            };
+            assert!(dialog.error.is_none());
+            assert!(dialog.text.len() + dialog.incoming.len() < initial_len);
+            assert_eq!(dialog.edited, action == Action::Rename);
+            assert!(c.app.operations.outbox.is_empty());
+            assert_retained(&c);
+        }
+    }
+}
+
+#[test]
+fn pending_destination_rejects_copy_and_move_without_notifying() {
+    for action in [
+        Action::Copy,
+        Action::Move,
+        Action::CopyQuick,
+        Action::MoveQuick,
+    ] {
+        let (_root, mut c) = loaded();
+        c.app.dual = true;
+        c.app.request_listing(1, c.app.panes[1].path.clone());
+        dispatch(&mut c, action);
+        assert!(c.app.status.contains("destination"));
+        assert!(c.app.operations.dialog.is_none());
+        assert!(c.app.operations.outbox.is_empty());
+        assert_retained(&c);
+    }
 }
 
 #[test]

@@ -74,7 +74,7 @@ fn open(
         return Ok(());
     }
     capture_target(controller, &mut plan, geometry)?;
-    if immediate(controller, action, &plan, geometry)? {
+    if immediate(action, &plan, geometry) {
         controller
             .app
             .operations
@@ -181,26 +181,13 @@ fn capture_target(
     Ok(())
 }
 
-fn immediate(
-    controller: &Controller,
-    action: Action,
-    plan: &Plan,
-    geometry: &Geometry,
-) -> std::io::Result<bool> {
+fn immediate(action: Action, plan: &Plan, geometry: &Geometry) -> bool {
     if !matches!(plan.operation, Operation::Copy | Operation::Move)
         || !geometry.panes.iter().all(Option::is_some)
     {
-        return Ok(false);
+        return false;
     }
-    if controller.app.panes[1 - controller.app.active]
-        .pending
-        .is_some()
-    {
-        return Err(std::io::Error::other(
-            "Destination listing pending; wait before approving",
-        ));
-    }
-    Ok(plan.operands.len() == 1 || matches!(action, Action::CopyQuick | Action::MoveQuick))
+    plan.operands.len() == 1 || matches!(action, Action::CopyQuick | Action::MoveQuick)
 }
 
 fn validate_single(plan: &Plan) -> std::io::Result<()> {

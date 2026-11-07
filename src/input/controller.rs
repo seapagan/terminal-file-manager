@@ -334,7 +334,8 @@ impl Controller {
             .collect();
         if self.app.panes[self.app.active].error.is_some() {
             self.app.status =
-                "Wait for a successful listing before counting directory contents".into();
+                "Refresh or navigate to reload the listing before counting directory contents"
+                    .into();
         } else if let Some(request) = self.app.request_totals() {
             requests.push(request);
             self.app.popup |= geometry.sidebar.is_none();
