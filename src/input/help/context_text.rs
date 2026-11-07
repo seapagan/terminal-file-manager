@@ -73,7 +73,7 @@ fn operation_text(operation: Operation) -> (Action, &'static [&'static str]) {
 }
 
 const PATTERN: &[&str] = &[
-    "Change marks on entries shown in this pane. Hidden and filtered-out entries keep their marks.",
+    "Change marks on entries shown in this pane. Hidden and filtered-out entries keep their marks. After applying, the status area shows how many visible entries are marked; this does not add a notification.",
     "Wildcards match the whole filename: * matches a sequence; ? matches one byte. Regex searches names; ^ and $ anchor the match. Case sensitive applies to both modes.",
     "You can type ? in Pattern. While typing, use `Alt+w` for Wildcard, `Alt+x` for Regex and `Alt+s` for Case sensitive. These shortcuts keep the cursor in Pattern.",
     "Outside Pattern, use `w`, `x` and `s` for those settings. Press `Tab` / `Shift+Tab` or click to choose a field or action. `Space` activates the focused control.",
@@ -165,9 +165,9 @@ const VIEW_OPTIONS: &[&str] = &[
 const VIEW_PROFILES: &[&str] = &[
     "Choose saved display settings with `Up` / `Down`, `Home` / `End` or the mouse wheel. Click a profile to select it. Press `Enter` to apply it to the active pane.",
     "Press `Space` on a profile to select Apply selected to both, then `Enter` or `Space` to apply it. You can also click that row. Profiles change display settings; your pane locations stay the same.",
-    "Choose Save active as… to save the active pane's settings under a name. `Esc` closes the list without applying the selected profile.",
+    "Choose Save active as… to save the active pane's settings under a name. Profile changes appear in the status area without adding notifications. `Esc` closes the list without applying the selected profile.",
 ];
 const SAVE_PROFILE: &[&str] = &[
     "Type a name for the active pane's display settings. You can type ? here; use `F1` for Help. `Backspace` removes the last character.",
-    "Press `Enter` to save. An existing name replaces that saved profile. Your pane locations stay the same. `Esc` discards the typed name and returns to the profile list.",
+    "Press `Enter` to save. An existing name replaces that saved profile. The form shows name errors; the status area shows save confirmation. Preferences save on exit. Your pane locations stay the same. `Esc` discards the typed name and returns to the profile list.",
 ];

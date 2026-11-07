@@ -79,13 +79,14 @@ fn expiry_deduplication_and_chronology_keep_all_session_evidence() {
 fn expired_application_event_is_retrievable_without_a_filesystem_job() {
     let mut c = controller();
     let g = ui::geometry(&c.app, Rect::new(0, 0, 80, 24));
-    c.dispatch(Action::Viewer, &g);
+    c.app
+        .reject_operation("Destination changed; refresh before retrying".into());
     assert_eq!(c.app.notifications.history.len(), 1);
     assert!(c.app.operations.history.is_empty());
     c.app.notifications.advance(Duration::from_secs(60));
     c.dispatch(Action::Notifications, &g);
     let (text, _) = draw(&c.app, 80, 24);
-    assert!(text.contains("file viewer is not available yet"), "{text}");
+    assert!(text.contains("Destination changed"), "{text}");
     key(&mut c, KeyCode::Esc);
     assert!(!c.app.notifications.open);
     assert!(!c.quit);

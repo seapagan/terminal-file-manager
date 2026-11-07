@@ -56,6 +56,10 @@ fn open(
     geometry: &Geometry,
 ) -> std::io::Result<()> {
     let pane = controller.app.active;
+    if let Some(message) = routine_feedback(controller, operation, geometry) {
+        controller.app.status = message.into();
+        return Ok(());
+    }
     let base = controller.app.panes[pane].path.clone();
     let destination = initial_destination(controller, operation);
     let mut plan = if operation == Operation::Mkdir {
@@ -65,9 +69,12 @@ fn open(
     } else {
         Plan::capture(&controller.app.panes[pane], operation, destination.clone())?
     };
-    validate_single(&plan)?;
+    if let Err(error) = validate_single(&plan) {
+        controller.app.status = error.to_string().into();
+        return Ok(());
+    }
     capture_target(controller, &mut plan, geometry)?;
-    if immediate(controller, action, &plan, geometry)? {
+    if immediate(action, &plan, geometry) {
         controller
             .app
             .operations
@@ -78,6 +85,32 @@ fn open(
     let native_target = destination.unwrap_or_else(|| base.clone());
     open_dialog(controller, plan, native_target);
     Ok(())
+}
+
+fn routine_feedback(
+    controller: &Controller,
+    operation: Operation,
+    geometry: &Geometry,
+) -> Option<&'static str> {
+    let pane = &controller.app.panes[controller.app.active];
+    if pane.pending.is_some() {
+        return Some("Wait for the directory to finish loading");
+    }
+    if pane.error.is_some() {
+        return None;
+    }
+    if !operation.creates_entry() && pane.eligible().is_empty() {
+        return Some("No visible entry selected");
+    }
+    if matches!(operation, Operation::Copy | Operation::Move)
+        && geometry.panes.iter().all(Option::is_some)
+        && controller.app.panes[1 - controller.app.active]
+            .pending
+            .is_some()
+    {
+        return Some("Wait for the destination directory to finish loading");
+    }
+    None
 }
 
 fn open_dialog(controller: &mut Controller, plan: Plan, native_target: std::path::PathBuf) {
@@ -148,33 +181,18 @@ fn capture_target(
     Ok(())
 }
 
-fn immediate(
-    controller: &Controller,
-    action: Action,
-    plan: &Plan,
-    geometry: &Geometry,
-) -> std::io::Result<bool> {
+fn immediate(action: Action, plan: &Plan, geometry: &Geometry) -> bool {
     if !matches!(plan.operation, Operation::Copy | Operation::Move)
         || !geometry.panes.iter().all(Option::is_some)
     {
-        return Ok(false);
+        return false;
     }
-    if controller.app.panes[1 - controller.app.active]
-        .pending
-        .is_some()
-    {
-        return Err(std::io::Error::other(
-            "Destination listing pending; wait before approving",
-        ));
-    }
-    Ok(plan.operands.len() == 1 || matches!(action, Action::CopyQuick | Action::MoveQuick))
+    plan.operands.len() == 1 || matches!(action, Action::CopyQuick | Action::MoveQuick)
 }
 
 fn validate_single(plan: &Plan) -> std::io::Result<()> {
     if plan.operation == Operation::Rename && plan.operands.len() != 1 {
-        return Err(std::io::Error::other(
-            "Rename requires exactly one visible entry",
-        ));
+        return Err(std::io::Error::other("Select one entry to rename"));
     }
     if matches!(
         plan.operation,
@@ -186,7 +204,7 @@ fn validate_single(plan: &Plan) -> std::io::Result<()> {
         )
     }) {
         return Err(std::io::Error::other(
-            "Attribute edits unsupported for links/reparse objects; targets are not followed",
+            "Cannot change attributes of links or special entries; linked targets stay unchanged",
         ));
     }
     Ok(())

@@ -280,6 +280,9 @@ fn default_unix_config() -> Option<PathBuf> {
     Some(home.join(".config"))
 }
 
+pub(crate) const PROFILE_NAME_ERROR: &str =
+    "profile name must be 1–64 printable characters without surrounding whitespace";
+
 /// Profile names are bounded, printable TOML keys, not paths.
 ///
 /// # Errors
@@ -290,7 +293,7 @@ pub fn validate_profile_name(name: &str) -> Result<(), String> {
         || name.chars().count() > 64
         || crate::ui::clean(name) != name
     {
-        Err("profile name must be 1–64 printable characters without surrounding whitespace".into())
+        Err(PROFILE_NAME_ERROR.into())
     } else {
         Ok(())
     }

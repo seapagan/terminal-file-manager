@@ -316,16 +316,12 @@ fn conflict_key(controller: &mut Controller, key: KeyCode, geometry: &Geometry) 
         return;
     };
     if let Some(reason) = disabled(&conflict.event, &decision) {
-        controller
-            .app
-            .notify(crate::notifications::Severity::Warning, reason);
+        controller.app.status = reason.into();
         return;
     }
     if !visible_decision(geometry, &decision) {
-        controller.app.notify(
-            crate::notifications::Severity::Warning,
-            "Resize to review the conflict before replacing.",
-        );
+        controller.app.status =
+            "Enlarge the terminal to review the conflict before replacing".into();
         return;
     }
     let decision = if conflict.all && !matches!(decision, Decision::Cancel) {
@@ -395,12 +391,16 @@ fn disabled(event: &JobEvent, decision: &Decision) -> Option<&'static str> {
     } = event
     {
         if matches!(decision, Decision::Newer) && !newer_available {
-            return Some("Newer-only unavailable for these timestamps/types");
+            return Some(
+                "Newer needs modification times on both entries and matching entry types; choose another action",
+            );
         }
         if matches!(decision, Decision::Replace)
             && source.may_recurse() != destination.may_recurse()
         {
-            return Some("Atomic type replacement unsupported; choose Keep both or Skip");
+            return Some(
+                "Cannot replace a file with a folder or a folder with a file; choose Keep both or Skip",
+            );
         }
     }
     None

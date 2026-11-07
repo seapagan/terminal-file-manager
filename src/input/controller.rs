@@ -109,8 +109,7 @@ impl Controller {
             return Vec::new();
         }
         if let Some(reason) = unavailable(action) {
-            self.app
-                .notify(crate::notifications::Severity::Info, reason);
+            self.app.status = reason.into();
             return Vec::new();
         }
         if self.application_action(action, geometry) {
@@ -213,10 +212,7 @@ impl Controller {
                     return Vec::new();
                 };
                 if !entry.enterable {
-                    self.app.notify(
-                        crate::notifications::Severity::Info,
-                        "The file viewer is not available yet.",
-                    );
+                    self.app.status = "The file viewer is not available yet.".into();
                     return Vec::new();
                 }
                 entry.path.clone()
@@ -336,14 +332,15 @@ impl Controller {
             .request_metadata(self.app.active)
             .into_iter()
             .collect();
-        if let Some(request) = self.app.request_totals() {
+        if self.app.panes[self.app.active].error.is_some() {
+            self.app.status =
+                "Refresh or navigate to reload the listing before counting directory contents"
+                    .into();
+        } else if let Some(request) = self.app.request_totals() {
             requests.push(request);
             self.app.popup |= geometry.sidebar.is_none();
         } else {
-            self.app.notify(
-                crate::notifications::Severity::Info,
-                "Directory totals require a visible directory",
-            );
+            self.app.status = "Select a directory to count its contents".into();
         }
         requests
     }
@@ -520,7 +517,7 @@ fn unavailable(action: Action) -> Option<&'static str> {
         Action::Viewer => Some("The file viewer is not available yet."),
         Action::Editor => Some("The file editor is not available yet."),
         Action::Path | Action::Zoxide | Action::OppositeZoxide | Action::ExitDirectory => {
-            Some("Navigation integration/shell handoff unavailable until M5")
+            Some("This navigation command is not available yet.")
         }
         _ => None,
     }

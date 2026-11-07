@@ -182,9 +182,7 @@ fn enter(controller: &mut Controller, layout: &crate::ui::PatternLayout) {
                     "Show the pattern and counts; scroll up or enlarge terminal".into()
                 });
             state.feedback = Some(reason.clone());
-            controller
-                .app
-                .notify(crate::notifications::Severity::Warning, reason);
+            controller.app.status = reason.into();
         }
     } else if let Some(target) = layout
         .targets()
@@ -244,20 +242,14 @@ fn activate(controller: &mut Controller, target: PatternControl, move_focus: boo
         PatternControl::Case => state.toggle_case(),
         PatternControl::Apply(operation) => {
             match state.apply(&mut controller.app.panes[state.pane], operation) {
-                Ok(preview) => {
-                    controller.app.notify(
-                        crate::notifications::Severity::Success,
-                        format!(
-                            "Pattern selection: {} matches; visible marks updated",
-                            preview.matches
-                        ),
-                    );
+                Ok(_) => {
+                    let count = controller.app.panes[state.pane].selection_counts().visible;
+                    let noun = if count == 1 { "entry" } else { "entries" };
+                    controller.app.status = format!("{count} visible {noun} marked").into();
                     return;
                 }
                 Err(error) => {
-                    controller
-                        .app
-                        .notify(crate::notifications::Severity::Error, error);
+                    state.feedback = Some(error);
                 }
             }
         }
@@ -332,68 +324,95 @@ fn mouse_input(
 #[cfg(test)]
 mod notification_tests {
     use super::*;
-    use crate::{app::Status, input::Bindings, notifications::Severity};
+    use crate::{app::PatternOperation, input::Bindings, notifications::Severity};
 
     fn controller() -> (tempfile::TempDir, Controller) {
         let root = tempfile::tempdir().unwrap();
+        for name in ["one.txt", "two.txt", "keep.rs"] {
+            std::fs::write(root.path().join(name), "owned").unwrap();
+        }
         let mut app = crate::app::App::new(root.path().into());
         let snapshot = crate::fs::list(
             root.path(),
             &crate::fs::IgnoreContext::isolated(),
-            &std::sync::atomic::AtomicBool::new(false),
+            &false.into(),
         )
         .unwrap();
         assert!(app.complete_listing(0, 1, Ok(snapshot)));
-        let controller = Controller::new(
-            app,
-            Bindings::new(&Default::default()).unwrap(),
-            Default::default(),
-        );
-        (root, controller)
+        app.notify(Severity::Error, "Retained failure");
+        (
+            root,
+            Controller::new(
+                app,
+                Bindings::new(&Default::default()).unwrap(),
+                Default::default(),
+            ),
+        )
     }
 
-    fn assert_notice(controller: &Controller, severity: Severity) {
-        let Status::Notice {
-            text,
-            severity: actual,
-        } = &controller.app.status
-        else {
-            panic!("pattern notification must retain typed status");
-        };
-        assert_eq!(*actual, severity);
-        assert_eq!(controller.app.notifications.history.len(), 1);
-        let event = &controller.app.notifications.history[0];
-        assert_eq!(event.text, *text);
-        assert_eq!(event.severity, severity);
+    fn apply(c: &mut Controller, expression: &str, operation: PatternOperation) {
+        open(c);
+        c.app
+            .pattern
+            .as_mut()
+            .unwrap()
+            .set_expression(expression.into());
+        activate(c, PatternControl::Apply(operation), true);
+        assert_eq!(c.app.notifications.history.len(), 1);
+        assert_eq!(c.app.notifications.history[0].text, "Retained failure");
+        assert_eq!(c.app.notifications.visible(), [0]);
     }
 
     #[test]
-    fn pattern_success_and_error_keep_typed_status_and_one_history_event() {
-        for (expression, severity) in [("*", Severity::Success), ("", Severity::Error)] {
-            let (_root, mut controller) = controller();
-            open(&mut controller);
-            controller
-                .app
-                .pattern
-                .as_mut()
-                .unwrap()
-                .set_expression(expression.into());
-            activate(
-                &mut controller,
-                PatternControl::Apply(crate::app::PatternOperation::Mark),
-                true,
+    fn pattern_reports_resulting_marks_without_notifying() {
+        let (_root, mut c) = controller();
+        for (pattern, operation, count) in [
+            ("*.txt", PatternOperation::Mark, 2),
+            ("one.txt", PatternOperation::Mark, 2),
+            ("one.txt", PatternOperation::Unmark, 1),
+            ("absent", PatternOperation::Unmark, 1),
+            ("*.txt", PatternOperation::Replace, 2),
+            ("absent", PatternOperation::Replace, 0),
+        ] {
+            apply(&mut c, pattern, operation);
+            assert_eq!(c.app.panes[0].marks.len(), count);
+            let noun = if count == 1 { "entry" } else { "entries" };
+            assert_eq!(
+                c.app.status.to_string(),
+                format!("{count} visible {noun} marked")
             );
-            assert_notice(&controller, severity);
+            assert!(c.app.pattern.is_none());
         }
     }
 
     #[test]
+    fn pattern_count_excludes_filtered_marks_and_preserves_them() {
+        let (_root, mut c) = controller();
+        c.app.panes[0].select_all();
+        c.app.panes[0].set_filter(".txt".into());
+        apply(&mut c, "*", PatternOperation::Replace);
+        assert_eq!(c.app.status.to_string(), "2 visible entries marked");
+        assert_eq!(c.app.panes[0].marks.len(), 3);
+        apply(&mut c, "*", PatternOperation::Unmark);
+        assert_eq!(c.app.status.to_string(), "0 visible entries marked");
+        assert_eq!(c.app.panes[0].marks.len(), 1);
+    }
+
+    #[test]
+    fn invalid_pattern_stays_in_the_form_without_notifying() {
+        let (_root, mut c) = controller();
+        apply(&mut c, "", PatternOperation::Mark);
+        assert!(c.app.pattern.as_ref().unwrap().feedback.is_some());
+        assert!(c.app.panes[0].marks.is_empty());
+    }
+
+    #[test]
     fn pattern_cancel_remains_status_only() {
-        let (_root, mut controller) = controller();
-        open(&mut controller);
-        activate(&mut controller, PatternControl::Cancel, true);
-        assert!(matches!(controller.app.status, Status::Text(_)));
-        assert!(controller.app.notifications.history.is_empty());
-        assert!(controller.app.pattern.is_none());
+        let (_root, mut c) = controller();
+        open(&mut c);
+        activate(&mut c, PatternControl::Cancel, true);
+        assert_eq!(c.app.notifications.history.len(), 1);
+        assert_eq!(c.app.notifications.visible(), [0]);
+        assert!(c.app.pattern.is_none());
     }
 }

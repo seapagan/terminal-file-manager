@@ -162,3 +162,24 @@ fn interrupt_cancels_a_preview_before_entering_safe_exit() {
     ));
     assert!(!controller.quit);
 }
+
+#[test]
+fn rejected_paste_does_not_disable_ready_trash_or_delete_confirmation() {
+    for (action, confirm) in [(Action::Trash, 'T'), (Action::Delete, 'D')] {
+        let (_root, mut c) = controller();
+        let plan = pending_preview(&mut c, action, 41);
+        let mut queue = terminal_file_manager::operations::Queue::new().unwrap();
+        let id = queue.preview(plan).unwrap();
+        preview_dialog(&mut c).preview_id = Some(id);
+        c.complete_operation(preview_result(&mut queue));
+        assert!(preview_dialog(&mut c).ready);
+        let geometry = ui::geometry(&c.app, Rect::new(0, 0, 120, 30));
+        c.handle(Event::Paste("x".repeat(65_537)), &geometry, Duration::ZERO);
+        key(&mut c, KeyCode::Char(confirm));
+        assert!(matches!(
+            c.app.operations.outbox.as_slice(),
+            [Intent::Submit(_, _)]
+        ));
+        assert!(c.app.notifications.history.is_empty());
+    }
+}
