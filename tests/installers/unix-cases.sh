@@ -209,7 +209,7 @@ assert_output "reported version does not match $TEST_RELEASE_TAG"
 assert_no_binary
 pass
 
-for suffix in '' ' (release build)'; do
+for suffix in '' ' (release build)' "$(printf '\t(release build)')"; do
     reset_env
     TEST_CANDIDATE_SUFFIX=$suffix
     TEST_CANDIDATE_TRAILER='Additional information
@@ -222,7 +222,7 @@ Arbitrary licence details'
     pass
 done
 
-for wrong in "${TEST_RELEASE_VERSION}0" "$TEST_RELEASE_VERSION-dev" '0.0.0'; do
+for wrong in "${TEST_RELEASE_VERSION}0" "$TEST_RELEASE_VERSION-dev" "$TEST_RELEASE_VERSION+build.1" "$(printf '%s\v(release build)' "$TEST_RELEASE_VERSION")" '0.0.0'; do
     reset_env
     TEST_CANDIDATE_VERSION=$wrong
     TEST_CANDIDATE_TRAILER="tfm $TEST_RELEASE_VERSION"
@@ -234,6 +234,32 @@ for wrong in "${TEST_RELEASE_VERSION}0" "$TEST_RELEASE_VERSION-dev" '0.0.0'; do
     assert_old_binary
     assert_tmp_cleaned
     pass
+done
+
+# Compare suffixed versions directly without changing the stable release-tag policy.
+sed '/^main "\$@"$/d' ./install.sh >"$root/installer-functions.sh"
+for expected in '1.2.3-rc.1' '1.2.3+build.1' '1.2.3-rc.1+build.1'; do
+    reset_env
+    mkdir -p "$root/version-check/extracted"
+    cp "$root/archive/tfm" "$root/version-check/extracted/tfm"
+    for reported_version in "$expected" "${expected}0"; do
+        if (
+            PATH=$test_bin
+            export PATH
+            . "$root/installer-functions.sh"
+            tmp_dir=$root/version-check
+            target=x86_64-unknown-linux-gnu
+            TEST_CANDIDATE_VERSION=$reported_version
+            export TEST_CANDIDATE_VERSION
+            validate_candidate "v$expected"
+        ) >"$root/output" 2>&1; then
+            test "$reported_version" = "$expected" || fail 'version-prefix collision accepted'
+        else
+            test "$reported_version" != "$expected" || fail 'suffixed version rejected'
+            assert_output "reported version does not match v$expected"
+        fi
+        pass
+    done
 done
 
 reset_env

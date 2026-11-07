@@ -60,7 +60,7 @@ function Assert-PromptVersion([string]$Path) {
             throw 'real tfm --version did not terminate within ten seconds'
         }
         $firstLine = ($stdout.GetAwaiter().GetResult() -split "\r?\n", 2)[0]
-        $expected = '^tfm ' + [regex]::Escape($Version) + '(?:\s|$)'
+        $expected = '^tfm ' + [regex]::Escape($Version) + '(?:[ \t]|$)'
         if ($process.ExitCode -ne 0 -or $firstLine -cnotmatch $expected -or $stderr.GetAwaiter().GetResult()) {
             throw 'incorrect real tfm version or exit status'
         }

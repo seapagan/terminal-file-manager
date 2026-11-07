@@ -304,7 +304,7 @@ if (-not $nativeWindows) {
     Fail -Message "success-path cases require a built binary at $builtExe (run cargo make release first)"
 } else {
     $firstLine = Get-PromptNativeVersion -Exe $builtExe
-    if ($firstLine -cnotmatch '^tfm ([0-9]+\.[0-9]+\.[0-9]+)(?:\s|$)') { Fail -Message 'invalid native version line' }
+    if ($firstLine -cnotmatch '^tfm (\S+)(?:[ \t]|$)') { Fail -Message 'invalid native version line' }
     $realVersion = $Matches[1]
     $realTag = "v$realVersion"
     . $resolvedInstaller
@@ -325,13 +325,13 @@ if (-not $nativeWindows) {
     Assert-Succeeds -Result $result -Why 'successful installation'
     $installed = Join-Path -Path $installDir -ChildPath 'tfm.exe'
     if (-not (Test-Path -Path $installed)) { Fail -Message 'installed binary missing' }
-    if ((Get-PromptNativeVersion -Exe $installed) -cnotmatch ('^tfm ' + [regex]::Escape($realVersion) + '(?:\s|$)')) { Fail -Message 'installed binary reports the wrong version' }
+    if ((Get-PromptNativeVersion -Exe $installed) -cnotmatch ('^tfm ' + [regex]::Escape($realVersion) + '(?:[ \t]|$)')) { Fail -Message 'installed binary reports the wrong version' }
     Pass
 
     # Replacement of an existing installation.
     $result = Invoke-Installer -Mirror $mirror -InstallDir $installDir -Version $realTag -Architecture $runnerArch -Native $true
     Assert-Succeeds -Result $result -Why 'replacement of existing installation'
-    if ((Get-PromptNativeVersion -Exe $installed) -cnotmatch ('^tfm ' + [regex]::Escape($realVersion) + '(?:\s|$)')) { Fail -Message 'replaced binary is wrong' }
+    if ((Get-PromptNativeVersion -Exe $installed) -cnotmatch ('^tfm ' + [regex]::Escape($realVersion) + '(?:[ \t]|$)')) { Fail -Message 'replaced binary is wrong' }
     Pass
 
     # Wrong advertised version must be rejected and change nothing.

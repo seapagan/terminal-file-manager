@@ -191,7 +191,7 @@ jobs:
               output=$(NO_COLOR=1 timeout 10 "target/$TARGET/release/tfm" --version)
               first_line=$(printf "%s\n" "$output" | sed -n "1p")
               case "$first_line" in
-                "tfm $CRATE_VERSION"|"tfm $CRATE_VERSION"[[:space:]]*) ;;
+                "tfm $CRATE_VERSION"|"tfm $CRATE_VERSION"[[:blank:]]*) ;;
                 *) echo "unexpected version: $first_line" >&2; exit 1 ;;
               esac
             '
@@ -241,7 +241,7 @@ jobs:
               output=$(NO_COLOR=1 timeout 10 "target/$TARGET/release/tfm" --version)
               first_line=$(printf "%s\n" "$output" | sed -n "1p")
               case "$first_line" in
-                "tfm $CRATE_VERSION"|"tfm $CRATE_VERSION"[[:space:]]*) ;;
+                "tfm $CRATE_VERSION"|"tfm $CRATE_VERSION"[[:blank:]]*) ;;
                 *) echo "unexpected version: $first_line" >&2; exit 1 ;;
               esac
             '
@@ -353,7 +353,7 @@ jobs:
           first_line=$(printf '%s\n' "$output" | sed -n "1p")
           expected="tfm $CRATE_VERSION"
           case "$first_line" in
-            "$expected"|"$expected"[[:space:]]*) ;;
+            "$expected"|"$expected"[[:blank:]]*) ;;
             *) echo "error: expected '$expected', got '$first_line'" >&2; exit 1 ;;
           esac
 
@@ -366,7 +366,7 @@ jobs:
           $output = @(& "target/$env:TARGET/release/tfm.exe" --version)
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $expected = "tfm $env:CRATE_VERSION"
-          if ($output.Count -eq 0 -or $output[0] -cnotmatch ('^' + [regex]::Escape($expected) + '(?:\s|$)')) {
+          if ($output.Count -eq 0 -or $output[0] -cnotmatch ('^' + [regex]::Escape($expected) + '(?:[ \t]|$)')) {
             Write-Error "expected '$expected', got '$($output | Select-Object -First 1)'"
             exit 1
           }

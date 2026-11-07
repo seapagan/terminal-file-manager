@@ -55,7 +55,7 @@ for installation in fresh reinstall; do
         "$TFM_INSTALL_DIR/tfm" --version)
     first_line=$(printf '%s\n' "$output" | sed -n '1p')
     case "$first_line" in
-        "tfm $version"|"tfm $version"[[:space:]]*) ;;
+        "tfm $version"|"tfm $version"[[:blank:]]*) ;;
         *) echo 'incorrect installed version' >&2; exit 1 ;;
     esac
     test -z "$(find "$root/tmp" -mindepth 1 -print)"

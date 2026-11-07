@@ -302,7 +302,7 @@ function Assert-CandidateVersion([string]$Exe, [string]$Version) {
         Die -Message 'candidate failed --version validation'
     }
     $expected = "tfm $($Version -replace '^v', '')"
-    if ($reported[0] -cnotmatch ('^' + [regex]::Escape($expected) + '(?:\s|$)')) {
+    if ($reported[0] -cnotmatch ('^' + [regex]::Escape($expected) + '(?:[ \t]|$)')) {
         Die -Message "reported version does not match ${Version}: $($reported[0])"
     }
 }

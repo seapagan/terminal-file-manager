@@ -356,7 +356,7 @@ assert_installed_version() {
     output=$(NO_COLOR=1 "$TFM_INSTALL_DIR/tfm" --version) || fail 'installed candidate execution failed'
     first_line=$(printf '%s\n' "$output" | sed -n '1p')
     case "$first_line" in
-        "tfm $TEST_RELEASE_VERSION"|"tfm $TEST_RELEASE_VERSION"[[:space:]]*) ;;
+        "tfm $TEST_RELEASE_VERSION"|"tfm $TEST_RELEASE_VERSION"[[:blank:]]*) ;;
         *) fail 'installed candidate is wrong' ;;
     esac
 }

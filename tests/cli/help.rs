@@ -75,16 +75,6 @@ fn help_colours_semantic_elements_and_preserves_plain_text() {
 fn help_output(policy: &[(&str, &str)]) -> String {
     let root = tempfile::tempdir().unwrap();
     let mut command = isolated_session_command(root.path());
-    for key in [
-        "NO_COLOR",
-        "FORCE_COLOR",
-        "CLICOLOR_FORCE",
-        "CLICOLOR",
-        "TERM",
-        "COLORTERM",
-    ] {
-        command.env_remove(key);
-    }
     let output = command
         .arg("--help")
         .envs(policy.iter().copied())

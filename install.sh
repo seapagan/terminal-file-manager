@@ -257,7 +257,7 @@ validate_candidate() {
     fi
     reported=$(sed -n '1p' "$tmp_dir/version")
     case "$reported" in
-        "tfm ${version#v}"|"tfm ${version#v}"[[:space:]]*) ;;
+        "tfm ${version#v}"|"tfm ${version#v}"[[:blank:]]*) ;;
         *) die "reported version does not match $version: $reported" ;;
     esac
 }
