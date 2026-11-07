@@ -7,6 +7,8 @@ use ratatui::{Frame, layout::Rect, text::Line, widgets::Paragraph};
 
 const HINT: &str = "Enter: active pane; Space: both panes; Esc: close";
 const SAVE_HINT: &str = "Enter saves; Esc cancels";
+const SAVE_GUIDANCE: &str = "Use 1–64 printable characters; no surrounding whitespace.";
+const SAVE_CONTENT_WIDTH: usize = 60;
 const APPLY_BOTH: &str = "Apply selected to both: ";
 
 pub(super) fn title(app: &App) -> &'static str {
@@ -18,24 +20,36 @@ pub(super) fn title(app: &App) -> &'static str {
 }
 
 pub(super) fn layout(app: &App, bounds: Rect) -> modal::Layout<()> {
+    if app.profile_name.is_some() {
+        return save_layout(bounds);
+    }
     let width = app
         .profile_names
         .iter()
         .map(|name| usize::from(modal::width(&super::clean(name))) + APPLY_BOTH.len())
         .max()
         .unwrap_or(0);
-    let hint = if app.profile_name.is_some() {
-        SAVE_HINT
-    } else {
-        HINT
-    };
-    let mut shell =
-        super::view::measure(bounds, title(app), width, app.profile_names.len() + 2, hint);
-    if app.profile_name.is_some() {
-        let count = save_rows(app, usize::from(shell.body.width)).len();
-        shell = super::view::measure(bounds, title(app), width, count, hint);
-    }
-    shell
+    super::view::measure(bounds, title(app), width, app.profile_names.len() + 2, HINT)
+}
+
+fn save_layout(bounds: Rect) -> modal::Layout<()> {
+    let shell = super::view::measure(bounds, "Save profile", SAVE_CONTENT_WIDTH, 1, SAVE_HINT);
+    let width = usize::from(shell.body.width);
+    let feedback = super::text::wrap_words(SAVE_GUIDANCE, width)
+        .len()
+        .max(super::text::wrap_words(crate::settings::PROFILE_NAME_ERROR, width).len());
+    super::view::measure(
+        bounds,
+        "Save profile",
+        SAVE_CONTENT_WIDTH,
+        name_rows(width) + 1 + feedback,
+        SAVE_HINT,
+    )
+}
+
+fn name_rows(width: usize) -> usize {
+    // Reserve the label and 64 two-cell characters before the user starts typing.
+    (6_usize + 64 * 2).div_ceil(width.max(1))
 }
 
 pub(super) fn render(frame: &mut Frame, app: &App, shell: &modal::Layout<()>, theme: &Theme) {
@@ -73,13 +87,19 @@ fn save_rows(app: &App, width: usize) -> Vec<(Role, String)> {
     .into_iter()
     .map(|text| (Role::Value, text))
     .collect();
-    if let Some(error) = &app.profile_error {
-        rows.extend(
-            super::text::wrap_words(error, width)
-                .into_iter()
-                .map(|text| (Role::Error, text)),
-        );
-    }
+    // Escaped invalid characters may be wider; retain the editing end in the fixed field.
+    rows.drain(..rows.len().saturating_sub(name_rows(width)));
+    rows.resize(name_rows(width), (Role::Value, String::new()));
+    rows.push((Role::Normal, String::new()));
+    let (feedback, role) = app
+        .profile_error
+        .as_deref()
+        .map_or((SAVE_GUIDANCE, Role::Muted), |error| (error, Role::Error));
+    rows.extend(
+        super::text::wrap_words(feedback, width)
+            .into_iter()
+            .map(|text| (role, text)),
+    );
     rows
 }
 

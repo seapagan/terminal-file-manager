@@ -3,7 +3,7 @@ use colored_text::ColorLevel;
 use crossterm::event::{
     Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
-use ratatui::{Terminal, backend::TestBackend, buffer::Buffer, layout::Rect};
+use ratatui::{Terminal, backend::TestBackend, buffer::Buffer, layout::Rect, style::Modifier};
 use std::time::Duration;
 use terminal_file_manager::{
     app::App,
@@ -73,6 +73,101 @@ fn area_text(buffer: &Buffer, area: Rect) -> String {
         .collect::<String>()
         .split_whitespace()
         .collect()
+}
+
+fn assert_feedback(buffer: &Buffer, body: Rect, expected: &str, style: Modifier) {
+    let rows: Vec<String> = (body.y..body.bottom())
+        .map(|y| {
+            (body.x..body.right())
+                .map(|x| buffer[(x, y)].symbol())
+                .collect()
+        })
+        .collect();
+    let start = rows
+        .iter()
+        .position(|row| row.starts_with(expected.split_whitespace().next().unwrap()))
+        .unwrap();
+    assert!(start > 0 && rows[start - 1].trim().is_empty());
+    let feedback = rows[start..]
+        .iter()
+        .map(|row| row.trim())
+        .filter(|row| !row.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert_eq!(feedback, expected);
+    assert!(
+        buffer[(body.x, body.y + start as u16)]
+            .modifier
+            .contains(style)
+    );
+}
+
+#[test]
+fn save_profile_guidance_and_errors_wrap_at_words_with_spacing_and_semantic_styles() {
+    for (width, height) in [(160, 48), (120, 32), (32, 24)] {
+        let mut c = editor();
+        let (buffer, geometry) = draw(&c, width, height);
+        let shell = geometry.menu_layout.unwrap();
+        assert_feedback(
+            &buffer,
+            shell.body,
+            "Use 1–64 printable characters; no surrounding whitespace.",
+            Modifier::DIM,
+        );
+        key(&mut c, KeyCode::Enter, width, height);
+        let (buffer, geometry) = draw(&c, width, height);
+        let failed = geometry.menu_layout.unwrap();
+        assert_eq!(
+            (failed.outer, failed.body, failed.footer),
+            (shell.outer, shell.body, shell.footer)
+        );
+        assert_feedback(
+            &buffer,
+            failed.body,
+            c.app.profile_error.as_deref().unwrap(),
+            Modifier::BOLD,
+        );
+        assert_eq!(c.app.profile_name.as_deref(), Some(""));
+        assert!(c.app.notifications.history.is_empty());
+    }
+}
+
+#[test]
+fn save_profile_reserves_desktop_width_and_stable_feedback_geometry() {
+    for (width, height) in [(160, 48), (120, 32), (80, 24), (40, 24), (32, 24)] {
+        let mut c = editor();
+        let (initial, geometry) = draw(&c, width, height);
+        let shell = geometry.menu_layout.unwrap();
+        assert_eq!(shell.outer.width, 64.min(width - 2));
+        assert!(
+            area_text(&initial, shell.body)
+                .contains("Use1–64printablecharacters;nosurroundingwhitespace.")
+        );
+        for name in ["Work界", " padded ", &"界".repeat(64)] {
+            c.app.profile_name = Some(name.into());
+            c.app.profile_error = None;
+            let (_, edited) = draw(&c, width, height);
+            assert_eq!(edited.menu_layout.as_ref().unwrap().outer, shell.outer);
+            if name.starts_with(' ') {
+                key(&mut c, KeyCode::Enter, width, height);
+                let (invalid, geometry) = draw(&c, width, height);
+                let failed = geometry.menu_layout.unwrap();
+                assert_eq!(
+                    (failed.outer, failed.body, failed.footer),
+                    (shell.outer, shell.body, shell.footer)
+                );
+                let text = area_text(&invalid, failed.body);
+                assert!(text.contains("profilenamemustbe"));
+                assert!(!text.contains("Use1–64"));
+                key(&mut c, KeyCode::Backspace, width, height);
+                let (correcting, geometry) = draw(&c, width, height);
+                assert_eq!(geometry.menu_layout.unwrap().outer, shell.outer);
+                assert!(area_text(&correcting, shell.body).contains("Use1–64"));
+            }
+        }
+        assert!(c.app.notifications.history.is_empty());
+        assert!(!c.preferences_changed);
+    }
 }
 
 #[test]
