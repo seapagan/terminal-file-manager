@@ -14,15 +14,55 @@ mod help;
 
 #[test]
 fn version_uses_the_executable_name_and_manifest_version() {
+    let expected = format!(
+        "tfm {}\nCopyright © 2026 Grant Ramsay\nLicensed under {}\n",
+        env!("CARGO_PKG_VERSION"),
+        env!("CARGO_PKG_LICENSE")
+    );
     for argument in ["--version", "-V"] {
-        let output = tfm(&[argument]);
-        assert!(output.status.success());
-        assert_eq!(
-            output.stdout,
-            concat!("tfm ", env!("CARGO_PKG_VERSION"), "\n").as_bytes()
-        );
-        assert!(output.stderr.is_empty());
+        assert_eq!(version_output(argument, &[]), expected);
     }
+}
+
+#[test]
+fn version_colours_only_the_name_and_licence_identifiers() {
+    let sgr = regex::Regex::new("\u{1b}\\[[0-9;]*m").unwrap();
+    for argument in ["--version", "-V"] {
+        let plain = version_output(argument, &[("NO_COLOR", "1"), ("FORCE_COLOR", "1")]);
+        assert!(!plain.contains('\u{1b}'));
+        let coloured = version_output(argument, &[("FORCE_COLOR", "1")]);
+        assert_eq!(
+            coloured,
+            format!(
+                "\u{1b}[1;36mtfm\u{1b}[0m {}\nCopyright © 2026 Grant Ramsay\nLicensed under \u{1b}[32mMIT\u{1b}[0m OR \u{1b}[32mApache-2.0\u{1b}[0m\n",
+                env!("CARGO_PKG_VERSION")
+            )
+        );
+        assert_eq!(sgr.replace_all(&coloured, ""), plain);
+    }
+}
+
+fn version_output(argument: &str, policy: &[(&str, &str)]) -> String {
+    let root = tempfile::tempdir().unwrap();
+    let mut command = isolated_session_command(root.path());
+    for key in [
+        "NO_COLOR",
+        "FORCE_COLOR",
+        "CLICOLOR_FORCE",
+        "CLICOLOR",
+        "TERM",
+        "COLORTERM",
+    ] {
+        command.env_remove(key);
+    }
+    let output = command
+        .arg(argument)
+        .envs(policy.iter().copied())
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    String::from_utf8(output.stdout).unwrap()
 }
 
 #[test]

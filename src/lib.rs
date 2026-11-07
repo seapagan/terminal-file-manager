@@ -57,7 +57,7 @@ pub enum Invocation {
 /// use std::ffi::OsString;
 /// let result = terminal_file_manager::run(&[OsString::from("--version")]).unwrap();
 /// assert!(matches!(result, terminal_file_manager::Invocation::Output(text)
-///     if text == format!("tfm {}", env!("CARGO_PKG_VERSION"))));
+///     if text.contains(env!("CARGO_PKG_VERSION"))));
 /// ```
 pub fn run(arguments: &[OsString]) -> Result<Invocation, &'static str> {
     match arguments {
@@ -71,13 +71,27 @@ pub fn run(arguments: &[OsString]) -> Result<Invocation, &'static str> {
 fn single_argument(argument: &OsString) -> Result<Invocation, &'static str> {
     match argument.as_encoded_bytes() {
         b"--help" | b"-h" => Ok(Invocation::Output(help())),
-        b"--version" | b"-V" => Ok(Invocation::Output(format!(
-            "tfm {}",
-            env!("CARGO_PKG_VERSION")
-        ))),
+        b"--version" | b"-V" => Ok(Invocation::Output(version())),
         bytes if !bytes.starts_with(b"-") => Ok(Invocation::Browse(argument.into())),
         _ => startup::parse(std::slice::from_ref(argument)),
     }
+}
+
+fn version() -> String {
+    use colored_text::{Colorize, RenderTarget};
+    let licence = env!("CARGO_PKG_LICENSE")
+        .split_whitespace()
+        .map(|token| match token {
+            "OR" | "AND" => token.to_owned(),
+            _ => token.green().render(RenderTarget::Stdout),
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!(
+        "{} {}\nCopyright © 2026 Grant Ramsay\nLicensed under {licence}",
+        "tfm".cyan().bold().render(RenderTarget::Stdout),
+        env!("CARGO_PKG_VERSION")
+    )
 }
 
 fn help() -> String {
