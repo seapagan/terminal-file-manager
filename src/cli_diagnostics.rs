@@ -61,14 +61,60 @@ fn summary(line: &str) -> String {
         && !phrase.is_empty()
         && !rest.is_empty()
     {
+        let rest = match option_list(rest) {
+            Some((label, values)) => {
+                format!("{label}{}", values.green().render(RenderTarget::Stderr))
+            }
+            None => rest.to_owned(),
+        };
         return format!("{}, {rest}", phrase.yellow().render(RenderTarget::Stderr));
     }
     line.to_owned()
 }
 
+fn option_list(text: &str) -> Option<(&str, &str)> {
+    let (label, values, separator) = if let Some(values) = text.strip_prefix("expected one of ") {
+        ("expected one of ", values, ", ")
+    } else {
+        ("expected ", text.strip_prefix("expected ")?, " or ")
+    };
+    let mut options = values.split(separator);
+    let quoted = options.clone().count() >= 2
+        && options.all(|option| {
+            option
+                .strip_prefix('`')
+                .and_then(|value| value.strip_suffix('`'))
+                .is_some_and(|value| !value.is_empty() && !value.contains('`'))
+        });
+    quoted.then_some((label, values))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn valid_options_require_an_explicit_complete_quoted_list() {
+        assert_eq!(
+            option_list("expected one of `first`, `last`, `mixed`"),
+            Some(("expected one of ", "`first`, `last`, `mixed`"))
+        );
+        assert_eq!(
+            option_list("expected `sidebar` or `popup`"),
+            Some(("expected ", "`sidebar` or `popup`"))
+        );
+        for text in [
+            "suggestions `first`, `last`",
+            "expected `first`",
+            "expected one of first, last",
+            "expected `first` or an integer",
+            "expected one of `first`, `last` followed by other text",
+            "expected one of `first`, ``",
+            "expected one of `first`, `last` or `mixed`",
+        ] {
+            assert_eq!(option_list(text), None, "{text}");
+        }
+    }
 
     #[test]
     fn gutters_require_an_empty_or_numeric_margin_and_preserve_source() {

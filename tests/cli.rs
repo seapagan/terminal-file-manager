@@ -211,6 +211,28 @@ fn cli_diagnostics_follow_library_colour_policy_without_changing_content() {
     assert_eq!(sgr.replace_all(&forced, ""), plain);
 }
 
+#[test]
+fn cli_diagnostics_colour_only_explicit_valid_option_lists_green() {
+    let root = tempfile::tempdir().unwrap();
+    let config = root.path().join("config").join("tfm").join("config.toml");
+    std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+    let sgr = regex::Regex::new("\u{1b}\\[[0-9;]*m").unwrap();
+    for (setting, options) in [
+        ("metadata_presentation", "`sidebar` or `popup`"),
+        ("grouping", "`first`, `last`, `mixed`"),
+    ] {
+        std::fs::write(&config, format!("{setting} = 'invalid'\n")).unwrap();
+        let plain = coloured_config_error(root.path(), &[("NO_COLOR", "1")]);
+        let forced = coloured_config_error(root.path(), &[("FORCE_COLOR", "1")]);
+        assert!(
+            forced.contains(&format!("\u{1b}[32m{options}\u{1b}[0m")),
+            "{forced:?}"
+        );
+        assert_eq!(sgr.replace_all(&forced, ""), plain);
+        assert!(!plain.contains('\u{1b}'));
+    }
+}
+
 fn coloured_config_error(root: &std::path::Path, policy: &[(&str, &str)]) -> String {
     let mut command = isolated_session_command(root);
     for key in [
