@@ -169,5 +169,5 @@ const VIEW_PROFILES: &[&str] = &[
 ];
 const SAVE_PROFILE: &[&str] = &[
     "Type a name for the active pane's display settings. You can type ? here; use `F1` for Help. `Backspace` removes the last character.",
-    "Press `Enter` to save. An existing name replaces that saved profile. Check the status area for name errors or confirmation; preferences save on exit. Your pane locations stay the same. `Esc` discards the typed name and returns to the profile list.",
+    "Press `Enter` to save. An existing name replaces that saved profile. The form shows name errors; the status area shows save confirmation. Preferences save on exit. Your pane locations stay the same. `Esc` discards the typed name and returns to the profile list.",
 ];

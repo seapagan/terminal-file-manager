@@ -138,3 +138,17 @@ fn switching_panes_keeps_count_results_with_the_originating_pane_and_surface() {
         assert_eq!(c.app.popup, popup);
     }
 }
+
+#[test]
+fn count_with_a_listing_error_waits_for_a_successful_listing() {
+    let (_root, mut c) = loaded(true, false);
+    c.app.panes[c.app.active].error = Some("listing failed".into());
+    let geometry = ui::geometry(&c.app, Rect::new(0, 0, 80, 40));
+    let requests = c.handle(
+        Event::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::NONE)),
+        &geometry,
+        Duration::ZERO,
+    );
+    assert!(requests.is_empty());
+    assert!(c.app.status.contains("Wait for a successful listing"));
+}

@@ -392,7 +392,7 @@ fn disabled(event: &JobEvent, decision: &Decision) -> Option<&'static str> {
     {
         if matches!(decision, Decision::Newer) && !newer_available {
             return Some(
-                "Cannot compare modification times for these entries; choose another action",
+                "Newer needs modification times on both entries and matching entry types; choose another action",
             );
         }
         if matches!(decision, Decision::Replace)

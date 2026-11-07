@@ -332,7 +332,10 @@ impl Controller {
             .request_metadata(self.app.active)
             .into_iter()
             .collect();
-        if let Some(request) = self.app.request_totals() {
+        if self.app.panes[self.app.active].error.is_some() {
+            self.app.status =
+                "Wait for a successful listing before counting directory contents".into();
+        } else if let Some(request) = self.app.request_totals() {
             requests.push(request);
             self.app.popup |= geometry.sidebar.is_none();
         } else {
