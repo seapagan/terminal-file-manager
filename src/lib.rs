@@ -22,7 +22,21 @@ pub mod watch;
 pub mod workers;
 
 /// Help for the implemented local browsing contract.
-pub const HELP: &str = "Usage: tfm [-2 | --two-panes] [DIRECTORY [OTHER_DIRECTORY]]\n       tfm [--help | --version]\n\nManage local files. Starts in the shell's current directory,\nor the explicit DIRECTORY. Requires an interactive terminal.\nFiles are never launched; SSH and viewers remain unavailable.\nPress r to refresh the current pane.\n\nOptions:\n  --save-session     Save selected locations/layout and exit\n  --restore-session  Restore saved navigation (no explicit paths)\n  -2, --two-panes  Start with two panes\n  -h, --help     Print help\n  -V, --version  Print version\n  -- DIRECTORY  Browse a directory whose name starts with a hyphen\n\nInside the browser: ? / F1 for shortcuts, F5/F6 copy/move, F7 mkdir,\nShift+F7/Alt+n new file, F8 Trash, F9 jobs, Alt+h notifications, q/F10 to quit safely, Shift+q to save session and quit.";
+pub const HELP: &str =
+    "Manage local files in one or two panes. The current directory is the default.
+
+Usage: tfm [OPTIONS] [DIRECTORY [OTHER_DIRECTORY]]
+       tfm --help | --version
+
+Options:
+  -2  --two-panes        Start with two panes
+      --save-session     Save selected locations/layout and exit
+      --restore-session  Restore saved locations/layout; no directory arguments
+  -h  --help             Print help and exit
+  -V  --version          Print version and exit
+      --                 Treat following arguments as directory paths
+
+In the browser, press ? or F1 for interactive help.";
 
 /// Parsed startup intent, preserving native directory identity.
 #[derive(Debug)]
@@ -56,7 +70,7 @@ pub fn run(arguments: &[OsString]) -> Result<Invocation, &'static str> {
 
 fn single_argument(argument: &OsString) -> Result<Invocation, &'static str> {
     match argument.as_encoded_bytes() {
-        b"--help" | b"-h" => Ok(Invocation::Output(HELP.to_owned())),
+        b"--help" | b"-h" => Ok(Invocation::Output(help())),
         b"--version" | b"-V" => Ok(Invocation::Output(format!(
             "tfm {}",
             env!("CARGO_PKG_VERSION")
@@ -64,6 +78,25 @@ fn single_argument(argument: &OsString) -> Result<Invocation, &'static str> {
         bytes if !bytes.starts_with(b"-") => Ok(Invocation::Browse(argument.into())),
         _ => startup::parse(std::slice::from_ref(argument)),
     }
+}
+
+fn help() -> String {
+    use colored_text::{Colorize, RenderTarget};
+    let tokens = regex::Regex::new(
+        r"(?m)^(?:Usage:|Options:)|--[a-z-]+|--|-[2hV]|\b(?:OTHER_)?DIRECTORY\b|\?|\bF1\b",
+    )
+    .unwrap();
+    tokens
+        .replace_all(HELP, |captures: &regex::Captures<'_>| {
+            let text = &captures[0];
+            let styled = match text {
+                "Usage:" | "Options:" => text.cyan().bold(),
+                "DIRECTORY" | "OTHER_DIRECTORY" | "?" | "F1" => text.cyan(),
+                _ => text.green(),
+            };
+            styled.render(RenderTarget::Stdout)
+        })
+        .into_owned()
 }
 
 /// Cached native ownership and presentation policy.
