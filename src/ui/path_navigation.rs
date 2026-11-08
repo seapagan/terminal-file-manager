@@ -118,7 +118,10 @@ pub(super) fn render(
                 .style(Role::Normal)
                 .remove_modifier(ratatui::style::Modifier::BOLD)
         } else {
-            theme.style(Role::Normal)
+            ratatui::style::Style {
+                fg: theme.style(Role::Header).fg,
+                ..theme.style(Role::Normal)
+            }
         };
         frame.render_widget(
             Paragraph::new(control.text.clone()).style(style),

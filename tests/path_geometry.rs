@@ -73,6 +73,45 @@ fn header_hit_regions_match_rendered_cells_and_avoid_dividers_after_resize() {
 }
 
 #[test]
+fn both_panes_keep_cyan_breadcrumbs_and_configured_hover_after_focus_changes() {
+    let mut app = App::new(path());
+    app.dual = true;
+    for level in [
+        ColorLevel::NoColor,
+        ColorLevel::Ansi16,
+        ColorLevel::Ansi256,
+        ColorLevel::TrueColor,
+    ] {
+        let mut theme = Theme::new(level);
+        theme.set_path_hover(Some("#ffffff")).unwrap();
+        for active in 0..2 {
+            app.active = active;
+            app.path_pointer = None;
+            let (before, geometry) = draw(&app, &theme, 160, 24);
+            for control in &geometry.path_controls {
+                let old = &before[(control.area.x, control.area.y)];
+                assert_eq!(old.fg, theme.style(Role::Header).fg.unwrap_or(Color::Reset));
+                app.path_pointer = Some((control.area.x, control.area.y));
+                let (after, _) = draw(&app, &theme, 160, 24);
+                let new = &after[(control.area.x, control.area.y)];
+                assert_eq!(
+                    new.fg,
+                    theme.style(Role::PathHover).fg.unwrap_or(Color::Reset)
+                );
+                assert_eq!(new.bg, old.bg);
+                assert_eq!(new.underline_color, old.underline_color);
+                if level == ColorLevel::NoColor {
+                    assert!(!old.modifier.contains(Modifier::BOLD));
+                    assert!(new.modifier.contains(Modifier::BOLD));
+                } else {
+                    assert_eq!(new.modifier, old.modifier);
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn hover_changes_only_foreground_and_has_a_monochrome_fallback() {
     for level in [
         ColorLevel::NoColor,
