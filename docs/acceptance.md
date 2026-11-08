@@ -13,7 +13,7 @@ sorting and single/dual/maximised layouts preserve this navigation-only boundary
 
 Header components retain native paths behind measured display slices. Single-click
 navigates to the selected lexical ancestor; truncated headers expose a one-cell
-ellipsis that opens a shared near-full-width, content-sized modal. The picker
+ellipsis that opens a shared content-sized modal. The picker
 wraps complete components where possible and oversized names by grapheme, supports
 keyboard/mouse selection and scrolling, and captures input until cancellation or
 navigation. Existing operation approvals and Ctrl+C safety retain priority.

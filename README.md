@@ -45,7 +45,8 @@ Click a component in a pane’s path to jump to that ancestor. Press Alt+L or cl
 `…` to open the full path picker, starting at the current directory. Use arrows
 and Enter or click a component to choose an ancestor. Arrows reveal the selected
 segment; the wheel scrolls long paths. Immediate Enter closes without navigating;
-Esc cancels. Press `?` or F1 to see your configured shortcuts.
+Esc cancels. The picker fits its contents and wraps long paths at terminal bounds.
+Press `?` or F1 to see your configured shortcuts.
 
 ## Keyboard shortcuts
 

@@ -18,6 +18,7 @@ pub struct PathLayout {
 }
 
 type Wrapped = Vec<Vec<(String, usize)>>;
+const HINT: &str = "Arrows select · Enter open";
 
 pub(super) fn layout(app: &App, area: Rect) -> Option<PathLayout> {
     let state = app.path_picker.as_ref()?;
@@ -30,7 +31,11 @@ pub(super) fn layout(app: &App, area: Rect) -> Option<PathLayout> {
     let shell = modal::Spec {
         title: "Full path",
         help: false,
-        content_width: usize::from(area.width),
+        content_width: segments
+            .iter()
+            .map(|segment| Line::raw(&segment.text).width())
+            .sum::<usize>()
+            .max(Line::raw(HINT).width()),
         pinned_rows: 0,
         footer_rows: 1,
         actions: &actions,
@@ -152,11 +157,8 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, layout: Option
         );
     }
     frame.render_widget(
-        Paragraph::new(modal::truncate(
-            "Arrows select · Enter open",
-            layout.shell.footer.width,
-        ))
-        .style(theme.style(Role::Muted)),
+        Paragraph::new(modal::truncate(HINT, layout.shell.footer.width))
+            .style(theme.style(Role::Muted)),
         layout.shell.footer,
     );
     modal::actions::render(frame, &layout.shell, theme, None);
