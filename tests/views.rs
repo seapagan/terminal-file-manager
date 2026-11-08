@@ -200,7 +200,7 @@ fn column_headers_and_cells_hide_together_without_losing_name_or_type() {
         assert!(!rows[1].contains("Size"));
         assert!(!rows[1].contains("Modified"));
         if width >= 25 {
-            assert!(rows[2].contains("name"));
+            assert!(rows[3].contains("name"));
         }
     }
 }

@@ -6,11 +6,13 @@ mod diagnostics;
 mod divider;
 mod help;
 mod metadata;
+mod navigation;
 mod notifications;
 mod operation_dialog;
 mod operation_exit;
 mod operation_jobs;
 mod operations;
+mod path_navigation;
 mod pattern;
 mod profiles;
 mod scroll;
@@ -19,7 +21,7 @@ pub use bindings::{Bindings, chord};
 pub use controller::Controller;
 pub use help::{
     ContextHelp, HelpEntry, HelpFragment, HelpHit, HelpParagraph, HelpPicker, HelpSection,
-    HelpTarget, HelpTopic, help_hits,
+    HelpTarget, HelpTopic, ViewHelpTopic, help_hits,
 };
 
 /// Browser and local-operation actions share dispatch; later milestones explain unavailability.
@@ -96,6 +98,7 @@ pub enum Action {
     CopyQuick,
     MoveQuick,
     Path,
+    FullPath,
     Zoxide,
     OppositeZoxide,
     ExitDirectory,

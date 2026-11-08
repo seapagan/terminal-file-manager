@@ -56,7 +56,9 @@ impl Pane {
             self.anchor_range();
         }
         self.shift_cursor(delta, height);
-        if let Some(path) = self.cursor.clone() {
+        if self.parent_focused() {
+            self.reset_range();
+        } else if let Some(path) = self.cursor.clone() {
             self.select_range_to(path, height);
         }
     }
@@ -108,6 +110,8 @@ impl Pane {
             }
         }
         self.range = Some(range);
+        // Preserve the displayed viewport so the new cursor only scrolls at its edges.
+        self.scroll = self.viewport_start(height);
         self.cursor = Some(path);
         self.shift_cursor(0, height);
     }

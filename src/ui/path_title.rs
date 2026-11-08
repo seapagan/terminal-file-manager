@@ -16,17 +16,22 @@ pub(super) fn title(path: &Path, id: usize, active: bool, loading: bool, width: 
 }
 
 pub(super) fn shorten(path: &Path, width: usize) -> String {
+    shortened(path, width).0
+}
+
+/// Display bytes before/after the omitted interval map back to native segments.
+pub(super) fn shortened(path: &Path, width: usize) -> (String, usize, usize) {
     let raw = path.to_string_lossy();
     let full = super::clean(&raw);
     if cells(&full) <= width {
-        return full;
+        return (full.clone(), full.len(), full.len());
     }
     let (anchor, parts, separator) = components(path, &raw);
     let Some(last) = parts.last() else {
-        return tail(&full, width);
+        return tail_map(&full, &full, width);
     };
     if parts.len() < 2 || cells(last) + 2 > width {
-        return tail(last, width);
+        return tail_map(&full, last, width);
     }
     let anchor = if cells(&anchor) + cells(last) + 2 <= width {
         anchor
@@ -35,11 +40,20 @@ pub(super) fn shorten(path: &Path, width: usize) -> String {
     };
     let remaining = width - cells(&anchor) - cells(last) - 2;
     let (start, end) = retained_ends(&parts, remaining);
-    format!(
-        "{anchor}{}…{separator}{}",
-        parts[..start].concat(),
-        parts[end..].concat()
+    let leading = format!("{anchor}{}", parts[..start].concat());
+    let ending = parts[end..].concat();
+    (
+        format!("{leading}…{separator}{ending}"),
+        leading.len(),
+        full.len() - ending.len(),
     )
+}
+
+fn tail_map(full: &str, last: &str, width: usize) -> (String, usize, usize) {
+    let shown = tail(last, width);
+    let ending = shown.strip_prefix('…').unwrap_or(&shown);
+    let start = full.len() - ending.len();
+    (shown, 0, start)
 }
 
 /// Comparison labels retain both endpoints when an entire final component cannot fit.
@@ -140,9 +154,6 @@ fn cells(text: &str) -> usize {
 }
 
 fn tail(text: &str, width: usize) -> String {
-    if cells(text) == width {
-        return text.to_owned();
-    }
     if width == 0 {
         return String::new();
     }

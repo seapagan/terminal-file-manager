@@ -4,6 +4,9 @@ use ratatui::layout::Rect;
 /// File panes, optional metadata and stable bottom controls.
 #[derive(Clone, Debug)]
 pub struct Geometry {
+    pub(crate) area: Rect,
+    pub path_controls: Vec<super::PathControl>,
+    pub path_picker: Option<super::PathLayout>,
     pub context_help: Option<super::ContextLayout>,
     pub context_control: Option<Rect>,
     pub modal_close: Option<Rect>,
@@ -95,8 +98,26 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
     } else {
         geometry.panes[app.active] = Some(body);
     }
+    geometry.context_control = geometry
+        .menu_layout
+        .as_ref()
+        .and_then(|shell| shell.help)
+        .or_else(|| {
+            context_control(
+                app,
+                geometry.operation_layout.as_ref(),
+                geometry.pattern.as_ref(),
+                geometry.path_picker.as_ref(),
+            )
+        });
+    geometry.path_controls = super::path_navigation::headers(app, &geometry.panes);
+    finish_geometry(app, area, &mut geometry);
+    geometry
+}
+
+fn finish_geometry(app: &App, area: Rect, geometry: &mut Geometry) {
     let bounds = super::overlay_bounds(app, area);
-    scroll_limits(app, &mut geometry, bounds);
+    scroll_limits(app, geometry, bounds);
     geometry.notification_history = super::notifications::history(app, bounds);
     geometry.status_segments = super::status::controls(app, geometry.status);
     geometry.status_controls = geometry
@@ -106,11 +127,17 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
         .collect();
     geometry.toasts = super::notifications::toasts(app, area);
     geometry.modal_close = geometry
-        .notification_history
+        .context_help
         .as_ref()
-        .and_then(|h| h.shell.close)
-        .or_else(|| close_control(app, &geometry));
-    geometry
+        .and_then(|help| help.shell.close)
+        .or_else(|| geometry.path_picker.as_ref().and_then(|p| p.shell.close))
+        .or_else(|| {
+            geometry
+                .notification_history
+                .as_ref()
+                .and_then(|h| h.shell.close)
+                .or_else(|| close_control(app, geometry))
+        });
 }
 
 fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
@@ -119,17 +146,16 @@ fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
         super::operations::geometry(app, bounds);
     let pattern = super::pattern::layout(app, bounds);
     let menu_layout = menu_layout(app, bounds);
-    let context_control = menu_layout
-        .as_ref()
-        .and_then(|shell| shell.help)
-        .or_else(|| context_control(app, operation_layout.as_ref(), pattern.as_ref()));
     Geometry {
+        area,
+        path_controls: Vec::new(),
+        path_picker: super::path_picker::layout(app, bounds),
         notification_history: None,
         status_controls: Vec::new(),
         status_segments: Vec::new(),
         toasts: Vec::new(),
         context_help: super::help::context::layout(app, bounds),
-        context_control,
+        context_control: None,
         modal_close: None,
         help: super::help::layout(app, bounds),
         pattern,
@@ -233,6 +259,7 @@ fn context_control(
     app: &App,
     operation: Option<&super::operations::Layout>,
     pattern: Option<&super::PatternLayout>,
+    path: Option<&super::PathLayout>,
 ) -> Option<Rect> {
     crate::input::HelpTopic::current(app)?;
     if app.popup {
@@ -241,7 +268,9 @@ fn context_control(
     if let Some(layout) = operation {
         return layout.shell.help;
     }
-    pattern.and_then(|layout| layout.shell.help)
+    pattern
+        .and_then(|layout| layout.shell.help)
+        .or_else(|| path.and_then(|layout| layout.shell.help))
 }
 
 fn close_control(app: &App, geometry: &Geometry) -> Option<Rect> {

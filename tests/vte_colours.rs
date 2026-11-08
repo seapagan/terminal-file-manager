@@ -128,7 +128,7 @@ fn palette_names(buffer: &mut Buffer, app: &App) {
             if entry.ignored != Some(true) || app.panes[id].cursor.as_ref() == Some(&entry.path) {
                 continue;
             }
-            let y = area.y + 2 + row as u16;
+            let y = area.y + 3 + row as u16;
             palette_name(buffer, start..area.right() - 1, y);
         }
     }
@@ -206,7 +206,7 @@ fn assert_names_and_output(buffer: &Buffer, app: &App, id: usize, level: ColorLe
             continue;
         }
         let x = area.x + 8;
-        let y = area.y + 2 + row as u16;
+        let y = area.y + 3 + row as u16;
         let cell = &buffer[(x, y)];
         let directory = entry.name == "ignored-dir";
         let fg = expected_foreground(level, vte, id == app.active, directory);
@@ -267,7 +267,7 @@ fn palette_hidden_markers(buffer: &mut Buffer, app: &App) {
         for (row, index) in app.panes[id].visible.iter().enumerate() {
             let entry = &app.panes[id].entries[*index];
             if entry.hidden && app.panes[id].cursor.as_ref() != Some(&entry.path) {
-                let cell = &mut buffer[(area.x + 6, area.y + 2 + row as u16)];
+                let cell = &mut buffer[(area.x + 6, area.y + 3 + row as u16)];
                 assert_eq!(cell.symbol(), "h");
                 assert_eq!(cell.fg, Color::Rgb(35, 140, 150));
                 assert_eq!(cell.modifier, Modifier::DIM);
@@ -284,7 +284,7 @@ fn assert_hidden_output(buffer: &Buffer, app: &App, id: usize, level: ColorLevel
         if !entry.hidden || app.panes[id].cursor.as_ref() == Some(&entry.path) {
             continue;
         }
-        let (x, y) = (area.x + 6, area.y + 2 + row as u16);
+        let (x, y) = (area.x + 6, area.y + 3 + row as u16);
         let cell = &buffer[(x, y)];
         let fg = match (level, vte) {
             (ColorLevel::NoColor, _) => Color::Reset,

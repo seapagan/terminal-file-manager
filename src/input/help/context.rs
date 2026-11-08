@@ -15,16 +15,32 @@ mod tests;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HelpTopic {
+    FullPath,
     Pattern,
-    ViewOptions,
-    ViewProfiles,
-    SaveProfile,
+    View(ViewHelpTopic),
     Operation(Operation),
     Conflict,
     Jobs,
     Metadata,
     Exit,
     Incident,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ViewHelpTopic {
+    Options,
+    Profiles,
+    SaveProfile,
+}
+
+impl ViewHelpTopic {
+    fn title(self) -> &'static str {
+        match self {
+            Self::Options => "View Options Help",
+            Self::Profiles => "View Profiles Help",
+            Self::SaveProfile => "Save Profile Help",
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -48,13 +64,13 @@ impl HelpTopic {
 
     fn menu(app: &App) -> Option<Self> {
         if app.view_menu.is_some() {
-            Some(Self::ViewOptions)
+            Some(Self::View(ViewHelpTopic::Options))
         } else if app.profile_menu.is_some() {
-            Some(if app.profile_name.is_some() {
-                Self::SaveProfile
+            Some(Self::View(if app.profile_name.is_some() {
+                ViewHelpTopic::SaveProfile
             } else {
-                Self::ViewProfiles
-            })
+                ViewHelpTopic::Profiles
+            }))
         } else {
             None
         }
@@ -77,15 +93,17 @@ impl HelpTopic {
         } else if app.operations.waiting_exit.is_some() {
             Some(Self::Exit)
         } else {
-            app.pattern.as_ref().map(|_| Self::Pattern)
+            app.pattern
+                .as_ref()
+                .map(|_| Self::Pattern)
+                .or_else(|| app.path_picker.as_ref().map(|_| Self::FullPath))
         }
     }
 
     pub fn title(self) -> &'static str {
         match self {
-            Self::ViewOptions => "View Options Help",
-            Self::ViewProfiles => "View Profiles Help",
-            Self::SaveProfile => "Save Profile Help",
+            Self::FullPath => "Go to directory Help",
+            Self::View(view) => view.title(),
             Self::Operation(operation) => operation_title(operation),
             Self::Pattern => "Pattern Help",
             Self::Conflict => "Conflict Help",
@@ -164,7 +182,7 @@ fn editing(app: &App, topic: HelpTopic) -> bool {
         HelpTopic::Operation(operation) => {
             !matches!(operation, Operation::Delete | Operation::Trash)
         }
-        HelpTopic::Incident | HelpTopic::SaveProfile => true,
+        HelpTopic::Incident | HelpTopic::View(ViewHelpTopic::SaveProfile) => true,
         _ => false,
     }
 }

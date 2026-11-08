@@ -119,7 +119,7 @@ fn assert_rendered_policy(level: colored_text::ColorLevel) {
     let buffer = terminal.backend().buffer();
     assert_selection_rows(buffer, &theme);
     if std::env::var("VTE_VERSION").as_deref() == Ok("8400") {
-        assert_eq!(buffer[(8, 2)].fg, Color::Indexed(67));
+        assert_eq!(buffer[(8, 3)].fg, Color::Indexed(67));
     }
     if level == colored_text::ColorLevel::NoColor {
         assert_monochrome(buffer);
@@ -147,7 +147,7 @@ fn assert_selection_rows(buffer: &ratatui::buffer::Buffer, theme: &Theme) {
         };
         let style = theme.style(role);
         for x in range {
-            let cell = &buffer[(x, 3)];
+            let cell = &buffer[(x, 4)];
             assert_eq!((cell.fg, cell.bg), (style.fg.unwrap(), style.bg.unwrap()));
             assert_eq!(
                 cell.modifier.contains(Modifier::REVERSED),

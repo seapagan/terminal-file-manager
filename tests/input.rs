@@ -242,7 +242,7 @@ fn wheel_does_not_change_focus_and_double_click_never_launches_files() {
         Event::Mouse(MouseEvent {
             kind,
             column: 65,
-            row: 2,
+            row: 3,
             modifiers: KeyModifiers::NONE,
         })
     };

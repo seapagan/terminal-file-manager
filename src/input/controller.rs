@@ -101,6 +101,13 @@ impl Controller {
     }
 
     pub(super) fn dispatch_action(&mut self, action: Action, geometry: &Geometry) -> Vec<Request> {
+        if self.app.path_picker.is_some() {
+            if action == Action::Cancel {
+                self.app.path_picker = None;
+            }
+            return Vec::new();
+        }
+        self.app.path_pointer = None;
         let action = self.preferred_action(action);
         if self.app.help && !super::help::accepts(action) {
             return Vec::new();
@@ -141,7 +148,7 @@ impl Controller {
             | ColumnAttributes | ColumnOwner | OwnerDisplay | MetadataPresentation => {
                 super::view::formatting(self, action)
             }
-            TogglePanes | Maximise | FocusPane | ToggleSidebar | Metadata | Help => {
+            TogglePanes | Maximise | FocusPane | ToggleSidebar | Metadata | Help | FullPath => {
                 self.layout(action, geometry)
             }
             _ => return false,
@@ -166,9 +173,9 @@ impl Controller {
             | ViewProfiles | Quit | SaveQuit | ViewOptions | HumanSizes | FuzzyTimestamps
             | Permissions | ColumnSize | ColumnModified | ColumnAttributes | ColumnOwner
             | OwnerDisplay | MetadataPresentation | TogglePanes | Maximise | FocusPane
-            | ToggleSidebar | Metadata | Help | Info | Viewer | Editor | Path | Zoxide
-            | OppositeZoxide | ExitDirectory | Copy | Move | Mkdir | CreateFile | Trash
-            | Delete | Rename | Attributes | Jobs | Notifications | DismissToast
+            | ToggleSidebar | Metadata | Help | Info | Viewer | Editor | Path | FullPath
+            | Zoxide | OppositeZoxide | ExitDirectory | Copy | Move | Mkdir | CreateFile
+            | Trash | Delete | Rename | Attributes | Jobs | Notifications | DismissToast
             | DismissToasts | CopyQuick | MoveQuick => {}
         }
         Vec::new()
@@ -184,42 +191,6 @@ impl Controller {
 
     fn exit(&mut self, action: Action) {
         super::operations::exit(self, action == Action::SaveQuit);
-    }
-
-    fn navigate(&mut self, action: Action) -> Vec<Request> {
-        let id = self.app.active;
-        if action == Action::Refresh {
-            return self.app.request_refresh(id).into_iter().collect();
-        }
-        if action == Action::Back {
-            return self.app.history(false).into_iter().collect();
-        }
-        if action == Action::Forward {
-            return self.app.history(true).into_iter().collect();
-        }
-        if action == Action::Parent {
-            if let Some(request) = self.app.parent() {
-                return vec![request];
-            }
-            self.app.status = "Filesystem root".into();
-            return Vec::new();
-        }
-        let pane = &self.app.panes[id];
-        let path = match action {
-            Action::Enter => {
-                let Some(entry) = pane.current() else {
-                    self.app.status = "No visible entry".into();
-                    return Vec::new();
-                };
-                if !entry.enterable {
-                    self.app.status = "The file viewer is not available yet.".into();
-                    return Vec::new();
-                }
-                entry.path.clone()
-            }
-            _ => pane.path.clone(),
-        };
-        vec![self.app.request_listing(id, path)]
     }
 
     fn extend_selection(&mut self, action: Action, geometry: &Geometry) {
@@ -275,6 +246,7 @@ impl Controller {
 
     fn layout(&mut self, action: Action, geometry: &Geometry) {
         match action {
+            Action::FullPath => super::path_navigation::open(self, geometry),
             Action::TogglePanes => self.toggle_panes(),
             Action::Maximise if self.app.dual => self.maximise(),
             Action::FocusPane if geometry.panes.iter().all(Option::is_some) => {
@@ -463,6 +435,7 @@ impl Controller {
         if super::divider::mouse(self, event, geometry) {
             return Vec::new();
         }
+        self.app.path_pointer = Some((event.column, event.row));
         if geometry.footer.contains((event.column, event.row).into())
             && event.kind == MouseEventKind::Down(MouseButton::Left)
         {

@@ -1,5 +1,5 @@
 //! Context prose identifies shortcut fragments before any theme or wrapping.
-use super::HelpTopic;
+use super::{HelpTopic, ViewHelpTopic};
 use crate::{app::App, input::Action, operations::Operation};
 
 /// A prose fragment or literal shortcut, styled only by the Help renderer.
@@ -37,9 +37,8 @@ fn paragraph(text: &str, bindings: &[&str]) -> HelpParagraph {
 
 pub(super) fn text(topic: HelpTopic, app: &App) -> Vec<HelpParagraph> {
     let (action, lines) = match topic {
-        HelpTopic::ViewOptions => (Action::ViewOptions, VIEW_OPTIONS),
-        HelpTopic::ViewProfiles => (Action::ViewProfiles, VIEW_PROFILES),
-        HelpTopic::SaveProfile => (Action::ViewProfiles, SAVE_PROFILE),
+        HelpTopic::FullPath => (Action::FullPath, FULL_PATH),
+        HelpTopic::View(view) => view_text(view),
         HelpTopic::Metadata => return metadata(app),
         HelpTopic::Pattern => (Action::PatternSelection, PATTERN),
         HelpTopic::Conflict => (Action::Jobs, CONFLICT),
@@ -59,6 +58,14 @@ fn action_paragraphs(app: &App, action: Action, lines: &[&str]) -> Vec<HelpParag
     text
 }
 
+fn view_text(view: ViewHelpTopic) -> (Action, &'static [&'static str]) {
+    match view {
+        ViewHelpTopic::Options => (Action::ViewOptions, VIEW_OPTIONS),
+        ViewHelpTopic::Profiles => (Action::ViewProfiles, VIEW_PROFILES),
+        ViewHelpTopic::SaveProfile => (Action::ViewProfiles, SAVE_PROFILE),
+    }
+}
+
 fn operation_text(operation: Operation) -> (Action, &'static [&'static str]) {
     match operation {
         Operation::Copy => (Action::Copy, TRANSFER),
@@ -71,6 +78,13 @@ fn operation_text(operation: Operation) -> (Action, &'static [&'static str]) {
         Operation::Permissions(_) | Operation::ReadOnly(_) => (Action::Attributes, ATTRIBUTES),
     }
 }
+
+const FULL_PATH: &[&str] = &[
+    "Choose a parent directory from the path shown. Only the pane that opened this dialog changes. The current directory starts selected; pressing `Enter` immediately closes without navigating.",
+    "Use `Left` / `Up` and `Right` / `Down`, or `Tab` / `Shift+Tab`, to choose a segment. `Home` selects the root; `End` selects the current directory. The selection stays visible as the path wraps.",
+    "Press `Enter` to open the selected ancestor, or click its segment. Use the mouse wheel to scroll long paths.",
+    "Press `Esc`, click `Esc Cancel` or the title's close button to cancel without navigating. Close Help first to return to the same segment and scroll position.",
+];
 
 const PATTERN: &[&str] = &[
     "Change marks on entries shown in this pane. Hidden and filtered-out entries keep their marks. After applying, the status area shows how many visible entries are marked; this does not add a notification.",

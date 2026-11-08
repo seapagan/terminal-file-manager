@@ -1,5 +1,12 @@
 # TODO
 
+## Terminal-default colour audit
+
+Audit TFM's reliance on terminal-default foreground and background colours.
+Identify contrast and theme-portability risks across terminal palettes and
+colour capabilities, including `NO_COLOR`. Propose explicit semantic theme
+roles where appropriate. This investigation requires separate approval.
+
 ## Automatic minimal layout for constrained terminals
 
 Explore an automatic minimal layout that removes decorative borders, secondary

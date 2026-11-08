@@ -31,7 +31,7 @@ pub(super) fn render(
         .border_style(theme.style(if id == app.active {
             Role::Header
         } else {
-            Role::Normal
+            Role::InactivePaneBorder
         }));
     let inner = block.inner(area);
     let title = super::path_title::title(
@@ -42,6 +42,7 @@ pub(super) fn render(
         inner.width,
     );
     frame.render_widget(block.title(title), area);
+    super::path_navigation::render(frame, app, theme, &geometry.path_controls, id);
     let summary = super::summary::lines(
         pane.visible.len(),
         geometry.selection_counts[id],
@@ -105,8 +106,12 @@ fn render_rows(
         Some(Constraint::Length(width)) => *width,
         _ => 0,
     };
-    let rows = pane.visible.iter().skip(start).take(height).map(|i| {
-        let entry = &pane.entries[*i];
+    let rows = (start..pane.row_count()).take(height).map(|row| {
+        if pane.has_parent() && row == 0 {
+            return parent_row(pane, area.width, theme, active);
+        }
+        let i = pane.visible[row - usize::from(pane.has_parent())];
+        let entry = &pane.entries[i];
         let cursor = pane.cursor.as_ref() == Some(&entry.path);
         let focus = if cursor && active {
             Some(Role::Cursor)
@@ -132,7 +137,26 @@ fn render_rows(
     }
 }
 
+fn parent_row(pane: &Pane, width: u16, theme: &Theme, active: bool) -> Row<'static> {
+    let cells = if width < 8 {
+        vec![Cell::from("..")]
+    } else {
+        vec![Cell::from(""), Cell::from(""), Cell::from("..")]
+    };
+    let style = if pane.parent_focused() {
+        theme.style(if active {
+            Role::Cursor
+        } else {
+            Role::InactiveCursor
+        })
+    } else {
+        theme.style(Role::Directory)
+    };
+    Row::new(cells).style(style)
+}
+
 fn render_empty(frame: &mut Frame, pane: &Pane, area: Rect) {
+    let offset = 1 + u16::from(pane.has_parent());
     frame.render_widget(
         Paragraph::new(if pane.pending.is_some() {
             "Loading directory…"
@@ -141,9 +165,9 @@ fn render_empty(frame: &mut Frame, pane: &Pane, area: Rect) {
         }),
         Rect::new(
             area.x,
-            area.y.saturating_add(1),
+            area.y.saturating_add(offset),
             area.width,
-            area.height.saturating_sub(1),
+            area.height.saturating_sub(offset),
         ),
     );
 }

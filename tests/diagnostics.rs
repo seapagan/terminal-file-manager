@@ -179,7 +179,7 @@ fn diagnostics_consumes_its_mouse_events_but_not_adjacent_rows() {
         &geometry,
         MouseEventKind::Down(MouseButton::Left),
         area.x - 1,
-        3,
+        4,
     );
     assert_eq!(c.app.active, 1);
     assert!(c.app.panes[1].cursor.as_ref().unwrap().ends_with("beta"));

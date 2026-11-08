@@ -132,8 +132,39 @@ session bytes. Restore is opt-in and validates both paths without fallback.
 The M1 browsing workers do not mutate selected files; completed M2 operations
 use the separate planner and executor below. Only deliberate preference/session
 actions write TFM's own configuration data. Unimplemented viewer/editor and
-path-navigation actions explain their later scope instead of falling back to
+direct-path/zoxide actions explain their later scope instead of falling back to
 a subprocess.
+
+### Implemented path navigation
+
+The virtual `..` row uses a native parent cursor target outside `entries` and
+`visible`. Listing row coordinates include it; selection counts, marks, metadata
+and operation operands continue to use filesystem entries. Enter and double-click
+reuse `App::parent`, including identity-aware exited-directory restoration.
+
+Header geometry projects the existing native path elision onto lexical ancestor
+slices. Display text never reconstructs a navigation target. A one-cell ellipsis
+control opens the shared full-path shell; complete components wrap where possible,
+and oversized components wrap on grapheme boundaries. Its pane/path-bound state
+captures input and yields to operation approvals and the existing Ctrl+C exit flow.
+The configurable `FullPath` action (Alt+l) opens the same picker for the active
+pane regardless of truncation. Both routes select the current directory and use
+the measured terminal area to reveal it. Immediate Enter normally closes without
+a listing request. An explicit current-directory choice supersedes any pending
+navigation. Successful directory changes close that pane's picker and child Help
+before the next input event. Ctrl+l retains the reserved manual-path action.
+The picker registers a `FullPath` context-Help topic and uses the shared title
+Help control, prose renderer and input layer. Help closes before its parent;
+shared resize handling retains a visible path selection when Help closes.
+The same semantic `PathHover` foreground resolves through `colored_text` on both
+surfaces. `path_hover` configures its colour; monochrome uses bold. No persistent
+row, new navigation engine, dependency or clipboard behavior is introduced.
+
+Both panes use the same cyan breadcrumb foreground. `InactivePaneBorder` gives
+the inactive border a neutral grey foreground, configurable with
+`inactive_pane_border`; the active border retains `Header` cyan and bold.
+Monochrome keeps the inactive border plain and the active border bold. Border
+styling leaves pane contents and path hover unchanged.
 
 ### Implemented pattern selection
 

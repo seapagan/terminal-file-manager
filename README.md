@@ -4,9 +4,8 @@
 Browse local directories in one or two panes, sort and filter files, mark entries,
 and inspect file information without leaving the terminal.
 
-Copy, move, rename and organise local files from the browser. SSH/SFTP, file
-viewing and editing remain planned. Enter navigates into directories; it does
-not open or execute files.
+Copy, move, rename and organise local files. SSH/SFTP, file viewing and editing
+remain planned. Enter opens directories; it does not open or execute files.
 
 ## Installation
 
@@ -37,10 +36,15 @@ and two visible panes at any time; each pane keeps its own directory and view
 settings. On a narrow terminal, `tfm` shows the active pane until there is
 room for both.
 
-Use the arrow keys (or `j`/`k`) to navigate, Enter to enter a directory and
-Backspace to go up. With a mouse, click to focus, double-click a directory to
-enter it, and use the wheel to scroll. Press `?` or F1 to see the shortcuts currently
-configured in your installation.
+Use arrows (or `j`/`k`) to navigate, Enter to enter a directory and Backspace to
+go up. Click to focus, double-click a directory to enter it, and use the wheel
+to scroll. The `..` row opens the parent directory; it cannot be marked or used
+in file operations.
+
+Click a path component to jump to that ancestor. Press Alt+l or click `…` to open
+**Go to directory** at the current directory. Use arrows and Enter, or click a
+component, to choose an ancestor. The wheel scrolls long paths. Immediate Enter
+closes without navigating; Esc cancels. Press `?` or F1 for Help.
 
 ## Keyboard shortcuts
 
@@ -56,6 +60,7 @@ example, `Shift+v` opens view options while `v` reverses the sort order.
 | Home / End / PageUp / PageDown | Jump or scroll through the listing |
 | Enter / Backspace (or Alt+Up) | Enter directory / go to parent, highlighting the directory just exited |
 | Alt+Left / Alt+Right | Go back / forward in directory history |
+| Alt+l | Open the full path picker, even when the header path fits |
 | Alt+p | Toggle one or two panes |
 | Tab / Shift+Tab | Switch active pane |
 | Ctrl+Left / Ctrl+Right | Adjust the pane split |
@@ -76,22 +81,20 @@ example, `Shift+v` opens view options while `v` reverses the sort order.
 | `r` | Refresh the directory |
 | `Shift+v` / Alt+v | View options / view profiles |
 
-Linux and macOS refresh local directories, including the hidden pane, while
-preserving the cursor and surviving marks. **On Windows, press `r` to see
-external changes.** You can use `r` on any platform to refresh the listing.
+Linux and macOS refresh both panes automatically, preserving the cursor and
+surviving marks. **On Windows, press `r` to see external changes.** Use `r` on
+any platform for a manual refresh.
 
-If automatic refresh fails on Linux or macOS, `tfm` reports the problem and
-retries. Slow directories and unavailable mounts can delay updates. If a
-directory disappears or another directory replaces it, reopen the directory;
-`tfm` keeps the last good listing and reports the error.
+Automatic refresh retries after errors; slow or unavailable mounts can delay it.
+If a directory disappears or another replaces it, `tfm` keeps the last good
+listing and reports the error. Reopen the directory to continue.
 
 ### Pattern selection
 
-Press **Alt+b** or click **Alt+b Mark** to mark filenames by wildcard or regex.
-Type a pattern, choose **Wildcard**, **Regex** and **Case sensitive** options,
-then use **Mark**, **Unmark** or **Replace**. With a valid pattern, Enter from
-the Pattern field moves to Mark; a second Enter applies it. Esc cancels without
-changing marks.
+Press **Alt+b** or click **Alt+b Mark** to select filenames by wildcard or regex.
+Choose matching options, then use **Mark**, **Unmark** or **Replace**. With a
+valid pattern, Enter from the Pattern field moves to Mark; a second Enter
+applies it. Esc cancels without changing marks.
 
 Tab or click to move between controls. Use **Alt+w / Alt+x / Alt+s** to change
 matching options while typing, and **Alt+m / Alt+u / Alt+r** to mark, unmark or
@@ -138,10 +141,9 @@ review the new matches. Enlarge the terminal if the controls cannot fit.
 | Ctrl+Alt+k | Dismiss all toasts |
 
 Create a file or directory in the active pane by entering one name. Existing
-entries stay intact. Press **Shift+F7** or **Alt+n** to create an empty file,
-or click **Alt+n File** in the footer. `tfm` selects the new file if it is visible
-and you have not moved the cursor or changed the selection or directory in the
-meantime.
+entries stay intact. You can also click **Alt+n File** in the footer. `tfm`
+selects the new file if it is visible and you have not moved the cursor or
+changed the selection or directory while it was being created.
 
 Other operations use visible marks, or the cursor when no visible marks remain.
 With two panes, copy and move target the other pane: one entry starts at once,
@@ -189,31 +191,23 @@ visibility option; operations use the visible selection.
 
 ## Notifications and status
 
-Toasts highlight file-operation results, background failures and important safety
-or navigation problems without moving keyboard focus. Routine actions, pattern
-marking, profile changes and input corrections use the status area or the open
-form. They do not add entries to notification history.
-Toasts appear above dialogs and other interfaces. Newer notifications sit nearest
-your chosen corner; complete cards and gaps use up to 80% of terminal height.
-When space runs out, older toasts leave the stack and remain in history.
-Click a toast to dismiss its whole group. **Alt+k** dismisses the oldest visible
-group; **Ctrl+Alt+k** dismisses all toasts. Both shortcuts work inside dialogs
-and editors without changing your work. You can remap them in `[bindings]` as
-`dismiss-toast` and `dismiss-toasts`.
+Toasts show operation results, background failures and safety or navigation
+problems without taking keyboard focus. Routine feedback stays in the status
+area or current form. Choose a toast corner and expiry in `config.toml`.
+Click a toast to dismiss its group; **Alt+k** dismisses the oldest visible group
+and **Ctrl+Alt+k** dismisses all, including inside dialogs. Remap these as
+`dismiss-toast` and `dismiss-toasts` in `[bindings]`.
 
-Press **Alt+h** to read session notification history after a toast disappears. Use Up/Down, PgUp/PgDown or the wheel to select an event.
-Press **e** to read its full details; PgUp/PgDown scrolls, and **e** returns to
-the list. Enter opens linked Jobs evidence. Repeated failures share a toast
+Press **Alt+h** for session notification history, including expired toasts.
+Use Up/Down, PgUp/PgDown or the wheel to select an event. Press **e** for full
+details, PgUp/PgDown to scroll, and **e** to return. Enter opens linked Jobs
+evidence; Esc returns to your previous view. Repeated failures share a toast
 with an occurrence count; each operation keeps its own history entry and Job.
-The history viewer updates as notifications arrive. It follows new entries while
-you view the newest event and preserves your position when you inspect older
-events. While history is open, incoming notifications appear there without
-queuing toasts for later. Esc returns to the previous view. History lasts until
-you exit `tfm`.
+Incoming notifications appear in the open history viewer without queuing toasts.
+History lasts until you exit `tfm`.
 
-The status area keeps current work and selection visible in one row, with a
-second row for critical information when space permits. Critical incidents and
-unknown outcomes remain visible and available in Jobs after toast expiry.
+The status area shows current work and selection. Critical incidents and unknown
+outcomes remain available in Jobs after toast expiry.
 
 ## Views and metadata
 
@@ -253,8 +247,7 @@ To save a session without opening the interface:
 tfm --save-session -2 /path/to/left /path/to/right
 ```
 
-`tfm` keeps marks, filters and back/forward navigation history for the current
-run.
+Marks, filters and back/forward history last only for the current run.
 
 ## Configuration
 
@@ -278,6 +271,10 @@ fuzzy_timestamps = true
 owner_display = "names" # or "numeric"
 ignore = "dim" # "dim", "hide" or "off"
 mouse = true
+# Optional path hover colour.
+# path_hover = "#b4f5ff"
+# Optional inactive pane border colour.
+# inactive_pane_border = "#767676"
 toast_placement = "bottom-right" # top-left, top-right, bottom-left, bottom-right
 toast_expiry_seconds = 5 # Range: 1–60; history survives expiry
 
@@ -289,25 +286,21 @@ owner = false
 
 [bindings]
 "Ctrl+f" = "filter"
+"Alt+l" = "full-path"
 ```
 
-Press `?` or F1 for one scrollable Help document, grouped by task. Press `/` in Help
-or click **Jump** to find a section or search commands and their effective
-shortcuts. Use the arrows and Enter, or click a result, to jump to its entry.
-Esc closes the picker first, then Help.
+In Help, press `/` or click **Jump** to find a section or search commands and
+your configured shortcuts. Use arrows and Enter, or click a result, to jump
+to its entry. Esc closes the picker first, then Help.
 
-In a dialog, including View options, View profiles and Save profile, press `?`
-or F1, or click **?** in its title, for contextual Help.
+In a dialog, including Go to directory, View options, View profiles and Save
+profile, press `?` or F1, or click **?** in its title, for contextual Help.
 While editing a text field, `?` stays literal; use F1 for Help. Esc returns to
 the same dialog, field and selection. Click **×** to cancel or close a dialog.
 
-Custom bindings override the defaults, and `?` displays the effective
-shortcuts. For punctuation keys, use the character produced rather than a
-`Shift+` symbol combination; some modified-key combinations cannot be
-reliably distinguished by terminals.
-
-CLI errors use colour to distinguish diagnostic headings, source paths and
-error pointers while preserving multiline source excerpts.
+Custom bindings override the defaults. For punctuation keys, use the character
+produced rather than a `Shift+` symbol combination; some modified-key combinations
+cannot be reliably distinguished by terminals.
 
 Set `NO_COLOR` to disable colours. Press F12 to inspect the terminal colour
 diagnostics when needed.

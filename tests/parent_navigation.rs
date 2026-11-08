@@ -56,14 +56,14 @@ fn parent_and_back_restore_the_exited_child_and_saved_viewport() {
         c.app.panes[0].move_cursor(30, 5);
         let child = root.path().join("child30");
         assert_eq!(c.app.panes[0].cursor.as_ref(), Some(&child));
-        assert_eq!(c.app.panes[0].scroll, 26);
+        assert_eq!(c.app.panes[0].scroll, 27);
         navigate(&mut c, Action::Enter);
         navigate(&mut c, action);
         let pane = &c.app.panes[0];
         assert_eq!(pane.cursor.as_ref(), Some(&child));
-        assert_eq!(pane.scroll, 26);
-        assert_eq!(pane.viewport_start(5), 26);
-        assert_eq!(pane.viewport_start(1), 30);
+        assert_eq!(pane.scroll, 27);
+        assert_eq!(pane.viewport_start(5), 27);
+        assert_eq!(pane.viewport_start(1), 31);
         assert_eq!(c.app.panes[1].cursor, Some(root.path().join("child00")));
     }
 }
@@ -76,7 +76,7 @@ fn parent_from_direct_start_selects_the_exited_directory() {
     let mut c = controller(&child);
     navigate(&mut c, Action::Parent);
     assert_eq!(c.app.panes[0].cursor, Some(child));
-    assert_eq!(c.app.panes[0].viewport_start(5), 26);
+    assert_eq!(c.app.panes[0].viewport_start(5), 27);
 }
 
 #[test]
@@ -87,7 +87,7 @@ fn parent_restoration_follows_native_path_after_sorted_contents_shift() {
     c.app.panes[0].sort.reverse = true;
     c.app.panes[0].resort();
     c.app.panes[0].move_cursor(-isize::MAX, 5);
-    c.app.panes[0].move_cursor(30, 5);
+    c.app.panes[0].move_cursor(31, 5);
     let child = root.path().join("child09");
     assert_eq!(c.app.panes[0].cursor.as_ref(), Some(&child));
     navigate(&mut c, Action::Enter);
@@ -95,8 +95,8 @@ fn parent_restoration_follows_native_path_after_sorted_contents_shift() {
     navigate(&mut c, Action::Parent);
     assert_eq!(c.app.panes[0].cursor, Some(child));
     assert_eq!(c.app.panes[0].cursor_index(), Some(29));
-    assert_eq!(c.app.panes[0].scroll, 26);
-    assert_eq!(c.app.panes[0].viewport_start(2), 28);
+    assert_eq!(c.app.panes[0].scroll, 27);
+    assert_eq!(c.app.panes[0].viewport_start(2), 29);
 }
 
 #[test]
@@ -122,13 +122,13 @@ fn nested_parent_history_and_unrelated_back_forward_remain_distinct() {
     assert_eq!(c.app.panes[0].cursor, Some(grandchild));
     navigate(&mut c, Action::Forward);
     assert_eq!(c.app.panes[0].cursor, Some(child));
-    assert_eq!(c.app.panes[0].scroll, 26);
+    assert_eq!(c.app.panes[0].scroll, 27);
     let other = tempfile::tempdir().unwrap();
     let jump = c.app.request_listing(0, other.path().into());
     complete(&mut c, jump);
     navigate(&mut c, Action::Back);
     assert_eq!(c.app.panes[0].path, root.path());
-    assert_eq!(c.app.panes[0].scroll, 26);
+    assert_eq!(c.app.panes[0].scroll, 27);
     navigate(&mut c, Action::Forward);
     assert_eq!(c.app.panes[0].path, other.path());
 }
@@ -154,7 +154,7 @@ fn failed_and_superseded_parent_completions_do_not_consume_history() {
     );
     complete(&mut c, back);
     assert_eq!(c.app.panes[0].cursor, Some(root.path().join("child30")));
-    assert_eq!(c.app.panes[0].scroll, 26);
+    assert_eq!(c.app.panes[0].scroll, 27);
     navigate(&mut c, Action::Forward);
     let stale = request(&mut c, Action::Parent);
     let other = tempfile::tempdir().unwrap();
@@ -319,7 +319,7 @@ fn replaced_parent_identity_discards_the_saved_viewport() {
     assert!(c.app.complete_listing(0, next.generation, Ok(listing)));
     assert_eq!(c.app.panes[0].cursor, Some(root.path().join("child30")));
     assert_eq!(c.app.panes[0].scroll, 0);
-    assert_eq!(c.app.panes[0].viewport_start(5), 26);
+    assert_eq!(c.app.panes[0].viewport_start(5), 27);
 }
 
 #[cfg(unix)]
@@ -336,7 +336,7 @@ fn parent_restores_a_link_entry_by_its_saved_no_follow_identity() {
     assert_eq!(c.app.panes[0].path, link);
     navigate(&mut c, Action::Parent);
     assert_eq!(c.app.panes[0].cursor, Some(link.clone()));
-    assert_eq!(c.app.panes[0].scroll, 36);
+    assert_eq!(c.app.panes[0].scroll, 37);
     let enter = request(&mut c, Action::Enter);
     let geometry = ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 100, 12));
     c.dispatch(Action::Up, &geometry);
@@ -366,9 +366,9 @@ fn concurrent_parent_requests_restore_each_pane_independently() {
     complete(&mut c, right);
     complete(&mut c, left);
     assert_eq!(c.app.panes[0].cursor, Some(root.path().join("child30")));
-    assert_eq!(c.app.panes[0].scroll, 26);
+    assert_eq!(c.app.panes[0].scroll, 27);
     assert_eq!(c.app.panes[1].cursor, Some(root.path().join("child20")));
-    assert_eq!(c.app.panes[1].scroll, 16);
+    assert_eq!(c.app.panes[1].scroll, 17);
 }
 
 #[test]

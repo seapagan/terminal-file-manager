@@ -15,6 +15,7 @@ use std::time::SystemTime;
 #[derive(Clone, Copy, Debug)]
 pub enum Role {
     Normal,
+    PathHover,
     Header,
     SectionHeader,
     Directory,
@@ -25,6 +26,7 @@ pub enum Role {
     Hidden,
     Cursor,
     InactiveCursor,
+    InactivePaneBorder,
     ActivePane,
     Label,
     Muted,
@@ -41,6 +43,8 @@ pub struct Theme {
     pub level: ColorLevel,
     pub(crate) evidence: Vec<String>,
     vte: bool,
+    path_hover: Option<Color>,
+    inactive_pane_border: Option<Color>,
 }
 
 impl Theme {
@@ -53,6 +57,8 @@ impl Theme {
     pub fn with_vte_version(level: ColorLevel, version: Option<&str>) -> Self {
         Self {
             level,
+            path_hover: None,
+            inactive_pane_border: None,
             evidence: Vec::new(),
             vte: version.is_some_and(|value| {
                 !value.is_empty()
@@ -106,6 +112,7 @@ impl Theme {
             style = style.fg(color);
         }
         match role {
+            Role::PathHover | Role::InactivePaneBorder => self.navigation_style(role),
             Role::SectionHeader => self.section_header_style(),
             Role::ActivePane if self.level >= ColorLevel::Ansi256 => {
                 self.pair((220, 225, 230), (22, 28, 36))
@@ -119,6 +126,49 @@ impl Theme {
             }
             _ => style,
         }
+    }
+
+    /// Resolve the optional path hover accent through the same terminal capability adapter.
+    pub fn set_path_hover(
+        &mut self,
+        hex: Option<&str>,
+    ) -> Result<(), colored_text::ColorInputError> {
+        self.path_hover = hex.map(|hex| self.resolve(hex)).transpose()?.flatten();
+        Ok(())
+    }
+
+    fn navigation_style(&self, role: Role) -> Style {
+        if matches!(role, Role::PathHover) {
+            return self.path_hover_style();
+        }
+        Style {
+            fg: self
+                .inactive_pane_border
+                .or_else(|| resolve_rgb(0x76, 0x76, 0x76, self.level).map(map_color)),
+            ..Style::default()
+        }
+    }
+
+    fn path_hover_style(&self) -> Style {
+        if self.level == ColorLevel::NoColor {
+            Style::default().add_modifier(Modifier::BOLD)
+        } else {
+            Style {
+                fg: self
+                    .path_hover
+                    .or_else(|| resolve_rgb(0xb4, 0xf5, 0xff, self.level).map(map_color)),
+                ..Style::default()
+            }
+        }
+    }
+
+    /// Configure only the inactive pane border foreground, respecting terminal capabilities.
+    pub fn set_inactive_pane_border(
+        &mut self,
+        hex: Option<&str>,
+    ) -> Result<(), colored_text::ColorInputError> {
+        self.inactive_pane_border = hex.map(|hex| self.resolve(hex)).transpose()?.flatten();
+        Ok(())
     }
 
     fn section_header_style(&self) -> Style {

@@ -1,6 +1,7 @@
 //! Authoritative pane state and pure transitions. No filesystem calls.
 mod creation;
 mod metadata;
+mod navigation;
 mod notifications;
 mod pane;
 pub use metadata::MetadataFormat;
@@ -50,6 +51,8 @@ pub struct Detail {
 
 /// Both panes remain alive when hidden or temporarily collapsed by width.
 pub struct App {
+    pub path_picker: Option<crate::navigation::PathPicker>,
+    pub path_pointer: Option<(u16, u16)>,
     pub notifications: crate::notifications::Notifications,
     pub operations: crate::operations::State,
     pub panes: [Pane; 2],
@@ -87,6 +90,8 @@ impl App {
     /// Every invocation starts single-pane, with two independent original locations.
     pub fn new(path: PathBuf) -> Self {
         Self {
+            path_picker: None,
+            path_pointer: None,
             notifications: Default::default(),
             operations: Default::default(),
             panes: [Pane::new(path.clone()), Pane::new(path)],
@@ -326,6 +331,7 @@ impl App {
             state.entry_identity = snapshot.entry_identity.clone();
         }
         state.install(snapshot);
+        self.close_stale_path_picker(pane);
         self.reconcile_listing_details(pane, previous);
         true
     }
