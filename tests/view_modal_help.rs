@@ -6,7 +6,7 @@ use std::time::Duration;
 use terminal_file_manager::{
     app::App,
     color::{Role, Theme},
-    input::{Bindings, Controller, HelpTopic, chord},
+    input::{Bindings, Controller, HelpTopic, ViewHelpTopic, chord},
     ui,
 };
 
@@ -62,8 +62,8 @@ fn text(buffer: &Buffer) -> String {
 #[test]
 fn both_help_keys_preserve_view_selection_settings_and_geometry() {
     for (open, topic) in [
-        ("V", HelpTopic::ViewOptions),
-        ("Alt+v", HelpTopic::ViewProfiles),
+        ("V", HelpTopic::View(ViewHelpTopic::Options)),
+        ("Alt+v", HelpTopic::View(ViewHelpTopic::Profiles)),
     ] {
         let mut c = controller();
         key(&mut c, open);
@@ -118,7 +118,7 @@ fn save_help_keeps_question_literal_and_close_cancels_one_layer_at_a_time() {
     key(&mut c, "F1");
     assert_eq!(
         c.app.context_help.as_ref().unwrap().topic,
-        HelpTopic::SaveProfile
+        HelpTopic::View(ViewHelpTopic::SaveProfile)
     );
     key(&mut c, "Enter");
     event(&mut c, Event::Paste("other".into()), bounds);
@@ -246,7 +246,7 @@ fn mouse_help_and_close_keep_view_changes_and_do_not_change_another_row() {
     click(&mut c, shell.help.unwrap(), bounds);
     assert_eq!(
         c.app.context_help.as_ref().unwrap().topic,
-        HelpTopic::ViewOptions
+        HelpTopic::View(ViewHelpTopic::Options)
     );
     click(&mut c, shell.body, bounds);
     assert_eq!(toml::to_string(&c.preferences).unwrap(), changed);

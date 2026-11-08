@@ -21,7 +21,7 @@ pub use bindings::{Bindings, chord};
 pub use controller::Controller;
 pub use help::{
     ContextHelp, HelpEntry, HelpFragment, HelpHit, HelpParagraph, HelpPicker, HelpSection,
-    HelpTarget, HelpTopic, help_hits,
+    HelpTarget, HelpTopic, ViewHelpTopic, help_hits,
 };
 
 /// Browser and local-operation actions share dispatch; later milestones explain unavailability.

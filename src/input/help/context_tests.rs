@@ -10,6 +10,51 @@ fn controller() -> Controller {
 }
 
 #[test]
+fn view_topics_keep_distinct_titles_prose_and_opening_hints() {
+    let c = controller();
+    for (topic, title, start, action) in [
+        (
+            HelpTopic::View(ViewHelpTopic::Options),
+            "View Options Help",
+            "Change how you see",
+            crate::input::Action::ViewOptions,
+        ),
+        (
+            HelpTopic::View(ViewHelpTopic::Profiles),
+            "View Profiles Help",
+            "Choose saved display settings",
+            crate::input::Action::ViewProfiles,
+        ),
+        (
+            HelpTopic::View(ViewHelpTopic::SaveProfile),
+            "Save Profile Help",
+            "Type a name for the active pane",
+            crate::input::Action::ViewProfiles,
+        ),
+    ] {
+        assert_eq!(topic.title(), title);
+        let paragraphs = topic.text(&c.app);
+        let plain = |paragraph: &crate::input::HelpParagraph| {
+            paragraph
+                .iter()
+                .map(|fragment| match fragment {
+                    crate::input::HelpFragment::Text(text)
+                    | crate::input::HelpFragment::Key(text) => text.as_str(),
+                })
+                .collect::<String>()
+        };
+        assert!(plain(&paragraphs[0]).starts_with(start));
+        assert_eq!(
+            plain(paragraphs.last().unwrap()),
+            format!(
+                "Open from the file list: {}.",
+                c.app.help_entry(action).unwrap().keys
+            )
+        );
+    }
+}
+
+#[test]
 fn current_topic_follows_the_visible_layer_instead_of_a_background_dialog() {
     let mut c = controller();
     assert_eq!(HelpTopic::current(&c.app), None);
@@ -25,11 +70,20 @@ fn current_topic_follows_the_visible_layer_instead_of_a_background_dialog() {
     });
     assert_eq!(HelpTopic::current(&c.app), Some(HelpTopic::Incident));
     c.app.profile_menu = Some(0);
-    assert_eq!(HelpTopic::current(&c.app), Some(HelpTopic::ViewProfiles));
+    assert_eq!(
+        HelpTopic::current(&c.app),
+        Some(HelpTopic::View(ViewHelpTopic::Profiles))
+    );
     c.app.profile_name = Some(String::new());
-    assert_eq!(HelpTopic::current(&c.app), Some(HelpTopic::SaveProfile));
+    assert_eq!(
+        HelpTopic::current(&c.app),
+        Some(HelpTopic::View(ViewHelpTopic::SaveProfile))
+    );
     c.app.view_menu = Some(0);
-    assert_eq!(HelpTopic::current(&c.app), Some(HelpTopic::ViewOptions));
+    assert_eq!(
+        HelpTopic::current(&c.app),
+        Some(HelpTopic::View(ViewHelpTopic::Options))
+    );
     c.app.popup = true;
     assert_eq!(HelpTopic::current(&c.app), Some(HelpTopic::Metadata));
     c.app.help = true;
@@ -58,7 +112,10 @@ fn editable_topics_reserve_question_but_always_offer_f1() {
         assert_eq!(opens_with_key(&c, question, topic), !editable);
         assert!(opens_with_key(&c, f1, topic));
     }
-    for topic in [HelpTopic::Incident, HelpTopic::SaveProfile] {
+    for topic in [
+        HelpTopic::Incident,
+        HelpTopic::View(ViewHelpTopic::SaveProfile),
+    ] {
         assert!(editing(&c.app, topic));
         assert!(!opens_with_key(&c, question, topic));
         assert!(opens_with_key(&c, f1, topic));

@@ -1,5 +1,5 @@
 //! Context prose identifies shortcut fragments before any theme or wrapping.
-use super::HelpTopic;
+use super::{HelpTopic, ViewHelpTopic};
 use crate::{app::App, input::Action, operations::Operation};
 
 /// A prose fragment or literal shortcut, styled only by the Help renderer.
@@ -38,9 +38,7 @@ fn paragraph(text: &str, bindings: &[&str]) -> HelpParagraph {
 pub(super) fn text(topic: HelpTopic, app: &App) -> Vec<HelpParagraph> {
     let (action, lines) = match topic {
         HelpTopic::FullPath => (Action::FullPath, FULL_PATH),
-        HelpTopic::ViewOptions => (Action::ViewOptions, VIEW_OPTIONS),
-        HelpTopic::ViewProfiles => (Action::ViewProfiles, VIEW_PROFILES),
-        HelpTopic::SaveProfile => (Action::ViewProfiles, SAVE_PROFILE),
+        HelpTopic::View(view) => view_text(view),
         HelpTopic::Metadata => return metadata(app),
         HelpTopic::Pattern => (Action::PatternSelection, PATTERN),
         HelpTopic::Conflict => (Action::Jobs, CONFLICT),
@@ -58,6 +56,14 @@ fn action_paragraphs(app: &App, action: Action, lines: &[&str]) -> Vec<HelpParag
         text.push(paragraph("Open from the file list: `{}`.", &[&entry.keys]));
     }
     text
+}
+
+fn view_text(view: ViewHelpTopic) -> (Action, &'static [&'static str]) {
+    match view {
+        ViewHelpTopic::Options => (Action::ViewOptions, VIEW_OPTIONS),
+        ViewHelpTopic::Profiles => (Action::ViewProfiles, VIEW_PROFILES),
+        ViewHelpTopic::SaveProfile => (Action::ViewProfiles, SAVE_PROFILE),
+    }
 }
 
 fn operation_text(operation: Operation) -> (Action, &'static [&'static str]) {
