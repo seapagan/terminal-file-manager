@@ -76,7 +76,7 @@ fn loading_suffix_and_directory_tail_share_the_measured_budget() {
 }
 
 #[test]
-fn path_budgets_preserve_exact_fits_and_elide_only_complete_middle_components() {
+fn path_budgets_elide_middle_components_and_retain_ellipsis_at_boundary_widths() {
     let app = App::new("/alpha/beta/gamma/leaf".into());
     for (budget, expected) in [
         (22, "/alpha/beta/gamma/leaf"),

@@ -146,12 +146,7 @@ fn picker_mouse(
     c.app.path_pointer = Some((mouse.column, mouse.row));
     match mouse.kind {
         MouseEventKind::Down(MouseButton::Left) if mouse.modifiers.is_empty() => {
-            if layout.shell.hit(mouse.column, mouse.row).is_some()
-                || layout
-                    .shell
-                    .close
-                    .is_some_and(|r| r.contains((mouse.column, mouse.row).into()))
-            {
+            if layout.shell.hit(mouse.column, mouse.row).is_some() {
                 c.app.path_picker = None;
             } else if let Some((control, _)) = layout
                 .controls
