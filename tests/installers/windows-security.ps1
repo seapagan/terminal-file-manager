@@ -27,6 +27,53 @@ function Assert-Equal([object]$Actual, [object]$Expected, [string]$Reason) {
     $script:securityPasses++
 }
 
+function Assert-VersionMessages {
+    $candidate = Join-Path -Path $securityRoot -ChildPath 'version.ps1'
+    [IO.File]::WriteAllText($candidate, @'
+if ($env:NO_COLOR -ne '1') { throw 'candidate needs plain output requested' }
+$global:LASTEXITCODE = [int]$env:TFM_TEST_VERSION_EXIT
+$env:TFM_TEST_VERSION_OUTPUT -split "`n"
+'@)
+    $savedNoColor = $env:NO_COLOR
+    try {
+        foreach ($case in @(
+            @{ Text = 'tfm 1.2.3'; Code = 0; Valid = $true },
+            @{ Text = "tfm 1.2.3`nAdditional information`nUnrelated licence details"; Code = 0; Valid = $true },
+            @{ Text = "tfm 1.2.3 (release build)`nMore details"; Code = 0; Valid = $true },
+            @{ Text = "tfm 1.2.3`t(release build)"; Code = 0; Valid = $true },
+            @{ Text = "tfm 1.2.3`v(release build)"; Code = 0; Valid = $false },
+            @{ Text = "tfm 1.2.30`ntfm 1.2.3"; Code = 0; Valid = $false },
+            @{ Text = 'tfm 1.2.3-dev'; Code = 0; Valid = $false },
+            @{ Text = "`ntfm 1.2.3"; Code = 0; Valid = $false },
+            @{ Text = "tfm 9.9.9`ntfm 1.2.3"; Code = 0; Valid = $false },
+            @{ Text = "tfm 1.2.3`nMore details"; Code = 23; Valid = $false }
+        )) {
+            $env:TFM_TEST_VERSION_OUTPUT = $case.Text
+            $env:TFM_TEST_VERSION_EXIT = $case.Code
+            $env:NO_COLOR = 'preserved'
+            if ($case.Valid) { Assert-CandidateVersion -Exe $candidate -Version 'v1.2.3'; $script:securityPasses++ }
+            else { Assert-Rejected -Action { Assert-CandidateVersion -Exe $candidate -Version 'v1.2.3' } -Reason 'invalid version message' -Expected 'candidate failed|reported version does not match' }
+            Assert-Equal -Actual $env:NO_COLOR -Expected 'preserved' -Reason 'version validation changed caller colour policy'
+        }
+        foreach ($version in @('1.2.3-rc.1', '1.2.3+build.1', '1.2.3-rc.1+build.1')) {
+            $env:TFM_TEST_VERSION_EXIT = '0'
+            $env:TFM_TEST_VERSION_OUTPUT = "tfm $version`nMore details"
+            Assert-CandidateVersion -Exe $candidate -Version "v$version"
+            $script:securityPasses++
+            $env:TFM_TEST_VERSION_OUTPUT = "tfm ${version}0"
+            Assert-Rejected -Action { Assert-CandidateVersion -Exe $candidate -Version "v$version" } -Reason 'version-prefix collision' -Expected 'reported version does not match'
+        }
+        Remove-Item -Path Env:NO_COLOR -ErrorAction SilentlyContinue
+        $env:TFM_TEST_VERSION_OUTPUT = 'tfm 1.2.3'
+        $env:TFM_TEST_VERSION_EXIT = '0'
+        Assert-CandidateVersion -Exe $candidate -Version 'v1.2.3'
+        Assert-Equal -Actual (Test-Path -Path Env:NO_COLOR) -Expected $false -Reason 'version validation leaked colour policy'
+    } finally {
+        if ($null -eq $savedNoColor) { Remove-Item -Path Env:NO_COLOR -ErrorAction SilentlyContinue }
+        else { $env:NO_COLOR = $savedNoColor }
+    }
+}
+
 function Build-MemberZip([string[]]$Names, [int]$Attributes = 0) {
     # Required isolated fixture construction; skipping it invalidates the test.
     $path = Join-Path -Path $securityRoot -ChildPath ([IO.Path]::GetRandomFileName() + '.zip')
@@ -242,6 +289,7 @@ public static class TfmTlsFixture {
         try { Assert-CandidateVersion -Exe $scriptCandidate -Version 'v1.2.3' }
         catch { $errorMessage = $_.Exception.Message }
         Assert-Equal -Actual $errorMessage -Expected 'unrelated candidate error' -Reason 'unrelated candidate error swallowed'
+        Assert-VersionMessages
     } finally {
         # Negative assertions must not manufacture a failure for the CI wrapper.
         if ($nativeStatus) { $global:LASTEXITCODE = $savedNativeStatus }

@@ -248,8 +248,10 @@ cp "$test_bin/curl" "$test_bin/wget" "$no_sha_bin/"
 cat >"$root/archive/tfm" <<'EOF'
 #!/bin/sh
 printf 'candidate\n' >>"$TEST_EVENT_LOG"
-test "${TEST_CANDIDATE_EXIT:-0}" = 0 || exit "$TEST_CANDIDATE_EXIT"
-printf 'tfm %s\n' "${TEST_CANDIDATE_VERSION:-99.88.77}"
+if test -n "${FORCE_COLOR:-}" && test -z "${NO_COLOR+x}"; then printf '\033[36m'; fi
+printf 'tfm %s%s\n' "${TEST_CANDIDATE_VERSION:-99.88.77}" "${TEST_CANDIDATE_SUFFIX:-}"
+test -z "${TEST_CANDIDATE_TRAILER:-}" || printf '%s\n' "$TEST_CANDIDATE_TRAILER"
+exit "${TEST_CANDIDATE_EXIT:-0}"
 EOF
 chmod +x "$root/archive/tfm"
 printf 'release notices\n' >"$root/archive/THIRD_PARTY_NOTICES.md"
@@ -308,7 +310,7 @@ reset_env() {
     printf '0\n' >"$TEST_STAGE_COUNTER"
     unset TFM_VERSION TFM_LIBC XDG_BIN_HOME \
         TEST_OS TEST_ARCH TEST_GLIBC_VERSION TEST_GETCONF_KIND TEST_LDD_KIND \
-        TEST_CANDIDATE_EXIT TEST_CANDIDATE_VERSION TEST_STAGE_FAIL \
+        TEST_CANDIDATE_EXIT TEST_CANDIDATE_VERSION TEST_CANDIDATE_SUFFIX TEST_CANDIDATE_TRAILER FORCE_COLOR NO_COLOR TEST_STAGE_FAIL \
         TEST_INSTALL_FAIL TEST_MOVE_FAIL TEST_INSTALL_SIGNAL TEST_BIN TEST_TAR_INSPECT_FAIL TEST_CHANGE_FINAL
     TEST_GLIBC_VERSION=2.39
     TEST_LATEST_URL=https://github.com/seapagan/terminal-file-manager/releases/tag/$TEST_RELEASE_TAG
@@ -348,6 +350,15 @@ assert_target_named() {
 assert_old_binary() {
     test "$(cat "$TFM_INSTALL_DIR/tfm")" = 'old tfm' || \
         fail 'existing tfm changed after failure'
+}
+
+assert_installed_version() {
+    output=$(NO_COLOR=1 "$TFM_INSTALL_DIR/tfm" --version) || fail 'installed candidate execution failed'
+    first_line=$(printf '%s\n' "$output" | sed -n '1p')
+    case "$first_line" in
+        "tfm $TEST_RELEASE_VERSION"|"tfm $TEST_RELEASE_VERSION"[[:blank:]]*) ;;
+        *) fail 'installed candidate is wrong' ;;
+    esac
 }
 
 assert_no_binary() {
