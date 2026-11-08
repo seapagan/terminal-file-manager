@@ -522,8 +522,11 @@ at `1ece1a1`, with final feature head `b924083`. The [acceptance record](accepta
 records completed independent reviews, maintainer acceptance and feature/merge
 verification. [PR #11](https://github.com/seapagan/terminal-file-manager/pull/11),
 merged as `41a913e`, subsequently narrowed notification delivery to noteworthy
-events. Path navigation and the internal file-operation clipboard remain
-separate future consumers of this status owner; snapshot testing remains deferred.
+events. PM3-06 path navigation is complete through
+[PR #13](https://github.com/seapagan/terminal-file-manager/pull/13), merged as
+`56bf891`; its [acceptance record](acceptance.md#pm3-06-accepted-and-merged--8-november-2026)
+records the final feature-head verification. PM3-07's internal file-operation
+clipboard remains pending and not authorised; snapshot testing remains deferred.
 
 The application owns notification events independently of filesystem jobs.
 Toasts reference those events in chronological order, with newer groups nearest

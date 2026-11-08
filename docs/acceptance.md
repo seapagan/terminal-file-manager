@@ -1,10 +1,19 @@
 # Acceptance gates
 
-## PM3-06 path navigation — 8 November 2026
+## PM3-06 accepted and merged — 8 November 2026
 
-Implementation is on `feat/pm3-06-path-navigation`, based on clean synchronised
-main `151ddaef`. Delivery stops at a draft PR; independent reviews, maintainer
-visual acceptance and merge remain outstanding.
+PM3-06 is **Complete**. The maintainer merged
+[PR #13](https://github.com/seapagan/terminal-file-manager/pull/13) at
+**20:25:22 UTC** as
+[`56bf891`](https://github.com/seapagan/terminal-file-manager/commit/56bf89114afcf160e274b4a889a36cd6b7e37195).
+The final feature head was GPG-signed/Signed-off-by
+[`7ac7fca`](https://github.com/seapagan/terminal-file-manager/commit/7ac7fca1d634421a44b2b303f8f688493e199af8)
+on `feat/pm3-06-path-navigation`, based on `151ddaef`.
+
+PM3-07 clipboard is **Pending (not authorised)**. Its preceding dependencies
+are complete, but implementation requires a separate assignment. M3-GATE remains
+**Not started** until PM3-07 completes. Earlier implementation, draft-delivery
+and verification checkpoints below describe their recorded revisions.
 
 The synthetic `..` row remains outside filesystem entries, marking/counting and
 operation operands. Home focuses it; Enter/double-click reuse parent navigation,
@@ -37,18 +46,33 @@ capture, cancellation and resize. Native Windows-only cases cover drive, UNC,
 verbatim and unpaired UTF-16 paths; existing link fixtures also exercise virtual
 parent navigation through Unix symlinks and Windows junctions.
 
-Verification commands and execution results are recorded in the ignored controller
-and draft-delivery handoff. Linux cross-build evidence does not establish native
-Windows/macOS execution or physical terminal visual acceptance. Infrastructure,
-dependencies, policy and release tooling are unchanged; no release rehearsal is
-part of this feature.
+The final feature head passed **19/19 hosted checks** across all five workflows.
+[Rust CI 42516674920](https://github.com/seapagan/terminal-file-manager/actions/runs/42516674920)
+passed native Linux **1,044 / 2 skipped**, macOS **1,019 / 2 skipped** and Windows
+**985 / 3 skipped**, plus one doctest on each platform. Combined coverage was
+**96.3% lines / 94.4% functions**. Codacy static analysis passed with zero
+annotations; diff coverage was 97.44%, with +0.09 percentage-point variation.
+
+The final navigation and cleanup commits passed elevated
+`RUSTUP_TOOLCHAIN=1.95.0 cargo make verify` in 86.70 and 109.29 seconds,
+including Windows MSVC check/Clippy/build. Clean `cargo make verify-postcommit`
+passed in 64.66 seconds, including exact MSRV and current-toolchain verification
+of the 310-file source package. Help title/prose dispatchers each measure CCN 9;
+20 inherited Lizard advisories remain. Existing Node deprecation and Codacy
+JGitText uploader warnings did not prevent coverage upload or final notification.
+
+These results describe the final feature head, not new tests on the merge commit
+or this documentation update. Native automated tests do not establish a physical
+terminal acceptance matrix. Infrastructure, dependencies, QC policy and release
+tooling are unchanged; no release rehearsal is part of this feature.
 
 ## Post-PM3-05 follow-ups accepted and merged — 8 November 2026
 
 The merged maintenance work preserves PM3-05 completion and the existing
-filesystem, Jobs and safe-exit contracts. PM3-06 remains **Ready, not authorised**;
-PM3-07 and M3-GATE remain **Not started**. Dated checkpoints below retain their
-original scope and evidence; their earlier draft or pending labels are historical.
+filesystem, Jobs and safe-exit contracts. At this checkpoint, PM3-06 was
+**Ready, not authorised**; PM3-07 and M3-GATE were **Not started**. The PM3-06
+closeout above supersedes those status labels. Dated checkpoints retain their
+original scope and evidence.
 
 | Follow-up | Final feature head | Accepted merge |
 | --- | --- | --- |
@@ -146,12 +170,9 @@ Claude corrections. Seventeen existing Lizard NLOC parser-span advisories and
 nonblocking uploader Node deprecation warnings remain; thresholds and
 suppressions are unchanged.
 
-**Current:** PM3-06 path navigation is implemented on `feat/pm3-06-path-navigation`;
-draft delivery and verification evidence appear in its checkpoint above.
-PM3-07 clipboard remains **Not started** until PM3-06 completes;
-its status-framework prerequisite is satisfied. M3-GATE remains **Not started**
-and still requires completion of PM3-06 and PM3-07. Snapshot testing remains a separately deferred
-proposal, not an outstanding PM3-05 acceptance condition.
+See the [PM3-06 closeout](#pm3-06-accepted-and-merged--8-november-2026) for current
+milestone status. Snapshot testing remains a separately deferred proposal, not an
+outstanding PM3-05 acceptance condition.
 
 ## PM3-05 review corrections — 6 November 2026
 
@@ -807,10 +828,10 @@ application includes the M1 local browser and completed M2 local operations.
 The maintainer merged M1 in [PR #2](https://github.com/seapagan/terminal-file-manager/pull/2)
 on 18 October 2026 and M2 in [PR #3](https://github.com/seapagan/terminal-file-manager/pull/3)
 on 24 October 2026. Local live refresh is complete through PR #4, with Windows
-manual refresh, and PM3-01 through PM3-05 are merged. The PR #11/#12 follow-ups
-are recorded above. PM3-06 navigation awaits a separate assignment; M3–M8 cover
-the remaining application and final release. Genuine direct SSH-to-SSH transfer
-remains post-v1 work.
+manual refresh, and PM3-01 through PM3-06 are merged. The PR #11/#12 follow-ups
+and PR #13 navigation closeout are recorded above. PM3-07 clipboard is pending
+and not authorised; M3–M8 cover the remaining application and final release.
+Genuine direct SSH-to-SSH transfer remains post-v1 work.
 
 | Checkpoint | Completed proof |
 | --- | --- |
