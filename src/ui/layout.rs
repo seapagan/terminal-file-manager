@@ -107,6 +107,7 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
                 app,
                 geometry.operation_layout.as_ref(),
                 geometry.pattern.as_ref(),
+                geometry.path_picker.as_ref(),
             )
         });
     geometry.path_controls = super::path_navigation::headers(app, &geometry.panes);
@@ -126,9 +127,10 @@ fn finish_geometry(app: &App, area: Rect, geometry: &mut Geometry) {
         .collect();
     geometry.toasts = super::notifications::toasts(app, area);
     geometry.modal_close = geometry
-        .path_picker
+        .context_help
         .as_ref()
-        .and_then(|p| p.shell.close)
+        .and_then(|help| help.shell.close)
+        .or_else(|| geometry.path_picker.as_ref().and_then(|p| p.shell.close))
         .or_else(|| {
             geometry
                 .notification_history
@@ -257,6 +259,7 @@ fn context_control(
     app: &App,
     operation: Option<&super::operations::Layout>,
     pattern: Option<&super::PatternLayout>,
+    path: Option<&super::PathLayout>,
 ) -> Option<Rect> {
     crate::input::HelpTopic::current(app)?;
     if app.popup {
@@ -265,7 +268,9 @@ fn context_control(
     if let Some(layout) = operation {
         return layout.shell.help;
     }
-    pattern.and_then(|layout| layout.shell.help)
+    pattern
+        .and_then(|layout| layout.shell.help)
+        .or_else(|| path.and_then(|layout| layout.shell.help))
 }
 
 fn close_control(app: &App, geometry: &Geometry) -> Option<Rect> {

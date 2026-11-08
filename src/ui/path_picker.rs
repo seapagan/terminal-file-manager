@@ -30,7 +30,7 @@ pub(super) fn layout(app: &App, area: Rect) -> Option<PathLayout> {
     )];
     let shell = modal::Spec {
         title: "Go to directory",
-        help: false,
+        help: true,
         content_width: segments
             .iter()
             .map(|segment| Line::raw(&segment.text).width())

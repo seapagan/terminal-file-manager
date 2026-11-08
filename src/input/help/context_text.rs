@@ -37,6 +37,7 @@ fn paragraph(text: &str, bindings: &[&str]) -> HelpParagraph {
 
 pub(super) fn text(topic: HelpTopic, app: &App) -> Vec<HelpParagraph> {
     let (action, lines) = match topic {
+        HelpTopic::FullPath => (Action::FullPath, FULL_PATH),
         HelpTopic::ViewOptions => (Action::ViewOptions, VIEW_OPTIONS),
         HelpTopic::ViewProfiles => (Action::ViewProfiles, VIEW_PROFILES),
         HelpTopic::SaveProfile => (Action::ViewProfiles, SAVE_PROFILE),
@@ -71,6 +72,13 @@ fn operation_text(operation: Operation) -> (Action, &'static [&'static str]) {
         Operation::Permissions(_) | Operation::ReadOnly(_) => (Action::Attributes, ATTRIBUTES),
     }
 }
+
+const FULL_PATH: &[&str] = &[
+    "Choose a parent directory from the path shown. Only the pane that opened this dialog changes. The current directory starts selected; pressing `Enter` immediately closes without navigating.",
+    "Use `Left` / `Up` and `Right` / `Down`, or `Tab` / `Shift+Tab`, to choose a segment. `Home` selects the root; `End` selects the current directory. The selection stays visible as the path wraps.",
+    "Press `Enter` to open the selected ancestor, or click its segment. Use the mouse wheel to scroll long paths.",
+    "Press `Esc`, click `Esc Cancel` or the title's close button to cancel without navigating. Close Help first to return to the same segment and scroll position.",
+];
 
 const PATTERN: &[&str] = &[
     "Change marks on entries shown in this pane. Hidden and filtered-out entries keep their marks. After applying, the status area shows how many visible entries are marked; this does not add a notification.",

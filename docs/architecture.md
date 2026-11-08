@@ -151,6 +151,9 @@ The configurable `FullPath` action (Alt+L) opens the same picker for the active
 pane regardless of truncation. Both routes select the current directory and use
 the measured terminal area to reveal it. Immediate Enter closes without issuing
 a listing request; Ctrl+L retains the reserved manual-path action.
+The picker registers a `FullPath` context-Help topic and uses the shared title
+Help control, prose renderer and input layer. Help closes before its parent;
+shared resize handling retains a visible path selection when Help closes.
 The same semantic `PathHover` foreground resolves through `colored_text` on both
 surfaces. `path_hover` configures its colour; monochrome uses bold. No persistent
 row, new navigation engine, dependency or clipboard behavior is introduced.

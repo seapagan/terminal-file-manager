@@ -15,6 +15,7 @@ mod tests;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HelpTopic {
+    FullPath,
     Pattern,
     ViewOptions,
     ViewProfiles,
@@ -77,12 +78,16 @@ impl HelpTopic {
         } else if app.operations.waiting_exit.is_some() {
             Some(Self::Exit)
         } else {
-            app.pattern.as_ref().map(|_| Self::Pattern)
+            app.pattern
+                .as_ref()
+                .map(|_| Self::Pattern)
+                .or_else(|| app.path_picker.as_ref().map(|_| Self::FullPath))
         }
     }
 
     pub fn title(self) -> &'static str {
         match self {
+            Self::FullPath => "Go to directory Help",
             Self::ViewOptions => "View Options Help",
             Self::ViewProfiles => "View Profiles Help",
             Self::SaveProfile => "Save Profile Help",

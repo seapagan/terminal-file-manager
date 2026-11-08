@@ -17,6 +17,7 @@ pub(super) fn resize(controller: &mut Controller, width: u16, height: u16) {
         .app
         .metadata_scroll
         .min(geometry.metadata_scroll_limit);
+    super::path_navigation::reveal(controller, &geometry);
 }
 
 pub(super) fn wheel(scroll: &mut u16, kind: MouseEventKind, limit: u16) {

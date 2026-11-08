@@ -41,9 +41,6 @@ pub(super) fn handle(c: &mut Controller, event: &Event, g: &Geometry) -> Option<
         Event::Resize(width, height) => {
             super::scroll::resize(c, *width, *height);
             c.app.path_pointer = None;
-            let next =
-                crate::ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, *width, *height));
-            reveal(c, &next);
             Vec::new()
         }
         _ => Vec::new(),
@@ -115,7 +112,7 @@ fn select(c: &mut Controller, code: KeyCode) -> bool {
     true
 }
 
-fn reveal(c: &mut Controller, g: &Geometry) {
+pub(super) fn reveal(c: &mut Controller, g: &Geometry) {
     let Some(layout) = &g.path_picker else { return };
     let state = c.app.path_picker.as_mut().unwrap();
     let row = layout

@@ -15,9 +15,6 @@ impl Controller {
         if super::notifications::handle(self, &event, geometry) {
             return Vec::new();
         }
-        if let Some(requests) = super::path_navigation::handle(self, &event, geometry) {
-            return requests;
-        }
         let closing = close_hit(&event, geometry.modal_close);
         if closing && metadata_owns_close(&self.app, geometry) {
             return self.dispatch(Action::Cancel, geometry);
@@ -37,6 +34,8 @@ impl Controller {
             || super::help::handle(self, &event, geometry)
         {
             Vec::new()
+        } else if let Some(requests) = super::path_navigation::handle(self, &event, geometry) {
+            requests
         } else {
             self.handle_event(event, geometry, now)
         };

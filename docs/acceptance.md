@@ -21,6 +21,8 @@ Alt+L opens the same picker even when the header path fits; both keyboard and
 ellipsis openings select and reveal the current directory. Immediate Enter and
 Esc close without navigating. The action appears in effective bindings and
 searchable Help; Ctrl+L remains reserved for future manual path entry.
+The shared title `?` button, `?` and F1 open contextual navigation Help. Closing
+Help restores the picker selection and scroll; input stays isolated in Help.
 
 `PathHover` uses a configurable foreground through `path_hover`, with terminal
 colour-depth resolution. Colour hover changes neither underline nor background;
