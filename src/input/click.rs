@@ -23,10 +23,12 @@ impl Controller {
             return Vec::new();
         }
         let pane = &mut self.app.panes[id];
-        let index = pane.viewport_start(page_height(geometry, id)) + usize::from(row - area.y - 2);
+        let start = pane.viewport_start(page_height(geometry, id));
+        let index = start + usize::from(row - area.y - 2);
         let Some(path) = pane.row_path(index) else {
             return Vec::new();
         };
+        pane.scroll = start;
         if event.modifiers.contains(KeyModifiers::SHIFT) {
             if Some(path.as_path()) == pane.path.parent() {
                 pane.cursor = Some(path);

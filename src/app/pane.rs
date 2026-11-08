@@ -289,6 +289,7 @@ impl Pane {
     }
 
     pub(super) fn shift_cursor(&mut self, delta: isize, height: usize) {
+        self.scroll = self.viewport_start(height);
         let index = self.row_index().unwrap_or(0);
         let next = index
             .saturating_add_signed(delta)
