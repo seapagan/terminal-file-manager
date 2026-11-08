@@ -135,7 +135,9 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, layout: Option
         let style = if hovered == Some(*index) || *index == state.selected {
             theme.style(Role::PathHover)
         } else {
-            theme.style(Role::Normal)
+            theme
+                .style(Role::Header)
+                .remove_modifier(ratatui::style::Modifier::BOLD)
         };
         frame.render_widget(
             Paragraph::new(control.text.clone()).style(style),

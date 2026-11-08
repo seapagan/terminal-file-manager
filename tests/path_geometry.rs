@@ -160,6 +160,52 @@ fn picker_wraps_complete_path_with_matching_mouse_targets_and_same_hover_role() 
 }
 
 #[test]
+fn picker_normal_segments_match_the_header_breadcrumb_foreground() {
+    for level in [
+        ColorLevel::NoColor,
+        ColorLevel::Ansi16,
+        ColorLevel::Ansi256,
+        ColorLevel::TrueColor,
+    ] {
+        let mut app = App::new(path());
+        let theme = Theme::new(level);
+        let (header, geometry) = draw(&app, &theme, 80, 24);
+        let area = geometry.path_controls[0].area;
+        let foreground = header[(area.x, area.y)].fg;
+        assert_eq!(
+            foreground,
+            theme.style(Role::Header).fg.unwrap_or(Color::Reset)
+        );
+        app.path_picker = Some(PathPicker {
+            pane: 0,
+            path: path(),
+            selected: 0,
+            scroll: 0,
+        });
+        let (picker, geometry) = draw(&app, &theme, 80, 24);
+        let layout = geometry.path_picker.unwrap();
+        for (control, index) in &layout.controls {
+            let cell = &picker[(control.area.x, control.area.y)];
+            if *index == 0 {
+                assert_eq!(
+                    cell.fg,
+                    theme.style(Role::PathHover).fg.unwrap_or(Color::Reset)
+                );
+                assert_eq!(cell.modifier, theme.style(Role::PathHover).add_modifier);
+            } else {
+                assert_eq!(cell.fg, foreground, "{level:?}: {}", control.text);
+                assert!(cell.modifier.is_empty());
+                if level != ColorLevel::NoColor {
+                    assert_ne!(Some(cell.fg), theme.style(Role::PathHover).fg);
+                }
+            }
+            assert_eq!(cell.bg, Color::Reset);
+            assert_eq!(cell.underline_color, Color::Reset);
+        }
+    }
+}
+
+#[test]
 fn configured_hover_is_strict_and_resolved_for_terminal_capabilities() {
     assert!(
         Settings::parse("path_hover = 'invalid-colour'")
