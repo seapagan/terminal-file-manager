@@ -67,6 +67,12 @@ fn draw(c: &Controller, width: u16) -> (Buffer, ui::PathLayout) {
 fn short_picker_fits_native_display_cells_with_small_padding_for_both_opening_routes() {
     let text = ui::clean(&path().to_string_lossy());
     let expected_width = Line::raw(&text).width() as u16 + 4;
+    let expected = Buffer::with_lines([text.as_str()]);
+    let expected = expected
+        .content
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect::<String>();
     let mut previous = None;
     for mouse in [false, true] {
         for width in [120, 240, 400] {
@@ -77,21 +83,16 @@ fn short_picker_fits_native_display_cells_with_small_padding_for_both_opening_ro
             assert_eq!(layout.shell.body.height, 1);
             assert_eq!(layout.shell.outer.x, (width - expected_width) / 2);
             assert_eq!(layout.scroll, 0);
-            let rendered = layout
-                .controls
-                .iter()
-                .map(|(control, _)| control.text.as_str())
+            let rendered = (layout.shell.body.x..layout.shell.body.right())
+                .map(|x| buffer[(x, layout.shell.body.y)].symbol())
                 .collect::<String>();
-            assert_eq!(rendered, text);
+            assert_eq!(rendered.trim_end(), expected);
             assert!(
-                layout
-                    .controls
-                    .iter()
-                    .all(|(control, _)| layout.shell.body.contains(control.area.as_position()))
-            );
-            assert_eq!(
-                buffer[(layout.shell.body.x, layout.shell.body.y)].symbol(),
-                &text[..1]
+                layout.controls.iter().all(|(control, _)| layout
+                    .shell
+                    .body
+                    .intersection(control.area)
+                    == control.area)
             );
             let shape = (layout.shell.outer.width, layout.shell.outer.height);
             if let Some(previous) = previous {
@@ -134,10 +135,11 @@ fn oversized_picker_caps_width_and_wraps_the_same_content_after_resizing() {
             let selected = c.app.path_picker.as_ref().unwrap().selected;
             assert!(layout.controls.iter().any(|(_, index)| *index == selected));
             assert!(
-                layout
-                    .controls
-                    .iter()
-                    .all(|(control, _)| control.area.right() <= layout.shell.body.right())
+                layout.controls.iter().all(|(control, _)| layout
+                    .shell
+                    .body
+                    .intersection(control.area)
+                    == control.area)
             );
         }
     }

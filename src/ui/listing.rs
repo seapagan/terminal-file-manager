@@ -132,7 +132,7 @@ fn render_rows(
             .column_spacing(1),
         area,
     );
-    if pane.row_count() == 0 {
+    if pane.visible.is_empty() {
         render_empty(frame, pane, area);
     }
 }
@@ -156,6 +156,7 @@ fn parent_row(pane: &Pane, width: u16, theme: &Theme, active: bool) -> Row<'stat
 }
 
 fn render_empty(frame: &mut Frame, pane: &Pane, area: Rect) {
+    let offset = 1 + u16::from(pane.has_parent());
     frame.render_widget(
         Paragraph::new(if pane.pending.is_some() {
             "Loading directory…"
@@ -164,9 +165,9 @@ fn render_empty(frame: &mut Frame, pane: &Pane, area: Rect) {
         }),
         Rect::new(
             area.x,
-            area.y.saturating_add(1),
+            area.y.saturating_add(offset),
             area.width,
-            area.height.saturating_sub(1),
+            area.height.saturating_sub(offset),
         ),
     );
 }

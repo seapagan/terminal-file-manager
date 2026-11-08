@@ -62,6 +62,7 @@ fn picker_mouse_and_keyboard_select_the_same_native_ancestor() {
             click(control.area.x, control.area.y)
         };
         let requests = c.handle(event, &g, Default::default());
+        assert_eq!(requests.len(), 1);
         assert_eq!(requests[0].path, expected);
         assert!(c.app.path_picker.is_none());
         assert_eq!(c.app.active, 0);

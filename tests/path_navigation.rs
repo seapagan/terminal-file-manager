@@ -48,21 +48,48 @@ fn parent_row_is_keyboard_accessible_and_never_a_filesystem_operand() {
 }
 
 #[test]
-fn parent_row_remains_rendered_when_filter_has_no_matches() {
+fn filtered_listing_keeps_parent_row_above_empty_and_loading_feedback() {
     let root = tempfile::tempdir().unwrap();
+    std::fs::write(root.path().join("file"), "owned").unwrap();
     let mut c = controller(root.path());
     c.app.panes[0].set_filter("absent".into());
-    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
-    terminal
-        .draw(|f| {
-            ui::render(f, &c.app, &Theme::new(colored_text::ColorLevel::NoColor));
-        })
-        .unwrap();
-    let row = (0..80)
-        .map(|x| terminal.backend().buffer()[(x, 2)].symbol())
-        .collect::<String>();
-    assert!(row.contains(".."), "{row}");
+    assert_eq!(c.app.panes[0].entries.len(), 1);
     assert!(c.app.panes[0].visible.is_empty());
+    assert_empty_feedback(&c.app, "No visible entries");
+    c.app.request_listing(0, root.path().into());
+    assert_empty_feedback(&c.app, "Loading directory…");
+}
+
+#[test]
+fn empty_directory_keeps_parent_row_above_empty_and_loading_feedback() {
+    let root = tempfile::tempdir().unwrap();
+    let mut c = controller(root.path());
+    assert!(c.app.panes[0].entries.is_empty());
+    assert_empty_feedback(&c.app, "No visible entries");
+    c.app.request_listing(0, root.path().into());
+    assert_empty_feedback(&c.app, "Loading directory…");
+}
+
+fn assert_empty_feedback(app: &App, message: &str) {
+    for (width, height) in [(80, 24), (32, 10), (24, 10), (24, 9)] {
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        terminal
+            .draw(|f| {
+                ui::render(f, app, &Theme::new(colored_text::ColorLevel::NoColor));
+            })
+            .unwrap();
+        let row = |y| {
+            (1..width - 1)
+                .map(|x| terminal.backend().buffer()[(x, y)].symbol())
+                .collect::<String>()
+        };
+        assert_eq!(row(2).trim(), "..", "{width}x{height}");
+        if height == 9 {
+            assert_eq!(row(3).trim(), "0 items", "Summary must remain unobscured");
+        } else {
+            assert_eq!(row(3).trim(), message, "{width}x{height}");
+        }
+    }
 }
 
 fn mouse(

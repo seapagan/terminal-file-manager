@@ -108,6 +108,7 @@ impl Pane {
             }
         }
         self.range = Some(range);
+        // Preserve the displayed viewport so the new cursor only scrolls at its edges.
         self.scroll = self.viewport_start(height);
         self.cursor = Some(path);
         self.shift_cursor(0, height);

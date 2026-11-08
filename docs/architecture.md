@@ -147,10 +147,10 @@ slices. Display text never reconstructs a navigation target. A one-cell ellipsis
 control opens the shared full-path shell; complete components wrap where possible,
 and oversized components wrap on grapheme boundaries. Its pane/path-bound state
 captures input and yields to operation approvals and the existing Ctrl+C exit flow.
-The configurable `FullPath` action (Alt+L) opens the same picker for the active
+The configurable `FullPath` action (Alt+l) opens the same picker for the active
 pane regardless of truncation. Both routes select the current directory and use
 the measured terminal area to reveal it. Immediate Enter closes without issuing
-a listing request; Ctrl+L retains the reserved manual-path action.
+a listing request; Ctrl+l retains the reserved manual-path action.
 The picker registers a `FullPath` context-Help topic and uses the shared title
 Help control, prose renderer and input layer. Help closes before its parent;
 shared resize handling retains a visible path selection when Help closes.

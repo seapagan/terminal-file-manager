@@ -17,10 +17,10 @@ ellipsis that opens a shared content-sized modal. The picker
 wraps complete components where possible and oversized names by grapheme, supports
 keyboard/mouse selection and scrolling, and captures input until cancellation or
 navigation. Existing operation approvals and Ctrl+C safety retain priority.
-Alt+L opens the same picker even when the header path fits; both keyboard and
+Alt+l opens the same picker even when the header path fits; both keyboard and
 ellipsis openings select and reveal the current directory. Immediate Enter and
 Esc close without navigating. The action appears in effective bindings and
-searchable Help; Ctrl+L remains reserved for future manual path entry.
+searchable Help; Ctrl+l remains reserved for future manual path entry.
 The shared title `?` button, `?` and F1 open contextual navigation Help. Closing
 Help restores the picker selection and scroll; input stays isolated in Help.
 

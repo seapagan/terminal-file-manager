@@ -149,7 +149,7 @@ fn hover_changes_only_foreground_and_has_a_monochrome_fallback() {
 }
 
 #[test]
-fn picker_wraps_complete_path_with_matching_mouse_targets_and_same_hover_role() {
+fn picker_wraps_complete_path_with_matching_mouse_targets_within_modal_bounds() {
     let mut app = App::new(path());
     app.path_picker = Some(PathPicker {
         pane: 0,
@@ -171,11 +171,11 @@ fn picker_wraps_complete_path_with_matching_mouse_targets_and_same_hover_role() 
                 app.path_picker.as_mut().unwrap().scroll = scroll;
                 let (_, g) = draw(&app, &theme, width, 24);
                 let layout = g.path_picker.unwrap();
-                assert!(layout.shell.outer.width >= width.saturating_sub(2));
-                assert!(layout.shell.outer.height <= 22);
+                let outer = layout.shell.outer;
+                assert!(outer.width >= width.saturating_sub(2));
+                assert_eq!(outer.intersection(Rect::new(1, 1, width - 2, 22)), outer);
                 for (control, _) in &layout.controls {
-                    assert!(layout.shell.body.contains(control.area.as_position()));
-                    assert!(control.area.right() <= layout.shell.body.right());
+                    assert_eq!(layout.shell.body.intersection(control.area), control.area);
                     if seen.insert((
                         layout.scroll + usize::from(control.area.y - layout.shell.body.y),
                         control.area.x,

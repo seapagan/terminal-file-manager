@@ -182,7 +182,7 @@ fn opening_reveals_selection_using_the_original_offset_geometry() {
     assert!(state.scroll > 0);
     let g = ui::geometry(&c.app, area);
     let layout = g.path_picker.unwrap();
-    assert!(area.contains(layout.shell.outer.as_position()));
+    assert_eq!(area.intersection(layout.shell.outer), layout.shell.outer);
     assert!(
         layout
             .controls
@@ -192,7 +192,7 @@ fn opening_reveals_selection_using_the_original_offset_geometry() {
 }
 
 #[test]
-fn immediate_enter_closes_the_current_directory_even_without_visible_controls() {
+fn immediate_enter_closes_picker_without_navigation_even_without_visible_controls() {
     for area in [Rect::new(0, 0, 1, 1), Rect::new(0, 0, 80, 24)] {
         let mut c = controller(path());
         let g = ui::geometry(&c.app, area);
