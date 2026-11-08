@@ -29,7 +29,7 @@ pub(super) fn layout(app: &App, area: Rect) -> Option<PathLayout> {
         KeyCode::Esc,
     )];
     let shell = modal::Spec {
-        title: "Full path",
+        title: "Go to directory",
         help: false,
         content_width: segments
             .iter()
@@ -128,7 +128,7 @@ fn wrap(segments: &[crate::navigation::PathSegment], width: u16) -> Wrapped {
 pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, layout: Option<&PathLayout>) {
     let Some(layout) = layout else { return };
     let state = app.path_picker.as_ref().unwrap();
-    modal::render_measured(frame, &layout.shell, "Full path", theme, Role::Header);
+    modal::render_measured(frame, &layout.shell, "Go to directory", theme, Role::Header);
     let hovered = app.path_pointer.and_then(|(x, y)| {
         layout
             .controls
