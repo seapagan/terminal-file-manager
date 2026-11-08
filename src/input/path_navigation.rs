@@ -71,21 +71,7 @@ fn picker_key(c: &mut Controller, key: crossterm::event::KeyEvent, g: &Geometry)
         }
         return Vec::new();
     }
-    if matches!(key.code, KeyCode::PageUp | KeyCode::PageDown) {
-        let height = g
-            .path_picker
-            .as_ref()
-            .map_or(1, |layout| layout.shell.body.height.max(1) as isize);
-        scroll(
-            c,
-            g,
-            if key.code == KeyCode::PageUp {
-                -height
-            } else {
-                height
-            },
-        );
-    } else if select(c, key.code) {
+    if select(c, key.code) {
         reveal(c, g);
     }
     Vec::new()

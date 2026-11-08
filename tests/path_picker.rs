@@ -179,3 +179,94 @@ fn modified_tab_does_not_move_picker_focus() {
     );
     assert_eq!(c.app.path_picker.as_ref().unwrap().selected, before);
 }
+
+#[test]
+fn paging_keys_are_inert_and_hints_omit_them_while_the_wheel_still_scrolls() {
+    let mut c = controller();
+    let g = ui::geometry(&c.app, Rect::new(0, 0, 24, 10));
+    assert!(g.path_picker.as_ref().unwrap().limit > 0);
+    for code in [KeyCode::PageDown, KeyCode::PageUp] {
+        assert!(
+            c.handle(
+                Event::Key(KeyEvent::new(code, KeyModifiers::NONE)),
+                &g,
+                Default::default()
+            )
+            .is_empty()
+        );
+        let state = c.app.path_picker.as_ref().unwrap();
+        assert_eq!((state.selected, state.scroll), (0, 0));
+    }
+    for (kind, expected) in [
+        (MouseEventKind::ScrollDown, 1),
+        (MouseEventKind::ScrollUp, 0),
+    ] {
+        let g = ui::geometry(&c.app, Rect::new(0, 0, 24, 10));
+        c.handle(
+            Event::Mouse(MouseEvent {
+                kind,
+                column: 10,
+                row: 4,
+                modifiers: KeyModifiers::NONE,
+            }),
+            &g,
+            Default::default(),
+        );
+        let state = c.app.path_picker.as_ref().unwrap();
+        assert_eq!((state.selected, state.scroll), (0, expected));
+    }
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    terminal
+        .draw(|f| {
+            ui::render(f, &c.app, &Theme::new(ColorLevel::NoColor));
+        })
+        .unwrap();
+    let text = terminal
+        .backend()
+        .buffer()
+        .content
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect::<String>();
+    assert!(text.contains("Arrows select"));
+    assert!(!text.contains("PgUp") && !text.contains("PgDn"));
+}
+
+#[test]
+fn arrow_navigation_reveals_each_segment_and_home_end_keep_their_targets() {
+    let mut c = controller();
+    let path = (0..24).fold(c.app.panes[0].path.clone(), |path, _| path.join("segment"));
+    c.app.panes[0].path = path.clone();
+    c.app.path_picker.as_mut().unwrap().path = path.clone();
+    let count = terminal_file_manager::navigation::path_segments(&path).len();
+    for (code, indices) in [
+        (KeyCode::Down, (1..count).collect::<Vec<_>>()),
+        (KeyCode::Up, (0..count - 1).rev().collect()),
+        (KeyCode::Right, (1..count).collect()),
+        (KeyCode::Left, (0..count - 1).rev().collect()),
+        (KeyCode::End, vec![count - 1]),
+        (KeyCode::Home, vec![0]),
+    ] {
+        for index in indices {
+            let g = ui::geometry(&c.app, Rect::new(0, 0, 40, 10));
+            assert!(
+                c.handle(
+                    Event::Key(KeyEvent::new(code, KeyModifiers::NONE)),
+                    &g,
+                    Default::default()
+                )
+                .is_empty()
+            );
+            let state = c.app.path_picker.as_ref().unwrap();
+            assert_eq!(state.selected, index);
+            let g = ui::geometry(&c.app, Rect::new(0, 0, 40, 10));
+            assert!(
+                g.path_picker
+                    .unwrap()
+                    .controls
+                    .iter()
+                    .any(|(_, selected)| *selected == index)
+            );
+        }
+    }
+}

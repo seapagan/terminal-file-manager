@@ -146,18 +146,14 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, layout: Option
     }
     if layout.limit > 0 && layout.shell.cue.height > 0 {
         frame.render_widget(
-            Paragraph::new(format!(
-                "{} / {} · PgUp/PgDn scroll",
-                layout.scroll + 1,
-                layout.limit + 1
-            ))
-            .style(theme.style(Role::Muted)),
+            Paragraph::new(format!("{} / {}", layout.scroll + 1, layout.limit + 1))
+                .style(theme.style(Role::Muted)),
             layout.shell.cue,
         );
     }
     frame.render_widget(
         Paragraph::new(modal::truncate(
-            "Arrows select · Enter open · PgUp/PgDn scroll",
+            "Arrows select · Enter open",
             layout.shell.footer.width,
         ))
         .style(theme.style(Role::Muted)),

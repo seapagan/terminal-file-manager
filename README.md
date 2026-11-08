@@ -43,7 +43,7 @@ enter it, and use the wheel to scroll. The `..` row opens the parent directory
 with Enter or a double-click; it cannot be marked or used in file operations.
 Click a component in a pane’s path to jump to that ancestor. Click `…` to show
 the full path, then use arrows and Enter or click a component. Esc cancels;
-PageUp/PageDown and the wheel scroll long paths. Press `?` or F1 to see the shortcuts currently
+Arrow keys reveal the selected segment; the wheel scrolls long paths. Press `?` or F1 to see the shortcuts currently
 configured in your installation.
 
 ## Keyboard shortcuts
