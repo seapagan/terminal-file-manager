@@ -196,7 +196,7 @@ fn navigate(c: &mut Controller, pane: usize, path: std::path::PathBuf) -> Vec<Re
     c.app.path_pointer = None;
     c.app.active = pane;
     c.app.sidebar = c.app.panes[pane].sidebar;
-    if path == c.app.panes[pane].path {
+    if path == c.app.panes[pane].path && c.app.panes[pane].pending.is_none() {
         return Vec::new();
     }
     if Some(path.as_path()) == c.app.panes[pane].path.parent() {

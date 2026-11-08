@@ -56,7 +56,9 @@ impl Pane {
             self.anchor_range();
         }
         self.shift_cursor(delta, height);
-        if let Some(path) = self.cursor.clone() {
+        if self.parent_focused() {
+            self.reset_range();
+        } else if let Some(path) = self.cursor.clone() {
             self.select_range_to(path, height);
         }
     }

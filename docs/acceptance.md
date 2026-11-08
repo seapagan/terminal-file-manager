@@ -21,6 +21,10 @@ Alt+l opens the same picker even when the header path fits; both keyboard and
 ellipsis openings select and reveal the current directory. Immediate Enter and
 Esc close without navigating. The action appears in effective bindings and
 searchable Help; Ctrl+l remains reserved for future manual path entry.
+Choosing the current directory supersedes pending navigation and rejects its late
+completion. Successful directory changes close the bound picker before further
+keyboard or mouse input. Shift+Up and Shift+click on `..` end the range gesture
+while preserving existing marks.
 The shared title `?` button, `?` and F1 open contextual navigation Help. Closing
 Help restores the picker selection and scroll; input stays isolated in Help.
 

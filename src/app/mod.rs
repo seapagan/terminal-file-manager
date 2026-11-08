@@ -331,6 +331,7 @@ impl App {
             state.entry_identity = snapshot.entry_identity.clone();
         }
         state.install(snapshot);
+        self.close_stale_path_picker(pane);
         self.reconcile_listing_details(pane, previous);
         true
     }

@@ -275,24 +275,49 @@ fn operation_shortcuts_on_parent_cannot_submit_a_filesystem_mutation() {
 }
 
 #[test]
-fn shift_clicking_parent_focuses_without_marking_or_double_click_navigation() {
+fn shift_keyboard_and_mouse_parent_focus_end_the_range_without_losing_marks() {
     use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
     let root = tempfile::tempdir().unwrap();
-    let mut c = controller(root.path());
-    let g = ui::geometry(&c.app, Rect::new(0, 0, 80, 24));
-    for time in [0, 100] {
-        let event = Event::Mouse(MouseEvent {
-            kind: MouseEventKind::Down(MouseButton::Left),
-            column: 8,
-            row: 2,
-            modifiers: KeyModifiers::SHIFT,
-        });
-        assert!(
-            c.handle(event, &g, std::time::Duration::from_millis(time))
-                .is_empty()
-        );
-        assert!(c.app.panes[0].parent_focused());
-        assert!(c.app.panes[0].marks.is_empty());
-        assert!(c.app.panes[0].pending.is_none());
+    for name in ["a", "b", "c", "d"] {
+        std::fs::write(root.path().join(name), "owned").unwrap();
+    }
+    for keyboard in [false, true] {
+        let mut c = controller(root.path());
+        let g = ui::geometry(&c.app, Rect::new(0, 0, 80, 24));
+        for action in [
+            Action::End,
+            Action::Mark,
+            Action::Up,
+            Action::ExtendUp,
+            Action::ExtendUp,
+        ] {
+            c.dispatch(action, &g);
+        }
+        let marks = c.app.panes[0].marks.clone();
+        assert_eq!(marks.len(), 4);
+        let parent = if keyboard {
+            Event::Key(KeyEvent::new(KeyCode::Up, KeyModifiers::SHIFT))
+        } else {
+            Event::Mouse(MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: 8,
+                row: 2,
+                modifiers: KeyModifiers::SHIFT,
+            })
+        };
+        for time in [0, 100] {
+            assert!(
+                c.handle(parent.clone(), &g, std::time::Duration::from_millis(time))
+                    .is_empty()
+            );
+            assert!(c.app.panes[0].parent_focused());
+            assert_eq!(c.app.panes[0].marks, marks);
+            assert!(c.app.panes[0].pending.is_none());
+        }
+        for _ in 0..2 {
+            let down = Event::Key(KeyEvent::new(KeyCode::Down, KeyModifiers::SHIFT));
+            assert!(c.handle(down, &g, Default::default()).is_empty());
+            assert_eq!(c.app.panes[0].marks, marks);
+        }
     }
 }

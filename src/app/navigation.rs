@@ -1,6 +1,26 @@
-//! Virtual navigation rows are separate from the filesystem working set.
-use super::Pane;
+//! Virtual navigation rows and path overlays follow their owning pane.
+use super::{App, Pane};
 use std::path::PathBuf;
+
+impl App {
+    pub(super) fn close_stale_path_picker(&mut self, pane: usize) {
+        if self
+            .path_picker
+            .as_ref()
+            .is_some_and(|picker| picker.pane == pane && picker.path != self.panes[pane].path)
+        {
+            self.path_picker = None;
+            self.path_pointer = None;
+            if self
+                .context_help
+                .as_ref()
+                .is_some_and(|help| help.topic == crate::input::HelpTopic::FullPath)
+            {
+                self.context_help = None;
+            }
+        }
+    }
+}
 
 impl Pane {
     /// A parent exists according to native lexical path semantics.
