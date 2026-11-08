@@ -3,7 +3,8 @@ use colored_text::{Colorize, RenderTarget};
 use terminal_file_manager::ui::clean;
 
 pub(super) fn render(error: &str) -> String {
-    let mut lines = error.split('\n').map(clean);
+    let normalized = error.replace("\r\n", "\n");
+    let mut lines = normalized.split('\n').map(clean);
     let mut output = format!(
         "{} {}",
         "tfm:".red().bold().render(RenderTarget::Stderr),
@@ -17,9 +18,9 @@ pub(super) fn render(error: &str) -> String {
             let pointer = margin.trim() == "|"
                 && !source.trim().is_empty()
                 && source.trim().bytes().all(|byte| byte == b'^');
+            explanation = pointer;
             if pointer {
                 output.push_str(&source.bright_red().render(RenderTarget::Stderr));
-                explanation = true;
             } else {
                 output.push_str(source);
             }
@@ -131,8 +132,24 @@ mod tests {
     }
 
     #[test]
+    fn crlf_diagnostics_preserve_lines_without_literal_carriage_returns() {
+        let sgr = regex::Regex::new("\u{1b}\\[[0-9;]*m").unwrap();
+        for (input, expected) in [
+            (
+                "heading\r\n\r\n 1 | value\r\n  | ^\r\nexplanation\r\n",
+                "tfm: heading\n\n 1 | value\n  | ^\nexplanation\n",
+            ),
+            ("heading\r\nlast\r", "tfm: heading\nlast\\r"),
+            ("heading\n\nlast\n", "tfm: heading\n\nlast\n"),
+            ("", "tfm: "),
+        ] {
+            assert_eq!(sgr.replace_all(&render(input), ""), expected);
+        }
+    }
+
+    #[test]
     fn generic_diagnostics_preserve_whitespace_and_escape_untrusted_controls() {
-        let input = "parser failed\n\n 12 | λ\\n\u{1b}[31m\u{202e}\r\n    | ^^^\ninvalid value, expected a number\n\nprose | unchanged\n";
+        let input = "parser failed\n\n 12 | λ\\n\u{1b}[31m\u{202e}\r\r\n    | ^^^\ninvalid value, expected a number\n\nprose | unchanged\n";
         let plain = regex::Regex::new("\u{1b}\\[[0-9;]*m")
             .unwrap()
             .replace_all(&render(input), "")

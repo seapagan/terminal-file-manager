@@ -308,6 +308,7 @@ reliably distinguished by terminals.
 
 CLI errors use colour to distinguish diagnostic headings, source paths and
 error pointers while preserving multiline source excerpts.
+
 Set `NO_COLOR` to disable colours. Press F12 to inspect the terminal colour
 diagnostics when needed.
 

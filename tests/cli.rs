@@ -12,6 +12,8 @@ fn tfm(arguments: &[&str]) -> Output {
 
 #[path = "cli/help.rs"]
 mod help;
+#[path = "cli/output.rs"]
+mod output;
 
 #[test]
 fn version_uses_the_executable_name_and_manifest_version() {
@@ -278,9 +280,30 @@ fn coloured_config_error(root: &std::path::Path, policy: &[(&str, &str)]) -> Str
 
 #[cfg(unix)]
 #[test]
+fn cli_diagnostic_explanation_highlighting_stops_at_intervening_gutters() {
+    let root = tempfile::tempdir().unwrap();
+    for gutter in ["  |", " 1 | other source"] {
+        let name = format!("missing\n  | ^^^\n{gutter}\nunrelated, expected a value");
+        let output = isolated_session_command(root.path())
+            .env("FORCE_COLOR", "1")
+            .arg(name)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2));
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains("\u{1b}[91m ^^^\u{1b}[0m"), "{stderr:?}");
+        assert!(
+            stderr.contains("\nunrelated, expected a value"),
+            "{stderr:?}"
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
 fn cli_errors_preserve_line_breaks_and_escape_unsafe_characters() {
     let root = tempfile::tempdir().unwrap();
-    let name = "missing\n\nλ界\\n\r\n\t\u{7}\u{1b}[31m\u{85}\u{202e}\u{2069}\u{2028}\u{2029}\n";
+    let name = "missing\n\nλ界\\n\r\r\n\t\u{7}\u{1b}[31m\u{85}\u{202e}\u{2069}\u{2028}\u{2029}\n";
     let output = isolated_session_command(root.path())
         .arg(name)
         .output()
