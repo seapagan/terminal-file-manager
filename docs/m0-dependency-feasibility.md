@@ -6,8 +6,8 @@ shipping-graph certification or an implementation of a file manager/SSH client.
 The maintainer removed the temporary source, isolated workspace and hosted
 workflow in [`e681a368`](https://github.com/seapagan/terminal-file-manager/commit/e681a368)
 on 2026-10-11. That cleanup left product dependencies, MSRV, installers and
-distribution unchanged. Later foundation changes appear in
-[provenance](provenance.md#later-foundation-changes).
+distribution unchanged. Later foundation checkpoints appear in the
+[acceptance record](acceptance.md#current-status-and-evidence).
 
 ## Handover location and future ownership
 
@@ -86,7 +86,8 @@ was the accepted distribution proof at probe closeout. The later
 [run 38625643530](https://github.com/seapagan/terminal-file-manager/actions/runs/38625643530)
 passed all eight native distribution targets and aggregate at `b3c31aa` on
 2026-10-14. The approved CI cleanup and coverage merger also landed after
-closeout; [provenance](provenance.md#later-foundation-changes) records them.
+closeout; the [acceptance record](acceptance.md#m0-c-completed-distribution-contracts)
+records the later distribution contracts and evidence.
 These checkpoints did not publish a release or change the M3/M8 obligations.
 
 ## Selected sources, versions and features

@@ -1,5 +1,56 @@
 # Acceptance gates
 
+## Post-PM3-05 follow-ups accepted and merged — 8 November 2026
+
+The merged maintenance work preserves PM3-05 completion and the existing
+filesystem, Jobs and safe-exit contracts. PM3-06 remains **Ready, not authorised**;
+PM3-07 and M3-GATE remain **Not started**. Dated checkpoints below retain their
+original scope and evidence; their earlier draft or pending labels are historical.
+
+| Follow-up | Final feature head | Accepted merge |
+| --- | --- | --- |
+| [PR #11: notification-noise cleanup](https://github.com/seapagan/terminal-file-manager/pull/11) | `d5b95fe` | `41a913e`, 7 November 2026, 10:26:42 UTC |
+| [PR #12: CLI output and installer compatibility](https://github.com/seapagan/terminal-file-manager/pull/12) | `43ce4fe` | `c198480`, 8 November 2026, 08:14:14 UTC |
+
+PR #11 routes routine marking, profile actions, unsupported commands and field
+validation to status or the active form without adding toast/history records.
+Pattern feedback reports the resulting visible selection count. Profile-name
+errors remain inside Save profile; bounded field geometry and editing preserve
+the dialog's controls. Empty destinations request a path; NUL-containing paths
+identify the invalid character. Edits clear stale field errors. Pending counts
+ask the user to wait; failed destructive previews require cancellation and
+reopening, with confirmation still blocked. Operation outcomes, failed previews,
+background/listing failures, watch recovery and safety warnings remain retained
+notifications. Filesystem Jobs keep their independent evidence; application-only
+events create no Jobs. Rendered/controller regressions cover these boundaries,
+disabled controls and unchanged source/destination bytes.
+
+PR #12 preserves multiline CLI diagnostics, normalises CRLF, escapes standalone
+carriage returns and unsafe controls, and confines explanation styling to the
+line immediately after an error pointer. It adds semantic colour to CLI errors,
+aligned help and metadata-driven multiline version/licence output under the
+existing colour policy. Help/version exit quietly when their stdout pipe closes;
+other write errors use normal CLI failure output. Regression coverage includes
+blank/trailing lines, intervening gutters, forced/plain colour, all four
+help/version flags with a closed pipe and Linux `/dev/full` write failures.
+Installer and rehearsal checks validate successful execution and the complete
+expected first-line version while accepting later banner text; collisions and
+wrong versions remain failures. Stable release-tag restrictions are unchanged.
+
+Both final feature heads passed **19/19 hosted checks**, including native
+Linux/macOS/Windows, exact MSRV, source packaging, combined coverage and Codacy:
+[PR #11 Rust CI](https://github.com/seapagan/terminal-file-manager/actions/runs/42362022606)
+and [PR #12 Rust CI](https://github.com/seapagan/terminal-file-manager/actions/runs/42461290234).
+The accepted `c198480` merge independently passed **14 checks**, with its two
+PR-only report jobs intentionally skipped:
+[merge Rust CI](https://github.com/seapagan/terminal-file-manager/actions/runs/42462059130).
+No merge-head Codacy check or new manual visual-acceptance matrix is inferred.
+
+The [eight-target nonpublishing rehearsal on 7 November](https://github.com/seapagan/terminal-file-manager/actions/runs/42382535639)
+passed at intermediate PR #12 revision `f45dda8`. Later validation corrections
+landed before final head `43ce4fe`; that rehearsal is not final-head or
+production-release certification.
+
 ## PM3-05 accepted and merged — 6 November 2026
 
 The maintainer accepted Status & Notifications and merged [PR #10](https://github.com/seapagan/terminal-file-manager/pull/10)
@@ -711,8 +762,10 @@ M0's engineering foundation is complete at the accepted checkpoints below. The
 application includes the M1 local browser and completed M2 local operations.
 The maintainer merged M1 in [PR #2](https://github.com/seapagan/terminal-file-manager/pull/2)
 on 18 October 2026 and M2 in [PR #3](https://github.com/seapagan/terminal-file-manager/pull/3)
-on 24 October 2026. The post-M2 live-refresh feature is in development; M3–M8 cover the remaining
-application and final release. Genuine direct SSH-to-SSH transfer
+on 24 October 2026. Local live refresh is complete through PR #4, with Windows
+manual refresh, and PM3-01 through PM3-05 are merged. The PR #11/#12 follow-ups
+are recorded above. PM3-06 navigation awaits a separate assignment; M3–M8 cover
+the remaining application and final release. Genuine direct SSH-to-SSH transfer
 remains post-v1 work.
 
 | Checkpoint | Completed proof |
@@ -724,9 +777,9 @@ remains post-v1 work.
 
 The eight-target rehearsal passed on 2026-10-14. It covered both Linux
 architectures with GNU and MUSL, both macOS architectures, and Windows x64/ARM64
-with PowerShell 5.1 and 7. The later Unix execution diagnostic and documentation
-updates have no independent eight-target rerun. They do not replace the recorded
-checkpoint or certify final release artifacts.
+with PowerShell 5.1 and 7. The later `f45dda8` rehearsal recorded above is a
+separate intermediate checkpoint. Neither run certifies the final PR #12 head
+or future release artifacts.
 
 ## M1 implementation and current proof
 
@@ -856,7 +909,7 @@ The tooling now pins Lizard 1.24.3; its scanner acceptance corpus covers
 corrected Rust match-arm counting and Python f-string complexity. Earlier
 Lizard 1.23.0 results in this record remain historical evidence.
 
-## M2: implementation in progress
+## M2 implementation checkpoints (historical)
 
 The browser now exposes frozen copy/move plans, a two-worker queue, recursive
 merge and conflicts, verified staging, create/rename/attributes, native Trash,
@@ -1250,8 +1303,14 @@ evidence. Hosted/native results are not implied by configuration files.
   sidecars and exactly five root-level regular archive members (including
   `THIRD_PARTY_NOTICES.md`). Reject unsafe
   names, duplicates, links and special types before extracting into owned staging.
-- Validate native executable architecture with bounded reads, then require exact
-  successful `tfm --version`. Per the revised C2 decision, this is synchronous
+- Validate native executable architecture with bounded reads, then require
+  successful `tfm --version` execution and the complete expected version on its
+  first line. Following space/tab-delimited build text and later banner lines
+  are allowed; version-prefix collisions and matches only on later lines fail.
+  Expected prerelease/build-metadata suffixes are compared literally without
+  changing the separate stable-tag policy. Request plain output with `NO_COLOR=1`;
+  PowerShell restores the caller's original setting, including absence.
+  Per the revised C2 decision, execution is synchronous
   without a deadline; no extra supervisor/runtime prerequisite. Native acceptance
   must check prompt termination. No descendant-containment claim is made.
 - Reject linked/reparse/non-directory ancestors and unsafe final objects;

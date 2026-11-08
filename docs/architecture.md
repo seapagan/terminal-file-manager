@@ -9,6 +9,21 @@ native checkpoints and the remaining production-release gates.
 
 `src/main.rs` owns native CLI arguments, output and exit status. `src/lib.rs`
 parses help/version, native startup locations and explicit session options.
+Help has aligned short/long options and an interactive-help hint; version output
+includes the executable name, package version, copyright and manifest licence.
+Both use `colored_text`'s stdout policy. Closing an output pipe early exits
+quietly; other stdout write failures produce a normal CLI error.
+
+`cli_diagnostics` renders stderr errors with the `tfm:` prefix and exit code 2.
+It normalises CRLF to LF, preserves blank/trailing lines and applies `ui::clean`
+to each line, leaving the TUI sanitiser unchanged. Standalone carriage returns,
+terminal escapes and unsafe Unicode controls remain escaped. Semantic styling
+distinguishes headings, unambiguous absolute paths, numeric gutters and pointers.
+Only the explanation immediately following a pointer receives summary styling;
+an intervening gutter clears that state. Explicit quoted valid-option lists
+receive an accent. The stderr colour policy, including `NO_COLOR`, remains owned
+by `colored_text`; plain and coloured output retain the same diagnostic text.
+
 The M1 browser retains two independent pane models, with configurable one/two-pane
 startup, bounded divider adjustment and temporary active-pane maximisation.
 Cursor, scroll, marks, filter and back/forward history are session-only;
@@ -114,11 +129,11 @@ and Windows UTF-16 arrays preserve identity without Unicode coercion. Q saves
 after teardown through the same owned atomic staging; normal quit never replaces
 session bytes. Restore is opt-in and validates both paths without fallback.
 
-M1 never creates, renames, copies, moves, deletes, trashes, opens or launches a
-selected file. Only deliberate preference/session actions write TFM's own
-configuration data.
-Viewer/editor, mutation and navigation integrations explain their later milestone
-instead of silently falling back to a subprocess.
+The M1 browsing workers do not mutate selected files; completed M2 operations
+use the separate planner and executor below. Only deliberate preference/session
+actions write TFM's own configuration data. Unimplemented viewer/editor and
+path-navigation actions explain their later scope instead of falling back to
+a subprocess.
 
 ### Implemented pattern selection
 
@@ -137,9 +152,9 @@ form; a higher-priority operation/conflict transition consumes its triggering
 event, and Ctrl+C retains Quit. Marked rows retain `[*]` independently of cursor
 and focus styling.
 
-## Planned application contracts
+## Local operations and future application contracts
 
-### M2 operation engine
+### Implemented M2 operation engine
 
 `operations::Plan` captures native operands from the visible working set at
 submission. It rejects pending listings, unresolved ignore-hidden scope and
@@ -294,13 +309,10 @@ passes only visible rows to the terminal widget. Geometry and rendering reuse
 the same wrapped layout for each draw. Non-Press events stay inside active
 operation surfaces, including paging while safe exit waits. Non-Unicode Rename
 shows escaped native text and requires an explicit replacement edit; display
-text never substitutes for the selected operand. The existing Notice queue holds
-at most two five-second
-success/warning/error notices without taking focus. Rendering uses the existing
-status row and semantic Theme roles; a non-expiring incident warning takes
-precedence. Jobs retain request failures and worker evidence after notices
-expire. These operation surfaces do not implement the later generic status
-framework.
+text never substitutes for the selected operand. Operation outcomes use the
+shared status and notification owner described below. Toast expiry and dismissal
+leave Jobs evidence and session history intact; unresolved incidents retain
+their independent warning and safe-exit controls.
 
 Future milestones preserve native local byte/UTF-16 path identities separately
 from display text. Remote POSIX paths remain exact bytes on every client OS;
@@ -477,7 +489,9 @@ wrapping; metadata and other shared text renderers keep their existing rules.
 PM3-05 is complete and merged through [PR #10](https://github.com/seapagan/terminal-file-manager/pull/10)
 at `1ece1a1`, with final feature head `b924083`. The [acceptance record](acceptance.md#pm3-05-accepted-and-merged--6-november-2026)
 records completed independent reviews, maintainer acceptance and feature/merge
-verification. Path navigation and the internal file-operation clipboard remain
+verification. [PR #11](https://github.com/seapagan/terminal-file-manager/pull/11),
+merged as `41a913e`, subsequently narrowed notification delivery to noteworthy
+events. Path navigation and the internal file-operation clipboard remain
 separate future consumers of this status owner; snapshot testing remains deferred.
 
 The application owns notification events independently of filesystem jobs.
@@ -492,7 +506,12 @@ create no filesystem jobs. Routine input feedback, pattern marking and profile
 changes use existing status or inline form fields without recording an event.
 Pre-submission name/path validation and disabled controls stay contextual;
 changed operation scope, failed previews and queue rejections remain retained
-notifications. Concise toast titles/messages remain separate from
+notifications. Empty and NUL-containing destinations receive distinct inline
+messages; editing a form clears its stale validation error. Pending destructive
+previews request waiting, while failed previews require cancellation and reopening.
+Neither route enables confirmation early. Save-profile name errors remain in
+that dialog, and marking feedback reports the resulting visible selection count.
+Concise toast titles/messages remain separate from
 retained diagnostic text. Within two seconds, matching failures on the same
 native operation targets share a toast across Job IDs, with occurrence counts;
 each Job keeps its own history link and evidence. Repeats extend the same group
