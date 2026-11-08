@@ -98,6 +98,7 @@ pub enum Action {
     CopyQuick,
     MoveQuick,
     Path,
+    FullPath,
     Zoxide,
     OppositeZoxide,
     ExitDirectory,

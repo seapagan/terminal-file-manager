@@ -7,6 +7,23 @@ use crate::{
 };
 use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind};
 
+pub(super) fn open(c: &mut Controller, g: &Geometry) {
+    let pane = c.app.active;
+    let path = c.app.panes[pane].path.clone();
+    let selected = path_segments(&path).len().saturating_sub(1);
+    c.last_click = None;
+    c.dragging_divider = false;
+    c.app.path_pointer = None;
+    c.app.path_picker = Some(PathPicker {
+        pane,
+        path,
+        selected,
+        scroll: 0,
+    });
+    let next = crate::ui::geometry(&c.app, g.area);
+    reveal(c, &next);
+}
+
 pub(super) fn handle(c: &mut Controller, event: &Event, g: &Geometry) -> Option<Vec<Request>> {
     c.app.path_picker.as_ref()?;
     if super::operations::interrupt(event) {
@@ -58,6 +75,10 @@ fn key_input(c: &mut Controller, key: crossterm::event::KeyEvent, g: &Geometry) 
 
 fn picker_key(c: &mut Controller, key: crossterm::event::KeyEvent, g: &Geometry) -> Vec<Request> {
     if key.code == KeyCode::Enter && key.kind == KeyEventKind::Press {
+        let state = c.app.path_picker.as_ref().unwrap();
+        if state.selected == path_segments(&state.path).len().saturating_sub(1) {
+            return navigate(c, state.pane, state.path.clone());
+        }
         if let Some(layout) = &g.path_picker {
             let state = c.app.path_picker.as_ref().unwrap();
             if layout
@@ -169,14 +190,7 @@ pub(super) fn header(
     }
     c.app.active = control.pane;
     c.app.sidebar = c.app.panes[control.pane].sidebar;
-    c.dragging_divider = false;
-    c.app.path_pointer = None;
-    c.app.path_picker = Some(PathPicker {
-        pane: control.pane,
-        path: control.source.clone(),
-        selected: 0,
-        scroll: 0,
-    });
+    open(c, g);
     Some(Vec::new())
 }
 

@@ -17,6 +17,10 @@ ellipsis that opens a shared near-full-width, content-sized modal. The picker
 wraps complete components where possible and oversized names by grapheme, supports
 keyboard/mouse selection and scrolling, and captures input until cancellation or
 navigation. Existing operation approvals and Ctrl+C safety retain priority.
+Alt+L opens the same picker even when the header path fits; both keyboard and
+ellipsis openings select and reveal the current directory. Immediate Enter and
+Esc close without navigating. The action appears in effective bindings and
+searchable Help; Ctrl+L remains reserved for future manual path entry.
 
 `PathHover` uses a configurable foreground through `path_hover`, with terminal
 colour-depth resolution. Colour hover changes neither underline nor background;

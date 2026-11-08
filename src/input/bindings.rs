@@ -231,6 +231,7 @@ const DEFAULT_BINDINGS: &[(&str, Action)] = &[
     ("M", MoveQuick),
     ("Shift+F8", Delete),
     ("Ctrl+l", Path),
+    ("Alt+l", FullPath),
     ("z", Zoxide),
     ("Z", OppositeZoxide),
     ("Q", SaveQuit),

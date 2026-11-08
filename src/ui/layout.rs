@@ -4,6 +4,7 @@ use ratatui::layout::Rect;
 /// File panes, optional metadata and stable bottom controls.
 #[derive(Clone, Debug)]
 pub struct Geometry {
+    pub(crate) area: Rect,
     pub path_controls: Vec<super::PathControl>,
     pub path_picker: Option<super::PathLayout>,
     pub context_help: Option<super::ContextLayout>,
@@ -144,6 +145,7 @@ fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
     let pattern = super::pattern::layout(app, bounds);
     let menu_layout = menu_layout(app, bounds);
     Geometry {
+        area,
         path_controls: Vec::new(),
         path_picker: super::path_picker::layout(app, bounds),
         notification_history: None,

@@ -148,7 +148,7 @@ impl Controller {
             | ColumnAttributes | ColumnOwner | OwnerDisplay | MetadataPresentation => {
                 super::view::formatting(self, action)
             }
-            TogglePanes | Maximise | FocusPane | ToggleSidebar | Metadata | Help => {
+            TogglePanes | Maximise | FocusPane | ToggleSidebar | Metadata | Help | FullPath => {
                 self.layout(action, geometry)
             }
             _ => return false,
@@ -173,9 +173,9 @@ impl Controller {
             | ViewProfiles | Quit | SaveQuit | ViewOptions | HumanSizes | FuzzyTimestamps
             | Permissions | ColumnSize | ColumnModified | ColumnAttributes | ColumnOwner
             | OwnerDisplay | MetadataPresentation | TogglePanes | Maximise | FocusPane
-            | ToggleSidebar | Metadata | Help | Info | Viewer | Editor | Path | Zoxide
-            | OppositeZoxide | ExitDirectory | Copy | Move | Mkdir | CreateFile | Trash
-            | Delete | Rename | Attributes | Jobs | Notifications | DismissToast
+            | ToggleSidebar | Metadata | Help | Info | Viewer | Editor | Path | FullPath
+            | Zoxide | OppositeZoxide | ExitDirectory | Copy | Move | Mkdir | CreateFile
+            | Trash | Delete | Rename | Attributes | Jobs | Notifications | DismissToast
             | DismissToasts | CopyQuick | MoveQuick => {}
         }
         Vec::new()
@@ -246,6 +246,7 @@ impl Controller {
 
     fn layout(&mut self, action: Action, geometry: &Geometry) {
         match action {
+            Action::FullPath => super::path_navigation::open(self, geometry),
             Action::TogglePanes => self.toggle_panes(),
             Action::Maximise if self.app.dual => self.maximise(),
             Action::FocusPane if geometry.panes.iter().all(Option::is_some) => {

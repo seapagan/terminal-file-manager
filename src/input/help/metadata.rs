@@ -62,6 +62,7 @@ define_commands! {
     (Action::PageUp, HelpSection::Navigation, "Previous page"),
     (Action::Home, HelpSection::Navigation, "First row (.. when available)"),
     (Action::End, HelpSection::Navigation, "Last entry"),
+    (Action::FullPath, HelpSection::Navigation, "Open full path picker"),
     (
         Action::Path,
         HelpSection::Navigation,
