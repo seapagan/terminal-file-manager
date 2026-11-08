@@ -247,11 +247,10 @@ for expected in '1.2.3-rc.1' '1.2.3+build.1' '1.2.3-rc.1+build.1'; do
             PATH=$test_bin
             export PATH
             . "$root/installer-functions.sh"
-            tmp_dir=$root/version-check
             target=x86_64-unknown-linux-gnu
             TEST_CANDIDATE_VERSION=$reported_version
             export TEST_CANDIDATE_VERSION
-            validate_candidate "v$expected"
+            tmp_dir=$root/version-check validate_candidate "v$expected"
         ) >"$root/output" 2>&1; then
             test "$reported_version" = "$expected" || fail 'version-prefix collision accepted'
         else
