@@ -132,8 +132,24 @@ session bytes. Restore is opt-in and validates both paths without fallback.
 The M1 browsing workers do not mutate selected files; completed M2 operations
 use the separate planner and executor below. Only deliberate preference/session
 actions write TFM's own configuration data. Unimplemented viewer/editor and
-path-navigation actions explain their later scope instead of falling back to
+direct-path/zoxide actions explain their later scope instead of falling back to
 a subprocess.
+
+### Implemented path navigation
+
+The virtual `..` row uses a native parent cursor target outside `entries` and
+`visible`. Listing row coordinates include it; selection counts, marks, metadata
+and operation operands continue to use filesystem entries. Enter and double-click
+reuse `App::parent`, including identity-aware exited-directory restoration.
+
+Header geometry projects the existing native path elision onto lexical ancestor
+slices. Display text never reconstructs a navigation target. A one-cell ellipsis
+control opens the shared full-path shell; complete components wrap where possible,
+and oversized components wrap on grapheme boundaries. Its pane/path-bound state
+captures input and yields to operation approvals and the existing Ctrl+C exit flow.
+The same semantic `PathHover` foreground resolves through `colored_text` on both
+surfaces. `path_hover` configures its colour; monochrome uses bold. No persistent
+row, new navigation engine, dependency or clipboard behavior is introduced.
 
 ### Implemented pattern selection
 

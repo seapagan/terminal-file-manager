@@ -10,9 +10,13 @@ use std::time::Duration;
 impl Controller {
     /// Normalize terminal input. Clock/geometry are explicit deterministic inputs.
     pub fn handle(&mut self, event: Event, geometry: &Geometry, now: Duration) -> Vec<Request> {
+        self.app.path_pointer = None;
         self.app.notifications.advance(now);
         if super::notifications::handle(self, &event, geometry) {
             return Vec::new();
+        }
+        if let Some(requests) = super::path_navigation::handle(self, &event, geometry) {
+            return requests;
         }
         let closing = close_hit(&event, geometry.modal_close);
         if closing && metadata_owns_close(&self.app, geometry) {

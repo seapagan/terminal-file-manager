@@ -88,7 +88,7 @@ fn path_budgets_preserve_exact_fits_and_elide_only_complete_middle_components() 
         (7, "/…/leaf"),
         (6, "…/leaf"),
         (5, "…leaf"),
-        (4, "leaf"),
+        (4, "…eaf"),
         (3, "…af"),
         (1, "…"),
         (0, ""),

@@ -105,8 +105,8 @@ fn dual_pane_focus_distinguishes_retained_cursor_and_background() {
                     })
                     .unwrap();
                 let buffer = terminal.backend().buffer();
-                let focused = &buffer[(1 + active as u16 * (width / 2), 2)];
-                let retained = &buffer[(1 + (1 - active) as u16 * (width / 2), 2)];
+                let focused = &buffer[(1 + active as u16 * (width / 2), 3)];
+                let retained = &buffer[(1 + (1 - active) as u16 * (width / 2), 3)];
                 assert_focus_styles(focused, retained, level);
                 let active_space = &buffer[((width / 2 - 2) + active as u16 * (width / 2), 5)];
                 let inactive_space =
@@ -274,7 +274,7 @@ fn compact_size_columns_align_values_and_units_without_a_fill_gap() {
             .map(|x| buffer[(x, y)].symbol())
             .collect::<String>()
     };
-    let lines = [row(2), row(3), row(4)];
+    let lines = [row(3), row(4), row(5)];
     let first_unit = lines[0].find(" B").unwrap();
     assert_eq!(lines[1].find(" K"), Some(first_unit));
     assert_eq!(lines[2].find(" M"), Some(first_unit));
@@ -326,7 +326,7 @@ fn exact_sizes_remeasure_on_settings_and_filter_changes_with_unicode_names() {
         );
         if width >= 47 {
             let row = (0..width)
-                .map(|x| buffer[(x, 2)].symbol())
+                .map(|x| buffer[(x, 3)].symbol())
                 .collect::<String>();
             assert!(row.contains("1048525"));
             assert!(!row.contains(" KiB"));
@@ -366,7 +366,7 @@ fn fuzzy_timestamp_setting_uses_one_fixed_frame_clock_and_preserves_exact_utc() 
             })
             .unwrap();
         let row = (0..100)
-            .map(|x| terminal.backend().buffer()[(x, 2)].symbol())
+            .map(|x| terminal.backend().buffer()[(x, 3)].symbol())
             .collect::<String>();
         assert!(row.contains(expected), "{row}");
     }

@@ -24,6 +24,7 @@ pub enum MetadataPresentation {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Settings {
+    pub path_hover: Option<String>,
     pub toast_placement: crate::notifications::Placement,
     pub toast_expiry_seconds: u16,
     pub sidebar: bool,
@@ -50,6 +51,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            path_hover: None,
             toast_placement: Default::default(),
             toast_expiry_seconds: 5,
             sidebar: false,
@@ -104,6 +106,11 @@ impl Settings {
         }
         if !(1..=60).contains(&settings.toast_expiry_seconds) {
             return Err("toast_expiry_seconds must be between 1 and 60".into());
+        }
+        if let Some(hex) = &settings.path_hover {
+            crate::color::Theme::new(colored_text::ColorLevel::TrueColor)
+                .resolve(hex)
+                .map_err(|e| format!("path_hover: {e}"))?;
         }
         for name in settings.profiles.keys() {
             validate_profile_name(name)?;

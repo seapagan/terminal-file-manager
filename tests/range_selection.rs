@@ -188,7 +188,7 @@ fn shift_click_uses_visible_order_and_ignores_double_click_and_owner_toggle() {
             Event::Mouse(MouseEvent {
                 kind: MouseEventKind::Down(MouseButton::Left),
                 column,
-                row: 5,
+                row: 6,
                 modifiers: KeyModifiers::SHIFT,
             }),
             &geometry,
@@ -215,7 +215,7 @@ fn scrolled_shift_click_targets_the_drawn_row_and_skips_missing_identities() {
     let pane = &c.app.panes[0];
     let row = pane.viewport_start(geometry.listing_rows[0]);
     assert!(row > 0);
-    let expected = pane.entries[pane.visible[row]].path.clone();
+    let expected = pane.row_path(row).unwrap();
     c.handle(
         Event::Mouse(MouseEvent {
             kind: MouseEventKind::Down(MouseButton::Left),
@@ -230,6 +230,7 @@ fn scrolled_shift_click_targets_the_drawn_row_and_skips_missing_identities() {
     assert_eq!(marks(&c, 0), ["d", "e"]);
     key(&mut c, "Ctrl+u");
     key(&mut c, "Home");
+    key(&mut c, "Down");
     c.app.panes[0].entries[1].identity = None;
     key(&mut c, "Shift+Down");
     key(&mut c, "Shift+Down");

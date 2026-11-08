@@ -118,3 +118,5 @@ pub mod owner;
 
 /// Frozen local operation requests and shared mutation coordination.
 pub mod operations;
+
+pub mod navigation;

@@ -85,7 +85,7 @@ fn assert_rendered_panes(lines: &[String], active: usize, border: &str, theme: &
             .iter()
             .find(|line| {
                 line.starts_with(&format!(
-                    "selected rendered x={}..{} y=2 (78 cells)",
+                    "selected rendered x={}..{} y=3 (78 cells)",
                     x + 1,
                     x + 79
                 ))
@@ -108,7 +108,7 @@ fn report_reads_actual_cell_layers_instead_of_repeating_the_cursor_role() {
     let (_root, app) = fixture();
     let theme = Theme::new(ColorLevel::TrueColor);
     let (mut buffer, geometry) = buffer(&app, &theme, 160, 40);
-    buffer[(1, 2)].set_style(
+    buffer[(1, 3)].set_style(
         Style::default()
             .fg(Color::Indexed(123))
             .bg(Color::Rgb(1, 2, 3))
@@ -118,7 +118,7 @@ fn report_reads_actual_cell_layers_instead_of_repeating_the_cursor_role() {
     let lines = report(&buffer, &app, &geometry, &theme);
     let actual = lines
         .iter()
-        .find(|line| line.starts_with("selected rendered x=1..2 y=2 (1 cells)"))
+        .find(|line| line.starts_with("selected rendered x=1..2 y=3 (1 cells)"))
         .unwrap();
     assert!(actual.contains("fg=indexed(123) bg=RGB(1,2,3) underline=ANSI(Red)"));
     assert!(actual.contains("UNDERLINED"));

@@ -97,11 +97,11 @@ fn assert_panes(app: &App, level: ColorLevel, width: u16) {
             .unwrap() as u16;
         if area.width >= 10 {
             for x in area.x + 1..area.x + 4 {
-                assert_eq!(buffer[(x, area.y + 2 + selected)].symbol(), " ");
+                assert_eq!(buffer[(x, area.y + 3 + selected)].symbol(), " ");
             }
         }
         for x in area.x + 1..area.right() - 1 {
-            let cell = &buffer[(x, area.y + 2 + selected)];
+            let cell = &buffer[(x, area.y + 3 + selected)];
             assert_eq!((cell.fg, cell.bg), (fg, bg), "{level:?} pane={id} x={x}");
             assert!(!cell.modifier.contains(Modifier::DIM));
             assert_eq!(
@@ -131,7 +131,7 @@ fn assert_unselected(
     active: bool,
     selected: u16,
 ) {
-    let y = area.y + 2 + (1 - selected);
+    let y = area.y + 3 + (1 - selected);
     let cells: Vec<_> = (area.x + 1..area.right() - 1)
         .map(|x| &buffer[(x, y)])
         .collect();
@@ -175,7 +175,7 @@ fn marked_cursor_and_other_rows_keep_brackets_in_both_panes_and_all_colours() {
                 .draw(|frame| geometry = ui::render(frame, &app, &Theme::new(level)))
                 .unwrap();
             for area in geometry.panes.into_iter().flatten() {
-                for y in area.y + 2..area.y + 4 {
+                for y in area.y + 3..area.y + 5 {
                     let marker: String = (area.x + 1..area.x + 4)
                         .map(|x| terminal.backend().buffer()[(x, y)].symbol())
                         .collect();
@@ -197,7 +197,7 @@ fn narrow_marked_rows_retain_the_marker_before_filename() {
         })
         .unwrap();
     let marker: String = (1..4)
-        .map(|x| terminal.backend().buffer()[(x, 2)].symbol())
+        .map(|x| terminal.backend().buffer()[(x, 3)].symbol())
         .collect();
     assert_eq!(marker, "[*]");
 }
@@ -239,7 +239,7 @@ fn assert_compact_row(buffer: &ratatui::buffer::Buffer, area: ratatui::layout::R
     if area.width < 2 {
         return;
     }
-    let y = area.y + 2;
+    let y = area.y + 3;
     assert_eq!(buffer[(area.x, y)].symbol(), "│");
     assert_eq!(buffer[(area.right() - 1, y)].symbol(), "│");
     let available = area.width.saturating_sub(2);

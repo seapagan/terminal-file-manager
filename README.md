@@ -39,7 +39,11 @@ room for both.
 
 Use the arrow keys (or `j`/`k`) to navigate, Enter to enter a directory and
 Backspace to go up. With a mouse, click to focus, double-click a directory to
-enter it, and use the wheel to scroll. Press `?` or F1 to see the shortcuts currently
+enter it, and use the wheel to scroll. The `..` row opens the parent directory
+with Enter or a double-click; it cannot be marked or used in file operations.
+Click a component in a pane’s path to jump to that ancestor. Click `…` to show
+the full path, then use arrows and Enter or click a component. Esc cancels;
+PageUp/PageDown and the wheel scroll long paths. Press `?` or F1 to see the shortcuts currently
 configured in your installation.
 
 ## Keyboard shortcuts
@@ -278,6 +282,8 @@ fuzzy_timestamps = true
 owner_display = "names" # or "numeric"
 ignore = "dim" # "dim", "hide" or "off"
 mouse = true
+# Optional path hover foreground; terminal colour depth and NO_COLOR still apply.
+# path_hover = "#b4f5ff"
 toast_placement = "bottom-right" # top-left, top-right, bottom-left, bottom-right
 toast_expiry_seconds = 5 # Range: 1–60; history survives expiry
 

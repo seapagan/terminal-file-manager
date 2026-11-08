@@ -104,14 +104,14 @@ fn owner_clicks_select_focus_and_double_click_directories_without_toggling() {
         assert_eq!(c.app.panes[id].owner_display, mode);
         click(&mut c, &geometry, x, 12);
         assert_eq!(c.app.panes[id].owner_display, mode);
-        assert!(click(&mut c, &geometry, x, 2).is_empty());
+        assert!(click(&mut c, &geometry, x, 3).is_empty());
         assert_eq!(c.app.panes[id].owner_display, mode);
         assert_eq!(
             c.app.panes[id].cursor.as_deref(),
             Some(root.path().join("entry").as_path())
         );
         assert_eq!(c.app.active, id);
-        let requests = click(&mut c, &geometry, x, 2);
+        let requests = click(&mut c, &geometry, x, 3);
         assert_eq!(requests.len(), 1);
         assert_eq!(requests[0].path, root.path().join("entry"));
         assert_eq!(c.app.panes[id].owner_display, mode);

@@ -246,10 +246,11 @@ impl Pane {
             self.permissions,
             self.owner_display,
         );
-        if !self
-            .visible
-            .iter()
-            .any(|i| Some(&self.entries[*i].path) == self.cursor.as_ref())
+        if !self.parent_focused()
+            && !self
+                .visible
+                .iter()
+                .any(|i| Some(&self.entries[*i].path) == self.cursor.as_ref())
         {
             let index = previous_index.min(self.visible.len().saturating_sub(1));
             self.cursor = self
@@ -288,14 +289,11 @@ impl Pane {
     }
 
     pub(super) fn shift_cursor(&mut self, delta: isize, height: usize) {
-        let index = self.cursor_index().unwrap_or(0);
+        let index = self.row_index().unwrap_or(0);
         let next = index
             .saturating_add_signed(delta)
-            .min(self.visible.len().saturating_sub(1));
-        self.cursor = self
-            .visible
-            .get(next)
-            .map(|i| self.entries[*i].path.clone());
+            .min(self.row_count().saturating_sub(1));
+        self.cursor = self.row_path(next);
         if next < self.scroll {
             self.scroll = next;
         }
@@ -315,7 +313,7 @@ impl Pane {
 
     /// Shared viewport calculation for drawing and mouse row hit testing.
     pub fn viewport_start(&self, height: usize) -> usize {
-        let index = self.cursor_index().unwrap_or(0);
+        let index = self.row_index().unwrap_or(0);
         self.scroll
             .min(index)
             .max(index.saturating_add(1).saturating_sub(height.max(1)))
@@ -438,7 +436,7 @@ impl Pane {
         if let Some(cursor) = self.visit_cursor(&visit) {
             self.cursor = Some(cursor);
             if self.matches_visit(&visit) {
-                self.scroll = visit.scroll.min(self.cursor_index().unwrap_or(0));
+                self.scroll = visit.scroll.min(self.row_index().unwrap_or(0));
             }
         }
     }
@@ -470,7 +468,11 @@ impl Pane {
         if let Some(visit) = self.restoring.take()
             && self.matches_visit(&visit)
         {
-            self.cursor = self.visit_cursor(&visit);
+            self.cursor = if visit.cursor.as_deref() == self.path.parent() {
+                visit.cursor.clone()
+            } else {
+                self.visit_cursor(&visit)
+            };
             self.scroll = visit.scroll;
             self.refilter();
         }

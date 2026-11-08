@@ -158,7 +158,7 @@ fn body_sample(
     rows: usize,
 ) {
     let start = pane.viewport_start(rows);
-    let used = pane.visible.len().saturating_sub(start).min(rows);
+    let used = pane.row_count().saturating_sub(start).min(rows);
     if area.width > 2 && used < rows {
         sample(
             lines,
@@ -181,10 +181,7 @@ fn selected_row(
     rows: usize,
 ) {
     let start = pane.viewport_start(rows);
-    let position = pane
-        .visible
-        .iter()
-        .position(|index| Some(&pane.entries[*index].path) == pane.cursor.as_ref());
+    let position = pane.row_index();
     let Some(offset) = position
         .and_then(|position| position.checked_sub(start))
         .filter(|offset| *offset < rows)

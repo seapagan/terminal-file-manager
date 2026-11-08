@@ -72,7 +72,7 @@ fn entry_row(app: &App, id: usize, name: &str) -> u16 {
         .iter()
         .position(|i| app.panes[id].entries[*i].name == name)
         .unwrap() as u16
-        + 2
+        + 3
 }
 #[test]
 fn type_and_hidden_indicators_are_adjacent_for_each_existing_kind() {
@@ -98,9 +98,9 @@ fn type_and_hidden_indicators_are_adjacent_for_each_existing_kind() {
             app.panes[0].refilter();
             app.panes[0].cursor = None;
             let (b, _) = draw(&app, 80, ColorLevel::NoColor);
-            assert_eq!(b[(5, 2)].symbol(), indicator);
-            assert_eq!(b[(6, 2)].symbol(), if hidden { "h" } else { " " });
-            let name: String = (8..79).map(|x| b[(x, 2)].symbol()).collect();
+            assert_eq!(b[(5, 3)].symbol(), indicator);
+            assert_eq!(b[(6, 3)].symbol(), if hidden { "h" } else { " " });
+            let name: String = (8..79).map(|x| b[(x, 3)].symbol()).collect();
             assert_eq!(
                 name.trim_end(),
                 if kind == EntryKind::Directory {

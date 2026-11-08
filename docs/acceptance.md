@@ -1,5 +1,38 @@
 # Acceptance gates
 
+## PM3-06 path navigation — 8 November 2026
+
+Implementation is on `feat/pm3-06-path-navigation`, based on clean synchronised
+main `151ddaef`. Delivery stops at a draft PR; independent reviews, maintainer
+visual acceptance and merge remain outstanding.
+
+The synthetic `..` row remains outside filesystem entries, marking/counting and
+operation operands. Home focuses it; Enter/double-click reuse parent navigation,
+including native identity checks and exited-directory restoration. Filtering,
+sorting and single/dual/maximised layouts preserve this navigation-only boundary.
+
+Header components retain native paths behind measured display slices. Single-click
+navigates to the selected lexical ancestor; truncated headers expose a one-cell
+ellipsis that opens a shared near-full-width, content-sized modal. The picker
+wraps complete components where possible and oversized names by grapheme, supports
+keyboard/mouse selection and scrolling, and captures input until cancellation or
+navigation. Existing operation approvals and Ctrl+C safety retain priority.
+
+`PathHover` uses a configurable foreground through `path_hover`, with terminal
+colour-depth resolution. Colour hover changes neither underline nor background;
+monochrome uses normal/bold weight. The full-path picker uses the same role.
+Tests assert rendered cells, native ancestor targets, layout/divider bounds,
+Unicode/non-UTF names, filtering, cursor/history, operation exclusions, modal
+capture, cancellation and resize. Native Windows-only cases cover drive, UNC,
+verbatim and unpaired UTF-16 paths; existing link fixtures also exercise virtual
+parent navigation through Unix symlinks and Windows junctions.
+
+Verification commands and execution results are recorded in the ignored controller
+and draft-delivery handoff. Linux cross-build evidence does not establish native
+Windows/macOS execution or physical terminal visual acceptance. Infrastructure,
+dependencies, policy and release tooling are unchanged; no release rehearsal is
+part of this feature.
+
 ## Post-PM3-05 follow-ups accepted and merged — 8 November 2026
 
 The merged maintenance work preserves PM3-05 completion and the existing
@@ -103,8 +136,9 @@ Claude corrections. Seventeen existing Lizard NLOC parser-span advisories and
 nonblocking uploader Node deprecation warnings remain; thresholds and
 suppressions are unchanged.
 
-**Next:** PM3-06 path navigation is **Ready**, awaiting a separate scope/branch
-assignment. PM3-07 clipboard remains **Not started** until PM3-06 completes;
+**Current:** PM3-06 path navigation is implemented on `feat/pm3-06-path-navigation`;
+draft delivery and verification evidence appear in its checkpoint above.
+PM3-07 clipboard remains **Not started** until PM3-06 completes;
 its status-framework prerequisite is satisfied. M3-GATE remains **Not started**
 and still requires completion of PM3-06 and PM3-07. Snapshot testing remains a separately deferred
 proposal, not an outstanding PM3-05 acceptance condition.

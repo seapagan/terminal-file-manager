@@ -12,6 +12,9 @@ impl Controller {
         geometry: &Geometry,
         now: Duration,
     ) -> Vec<Request> {
+        if let Some(requests) = super::path_navigation::header(self, event, geometry) {
+            return requests;
+        }
         self.app.active = id;
         self.app.sidebar = self.app.panes[id].sidebar;
         let area = geometry.panes[id].expect("hit pane");
@@ -21,17 +24,29 @@ impl Controller {
         }
         let pane = &mut self.app.panes[id];
         let index = pane.viewport_start(page_height(geometry, id)) + usize::from(row - area.y - 2);
-        let Some(entry) = pane.visible.get(index).map(|i| &pane.entries[*i]) else {
+        let Some(path) = pane.row_path(index) else {
             return Vec::new();
         };
-        let path = entry.path.clone();
         if event.modifiers.contains(KeyModifiers::SHIFT) {
-            pane.select_range_to(path, page_height(geometry, id));
+            if Some(path.as_path()) == pane.path.parent() {
+                pane.cursor = Some(path);
+                pane.reset_range();
+            } else {
+                pane.select_range_to(path, page_height(geometry, id));
+            }
             self.last_click = None;
             return Vec::new();
         }
         pane.cursor = Some(path.clone());
         pane.anchor_range();
+        let double = self.record_click(id, path, now);
+        if double {
+            self.dispatch(Action::Enter, geometry)
+        } else {
+            Vec::new()
+        }
+    }
+    fn record_click(&mut self, id: usize, path: std::path::PathBuf, now: Duration) -> bool {
         let double = self
             .last_click
             .as_ref()
@@ -41,10 +56,6 @@ impl Controller {
                     && now.saturating_sub(*time) <= Duration::from_millis(400)
             });
         self.last_click = if double { None } else { Some((id, path, now)) };
-        if double {
-            self.dispatch(Action::Enter, geometry)
-        } else {
-            Vec::new()
-        }
+        double
     }
 }

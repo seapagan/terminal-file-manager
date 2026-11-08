@@ -60,9 +60,9 @@ fn assert_entry_cells(app: &App, level: ColorLevel, expected: Style) {
         })
         .unwrap();
     let buffer = terminal.backend().buffer();
-    assert_eq!(buffer[(8, 2)].symbol(), "f");
+    assert_eq!(buffer[(8, 3)].symbol(), "f");
     for x in [5, 8] {
-        let cell = &buffer[(x, 2)];
+        let cell = &buffer[(x, 3)];
         assert_eq!(cell.fg, expected.fg.unwrap_or(Color::Reset));
         assert_eq!(cell.bg, Color::Reset);
         assert_eq!(cell.modifier, expected.add_modifier);
@@ -204,7 +204,7 @@ fn ignored_hidden_executable_and_mark_cues_compose_beneath_active_cursor() {
                 })
                 .unwrap();
             let buffer = terminal.backend().buffer();
-            let name = &buffer[(8, 2)];
+            let name = &buffer[(8, 3)];
             assert_eq!(name.symbol(), ".");
             assert_eq!(name.modifier.contains(Modifier::DIM), !cursor);
             assert_eq!(
@@ -216,9 +216,9 @@ fn ignored_hidden_executable_and_mark_cues_compose_beneath_active_cursor() {
                 let expected = Theme::new(level).entry_style(&app.panes[0].entries[0]).fg;
                 assert_eq!(Some(name.fg), expected);
             }
-            assert_eq!(buffer[(2, 2)].symbol(), "*");
-            assert_eq!(buffer[(5, 2)].symbol(), "*");
-            assert_eq!(buffer[(6, 2)].symbol(), "h");
+            assert_eq!(buffer[(2, 3)].symbol(), "*");
+            assert_eq!(buffer[(5, 3)].symbol(), "*");
+            assert_eq!(buffer[(6, 3)].symbol(), "h");
         }
     }
 }

@@ -76,5 +76,5 @@ fn disabled_columns_release_width_and_cached_sizes_determine_boundaries() {
     assert_eq!(app.panes[0].measurements.number, 10);
     assert!(!row(&app, 65, 1).contains("Mode/attrs"));
     assert!(row(&app, 66, 1).contains("Mode/attrs"));
-    assert!(row(&app, 66, 2).contains("1234567890"));
+    assert!(row(&app, 66, 3).contains("1234567890"));
 }

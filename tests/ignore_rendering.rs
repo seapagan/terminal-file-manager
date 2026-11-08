@@ -54,7 +54,7 @@ fn global_and_local_ignores_dim_only_filename_cells() {
         .filter_map(|(row, index)| {
             let entry = &app.panes[0].entries[*index];
             (entry.ignored == Some(true))
-                .then_some((row as u16 + 2, entry.name.to_str().unwrap().len() as u16))
+                .then_some((row as u16 + 3, entry.name.to_str().unwrap().len() as u16))
         })
         .collect();
     assert_eq!(targets.len(), 4);

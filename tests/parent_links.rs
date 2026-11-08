@@ -192,3 +192,23 @@ fn windows_directory_symlink_restores_focus_where_creation_is_supported() {
     complete(&mut app, request);
     assert_eq!(app.panes[0].cursor, Some(alias));
 }
+
+#[test]
+fn virtual_parent_row_restores_native_symlink_or_junction_entry() {
+    use terminal_file_manager::input::{Action, Bindings, Controller};
+    let (root, _target) = fixture();
+    let alias = root.path().join("link");
+    let mut c = Controller::new(
+        loaded(&alias),
+        Bindings::new(&Default::default()).unwrap(),
+        Default::default(),
+    );
+    let g = terminal_file_manager::ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 80, 24));
+    c.dispatch(Action::Home, &g);
+    assert!(c.app.panes[0].parent_focused());
+    assert!(c.app.panes[0].eligible().is_empty());
+    let request = c.dispatch(Action::Enter, &g).remove(0);
+    assert_eq!(request.path, root.path());
+    complete(&mut c.app, request);
+    assert_eq!(c.app.panes[0].cursor, Some(alias));
+}

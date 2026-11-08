@@ -15,8 +15,12 @@ pub mod modal;
 mod operations;
 pub(crate) use operations::animate_preview;
 pub use operations::{OperationControl, OperationTarget};
+mod path_navigation;
+mod path_picker;
 mod path_title;
 pub use metadata::MetadataControl;
+pub use path_navigation::PathControl;
+pub use path_picker::PathLayout;
 mod pattern;
 mod policy;
 mod profiles;
@@ -111,6 +115,7 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     if let Some(lines) = diagnostics {
         diagnostics::render(frame, app, theme, &mut geometry, lines);
     }
+    path_picker::render(frame, app, theme, geometry.path_picker.as_ref());
     pattern::render(frame, app, theme, geometry.pattern.as_ref());
     operations::render(frame, app, theme, &geometry);
     help::context::render(frame, app, theme, geometry.context_help.as_ref());
