@@ -14,7 +14,13 @@ use terminal_file_manager::{
 };
 
 fn controller() -> Controller {
-    let path = std::env::temp_dir().join("parent".repeat(30)).join("leaf");
+    let path = std::path::PathBuf::from(if cfg!(windows) {
+        r"C:\tfm-fixture"
+    } else {
+        "/tfm-fixture"
+    })
+    .join("parent".repeat(30))
+    .join("leaf");
     let mut app = App::new(path.clone());
     app.path_picker = Some(PathPicker {
         pane: 0,

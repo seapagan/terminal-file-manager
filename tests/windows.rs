@@ -117,7 +117,7 @@ fn assert_junction_rendering(snapshot: &local::Snapshot) {
         .iter()
         .position(|i| app.panes[0].entries[*i].name == "junction")
         .unwrap() as u16
-        + 2;
+        + 3;
     let mut terminal = Terminal::new(TestBackend::new(80, 12)).unwrap();
     terminal
         .draw(|frame| {

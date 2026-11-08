@@ -25,16 +25,20 @@ fn draw(app: &App, theme: &Theme, width: u16, height: u16) -> (Buffer, ui::Geome
 }
 
 fn path() -> std::path::PathBuf {
-    std::env::temp_dir()
-        .join("界e\u{301}")
-        .join("long-parent".repeat(12))
-        .join("leaf👩‍💻")
+    std::path::PathBuf::from(if cfg!(windows) {
+        r"C:\tfm-fixture"
+    } else {
+        "/tfm-fixture"
+    })
+    .join("界e\u{301}")
+    .join("long-parent".repeat(12))
+    .join("leaf👩‍💻")
 }
 
 #[test]
 fn header_hit_regions_match_rendered_cells_and_avoid_dividers_after_resize() {
     let mut app = App::new(path());
-    app.panes[1].path = std::env::temp_dir().join("opposite");
+    app.panes[1].path = path().ancestors().last().unwrap().join("opposite");
     for dual in [false, true] {
         app.dual = dual;
         for maximized in [false, true] {

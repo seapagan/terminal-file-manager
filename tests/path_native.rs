@@ -32,7 +32,11 @@ fn native_spelling_roots_relative_paths_and_separators_retain_exact_targets() {
         PathBuf::from("."),
         PathBuf::from(".."),
         PathBuf::from("alpha/./beta/../leaf/"),
-        std::env::temp_dir(),
+        PathBuf::from(if cfg!(windows) {
+            r"C:\tfm-fixture"
+        } else {
+            "/tfm-fixture"
+        }),
     ] {
         assert_segments(&path);
         for ancestor in path.ancestors().filter(|p| !p.as_os_str().is_empty()) {
