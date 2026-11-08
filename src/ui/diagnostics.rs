@@ -115,7 +115,11 @@ fn intended(lines: &mut Vec<String>, app: &App, theme: &Theme, id: usize) {
     } else {
         Role::Normal
     });
-    let border = theme.style(if active { Role::Header } else { Role::Normal });
+    let border = theme.style(if active {
+        Role::Header
+    } else {
+        Role::InactivePaneBorder
+    });
     let cursor = theme.style(if active {
         Role::Cursor
     } else {

@@ -55,6 +55,9 @@ fn browse(app: App, settings: Settings, store: &mut Option<Store>) -> Result<(),
     theme
         .set_path_hover(settings.path_hover.as_deref())
         .map_err(|e| e.to_string())?;
+    theme
+        .set_inactive_pane_border(settings.inactive_pane_border.as_deref())
+        .map_err(|e| e.to_string())?;
     let mut pool = Pool::new(IgnoreContext::default()).map_err(|e| e.to_string())?;
     let mut jobs = crate::operations::Queue::new().map_err(|error| error.to_string())?;
     for pane in 0..2 {

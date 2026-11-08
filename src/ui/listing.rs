@@ -31,7 +31,7 @@ pub(super) fn render(
         .border_style(theme.style(if id == app.active {
             Role::Header
         } else {
-            Role::Normal
+            Role::InactivePaneBorder
         }));
     let inner = block.inner(area);
     let title = super::path_title::title(

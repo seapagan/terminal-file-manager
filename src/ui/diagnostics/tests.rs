@@ -73,12 +73,18 @@ fn assert_rendered_panes(lines: &[String], active: usize, border: &str, theme: &
             .iter()
             .find(|line| line.starts_with(&format!("border rendered ({x},1)")))
             .unwrap();
+        let inactive = colour(Some(
+            theme
+                .style(Role::InactivePaneBorder)
+                .fg
+                .unwrap_or(ratatui::style::Color::Reset),
+        ));
         assert!(actual.contains(&format!(
             "fg={}",
             if id as usize == active {
                 border
             } else {
-                "terminal default / unknown (Reset)"
+                &inactive
             }
         )));
         let row = lines

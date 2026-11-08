@@ -151,6 +151,12 @@ The same semantic `PathHover` foreground resolves through `colored_text` on both
 surfaces. `path_hover` configures its colour; monochrome uses bold. No persistent
 row, new navigation engine, dependency or clipboard behavior is introduced.
 
+Both panes use the same cyan breadcrumb foreground. `InactivePaneBorder` gives
+the inactive border a neutral grey foreground, configurable with
+`inactive_pane_border`; the active border retains `Header` cyan and bold.
+Monochrome keeps the inactive border plain and the active border bold. Border
+styling leaves pane contents and path hover unchanged.
+
 ### Implemented pattern selection
 
 `app::PatternSelection` captures the active pane's visible selectable native

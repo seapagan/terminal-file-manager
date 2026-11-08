@@ -25,6 +25,7 @@ pub enum MetadataPresentation {
 #[serde(default, deny_unknown_fields)]
 pub struct Settings {
     pub path_hover: Option<String>,
+    pub inactive_pane_border: Option<String>,
     pub toast_placement: crate::notifications::Placement,
     pub toast_expiry_seconds: u16,
     pub sidebar: bool,
@@ -52,6 +53,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             path_hover: None,
+            inactive_pane_border: None,
             toast_placement: Default::default(),
             toast_expiry_seconds: 5,
             sidebar: false,
@@ -107,11 +109,7 @@ impl Settings {
         if !(1..=60).contains(&settings.toast_expiry_seconds) {
             return Err("toast_expiry_seconds must be between 1 and 60".into());
         }
-        if let Some(hex) = &settings.path_hover {
-            crate::color::Theme::new(colored_text::ColorLevel::TrueColor)
-                .resolve(hex)
-                .map_err(|e| format!("path_hover: {e}"))?;
-        }
+        settings.validate_colours()?;
         for name in settings.profiles.keys() {
             validate_profile_name(name)?;
         }
@@ -120,6 +118,19 @@ impl Settings {
         }
         Bindings::new(&settings.bindings)?;
         Ok(settings)
+    }
+
+    fn validate_colours(&self) -> Result<(), String> {
+        let theme = crate::color::Theme::new(colored_text::ColorLevel::TrueColor);
+        for (name, value) in [
+            ("path_hover", &self.path_hover),
+            ("inactive_pane_border", &self.inactive_pane_border),
+        ] {
+            if let Some(hex) = value {
+                theme.resolve(hex).map_err(|e| format!("{name}: {e}"))?;
+            }
+        }
+        Ok(())
     }
 
     /// Apply startup/view preferences without replacing native locations.

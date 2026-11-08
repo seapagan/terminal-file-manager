@@ -284,6 +284,8 @@ ignore = "dim" # "dim", "hide" or "off"
 mouse = true
 # Optional path hover foreground; terminal colour depth and NO_COLOR still apply.
 # path_hover = "#b4f5ff"
+# Optional inactive pane border foreground; pane contents keep their own styles.
+# inactive_pane_border = "#767676"
 toast_placement = "bottom-right" # top-left, top-right, bottom-left, bottom-right
 toast_expiry_seconds = 5 # Range: 1–60; history survives expiry
 
