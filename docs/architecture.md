@@ -525,8 +525,9 @@ merged as `41a913e`, subsequently narrowed notification delivery to noteworthy
 events. PM3-06 path navigation is complete through
 [PR #13](https://github.com/seapagan/terminal-file-manager/pull/13), merged as
 `56bf891`; its [acceptance record](acceptance.md#pm3-06-accepted-and-merged--8-november-2026)
-records the final feature-head verification. PM3-07's internal file-operation
-clipboard remains pending and not authorised; snapshot testing remains deferred.
+records the final feature-head verification. PM3-07 provides OS path-text copying.
+The internal file-operation clipboard is deferred indefinitely; snapshot testing
+remains deferred.
 
 The application owns notification events independently of filesystem jobs.
 Toasts reference those events in chronological order, with newer groups nearest
@@ -574,3 +575,32 @@ Neither action changes operation state, retained events or Jobs evidence.
 Passive per-entry metadata diagnostics stay inline; accepted worker failures
 and listing errors retain Error notifications. Watch recovery remains Info.
 Placement and expiry use the existing strict TOML settings and atomic save path.
+
+
+## Footer workflows and OS path copy
+
+`workflow::Flow` owns ordered stages, enabled-choice defaults, highlights, Back,
+cancellation, physical key/click history and the final semantic choice path.
+Its opaque context and one-shot handler keep it independent of filesystem and
+clipboard rules. The measured workflow renderer shares complete text-cell
+rectangles with mouse input and occupies only `Geometry.footer`. Pane/status
+allocation and scroll state remain unchanged. Higher input owners invalidate
+the flow before the next draw; global toast dismissal retains priority.
+
+The path-copy consumer captures the originating pane, native highlighted and
+visible marked identities, current directory and relative reference. Startup
+captures the original launch directory separately from pane locations. Completion
+validates context and native identities, constructs the entire Unicode payload,
+and queues one write. Lexical relative paths never follow symlinks or cross
+incomparable roots; the configured opposite-pane base requires logical dual mode.
+Remote source identity and host-qualified output require a separate future
+consumer; local paths never masquerade as remote references.
+
+The clipboard router adapts git-diff-out's provider and fallback implementation
+and tests. External providers use literal stdin and bounded command/output I/O.
+One background request at a time keeps provider waits outside event processing.
+OSC52 preparation returns bytes to the terminal owner for serial emission between
+frames, and reports sent with acceptance unconfirmed. Local providers report
+copied only after a successful invocation. Preflight failures never invoke a
+provider or clear the clipboard. Clipboard settings use the existing strict,
+atomic preference storage; no workflow state persists across sessions.

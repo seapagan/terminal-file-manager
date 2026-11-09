@@ -4,6 +4,7 @@ use std::ffi::OsString;
 
 pub mod app;
 pub mod browser;
+pub mod clipboard;
 pub mod color;
 pub mod fs;
 pub mod fuzzy_time;

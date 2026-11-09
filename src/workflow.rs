@@ -180,7 +180,9 @@ impl<C, O> Flow<C, O> {
         if key.kind != KeyEventKind::Press {
             return None;
         }
-        if key.code == KeyCode::BackTab && key.modifiers.difference(KeyModifiers::SHIFT).is_empty()
+        if (key.code == KeyCode::BackTab
+            || key.code == KeyCode::Tab && key.modifiers == KeyModifiers::SHIFT)
+            && key.modifiers.difference(KeyModifiers::SHIFT).is_empty()
         {
             self.move_highlight(-1);
             return None;

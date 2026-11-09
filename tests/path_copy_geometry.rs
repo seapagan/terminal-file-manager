@@ -51,6 +51,55 @@ fn assert_selected_style(c: &Controller, g: &ui::Geometry, width: u16, level: Co
     }
 }
 
+#[test]
+fn active_resize_preserves_choice_and_scroll_even_at_zero_height_and_clipped_keyboard_completion() {
+    let root = tempfile::tempdir().unwrap();
+    let mut app = App::new(root.path().into());
+    app.launch_directory = Some(root.path().into());
+    app.panes[0].scroll = 7;
+    let mut c = Controller::new(
+        app,
+        Bindings::new(&Default::default()).unwrap(),
+        Default::default(),
+    );
+    send(&mut c, KeyCode::Char('y'), 120);
+    send(&mut c, KeyCode::Enter, 120);
+    for width in [0, 1, 2, 24, 40, 80, 120, 160] {
+        for height in [0, 1, 2, 8, 24] {
+            let old = ui::geometry(&c.app, Rect::new(0, 0, 120, 24));
+            c.handle(Event::Resize(width, height), &old, Default::default());
+            assert_eq!(c.app.panes[0].scroll, 7);
+            assert_eq!(
+                c.app
+                    .footer_workflow
+                    .as_ref()
+                    .unwrap()
+                    .highlighted()
+                    .unwrap()
+                    .id,
+                "full"
+            );
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+            terminal
+                .draw(|f| {
+                    ui::render(f, &c.app, &Theme::new(ColorLevel::NoColor));
+                })
+                .unwrap();
+        }
+    }
+    let clipped = ui::geometry(&c.app, Rect::new(0, 0, 0, 0));
+    c.handle(
+        Event::Key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::NONE)),
+        &clipped,
+        Default::default(),
+    );
+    assert_eq!(
+        c.path_copy_request.take().unwrap().text,
+        root.path().to_str().unwrap()
+    );
+    assert!(c.app.footer_workflow.is_none());
+}
+
 fn lifecycle(root: &std::path::Path, width: u16, dual: bool, maximized: bool) {
     let mut app = App::new(root.into());
     app.launch_directory = Some(root.into());

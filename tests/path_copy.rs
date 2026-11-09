@@ -134,6 +134,38 @@ fn snapshot_accepts_refresh_but_rejects_replaced_native_selection() {
 }
 
 #[test]
+fn first_background_listing_preserves_a_current_directory_snapshot() {
+    let root = tempfile::tempdir().unwrap();
+    let mut app = App::new(root.path().into());
+    app.launch_directory = Some(root.path().into());
+    let mut c = Controller::new(
+        app,
+        Bindings::new(&Default::default()).unwrap(),
+        Default::default(),
+    );
+    sequence(&mut c, "yc");
+    c.app.complete_listing(
+        0,
+        1,
+        Ok(fs::list(root.path(), &Default::default(), &AtomicBool::new(false)).unwrap()),
+    );
+    sequence(&mut c, "f");
+    assert!(c.path_copy_request.is_some());
+}
+
+#[test]
+fn stale_directory_before_activation_cannot_copy_a_replacement_context() {
+    let root = tempfile::tempdir().unwrap();
+    let directory = root.path().join("pane");
+    std::fs::create_dir(&directory).unwrap();
+    let mut c = controller(&directory);
+    std::fs::rename(&directory, root.path().join("old")).unwrap();
+    std::fs::create_dir(&directory).unwrap();
+    sequence(&mut c, "ycf");
+    assert!(c.path_copy_request.is_none());
+}
+
+#[test]
 fn opposite_pane_requires_logical_dual_and_rejects_changed_base() {
     let root = tempfile::tempdir().unwrap();
     let mut c = controller(root.path());

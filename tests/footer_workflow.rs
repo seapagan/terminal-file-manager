@@ -128,3 +128,22 @@ fn renderer_uses_one_row_cell_widths_and_only_complete_enabled_hits() {
         }
     }
 }
+
+#[test]
+fn both_shift_tab_encodings_traverse_enabled_choices_and_unknown_clicks_are_inert() {
+    let mut flow = flow();
+    for code in [KeyCode::Tab, KeyCode::BackTab] {
+        flow.input(Input::Key(KeyEvent::new(code, KeyModifiers::SHIFT)));
+        assert_eq!(flow.highlighted().unwrap().id, "second");
+        flow.input(key(KeyCode::Up));
+        assert_eq!(flow.highlighted().unwrap().id, "first");
+    }
+    flow.input(Input::Click(
+        terminal_file_manager::workflow::Target::Choice("missing"),
+    ));
+    assert_eq!(flow.stage_index(), 0);
+    assert!(matches!(
+        flow.input(key(KeyCode::Backspace)),
+        Progress::Cancelled
+    ));
+}

@@ -1,5 +1,28 @@
 # Acceptance gates
 
+## PM3-07 implementation for draft review — 9 November 2026
+
+The implementation adds reusable one-row footer workflows and their local
+name/path-copy consumer. Default `y → m/h/c → n/r/f` sequences, contextual
+Enter defaults, Back/Esc, mouse choices, effective bindings and detailed Help
+use the existing browser geometry and status owners. Ctrl+c Quit and direct
+F5/F6 operations retain their established ordinary-browser behavior.
+
+Native source snapshots, visible-mark order, lexical launch/opposite-pane
+relative paths, Unicode/control validation and all-or-nothing text precede
+clipboard submission. Platform providers and opt-in local OSC52 fallback run
+outside the UI thread; OSC52 reports sent without claiming terminal acceptance.
+The approved Windows provider adds clipboard-win5.4.3 and its BSL-1.0 notice.
+
+Automated coverage includes a non-clipboard consumer, ordered physical and
+semantic history, one-shot callbacks, source/default rules, stale identities,
+relative bases, literal payloads, one-row geometry, theme emphasis, input
+ownership, provider/fallback failures, bounded I/O and asynchronous outcomes.
+Final-head local/hosted evidence belongs to the draft PR and ignored work
+controller. Manual desktop/SSH/multiplexer clipboard acceptance and independent
+reviews remain outstanding; this implementation record grants no acceptance,
+merge, release or M3 authority.
+
 ## PM3-06 accepted and merged — 8 November 2026
 
 PM3-06 is **Complete**. The maintainer merged
@@ -10,9 +33,10 @@ The final feature head was GPG-signed/Signed-off-by
 [`7ac7fca`](https://github.com/seapagan/terminal-file-manager/commit/7ac7fca1d634421a44b2b303f8f688493e199af8)
 on `feat/pm3-06-path-navigation`, based on `151ddaef`.
 
-PM3-07 clipboard is **Pending (not authorised)**. Its preceding dependencies
-are complete, but implementation requires a separate assignment. M3-GATE remains
-**Not started** until PM3-07 completes. Earlier implementation, draft-delivery
+PM3-07 OS clipboard path copy is in **draft delivery**, authorised 9 November.
+Independent reviews, maintainer visual acceptance and merge remain outstanding.
+The internal file-operation clipboard is deferred indefinitely. M3-GATE remains
+**Not started** until PM3-07 is accepted. Earlier implementation, draft-delivery
 and verification checkpoints below describe their recorded revisions.
 
 The synthetic `..` row remains outside filesystem entries, marking/counting and
@@ -829,8 +853,9 @@ The maintainer merged M1 in [PR #2](https://github.com/seapagan/terminal-file-ma
 on 18 October 2026 and M2 in [PR #3](https://github.com/seapagan/terminal-file-manager/pull/3)
 on 24 October 2026. Local live refresh is complete through PR #4, with Windows
 manual refresh, and PM3-01 through PM3-06 are merged. The PR #11/#12 follow-ups
-and PR #13 navigation closeout are recorded above. PM3-07 clipboard is pending
-and not authorised; M3–M8 cover the remaining application and final release.
+and PR #13 navigation closeout are recorded above. PM3-07 OS path-copy draft
+delivery is authorised; acceptance remains outstanding. M3–M8 cover the remaining
+application and final release.
 Genuine direct SSH-to-SSH transfer remains post-v1 work.
 
 | Checkpoint | Completed proof |

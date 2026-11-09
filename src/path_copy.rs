@@ -7,6 +7,8 @@ pub const HELP: &[&str] = &[
     "Up/Down/Right and Tab/Shift+Tab change the choice. Left/Backspace goes back; Esc cancels. Click a displayed choice to activate it. Unsupported keys stay inside the workflow; there is no timeout.",
     "Relative uses the original launch directory, including after navigation. Configure clipboard.relative_path_base = opposite-pane to use the other pane instead; logical two-pane mode and comparable roots are required, even when a pane is hidden or maximised.",
     "Only visible marks in the active pane are copied, in displayed order, one per LF-delimited line. Directories copy their own path, without traversal. Text is literal and unquoted. Non-Unicode or control-containing paths are rejected without changing the clipboard.",
+    "Local providers: wl-copy on Wayland, xclip/xsel on X11, pbcopy on macOS and native Windows clipboard. Commands have a three-second deadline. Clipboard text is limited to 16 MiB.",
+    "SSH sends OSC 52 to the terminal-side clipboard. Local OSC 52 fallback requires clipboard.osc52_fallback = true. Sent does not mean accepted; the terminal may refuse it. Limit: 74,991 UTF-8 bytes. Zellij uses standard framing; tmux needs set-clipboard on and outer terminal support. GNU screen and dumb/unknown terminals are unsupported.",
 ];
 use crate::{
     app::App,
@@ -56,6 +58,7 @@ pub struct Snapshot {
     path: PathBuf,
     context: u64,
     directory: Entry,
+    physical_directory: Option<Entry>,
     highlighted: Option<Entry>,
     marked: Vec<Entry>,
     base: Result<PathBuf, String>,
@@ -125,7 +128,7 @@ impl Snapshot {
         let pane = &app.panes[self.pane];
         app.active == self.pane
             && pane.path == self.path
-            && pane.context == self.context
+            && (pane.context == self.context || (self.context == 0 && pane.context == 1))
             && pane.pending.is_none()
             && pane.error.is_none()
     }
@@ -135,9 +138,7 @@ impl Snapshot {
             return Err("Wait for a valid local directory before copying paths".into());
         }
         let directory = crate::fs::inspect(&pane.path);
-        if directory.identity.is_none() {
-            return Err("Current directory identity is unavailable; refresh first".into());
-        }
+        validate_directory(pane, &directory)?;
         let marked = pane
             .visible
             .iter()
@@ -171,6 +172,7 @@ impl Snapshot {
             path: pane.path.clone(),
             context: pane.context,
             directory,
+            physical_directory: pane.directory.clone(),
             highlighted: pane.current().filter(|e| e.identity.is_some()).cloned(),
             marked,
             base,
@@ -180,11 +182,7 @@ impl Snapshot {
 
     fn validate(&self, app: &App, source: Source, format: Format) -> Result<Vec<Entry>, String> {
         let pane = &app.panes[self.pane];
-        if !self.matches_context(app)
-            || !same_entry(&self.directory, &crate::fs::inspect(&self.path))
-        {
-            return Err("Path-copy context changed; start again".into());
-        }
+        self.validate_context(app)?;
         if format == Format::Relative {
             self.validate_base(app)?;
         }
@@ -195,6 +193,18 @@ impl Snapshot {
         };
         validate_entries(&entries)?;
         Ok(entries)
+    }
+
+    fn validate_context(&self, app: &App) -> Result<(), String> {
+        if !self.matches_context(app)
+            || !same_entry(&self.directory, &crate::fs::inspect(&self.path))
+        {
+            return Err("Path-copy context changed; start again".into());
+        }
+        if let Some(directory) = &self.physical_directory {
+            validate_entries(std::slice::from_ref(directory))?;
+        }
+        Ok(())
     }
 
     fn validate_highlight(&self, pane: &crate::app::Pane) -> Result<Vec<Entry>, String> {
@@ -249,6 +259,26 @@ fn validate_entries(entries: &[Entry]) -> Result<(), String> {
             .any(|e| !same_entry(e, &crate::fs::inspect(&e.path)))
     {
         return Err("Selected path was removed or replaced; refresh and start again".into());
+    }
+    Ok(())
+}
+
+fn validate_directory(pane: &crate::app::Pane, directory: &Entry) -> Result<(), String> {
+    if directory.identity.is_none() {
+        return Err("Current directory identity is unavailable; refresh first".into());
+    }
+    if let Some(expected) = &pane.entry_identity
+        && !directory
+            .identity
+            .as_ref()
+            .is_some_and(|fresh| same_identity(expected, fresh))
+    {
+        return Err(
+            "Current directory was replaced; refresh or reopen it before copying paths".into(),
+        );
+    }
+    if let Some(physical) = &pane.directory {
+        validate_entries(std::slice::from_ref(physical))?;
     }
     Ok(())
 }

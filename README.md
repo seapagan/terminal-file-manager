@@ -272,6 +272,21 @@ at the start of each copy instead. This requires logical two-pane mode and
 comparable roots or volumes; it works while a pane is maximised or hidden by width.
 Remap the activation action with `path-copy` in `[bindings]`.
 
+Local clipboard providers are `wl-copy` on Wayland, `xclip` or `xsel` on X11,
+`pbcopy` on macOS and the native Windows clipboard. Install a Linux provider
+if none is available. Commands run in the background with a three-second deadline.
+TFM limits text to 16 MiB and rejects oversized requests without truncating them.
+
+Through SSH, TFM sends OSC 52 to the terminal-side clipboard. Local runs use
+OSC 52 as a fallback only with `clipboard.osc52_fallback = true`. TFM reports
+**sent**, with acceptance unconfirmed: the terminal can ignore or refuse it.
+OSC 52 is limited to 74,991 UTF-8 bytes. Zellij uses standard OSC 52;
+tmux needs `set-clipboard on` and clipboard support in the outer terminal.
+GNU screen and dumb/unknown terminals are refused. Clipboard settings and
+limits in your terminal or multiplexer still apply. See the
+[Zellij clipboard guide](https://zellij.dev/documentation/compatibility.html) and
+[tmux clipboard guide](https://github.com/tmux/tmux/wiki/Clipboard).
+
 ## Configuration
 
 `tfm` works without a configuration file and saves preferences when they change.

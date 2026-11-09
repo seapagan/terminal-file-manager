@@ -1,4 +1,5 @@
 //! Runtime orchestration: terminal events and bounded worker results meet here.
+mod clipboard;
 mod operations;
 use crate::{
     app::{App, Request, RequestKind},
@@ -104,6 +105,7 @@ fn drive(
     let mut metadata: [Option<(Request, Instant)>; 2] = [None, None];
     let mut dirty = true;
     let mut watches = crate::watch::Runtime::default();
+    let mut clipboard = crate::clipboard::runtime::Runtime::default();
     let mut geometry = ui::geometry(&controller.app, terminal.size()?.into());
     while !controller.quit {
         dirty |= controller.app.notifications.advance(started.elapsed());
@@ -113,6 +115,7 @@ fn drive(
         dirty |= operations::collect(controller, jobs, pool);
         dirty |= watches.poll(&mut controller.app, pool, started.elapsed());
         dirty |= controller.reconcile_footer();
+        dirty |= clipboard::collect(controller, &mut clipboard);
         submit_refreshes(&mut controller.app, pool);
         dirty |= schedule_metadata(controller, pool, &mut metadata);
         if dirty {
@@ -129,6 +132,7 @@ fn drive(
                 pool.submit(request);
             }
             operations::submit(controller, jobs);
+            clipboard::submit(controller, &mut clipboard);
             dirty = true;
         }
     }
