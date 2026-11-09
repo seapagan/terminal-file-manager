@@ -279,7 +279,7 @@ fn navigation_and_modal_ownership_invalidate_before_next_frame_without_stale_cal
 }
 
 #[test]
-fn filtered_marks_never_join_the_batch_and_invalid_unicode_or_controls_reject_whole_batch() {
+fn filtered_marks_never_join_the_batch_and_control_names_reject_whole_batch() {
     let root = tempfile::tempdir().unwrap();
     for name in ["alpha", "beta", "界e\u{301}👩"] {
         std::fs::write(root.path().join(name), "").unwrap();
@@ -294,18 +294,31 @@ fn filtered_marks_never_join_the_batch_and_invalid_unicode_or_controls_reject_wh
     assert_eq!(c.path_copy_request.take().unwrap().text, "界e\u{301}👩");
     #[cfg(unix)]
     {
-        use std::os::unix::ffi::OsStringExt;
-        for name in [
-            std::ffi::OsString::from("bad\nname"),
-            std::ffi::OsString::from_vec(vec![b'x', 0xff]),
-        ] {
-            std::fs::write(root.path().join(name), "").unwrap();
-        }
+        std::fs::write(root.path().join("bad\nname"), "").unwrap();
         let mut c = controller(root.path());
         c.app.panes[0].select_all();
         sequence(&mut c, "ymn");
         assert!(c.path_copy_request.is_none());
     }
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn non_unicode_native_entry_rejects_the_entire_marked_batch() {
+    use std::os::unix::ffi::OsStringExt;
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(root.path().join("valid"), "").unwrap();
+    std::fs::write(
+        root.path()
+            .join(std::ffi::OsString::from_vec(vec![b'x', 0xff])),
+        "",
+    )
+    .unwrap();
+    let mut c = controller(root.path());
+    c.app.panes[0].select_all();
+    sequence(&mut c, "ymn");
+    assert!(c.path_copy_request.is_none());
+    assert!(c.app.footer_workflow.is_none());
 }
 
 #[test]

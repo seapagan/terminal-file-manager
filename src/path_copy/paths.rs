@@ -94,6 +94,25 @@ pub(super) fn text(
 mod tests {
     use super::*;
 
+    #[cfg(unix)]
+    #[test]
+    fn non_unicode_native_spelling_is_rejected_in_every_text_format() {
+        use std::os::unix::ffi::OsStringExt;
+        let root = tempfile::tempdir().unwrap();
+        let mut entry = crate::fs::inspect(root.path());
+        entry.path = root
+            .path()
+            .join(std::ffi::OsString::from_vec(vec![b'x', 0xff]));
+        let source = SourceIdentity::Local(entry);
+        for format in [Format::Name, Format::Relative, Format::Full] {
+            assert!(
+                text(&source, format, Some(root.path()))
+                    .unwrap_err()
+                    .contains("Unicode")
+            );
+        }
+    }
+
     #[test]
     fn filesystem_roots_have_nonempty_native_name_text() {
         let root = tempfile::tempdir().unwrap();
