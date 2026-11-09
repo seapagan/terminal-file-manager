@@ -576,7 +576,6 @@ Passive per-entry metadata diagnostics stay inline; accepted worker failures
 and listing errors retain Error notifications. Watch recovery remains Info.
 Placement and expiry use the existing strict TOML settings and atomic save path.
 
-
 ## Footer workflows and OS path copy
 
 `workflow::Flow` owns ordered stages, enabled-choice defaults, highlights, Back,
