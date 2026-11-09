@@ -5,6 +5,7 @@ use crate::{
 };
 use ratatui::{Frame, layout::Rect, style::Modifier, text::Span, widgets::Paragraph};
 
+#[derive(Clone, Debug)]
 pub struct Control {
     pub area: Rect,
     pub label: String,
@@ -13,6 +14,7 @@ pub struct Control {
     pub selected: bool,
 }
 
+#[derive(Clone, Debug)]
 pub struct Layout {
     pub controls: Vec<Control>,
 }
@@ -73,9 +75,21 @@ pub fn layout<C, O>(flow: &Flow<C, O>, area: Rect) -> Layout {
 }
 
 fn choices<C, O>(layout: &mut Layout, x: &mut u16, area: Rect, flow: &Flow<C, O>, tier: usize) {
+    let compact = flow
+        .stage()
+        .choices
+        .iter()
+        .map(|choice| super::modal::width(&format!("{} {}", choice.key, choice.labels[tier])) + 3)
+        .map(u32::from)
+        .sum::<u32>()
+        > u32::from(area.right().saturating_sub(*x));
     for choice in &flow.stage().choices {
         let selected = flow.highlighted().is_some_and(|c| c.id == choice.id);
-        let text = format!("{} {}", choice.key, crate::ui::clean(&choice.labels[tier]));
+        let text = if compact {
+            choice.key.to_string()
+        } else {
+            format!("{} {}", choice.key, crate::ui::clean(&choice.labels[tier]))
+        };
         let label = if selected {
             format!("[{text}]")
         } else if choice.disabled.is_some() {

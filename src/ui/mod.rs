@@ -99,7 +99,7 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
         metadata::render(frame, app, area, theme, false);
     }
     status::render(frame, &geometry.status_segments, theme);
-    footer::render(frame, geometry.footer, &geometry.footer_controls, theme);
+    footer::render_geometry(frame, &geometry, theme);
     if app.popup {
         metadata::render(frame, app, overlay_bounds(app, frame.area()), theme, true);
     }

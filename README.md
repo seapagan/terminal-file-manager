@@ -249,6 +249,29 @@ tfm --save-session -2 /path/to/left /path/to/right
 
 Marks, filters and back/forward history last only for the current run.
 
+## Copy names and paths
+
+Press `y`, choose `m` Marked, `h` Highlighted or `c` Current directory, then
+`n` Name, `r` Relative or `f` Full path. For example, `y h f` copies the
+highlighted file or directory's full path as plain text. Directories copy their
+own path. `..` is navigation only; use Current to copy the directory being browsed.
+
+Enter accepts the highlighted choice. The source default prefers visible marks,
+then a real highlighted entry, then the current directory; the format default
+is Full. Arrows or Tab change the choice, Left/Backspace goes back and Esc
+cancels. The workflow occupies the existing key bar without moving the panes.
+Help includes full instructions for narrow terminals.
+
+Marked output includes only visible marks in the active pane, in displayed order,
+with one path per line. Text is literal and unquoted. TFM rejects paths that a
+text clipboard cannot preserve, including non-Unicode names and control characters.
+
+Relative paths use the original launch directory throughout the session. Set
+`clipboard.relative_path_base = "opposite-pane"` to use the other pane's directory
+at the start of each copy instead. This requires logical two-pane mode and
+comparable roots or volumes; it works while a pane is maximised or hidden by width.
+Remap the activation action with `path-copy` in `[bindings]`.
+
 ## Configuration
 
 `tfm` works without a configuration file and saves preferences when they change.
@@ -283,6 +306,10 @@ size = true
 modified = true
 attributes = true
 owner = false
+
+[clipboard]
+relative_path_base = "launch" # "launch" or "opposite-pane"
+osc52_fallback = false # Opt in to terminal clipboard fallback
 
 [bindings]
 "Ctrl+f" = "filter"

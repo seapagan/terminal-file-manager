@@ -104,20 +104,35 @@ fn document(app: &App, width: usize, keys_width: usize) -> (Vec<Row>, Vec<(HelpT
         {
             let target = HelpTarget::Action(entry.action);
             anchors.push((target, rows.len() as u16));
-            let keys = super::text::wrap_value(&entry.keys, keys_width);
-            let text =
-                super::text::wrap_value(entry.description, width.saturating_sub(keys_width + 1));
-            for index in 0..keys.len().max(text.len()) {
-                rows.push(Row {
-                    keys: keys.get(index).cloned().unwrap_or_default(),
-                    text: text.get(index).cloned().unwrap_or_default(),
-                    heading: false,
-                    target,
-                });
-            }
+            command_rows(&mut rows, entry, width, keys_width);
         }
     }
     (rows, anchors)
+}
+
+fn command_rows(
+    rows: &mut Vec<Row>,
+    entry: &crate::input::HelpEntry,
+    width: usize,
+    keys_width: usize,
+) {
+    let target = HelpTarget::Action(entry.action);
+    let keys = super::text::wrap_value(&entry.keys, keys_width);
+    let text_width = width.saturating_sub(keys_width + 1);
+    let mut text = super::text::wrap_value(entry.description, text_width);
+    if entry.action == crate::input::Action::PathCopy {
+        for detail in crate::path_copy::HELP {
+            text.extend(super::text::wrap_value(detail, text_width));
+        }
+    }
+    for index in 0..keys.len().max(text.len()) {
+        rows.push(Row {
+            keys: keys.get(index).cloned().unwrap_or_default(),
+            text: text.get(index).cloned().unwrap_or_default(),
+            heading: false,
+            target,
+        });
+    }
 }
 
 pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, layout: &HelpLayout) {

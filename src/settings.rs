@@ -24,6 +24,7 @@ pub enum MetadataPresentation {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Settings {
+    pub clipboard: crate::path_copy::Preferences,
     pub path_hover: Option<String>,
     pub inactive_pane_border: Option<String>,
     pub toast_placement: crate::notifications::Placement,
@@ -52,6 +53,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            clipboard: Default::default(),
             path_hover: None,
             inactive_pane_border: None,
             toast_placement: Default::default(),

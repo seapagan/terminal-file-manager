@@ -12,6 +12,7 @@ mod operation_dialog;
 mod operation_exit;
 mod operation_jobs;
 mod operations;
+mod path_copy;
 mod path_navigation;
 mod pattern;
 mod profiles;
@@ -30,6 +31,7 @@ pub use help::{
 )]
 #[serde(rename_all = "kebab-case")]
 pub enum Action {
+    PathCopy,
     Up,
     Down,
     ExtendUp,

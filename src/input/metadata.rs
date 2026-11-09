@@ -15,6 +15,9 @@ impl Controller {
         if super::notifications::handle(self, &event, geometry) {
             return Vec::new();
         }
+        if super::path_copy::handle(self, &event, geometry) {
+            return Vec::new();
+        }
         let closing = close_hit(&event, geometry.modal_close);
         if closing && metadata_owns_close(&self.app, geometry) {
             return self.dispatch(Action::Cancel, geometry);

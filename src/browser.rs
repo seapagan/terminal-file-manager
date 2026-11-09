@@ -112,6 +112,7 @@ fn drive(
         dirty |= collect(controller, pool);
         dirty |= operations::collect(controller, jobs, pool);
         dirty |= watches.poll(&mut controller.app, pool, started.elapsed());
+        dirty |= controller.reconcile_footer();
         submit_refreshes(&mut controller.app, pool);
         dirty |= schedule_metadata(controller, pool, &mut metadata);
         if dirty {

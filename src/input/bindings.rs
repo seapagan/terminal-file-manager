@@ -158,6 +158,7 @@ fn named_key(key: &str) -> Option<KeyCode> {
 
 use Action::*;
 const DEFAULT_BINDINGS: &[(&str, Action)] = &[
+    ("y", PathCopy),
     ("Up", Up),
     ("k", Up),
     ("Down", Down),

@@ -156,7 +156,7 @@ fn help_lists_effective_bindings_and_centres_the_action_table() {
         settings,
     );
     key(&mut controller, "?");
-    let mut terminal = Terminal::new(TestBackend::new(160, 60)).unwrap();
+    let mut terminal = Terminal::new(TestBackend::new(160, 120)).unwrap();
     terminal
         .draw(|frame| {
             ui::render(

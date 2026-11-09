@@ -75,6 +75,7 @@ impl Startup {
         &self,
         settings: &crate::settings::Settings,
     ) -> Result<crate::app::App, String> {
+        let launch_directory = capture_launch_directory()?;
         if self.paths.len() > 2 {
             return Err("at most two directory paths are supported".into());
         }
@@ -91,12 +92,29 @@ impl Startup {
         for pane in &mut app.panes {
             pane.path = validate_path(&pane.path)?;
         }
-        if self.two_panes || self.paths.len() == 2 {
-            app.dual = true;
-            app.maximized = false;
-        }
-        Ok(app)
+        Ok(finish_layout(
+            app,
+            self.two_panes || self.paths.len() == 2,
+            launch_directory,
+        ))
     }
+}
+
+fn capture_launch_directory() -> Result<PathBuf, String> {
+    std::env::current_dir().map_err(|e| format!("Cannot capture launch directory: {e}"))
+}
+
+fn finish_layout(
+    mut app: crate::app::App,
+    dual: bool,
+    launch_directory: PathBuf,
+) -> crate::app::App {
+    if dual {
+        app.dual = true;
+        app.maximized = false;
+    }
+    app.launch_directory = Some(launch_directory);
+    app
 }
 
 fn validate_path(path: &std::path::Path) -> Result<PathBuf, String> {

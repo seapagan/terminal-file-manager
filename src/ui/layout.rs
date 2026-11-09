@@ -4,6 +4,7 @@ use ratatui::layout::Rect;
 /// File panes, optional metadata and stable bottom controls.
 #[derive(Clone, Debug)]
 pub struct Geometry {
+    pub workflow: Option<super::workflow::Layout>,
     pub(crate) area: Rect,
     pub path_controls: Vec<super::PathControl>,
     pub path_picker: Option<super::PathLayout>,
@@ -78,7 +79,13 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
     let height = area.height.saturating_sub(1 + status_rows);
     let body = Rect::new(area.x, area.y, area.width, height);
     let mut geometry = initial_geometry(app, area, height);
-    geometry.footer_controls = super::footer::controls(app, geometry.footer);
+    geometry.workflow = app
+        .footer_workflow
+        .as_ref()
+        .map(|flow| super::workflow::layout(flow, geometry.footer));
+    if geometry.workflow.is_none() {
+        geometry.footer_controls = super::footer::controls(app, geometry.footer);
+    }
     if app.visible_panes(area.width).len() == 2 {
         let width = ((u32::from(body.width) * u32::from(app.split_percent.clamp(20, 80)) / 100)
             as u16)
@@ -147,6 +154,7 @@ fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
     let pattern = super::pattern::layout(app, bounds);
     let menu_layout = menu_layout(app, bounds);
     Geometry {
+        workflow: None,
         area,
         path_controls: Vec::new(),
         path_picker: super::path_picker::layout(app, bounds),
