@@ -2,6 +2,7 @@
 mod diagnostics;
 mod footer;
 mod help;
+pub mod workflow;
 pub use footer::FooterControl;
 pub use help::{HelpLayout, context::ContextLayout};
 mod layout;

@@ -20,6 +20,7 @@ pub mod ui;
 pub mod view;
 pub mod watch;
 pub mod workers;
+pub mod workflow;
 
 /// Help for the implemented local browsing contract.
 pub const HELP: &str =
