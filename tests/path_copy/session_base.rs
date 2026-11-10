@@ -236,6 +236,23 @@ fn copy_path_header_and_from_stage_ignore_old_navigation_keys() {
     let flow = c.app.footer_workflow.as_ref().unwrap();
     assert_eq!(flow.label, "Copy Path");
     assert_eq!(flow.stage().label, "From");
+    let current = flow
+        .stage()
+        .choices
+        .iter()
+        .find(|choice| choice.id == "current")
+        .unwrap();
+    assert_eq!(current.key, 'c');
+    assert_eq!(current.labels, ["Current folder"; 3]);
+    let g = ui::geometry(&c.app, Rect::new(0, 0, 160, 24));
+    assert!(
+        g.workflow
+            .as_ref()
+            .unwrap()
+            .controls
+            .iter()
+            .any(|control| control.label == "[c Current folder]")
+    );
     for key in [
         KeyCode::Up,
         KeyCode::Down,

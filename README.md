@@ -252,10 +252,10 @@ Marks, filters and back/forward history last only for the current run.
 ## Copy names and paths
 
 Press `y` to open **Copy Path / From**. Choose `m` Marked, `h` Highlighted or
-`c` Current, then
+`c` Current folder, then
 `n` Name, `r` Relative or `f` Full path. For example, `y h f` copies the
 highlighted file or directory's full path as plain text. Directories copy their
-own path. `..` is navigation only; use Current to copy the directory being browsed.
+own path. `..` is navigation only; use Current folder to copy the directory being browsed.
 
 Enter accepts the highlighted choice. The source default prefers visible marks,
 then a real highlighted entry, then the current directory; the format default

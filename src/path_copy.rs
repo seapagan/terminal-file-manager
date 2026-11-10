@@ -3,8 +3,8 @@ mod base;
 mod paths;
 /// Detailed Help remains available before activation, including at narrow widths.
 pub const HELP: &[&str] = &[
-    "Choose m Marked, h Highlighted or c Current directory, then n Name, r Relative or f Full path. Example: y h f copies the highlighted path with the default binding.",
-    "Enter accepts the highlighted choice: visible marks first, then the real highlighted entry, then current directory. Full path starts selected. The synthetic .. row is never Highlighted; Current still means this directory.",
+    "Choose m Marked, h Highlighted or c Current folder, then n Name, r Relative or f Full path. Example: y h f copies the highlighted path with the default binding.",
+    "Enter accepts the highlighted choice: visible marks first, then the real highlighted entry, then current directory. Full path starts selected. The synthetic .. row is never Highlighted; Current folder still means this directory.",
     "Copy Path starts with From: choose a direct letter shortcut or press Enter for the highlighted default. Backspace returns to the previous stage; Esc cancels. Click a displayed choice to activate it. Arrow and Tab keys stay inside the workflow without changing the choice; there is no timeout.",
     "From also offers s Set base and Shift+s Other base. They capture the active or opposite pane directory, confirm the change and exit without copying. Other base requires a valid directory in logical two-pane mode. Relative copies immediately from Format using the selected session base; incomparable roots are disabled.",
     "The startup base is the first explicit CLI directory, or the process working directory when no directory is supplied. Saved navigation sessions restore their captured base; older sessions use the first pane. Shift+q and --save-session save it; ordinary quit does not. It is not a configuration preference.",
@@ -100,7 +100,7 @@ fn from_stage(snapshot: &Snapshot) -> Stage {
     let mut choices = vec![
         marked,
         highlighted,
-        Choice::new("current", 'c', ["Current", "Current", "Here"]),
+        Choice::new("current", 'c', ["Current folder"; 3]),
     ];
     choices.extend(snapshot.bases.choices());
     Stage::new("From", choices, default)

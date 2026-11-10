@@ -606,7 +606,7 @@ pane, native highlighted and
 visible marked identities, current directory and relative reference. Startup
 captures the first explicit CLI directory (or process cwd without arguments) as
 an absolute native startup base. The selected relative base is session state.
-From offers Marked, Highlighted and Current sources followed by the Format stage.
+From offers Marked, Highlighted and Current folder sources followed by the Format stage.
 Each format completes immediately, including Relative using the captured session
 base. Set base and Other base complete directly from From with a distinct
 base-set outcome: they validate and capture a native directory path, confirm the

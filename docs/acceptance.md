@@ -6,8 +6,8 @@ The implementation adds reusable one-row footer workflows and their local
 name/path-copy consumer. Two-stage `y → m/h/c → n/r/f` copying, immediate
 From-stage base actions, contextual Enter defaults, Backspace/Esc, mouse choices, effective
 bindings and detailed Help use the existing browser geometry and status owners.
-Copy Path / From presents bracketed options; direct letters and Enter activate
-choices. Arrow and Tab keys do not navigate the workflow. Ctrl+c Quit and direct
+Copy Path / From presents bracketed options, including c Current folder; direct
+letters and Enter activate choices. Arrow and Tab keys do not navigate the workflow. Ctrl+c Quit and direct
 F5/F6 operations retain their established ordinary-browser behavior.
 
 Native source snapshots, visible-mark order, fixed session-relative bases,
