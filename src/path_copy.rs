@@ -5,7 +5,7 @@ mod paths;
 pub const HELP: &[&str] = &[
     "Choose m Marked, h Highlighted or c Current directory, then n Name, r Relative or f Full path. Example: y h f copies the highlighted path with the default binding.",
     "Enter accepts the highlighted choice: visible marks first, then the real highlighted entry, then current directory. Full path starts selected. The synthetic .. row is never Highlighted; Current still means this directory.",
-    "Up/Down/Right and Tab/Shift+Tab change the choice. Left/Backspace goes back; Esc cancels. Click a displayed choice to activate it. Unsupported keys stay inside the workflow; there is no timeout.",
+    "Copy Path starts with From: choose a direct letter shortcut or press Enter for the highlighted default. Backspace returns to the previous stage; Esc cancels. Click a displayed choice to activate it. Arrow and Tab keys stay inside the workflow without changing the choice; there is no timeout.",
     "Relative opens a Base choice: k Keep base (the default), s This pane, Shift+s Other pane, or o Startup base. Captured bases stay fixed across pane navigation. Other pane requires logical two-pane mode; incomparable roots are disabled.",
     "The startup base is the first explicit CLI directory, or the process working directory when no directory is supplied. Saved navigation sessions restore their captured base; older sessions use the first pane. Shift+q and --save-session save it; ordinary quit does not. It is not a configuration preference.",
     "Only visible marks in the active pane are copied, in displayed order, one per LF-delimited line. Directories copy their own path, without traversal. Text is literal and unquoted. Non-Unicode or control-containing paths are rejected without changing the clipboard.",
@@ -86,7 +86,7 @@ pub fn open(app: &App, trigger: Input) -> Result<Workflow, String> {
     };
     let stages = vec![
         Stage::new(
-            "Source",
+            "From",
             vec![
                 marked,
                 highlighted,
@@ -100,7 +100,15 @@ pub fn open(app: &App, trigger: Input) -> Result<Workflow, String> {
             .stage()
             .when(|choices| choices.last().is_some_and(|c| c.id == "relative")),
     ];
-    Flow::new("path-copy", "YANK", trigger, snapshot, stages, |done| done).map_err(str::to_owned)
+    Flow::new(
+        "path-copy",
+        "Copy Path",
+        trigger,
+        snapshot,
+        stages,
+        |done| done,
+    )
+    .map_err(str::to_owned)
 }
 
 fn formats() -> Stage {

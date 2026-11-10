@@ -35,7 +35,7 @@ pub(super) fn controls(app: &crate::app::App, area: Rect) -> Vec<FooterControl> 
         ("Shift+v", "View", Action::ViewOptions),
         ("/", "Filter", Action::Filter),
         ("Alt+v", "Profiles", Action::ViewProfiles),
-        ("y", "Yank", Action::PathCopy),
+        ("y", "Path", Action::PathCopy),
     ] {
         let Some(entry) = app.help_entry(action) else {
             continue;

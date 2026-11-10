@@ -18,7 +18,7 @@ fn flow() -> Flow<usize, (usize, Vec<Input>, Vec<&'static str>)> {
                     Choice::new("disabled", 'd', ["Disabled", "Off", "Off"])
                         .disabled("Unavailable"),
                     Choice::new("first", 'a', ["First", "First", "A"]),
-                    Choice::new("second", 'b', ["Second", "Second", "B"]),
+                    Choice::new("second", 'b', ["Second界", "Second界", "B界"]),
                 ],
                 "disabled",
             ),
@@ -48,7 +48,7 @@ fn dummy_callback_gets_physical_detour_and_only_final_semantic_path_once() {
         Progress::Disabled(_)
     ));
     flow.input(key(KeyCode::Char('b')));
-    flow.input(key(KeyCode::Left));
+    flow.input(key(KeyCode::Backspace));
     assert_eq!(flow.highlighted().unwrap().id, "second");
     flow.input(key(KeyCode::Up));
     flow.input(Input::Click(
@@ -65,7 +65,7 @@ fn dummy_callback_gets_physical_detour_and_only_final_semantic_path_once() {
             key(KeyCode::Char('x')),
             key(KeyCode::Char('d')),
             key(KeyCode::Char('b')),
-            key(KeyCode::Left),
+            key(KeyCode::Backspace),
             key(KeyCode::Up),
             Input::Click(terminal_file_manager::workflow::Target::Choice("first")),
             key(KeyCode::Enter)
@@ -98,50 +98,33 @@ fn defaults_repeats_modifiers_and_cancel_never_activate_disabled_choices() {
 }
 
 #[test]
-fn renderer_uses_one_row_cell_widths_and_only_complete_enabled_hits() {
-    use ratatui::{Terminal, backend::TestBackend, layout::Rect};
-    use terminal_file_manager::{color::Theme, ui::workflow as presentation};
-    for width in [0, 1, 2, 8, 24, 40, 80, 120, 160] {
-        let flow = flow();
-        let layout = presentation::layout(&flow, Rect::new(0, 2, width, 1));
-        let mut terminal = Terminal::new(TestBackend::new(width, 4)).unwrap();
-        terminal
-            .draw(|frame| {
-                presentation::render(
-                    frame,
-                    &layout,
-                    &Theme::new(colored_text::ColorLevel::NoColor),
-                )
-            })
-            .unwrap();
-        for control in &layout.controls {
-            assert_eq!(control.area.y, 2);
-            assert_eq!(control.area.height, 1);
-            assert!(control.area.right() <= width);
-            assert_eq!(
-                usize::from(control.area.width),
-                ratatui::text::Line::raw(&control.label).width()
-            );
-            if !control.enabled {
-                assert!(layout.hit(control.area.x, 2).is_none());
-            }
+fn arrows_and_tab_are_consumed_without_changing_stage_or_default() {
+    let mut flow = flow();
+    for code in [
+        KeyCode::Up,
+        KeyCode::Down,
+        KeyCode::Left,
+        KeyCode::Right,
+        KeyCode::Tab,
+        KeyCode::BackTab,
+    ] {
+        for modifiers in [KeyModifiers::NONE, KeyModifiers::SHIFT] {
+            assert!(matches!(
+                flow.input(Input::Key(KeyEvent::new(code, modifiers))),
+                Progress::Active
+            ));
+            assert_eq!(flow.highlighted().unwrap().id, "first");
+            assert_eq!(flow.stage_index(), 0);
         }
     }
-}
-
-#[test]
-fn both_shift_tab_encodings_traverse_enabled_choices_and_unknown_clicks_are_inert() {
-    let mut flow = flow();
-    for code in [KeyCode::Tab, KeyCode::BackTab] {
-        flow.input(Input::Key(KeyEvent::new(code, KeyModifiers::SHIFT)));
-        assert_eq!(flow.highlighted().unwrap().id, "second");
-        flow.input(key(KeyCode::Up));
-        assert_eq!(flow.highlighted().unwrap().id, "first");
-    }
+    flow.input(key(KeyCode::Enter));
+    flow.input(key(KeyCode::Left));
+    assert_eq!(flow.stage_index(), 1);
     flow.input(Input::Click(
         terminal_file_manager::workflow::Target::Choice("missing"),
     ));
-    assert_eq!(flow.stage_index(), 0);
+    assert_eq!(flow.stage_index(), 1);
+    flow.input(key(KeyCode::Backspace));
     assert!(matches!(
         flow.input(key(KeyCode::Backspace)),
         Progress::Cancelled
@@ -218,7 +201,7 @@ fn conditional_stages_skip_and_reenter_with_history_defaults_and_mouse_back() {
     flow.input(key(KeyCode::Enter));
     flow.input(key(KeyCode::Backspace));
     assert_eq!(flow.highlighted().unwrap().id, "extra");
-    flow.input(key(KeyCode::Left));
+    flow.input(key(KeyCode::Backspace));
     assert_eq!(flow.highlighted().unwrap().id, "long");
     flow.input(key(KeyCode::Char('a')));
     let Progress::Complete(done) = flow.input(Input::Click(Target::Choice("end"))) else {
@@ -243,7 +226,7 @@ fn conditional_start_has_no_back_and_empty_available_definition_is_rejected() {
             vec![
                 Stage::new(
                     "Skipped",
-                    vec![Choice::new("skip", 'a', ["Skip"; 3])],
+                    vec![Choice::new("skip", 'a', ["Skip"; 3]).disabled("Unavailable")],
                     "skip",
                 )
                 .when(|_| false),
@@ -280,6 +263,102 @@ fn conditional_start_has_no_back_and_empty_available_definition_is_rejected() {
             ));
         } else {
             assert!(flow.is_err());
+        }
+    }
+}
+
+#[test]
+fn no_enabled_start_is_rejected_even_when_conditionally_reachable() {
+    for choices in [
+        vec![],
+        vec![Choice::new("off", 'o', ["Off"; 3]).disabled("Unavailable")],
+    ] {
+        let result = Flow::new(
+            "dummy",
+            "DUMMY",
+            key(KeyCode::Char('x')),
+            (),
+            vec![Stage::new("Start", choices, "off").when(|_| true)],
+            |done| done,
+        );
+        assert!(result.is_err());
+    }
+}
+
+#[test]
+fn unusable_conditional_stage_keeps_previous_choice_and_cannot_complete_a_partial_path() {
+    use terminal_file_manager::workflow::Target;
+    let mut required = Stage::new("Required", vec![Choice::new("off", 'o', ["Off"; 3])], "off");
+    required.choices[0].disabled = Some("Unavailable".into());
+    let mut flow = Flow::new(
+        "dummy",
+        "DUMMY",
+        key(KeyCode::Char('x')),
+        (),
+        vec![
+            Stage::new(
+                "Branch",
+                vec![
+                    Choice::new("long", 'l', ["Long"; 3]),
+                    Choice::new("short", 's', ["Short"; 3]),
+                ],
+                "long",
+            ),
+            required.when(|choices| choices.last().is_some_and(|c| c.id == "long")),
+        ],
+        |done| done,
+    )
+    .unwrap();
+    assert!(
+        matches!(flow.input(key(KeyCode::Enter)), Progress::Disabled(reason) if reason.contains("Required"))
+    );
+    assert_eq!(flow.stage_index(), 0);
+    assert_eq!(flow.highlighted().unwrap().id, "long");
+    assert!(!flow.can_back());
+    assert!(matches!(
+        flow.input(Input::Click(Target::Choice("long"))),
+        Progress::Disabled(_)
+    ));
+    let Progress::Complete(done) = flow.input(Input::Click(Target::Choice("short"))) else {
+        panic!("completion")
+    };
+    assert_eq!(
+        done.choices.iter().map(|c| c.id).collect::<Vec<_>>(),
+        ["dummy", "short"]
+    );
+    assert_eq!(done.inputs.len(), 4);
+}
+
+#[path = "footer_workflow/rendering.rs"]
+mod rendering;
+
+#[test]
+fn activation_revalidates_consumer_availability_and_falls_back_to_an_enabled_default() {
+    for enabled in [true, false] {
+        let mut stage = Stage::new(
+            "Start",
+            vec![
+                Choice::new("first", 'f', ["First"; 3]),
+                Choice::new("second", 's', ["Second"; 3]),
+            ],
+            "first",
+        );
+        stage.choices[0].disabled = Some("Unavailable".into());
+        if !enabled {
+            stage.choices[1].disabled = Some("Unavailable".into());
+        }
+        let result = Flow::new(
+            "dummy",
+            "DUMMY",
+            key(KeyCode::Char('x')),
+            (),
+            vec![stage],
+            |done| done,
+        );
+        if enabled {
+            assert_eq!(result.unwrap().highlighted().unwrap().id, "second");
+        } else {
+            assert!(result.is_err());
         }
     }
 }

@@ -4,8 +4,10 @@
 
 The implementation adds reusable one-row footer workflows and their local
 name/path-copy consumer. Default `y → m/h/c → n/r/f` sequences, a Relative-only
-base choice, contextual Enter defaults, Back/Esc, mouse choices, effective bindings and detailed Help
-use the existing browser geometry and status owners. Ctrl+c Quit and direct
+base choice, contextual Enter defaults, Backspace/Esc, mouse choices, effective
+bindings and detailed Help use the existing browser geometry and status owners.
+Copy Path / From presents bracketed options; direct letters and Enter activate
+choices. Arrow and Tab keys do not navigate the workflow. Ctrl+c Quit and direct
 F5/F6 operations retain their established ordinary-browser behavior.
 
 Native source snapshots, visible-mark order, fixed session-relative bases,
@@ -18,9 +20,11 @@ Relative bases initialise from the first CLI directory or cwd. Users can capture
 either pane or restore the startup base. Session saves persist the native base;
 restoration supports older sessions, and ordinary quit leaves saved data unchanged.
 
-Automated coverage includes conditional stages, modifier-sensitive shortcuts,
+Automated coverage includes blocked and disabled conditional stages,
+bracket styling and mouse hitboxes, modifier-sensitive shortcuts,
 startup/session compatibility, base capture and navigation persistence,
-a non-clipboard consumer, ordered physical and semantic history, one-shot callbacks, source/default rules, stale identities,
+a non-clipboard consumer, ordered physical and semantic history, one-shot
+callbacks, source/default rules, stale identities,
 relative bases, literal payloads, one-row geometry, theme emphasis, input
 ownership, provider/fallback failures, bounded I/O and asynchronous outcomes.
 Final-head local/hosted evidence belongs to the draft PR and ignored work

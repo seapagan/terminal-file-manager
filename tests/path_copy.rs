@@ -86,7 +86,7 @@ fn parent_defaults_current_marks_win_and_back_does_not_navigate() {
             .id,
         "current"
     );
-    send(&mut c, KeyCode::Left);
+    send(&mut c, KeyCode::Backspace);
     assert!(c.app.footer_workflow.is_none());
     assert_eq!(c.app.panes[0].path, before);
     assert!(c.path_copy_request.is_none());

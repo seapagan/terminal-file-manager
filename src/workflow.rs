@@ -57,17 +57,25 @@ pub struct Stage {
 
 impl Stage {
     pub fn new(label: impl Into<String>, choices: Vec<Choice>, default: &str) -> Self {
-        let selected = choices
-            .iter()
-            .position(|c| c.id == default && c.disabled.is_none())
-            .or_else(|| choices.iter().position(|c| c.disabled.is_none()));
-        Self {
+        let selected = choices.iter().position(|c| c.id == default);
+        let mut stage = Self {
             label: label.into(),
             choices,
             selected,
             condition: None,
-        }
+        };
+        stage.select_enabled();
+        stage
     }
+
+    fn select_enabled(&mut self) -> bool {
+        self.selected = self
+            .selected
+            .filter(|i| self.choices.get(*i).is_some_and(|c| c.disabled.is_none()))
+            .or_else(|| self.choices.iter().position(|c| c.disabled.is_none()));
+        self.selected.is_some()
+    }
+
     /// Consumer-owned eligibility evaluated against the accepted semantic path.
     pub fn when(mut self, condition: impl Fn(&[Resolved]) -> bool + 'static) -> Self {
         self.condition = Some(Box::new(condition));
@@ -125,7 +133,7 @@ impl<C, O> Flow<C, O> {
         label: impl Into<String>,
         trigger: Input,
         context: C,
-        stages: Vec<Stage>,
+        mut stages: Vec<Stage>,
         handler: impl FnOnce(Completion<C>) -> O + 'static,
     ) -> Result<Self, &'static str> {
         if stages.is_empty() || stages.iter().any(|s| !valid_choices(&s.choices)) {
@@ -146,6 +154,9 @@ impl<C, O> Flow<C, O> {
             .iter()
             .position(|s| s.available(&choices))
             .ok_or("Workflow requires an available starting stage")?;
+        if !stages[stage].select_enabled() {
+            return Err("Workflow starting stage has no enabled choices");
+        }
         Ok(Self {
             label: label.into(),
             stages,
@@ -209,13 +220,6 @@ impl<C, O> Flow<C, O> {
         if key.kind != KeyEventKind::Press {
             return None;
         }
-        if (key.code == KeyCode::BackTab
-            || key.code == KeyCode::Tab && key.modifiers == KeyModifiers::SHIFT)
-            && key.modifiers.difference(KeyModifiers::SHIFT).is_empty()
-        {
-            self.move_highlight(-1);
-            return None;
-        }
         let (code, modifiers) = crate::input::normalize_chord(key.code, key.modifiers);
         if !modifiers.is_empty() {
             return None;
@@ -226,15 +230,7 @@ impl<C, O> Flow<C, O> {
     fn unmodified_key(&mut self, code: KeyCode) -> Option<Target> {
         match code {
             KeyCode::Esc => Some(Target::Cancel),
-            KeyCode::Left | KeyCode::Backspace => Some(Target::Back),
-            KeyCode::Up => {
-                self.move_highlight(-1);
-                None
-            }
-            KeyCode::Down | KeyCode::Right | KeyCode::Tab => {
-                self.move_highlight(1);
-                None
-            }
+            KeyCode::Backspace => Some(Target::Back),
             KeyCode::Enter => self.highlighted().map(|c| Target::Choice(c.id)),
             KeyCode::Char(key) => self
                 .stage()
@@ -244,27 +240,6 @@ impl<C, O> Flow<C, O> {
                 .map(|c| Target::Choice(c.id)),
             _ => None,
         }
-    }
-
-    fn move_highlight(&mut self, delta: isize) {
-        let stage = &mut self.stages[self.stage];
-        let enabled: Vec<_> = stage
-            .choices
-            .iter()
-            .enumerate()
-            .filter(|(_, c)| c.disabled.is_none())
-            .map(|(i, _)| i)
-            .collect();
-        if enabled.is_empty() {
-            stage.selected = None;
-            return;
-        }
-        let current = enabled
-            .iter()
-            .position(|i| Some(*i) == stage.selected)
-            .unwrap_or(0);
-        stage.selected =
-            Some(enabled[(current as isize + delta).rem_euclid(enabled.len() as isize) as usize]);
     }
 
     fn choose(&mut self, id: &'static str) -> Progress<O> {
@@ -284,6 +259,13 @@ impl<C, O> Flow<C, O> {
         if let Some(next) =
             (self.stage + 1..self.stages.len()).find(|i| self.stages[*i].available(&self.choices))
         {
+            if !self.stages[next].select_enabled() {
+                self.choices.pop();
+                return Progress::Disabled(format!(
+                    "No enabled choices in {}",
+                    self.stages[next].label
+                ));
+            }
             self.history.push(self.stage);
             self.stage = next;
             return Progress::Active;

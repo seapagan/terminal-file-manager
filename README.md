@@ -251,15 +251,17 @@ Marks, filters and back/forward history last only for the current run.
 
 ## Copy names and paths
 
-Press `y`, choose `m` Marked, `h` Highlighted or `c` Current directory, then
+Press `y` to open **Copy Path / From**, choose `m` Marked, `h` Highlighted or `c` Current directory, then
 `n` Name, `r` Relative or `f` Full path. For example, `y h f` copies the
 highlighted file or directory's full path as plain text. Directories copy their
 own path. `..` is navigation only; use Current to copy the directory being browsed.
 
 Enter accepts the highlighted choice. The source default prefers visible marks,
 then a real highlighted entry, then the current directory; the format default
-is Full. Arrows or Tab change the choice, Left/Backspace goes back and Esc
-cancels. The workflow occupies the existing key bar without moving the panes.
+is Full. Press a choice's letter to select it, Backspace to go back, or Esc to
+cancel. Mouse choices remain clickable. Each option has square brackets; the
+highlighted default stands out in colour and monochrome. The workflow occupies
+the existing key bar without moving the panes.
 Help includes full instructions for narrow terminals.
 
 Marked output includes only visible marks in the active pane, in displayed order,

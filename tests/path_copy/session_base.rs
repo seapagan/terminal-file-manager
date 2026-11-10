@@ -98,13 +98,13 @@ fn base_stage_back_cancel_and_shift_label_preserve_session_intent() {
                 ))
         })
         .unwrap();
-    assert_eq!(shifted.label, "Shift+s");
+    assert_eq!(shifted.label, "[Shift+s]");
     send(&mut c, KeyCode::Down);
     send(&mut c, KeyCode::Esc);
     assert_eq!(c.app.relative_path_base, root.path());
     assert!(c.path_copy_request.is_none());
     sequence(&mut c, "ycr");
-    send(&mut c, KeyCode::Left);
+    send(&mut c, KeyCode::Backspace);
     assert_eq!(
         c.app
             .footer_workflow
@@ -179,4 +179,30 @@ fn incomparable_saved_base_does_not_block_capturing_this_pane() {
     send(&mut c, KeyCode::Enter);
     assert_eq!(c.path_copy_request.take().unwrap().text, ".");
     assert_eq!(c.app.relative_path_base, root.path());
+}
+
+#[test]
+fn copy_path_header_and_from_stage_ignore_old_navigation_keys() {
+    let root = tempfile::tempdir().unwrap();
+    let mut c = controller(root.path());
+    sequence(&mut c, "y");
+    let flow = c.app.footer_workflow.as_ref().unwrap();
+    assert_eq!(flow.label, "Copy Path");
+    assert_eq!(flow.stage().label, "From");
+    for key in [
+        KeyCode::Up,
+        KeyCode::Down,
+        KeyCode::Left,
+        KeyCode::Right,
+        KeyCode::Tab,
+        KeyCode::BackTab,
+    ] {
+        send(&mut c, key);
+        assert_eq!(c.app.footer_workflow.as_ref().unwrap().stage_index(), 0);
+        assert_eq!(c.app.panes[0].path, root.path());
+        assert_eq!(c.app.active, 0);
+    }
+    send(&mut c, KeyCode::Backspace);
+    assert!(c.app.footer_workflow.is_none());
+    assert!(c.path_copy_request.is_none());
 }

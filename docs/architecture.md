@@ -581,23 +581,31 @@ Placement and expiry use the existing strict TOML settings and atomic save path.
 ## Footer workflows and OS path copy
 
 `workflow::Flow` owns ordered conditional stages, enabled-choice defaults,
-highlights, Back,
-cancellation, physical key/click history and the final semantic choice path.
+highlights, Backspace, cancellation, physical key/click history and the final
+semantic choice path. Direct letters and Enter activate choices; arrow and Tab
+keys are consumed without traversal.
 Consumer predicates select relevant stages from the accepted semantic path; Back
-visits the actual stage history. Letter shortcuts distinguish lowercase and Shift
+visits the actual stage history. Definitions require an enabled starting choice.
+If a reachable later stage has no enabled choices, the engine reports the blocked
+stage and retains the previous usable stage without accepting a partial path.
+Letter shortcuts distinguish lowercase and Shift
 using the shared binding normalization and explicit Shift+letter display.
 Its opaque context and one-shot handler keep it independent of filesystem and
 clipboard rules. The measured workflow renderer shares complete text-cell
 rectangles with mouse input and occupies only `Geometry.footer`. Pane/status
-allocation and scroll state remain unchanged. Higher input owners invalidate
+allocation and scroll state remain unchanged. Choices share square brackets;
+selected choices retain bold/reverse emphasis, unselected brackets use Muted and
+disabled choices use Disabled. Higher input owners invalidate
 the flow before the next draw; global toast dismissal retains priority.
 
-The path-copy consumer captures the originating pane, native highlighted and
+The path-copy consumer presents Copy Path / From and captures the originating
+pane, native highlighted and
 visible marked identities, current directory and relative reference. Startup
 captures the first explicit CLI directory (or process cwd without arguments) as
 an absolute native startup base. The selected relative base is session state.
 Only Relative opens a third stage: keep, capture this pane, capture the opposite
-pane, or reset to startup. Completion validates context and native identities, constructs the entire Unicode payload,
+pane, or reset to startup. Completion validates context and native identities,
+constructs the entire Unicode payload,
 and queues one write. Lexical relative paths never follow symlinks or cross
 incomparable roots. Capturing the opposite pane requires logical dual mode,
 including when maximised or hidden. Successful completion captures a path value,

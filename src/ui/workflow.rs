@@ -3,7 +3,13 @@ use crate::{
     color::{Role, Theme},
     workflow::{Flow, Target},
 };
-use ratatui::{Frame, layout::Rect, style::Modifier, text::Span, widgets::Paragraph};
+use ratatui::{
+    Frame,
+    layout::Rect,
+    style::Modifier,
+    text::{Line, Span},
+    widgets::Paragraph,
+};
 
 #[derive(Clone, Debug)]
 pub struct Control {
@@ -56,7 +62,7 @@ pub fn layout<C, O>(flow: &Flow<C, O>, area: Rect) -> Layout {
             &mut layout,
             &mut x,
             area,
-            "< Back".into(),
+            "Backspace".into(),
             Some(Target::Back),
             true,
             false,
@@ -96,13 +102,7 @@ fn choices<C, O>(layout: &mut Layout, x: &mut u16, area: Rect, flow: &Flow<C, O>
                 crate::ui::clean(&choice.labels[tier])
             )
         };
-        let label = if selected {
-            format!("[{text}]")
-        } else if choice.disabled.is_some() {
-            format!("({text})")
-        } else {
-            text
-        };
+        let label = format!("[{text}]");
         append(
             layout,
             x,
@@ -151,9 +151,26 @@ pub fn render(frame: &mut Frame, layout: &Layout, theme: &Theme) {
         if control.selected {
             style = style.add_modifier(Modifier::BOLD | Modifier::REVERSED);
         }
-        frame.render_widget(
-            Paragraph::new(Span::styled(&control.label, style)),
-            control.area,
-        );
+        frame.render_widget(Paragraph::new(content(control, style, theme)), control.area);
     }
+}
+
+fn content<'a>(control: &'a Control, style: ratatui::style::Style, theme: &Theme) -> Line<'a> {
+    let Some(text) = control
+        .label
+        .strip_prefix('[')
+        .and_then(|label| label.strip_suffix(']'))
+    else {
+        return Line::from(Span::styled(&control.label, style));
+    };
+    let brackets = if control.selected || !control.enabled {
+        style
+    } else {
+        theme.style(Role::Muted)
+    };
+    Line::from(vec![
+        Span::styled("[", brackets),
+        Span::styled(text, style),
+        Span::styled("]", brackets),
+    ])
 }

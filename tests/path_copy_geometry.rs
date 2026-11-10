@@ -119,10 +119,10 @@ fn lifecycle(root: &std::path::Path, width: u16, dual: bool, maximized: bool) {
     for key in [
         KeyCode::Char('y'),
         KeyCode::Enter,
-        KeyCode::Left,
+        KeyCode::Backspace,
         KeyCode::Enter,
         KeyCode::Char('r'),
-        KeyCode::Left,
+        KeyCode::Backspace,
         KeyCode::Char('r'),
         KeyCode::Esc,
     ] {
