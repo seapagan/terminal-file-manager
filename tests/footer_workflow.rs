@@ -362,3 +362,6 @@ fn activation_revalidates_consumer_availability_and_falls_back_to_an_enabled_def
         }
     }
 }
+
+#[path = "footer_workflow/early_completion.rs"]
+mod early_completion;

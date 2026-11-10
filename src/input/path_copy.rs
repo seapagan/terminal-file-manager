@@ -111,9 +111,12 @@ fn transition(c: &mut Controller, input: Input) {
         Progress::Complete(done) => {
             c.app.footer_workflow = None;
             match path_copy::complete(done, &mut c.app) {
-                Ok(request) => {
+                Ok(path_copy::Outcome::Copy(request)) => {
                     c.app.status = format!("Clipboard request ready: {}", request.scope).into();
                     c.path_copy_request = Some(request);
+                }
+                Ok(path_copy::Outcome::BaseSet(path)) => {
+                    c.app.status = format!("Relative-path base set: {}", path.display()).into();
                 }
                 Err(error) => c.app.notify(crate::notifications::Severity::Error, error),
             }

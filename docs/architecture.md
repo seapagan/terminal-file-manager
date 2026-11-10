@@ -588,6 +588,9 @@ Consumer predicates select relevant stages from the accepted semantic path; Back
 visits the actual stage history. Definitions require an enabled starting choice.
 If a reachable later stage has no enabled choices, the engine reports the blocked
 stage and retains the previous usable stage without accepting a partial path.
+Consumer-marked completing choices bypass later stages and invoke the same
+one-shot callback with the accepted semantic path. The callback's generic result
+supports distinct actions without domain branching in the engine.
 Letter shortcuts distinguish lowercase and Shift
 using the shared binding normalization and explicit Shift+letter display.
 Its opaque context and one-shot handler keep it independent of filesystem and
@@ -603,15 +606,20 @@ pane, native highlighted and
 visible marked identities, current directory and relative reference. Startup
 captures the first explicit CLI directory (or process cwd without arguments) as
 an absolute native startup base. The selected relative base is session state.
-Only Relative opens a third stage: keep, capture this pane, capture the opposite
-pane, or reset to startup. Completion validates context and native identities,
-constructs the entire Unicode payload,
-and queues one write. Lexical relative paths never follow symlinks or cross
-incomparable roots. Capturing the opposite pane requires logical dual mode,
-including when maximised or hidden. Successful completion captures a path value,
-which subsequent navigation cannot change. Existing session saves persist native
-path units; explicit/automatic restoration uses that path, with the first restored
-pane as the fallback for older sessions. Ordinary exit does not save it.
+From offers Marked, Highlighted and Current sources followed by the Format stage.
+Each format completes immediately, including Relative using the captured session
+base. Set base and Other base complete directly from From with a distinct
+base-set outcome: they validate and capture a native directory path, confirm the
+change and do not queue clipboard text. Other base requires a valid logical
+opposite pane and revalidates its snapshot before setting the base.
+
+Copy completion validates context and native identities, constructs the entire
+Unicode payload and queues one write. Lexical relative paths never follow
+symlinks or cross incomparable roots. Capturing the opposite pane works while
+maximised or hidden. Subsequent navigation cannot change a captured base.
+Existing session saves persist native path units; explicit/automatic restoration
+uses that path, with the first restored pane as the fallback for older sessions.
+Ordinary exit does not save it.
 Remote source identity and host-qualified output require a separate future
 consumer; local paths never masquerade as remote references.
 

@@ -251,7 +251,8 @@ Marks, filters and back/forward history last only for the current run.
 
 ## Copy names and paths
 
-Press `y` to open **Copy Path / From**, choose `m` Marked, `h` Highlighted or `c` Current directory, then
+Press `y` to open **Copy Path / From**. Choose `m` Marked, `h` Highlighted or
+`c` Current, then
 `n` Name, `r` Relative or `f` Full path. For example, `y h f` copies the
 highlighted file or directory's full path as plain text. Directories copy their
 own path. `..` is navigation only; use Current to copy the directory being browsed.
@@ -268,10 +269,11 @@ Marked output includes only visible marks in the active pane, in displayed order
 with one path per line. Text is literal and unquoted. TFM rejects paths that a
 text clipboard cannot preserve, including non-Unicode names and control characters.
 
-Relative opens one more choice: `k` keeps the base (also the Enter default),
-`s` captures this pane's directory, `Shift+s` captures the other pane's directory,
-and `o` restores the startup base. Other pane requires logical two-pane mode;
-paths must share a comparable root or volume. Name and Full need no base choice.
+At **From**, `s` Set base captures the active pane's directory and `Shift+s`
+Other base captures the opposite pane's directory. Each confirms the change and
+exits without copying. Other base requires a valid directory in logical two-pane
+mode. Relative copies immediately from Format using the selected session base;
+paths must share a comparable root or volume.
 
 The startup base is the first explicit directory argument, resolved to an absolute
 native path, or the process working directory when no directory is supplied.

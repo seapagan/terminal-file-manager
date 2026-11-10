@@ -6,7 +6,7 @@ pub const HELP: &[&str] = &[
     "Choose m Marked, h Highlighted or c Current directory, then n Name, r Relative or f Full path. Example: y h f copies the highlighted path with the default binding.",
     "Enter accepts the highlighted choice: visible marks first, then the real highlighted entry, then current directory. Full path starts selected. The synthetic .. row is never Highlighted; Current still means this directory.",
     "Copy Path starts with From: choose a direct letter shortcut or press Enter for the highlighted default. Backspace returns to the previous stage; Esc cancels. Click a displayed choice to activate it. Arrow and Tab keys stay inside the workflow without changing the choice; there is no timeout.",
-    "Relative opens a Base choice: k Keep base (the default), s This pane, Shift+s Other pane, or o Startup base. Captured bases stay fixed across pane navigation. Other pane requires logical two-pane mode; incomparable roots are disabled.",
+    "From also offers s Set base and Shift+s Other base. They capture the active or opposite pane directory, confirm the change and exit without copying. Other base requires a valid directory in logical two-pane mode. Relative copies immediately from Format using the selected session base; incomparable roots are disabled.",
     "The startup base is the first explicit CLI directory, or the process working directory when no directory is supplied. Saved navigation sessions restore their captured base; older sessions use the first pane. Shift+q and --save-session save it; ordinary quit does not. It is not a configuration preference.",
     "Only visible marks in the active pane are copied, in displayed order, one per LF-delimited line. Directories copy their own path, without traversal. Text is literal and unquoted. Non-Unicode or control-containing paths are rejected without changing the clipboard.",
     "Local providers: wl-copy on Wayland, xclip/xsel on X11, pbcopy on macOS and native Windows clipboard. Commands have a three-second deadline. Clipboard text is limited to 16 MiB.",
@@ -68,6 +68,19 @@ pub struct CopyRequest {
 
 pub fn open(app: &App, trigger: Input) -> Result<Workflow, String> {
     let snapshot = Snapshot::capture(app)?;
+    let stages = vec![from_stage(&snapshot), formats(&snapshot)];
+    Flow::new(
+        "path-copy",
+        "Copy Path",
+        trigger,
+        snapshot,
+        stages,
+        |done| done,
+    )
+    .map_err(str::to_owned)
+}
+
+fn from_stage(snapshot: &Snapshot) -> Stage {
     let mut marked = Choice::new("marked", 'm', ["Marked", "Marked", "Marks"]);
     marked.labels[0] = format!("Marked ({})", snapshot.marked.len());
     if snapshot.marked.is_empty() {
@@ -84,39 +97,25 @@ pub fn open(app: &App, trigger: Input) -> Result<Workflow, String> {
     } else {
         "current"
     };
-    let stages = vec![
-        Stage::new(
-            "From",
-            vec![
-                marked,
-                highlighted,
-                Choice::new("current", 'c', ["Current directory", "Current", "Here"]),
-            ],
-            default,
-        ),
-        formats(),
-        snapshot
-            .bases
-            .stage()
-            .when(|choices| choices.last().is_some_and(|c| c.id == "relative")),
+    let mut choices = vec![
+        marked,
+        highlighted,
+        Choice::new("current", 'c', ["Current", "Current", "Here"]),
     ];
-    Flow::new(
-        "path-copy",
-        "Copy Path",
-        trigger,
-        snapshot,
-        stages,
-        |done| done,
-    )
-    .map_err(str::to_owned)
+    choices.extend(snapshot.bases.choices());
+    Stage::new("From", choices, default)
 }
 
-fn formats() -> Stage {
+fn formats(snapshot: &Snapshot) -> Stage {
+    let mut relative = Choice::new("relative", 'r', ["Relative", "Relative", "Rel"]);
+    if let Err(reason) = snapshot.bases.copy_base() {
+        relative.disabled = Some(reason);
+    }
     Stage::new(
         "Format",
         vec![
             Choice::new("name", 'n', ["Name"; 3]),
-            Choice::new("relative", 'r', ["Relative", "Relative", "Rel"]),
+            relative,
             Choice::new("full", 'f', ["Full path", "Full", "Full"]),
         ],
         "full",
@@ -228,6 +227,9 @@ fn validate_entries(entries: &[Entry]) -> Result<(), String> {
 }
 
 fn validate_directory(pane: &crate::app::Pane, directory: &Entry) -> Result<(), String> {
+    if !directory.enterable || directory.error.is_some() {
+        return Err("Current path is not a valid local directory; refresh first".into());
+    }
     if directory.identity.is_none() {
         return Err("Current directory identity is unavailable; refresh first".into());
     }
@@ -247,16 +249,45 @@ fn validate_directory(pane: &crate::app::Pane, directory: &Entry) -> Result<(), 
     Ok(())
 }
 
-/// Resolve semantic IDs, validate the complete batch, then construct exact clipboard text.
-pub fn complete(done: Completion<Snapshot>, app: &mut App) -> Result<CopyRequest, String> {
-    let ids: Vec<_> = done.choices.iter().map(|c| c.id).collect();
-    let ["path-copy", source, format, rest @ ..] = ids.as_slice() else {
-        return Err("Incomplete path-copy choices".into());
+/// A completed flow either queues clipboard text or confirms a session-base change.
+pub enum Outcome {
+    Copy(CopyRequest),
+    BaseSet(PathBuf),
+}
+
+/// Resolve semantic choices and validate native identities before applying an action.
+pub fn complete(done: Completion<Snapshot>, app: &mut App) -> Result<Outcome, String> {
+    let ids: Vec<_> = done.choices.iter().map(|choice| choice.id).collect();
+    match ids.as_slice() {
+        ["path-copy", base] => {
+            done.context.validate_context(app)?;
+            let path = done.context.bases.select(base, app)?;
+            app.relative_path_base = path.clone();
+            Ok(Outcome::BaseSet(path))
+        }
+        ["path-copy", source, format] => copy_request(
+            done.context,
+            source_choice(source)?,
+            format_choice(format)?,
+            app,
+        )
+        .map(Outcome::Copy),
+        _ => Err("Incomplete path-copy choices".into()),
+    }
+}
+
+fn copy_request(
+    snapshot: Snapshot,
+    source: Source,
+    format: Format,
+    app: &App,
+) -> Result<CopyRequest, String> {
+    let base = if format == Format::Relative {
+        Some(snapshot.bases.copy_base()?)
+    } else {
+        None
     };
-    let source = source_choice(source)?;
-    let format = format_choice(format)?;
-    let base = done.context.bases.resolve(format, rest, app)?;
-    let entries = done.context.validate(app, source)?;
+    let entries = snapshot.validate(app, source)?;
     let values = entries
         .iter()
         .map(|entry| {
@@ -272,9 +303,6 @@ pub fn complete(done: Completion<Snapshot>, app: &mut App) -> Result<CopyRequest
         return Err("Path text exceeds the 16 MiB clipboard limit; copy fewer entries".into());
     }
     let scope = scope(source, format, entries.len());
-    if let Some(base) = base {
-        app.relative_path_base = base.clone();
-    }
     Ok(CopyRequest { text, scope })
 }
 

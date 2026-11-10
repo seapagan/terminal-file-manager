@@ -4,21 +4,6 @@ use ratatui::layout::Rect;
 use std::{path::Path, sync::atomic::AtomicBool};
 use terminal_file_manager::{fs, input::Controller, ui};
 
-#[test]
-fn relative_alone_opens_base_stage_and_cancel_preserves_clipboard() {
-    let root = tempfile::tempdir().unwrap();
-    let mut c = controller(root.path());
-    sequence(&mut c, "ycr");
-    assert!(c.path_copy_request.is_none());
-    assert_eq!(
-        c.app.footer_workflow.as_ref().unwrap().stage().label,
-        "Base"
-    );
-    send(&mut c, KeyCode::Esc);
-    assert!(c.app.footer_workflow.is_none());
-    assert!(c.path_copy_request.is_none());
-}
-
 fn navigate(c: &mut Controller, pane: usize, path: &Path) {
     let request = c.app.request_listing(pane, path.into());
     let listing = fs::list(path, &Default::default(), &AtomicBool::new(false)).unwrap();
@@ -29,7 +14,21 @@ fn navigate(c: &mut Controller, pane: usize, path: &Path) {
 }
 
 #[test]
-fn captured_bases_persist_across_navigation_until_replaced_or_reset() {
+fn relative_completes_at_format_and_base_setting_completes_at_from() {
+    let root = tempfile::tempdir().unwrap();
+    let mut c = controller(root.path());
+    sequence(&mut c, "ycr");
+    assert_eq!(c.path_copy_request.take().unwrap().text, ".");
+    assert!(c.app.footer_workflow.is_none());
+    sequence(&mut c, "ys");
+    assert!(c.path_copy_request.is_none());
+    assert!(c.app.footer_workflow.is_none());
+    assert_eq!(c.app.relative_path_base, root.path());
+    assert!(c.app.status.to_string().contains("Relative-path base set"));
+}
+
+#[test]
+fn captured_bases_persist_across_navigation_without_copying_or_changing_preferences() {
     let root = tempfile::tempdir().unwrap();
     let left = root.path().join("left");
     let right = root.path().join("right");
@@ -40,70 +39,80 @@ fn captured_bases_persist_across_navigation_until_replaced_or_reset() {
     c.app.active = 1;
     c.app.maximized = true;
     navigate(&mut c, 1, &right);
-    sequence(&mut c, "ycrs");
-    assert_eq!(c.path_copy_request.take().unwrap().text, ".");
+    sequence(&mut c, "ys");
     assert_eq!(c.app.relative_path_base, right);
+    assert!(c.path_copy_request.is_none());
     navigate(&mut c, 1, &left);
-    sequence(&mut c, "ycrk");
+    sequence(&mut c, "ycr");
     assert_eq!(
         c.path_copy_request.take().unwrap().text,
-        Path::new("../left")
-            .to_str()
-            .unwrap()
-            .replace('/', std::path::MAIN_SEPARATOR_STR)
+        Path::new("..").join("left").to_str().unwrap()
     );
-    assert_eq!(c.app.relative_path_base, right);
-    sequence(&mut c, "ycr");
+    sequence(&mut c, "y");
     let g = ui::geometry(&c.app, Rect::new(0, 0, 40, 24));
     c.handle(
         Event::Key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::SHIFT)),
         &g,
         Default::default(),
     );
-    assert!(c.path_copy_request.take().is_some());
+    assert!(c.app.footer_workflow.is_none());
+    assert!(c.path_copy_request.is_none());
     assert_eq!(c.app.relative_path_base, root.path());
     navigate(&mut c, 0, &right);
-    sequence(&mut c, "ycrk");
+    sequence(&mut c, "ycr");
+    assert_eq!(c.path_copy_request.take().unwrap().text, "left");
     assert_eq!(c.app.relative_path_base, root.path());
-    c.path_copy_request.take();
-    sequence(&mut c, "ycrs");
-    assert_eq!(c.app.relative_path_base, left);
-    c.path_copy_request.take();
-    sequence(&mut c, "ycro");
-    assert_eq!(c.app.relative_path_base, root.path());
-    assert!(c.path_copy_request.take().is_some());
     assert!(!c.preferences_changed);
 }
 
 #[test]
-fn base_stage_back_cancel_and_shift_label_preserve_session_intent() {
+fn only_from_and_format_choices_exist_and_formats_complete_immediately() {
+    let root = tempfile::tempdir().unwrap();
+    let mut c = controller(root.path());
+    for format in ['n', 'r', 'f'] {
+        sequence(&mut c, "y");
+        let stage = c.app.footer_workflow.as_ref().unwrap().stage();
+        assert_eq!(
+            stage
+                .choices
+                .iter()
+                .map(|choice| choice.key)
+                .collect::<Vec<_>>(),
+            ['m', 'h', 'c', 's', 'S']
+        );
+        sequence(&mut c, "c");
+        let flow = c.app.footer_workflow.as_ref().unwrap();
+        assert_eq!(flow.stage_index(), 1);
+        assert_eq!(
+            flow.stage()
+                .choices
+                .iter()
+                .map(|choice| choice.key)
+                .collect::<Vec<_>>(),
+            ['n', 'r', 'f']
+        );
+        send(&mut c, KeyCode::Char(format));
+        assert!(c.app.footer_workflow.is_none());
+        assert!(c.path_copy_request.take().is_some());
+    }
+}
+
+#[test]
+fn mouse_base_capture_and_backtracking_set_a_base_without_a_clipboard_request() {
     let root = tempfile::tempdir().unwrap();
     let child = root.path().join("child");
     std::fs::create_dir(&child).unwrap();
     let mut c = controller(root.path());
     c.app.dual = true;
     navigate(&mut c, 1, &child);
-    sequence(&mut c, "ycr");
-    let g = ui::geometry(&c.app, Rect::new(0, 0, 40, 24));
-    let shifted = g
-        .workflow
-        .as_ref()
-        .unwrap()
-        .controls
-        .iter()
-        .find(|control| {
-            control.target
-                == Some(terminal_file_manager::workflow::Target::Choice(
-                    "opposite-base",
-                ))
-        })
-        .unwrap();
-    assert_eq!(shifted.label, "[Shift+s]");
-    send(&mut c, KeyCode::Down);
-    send(&mut c, KeyCode::Esc);
-    assert_eq!(c.app.relative_path_base, root.path());
+    let bounds = Rect::new(0, 0, 160, 24);
+    sequence(&mut c, "y");
+    click_choice(&mut c, "opposite-base", bounds);
+    assert!(c.app.footer_workflow.is_none());
     assert!(c.path_copy_request.is_none());
-    sequence(&mut c, "ycr");
+    assert_eq!(c.app.relative_path_base, child);
+    assert!(c.app.status.to_string().contains("Relative-path base set"));
+    sequence(&mut c, "yc");
     send(&mut c, KeyCode::Backspace);
     assert_eq!(
         c.app
@@ -113,72 +122,110 @@ fn base_stage_back_cancel_and_shift_label_preserve_session_intent() {
             .highlighted()
             .unwrap()
             .id,
-        "relative"
+        "current"
     );
-    sequence(&mut c, "f");
-    assert!(c.path_copy_request.take().is_some());
+    click_choice(&mut c, "current-base", bounds);
+    assert!(c.app.footer_workflow.is_none());
+    assert!(c.path_copy_request.is_none());
+    assert_eq!(c.app.relative_path_base, root.path());
 }
 
 #[test]
-fn mouse_capture_persists_and_stale_or_disabled_opposite_capture_cannot_change_base() {
+fn unavailable_or_invalid_opposite_base_is_disabled_for_keyboard_and_mouse() {
+    let root = tempfile::tempdir().unwrap();
+    let file = root.path().join("file");
+    std::fs::write(&file, "data").unwrap();
+    for case in 0..6 {
+        let mut c = controller(root.path());
+        c.app.dual = true;
+        match case {
+            0 => c.app.dual = false,
+            1 => c.app.panes[1].pending = Some(root.path().into()),
+            2 => c.app.panes[1].error = Some("unavailable".into()),
+            3 => c.app.panes[1].path = root.path().join("missing"),
+            4 => c.app.panes[1].path = file.clone(),
+            _ => c.app.panes[1].path = "relative".into(),
+        }
+        sequence(&mut c, "yS");
+        assert_other_disabled(&c);
+        assert_eq!(c.app.relative_path_base, root.path());
+        assert!(c.path_copy_request.is_none());
+        send(&mut c, KeyCode::Esc);
+    }
+}
+
+fn assert_other_disabled(c: &Controller) {
+    let flow = c.app.footer_workflow.as_ref().unwrap();
+    assert_eq!(flow.stage_index(), 0);
+    assert!(
+        flow.stage()
+            .choices
+            .iter()
+            .find(|choice| choice.id == "opposite-base")
+            .unwrap()
+            .disabled
+            .is_some()
+    );
+    let g = ui::geometry(&c.app, Rect::new(0, 0, 160, 24));
+    let layout = g.workflow.as_ref().unwrap();
+    let control = layout
+        .controls
+        .iter()
+        .find(|control| {
+            control.target
+                == Some(terminal_file_manager::workflow::Target::Choice(
+                    "opposite-base",
+                ))
+        })
+        .unwrap();
+    assert_eq!(layout.hit(control.area.x, control.area.y), None);
+}
+
+#[test]
+fn replaced_or_navigated_opposite_snapshot_cannot_change_the_base() {
     let root = tempfile::tempdir().unwrap();
     let child = root.path().join("child");
     std::fs::create_dir(&child).unwrap();
     let mut c = controller(root.path());
     c.app.dual = true;
     navigate(&mut c, 1, &child);
-    let bounds = Rect::new(0, 0, 120, 24);
-    sequence(&mut c, "ycr");
+    sequence(&mut c, "y");
+    std::fs::rename(&child, root.path().join("old")).unwrap();
+    std::fs::create_dir(&child).unwrap();
+    sequence(&mut c, "S");
+    assert_eq!(c.app.relative_path_base, root.path());
+    assert!(c.path_copy_request.is_none());
+    navigate(&mut c, 1, &child);
+    sequence(&mut c, "y");
     navigate(&mut c, 1, root.path());
     sequence(&mut c, "S");
-    assert!(c.path_copy_request.is_none());
     assert_eq!(c.app.relative_path_base, root.path());
-    navigate(&mut c, 1, &child);
-    for target in ["current", "relative", "opposite-base"] {
-        if target == "current" {
-            sequence(&mut c, "y");
-        }
-        click_choice(&mut c, target, bounds);
-    }
-    assert_eq!(c.app.relative_path_base, child);
-    assert!(c.path_copy_request.take().is_some());
-    c.app.dual = false;
-    sequence(&mut c, "ycrS");
     assert!(c.path_copy_request.is_none());
-    assert_eq!(
-        c.app.footer_workflow.as_ref().unwrap().stage().label,
-        "Base"
-    );
-    send(&mut c, KeyCode::Enter);
-    assert!(c.path_copy_request.take().is_some());
-    assert_eq!(c.app.relative_path_base, child);
 }
 
 #[cfg(windows)]
 #[test]
-fn incomparable_saved_base_does_not_block_capturing_this_pane() {
+fn incomparable_saved_base_disables_relative_but_not_explicit_set_base() {
     let root = tempfile::tempdir().unwrap();
     let mut c = controller(root.path());
-    let other_drive = if root.path().to_string_lossy().starts_with('Z') {
+    c.app.relative_path_base = if root.path().to_string_lossy().starts_with('Z') {
         r"Y:\base"
     } else {
         r"Z:\base"
-    };
-    c.app.relative_path_base = other_drive.into();
+    }
+    .into();
     sequence(&mut c, "ycr");
+    assert!(c.path_copy_request.is_none());
     assert_eq!(
-        c.app
-            .footer_workflow
-            .as_ref()
-            .unwrap()
-            .highlighted()
-            .unwrap()
-            .id,
-        "current-base"
+        c.app.footer_workflow.as_ref().unwrap().stage().label,
+        "Format"
     );
-    send(&mut c, KeyCode::Enter);
-    assert_eq!(c.path_copy_request.take().unwrap().text, ".");
+    send(&mut c, KeyCode::Backspace);
+    sequence(&mut c, "s");
     assert_eq!(c.app.relative_path_base, root.path());
+    assert!(c.app.footer_workflow.is_none());
+    sequence(&mut c, "ycr");
+    assert_eq!(c.path_copy_request.take().unwrap().text, ".");
 }
 
 #[test]

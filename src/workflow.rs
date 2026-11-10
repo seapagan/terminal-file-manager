@@ -23,6 +23,7 @@ pub struct Choice {
     pub key: char,
     pub labels: [String; 3],
     pub disabled: Option<String>,
+    complete: bool,
 }
 
 impl Choice {
@@ -32,7 +33,14 @@ impl Choice {
             key,
             labels: labels.map(str::to_owned),
             disabled: None,
+            complete: false,
         }
+    }
+
+    /// Finish through the registered callback without visiting later stages.
+    pub fn completes(mut self) -> Self {
+        self.complete = true;
+        self
     }
 
     pub fn key_label(&self) -> String {
@@ -256,8 +264,9 @@ impl<C, O> Flow<C, O> {
             id,
             key: Some(choice.key),
         });
-        if let Some(next) =
-            (self.stage + 1..self.stages.len()).find(|i| self.stages[*i].available(&self.choices))
+        if !choice.complete
+            && let Some(next) = (self.stage + 1..self.stages.len())
+                .find(|i| self.stages[*i].available(&self.choices))
         {
             if !self.stages[next].select_enabled() {
                 self.choices.pop();

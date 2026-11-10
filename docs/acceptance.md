@@ -3,8 +3,8 @@
 ## PM3-07 implementation for draft review — 10 November 2026
 
 The implementation adds reusable one-row footer workflows and their local
-name/path-copy consumer. Default `y → m/h/c → n/r/f` sequences, a Relative-only
-base choice, contextual Enter defaults, Backspace/Esc, mouse choices, effective
+name/path-copy consumer. Two-stage `y → m/h/c → n/r/f` copying, immediate
+From-stage base actions, contextual Enter defaults, Backspace/Esc, mouse choices, effective
 bindings and detailed Help use the existing browser geometry and status owners.
 Copy Path / From presents bracketed options; direct letters and Enter activate
 choices. Arrow and Tab keys do not navigate the workflow. Ctrl+c Quit and direct
@@ -17,10 +17,12 @@ outside the UI thread; OSC52 reports sent without claiming terminal acceptance.
 The approved Windows provider adds clipboard-win5.4.3 and its BSL-1.0 notice.
 
 Relative bases initialise from the first CLI directory or cwd. Users can capture
-either pane or restore the startup base. Session saves persist the native base;
+either pane with From-stage s Set base / Shift+s Other base; each confirms and
+exits without copying. Relative completes at Format. Session saves persist the native base;
 restoration supports older sessions, and ordinary quit leaves saved data unchanged.
 
-Automated coverage includes blocked and disabled conditional stages,
+Automated coverage includes generic early completion and distinct callback
+outcomes, blocked and disabled conditional stages,
 bracket styling and mouse hitboxes, modifier-sensitive shortcuts,
 startup/session compatibility, base capture and navigation persistence,
 a non-clipboard consumer, ordered physical and semantic history, one-shot

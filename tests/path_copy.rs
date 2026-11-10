@@ -55,7 +55,7 @@ fn literal_highlighted_current_and_visible_marked_outputs_use_native_paths() {
         c.path_copy_request.take().unwrap().text,
         "a λ;$(touch nope)"
     );
-    sequence(&mut c, "ycrk");
+    sequence(&mut c, "ycr");
     assert_eq!(c.path_copy_request.take().unwrap().text, ".");
     c.app.panes[0].select_all();
     sequence(&mut c, "ymn");
@@ -311,7 +311,7 @@ fn launch_base_is_stable_and_lexical_relative_paths_handle_roots_and_parent_segm
     let mut c = controller(root.path());
     c.app.launch_directory = Some(base.clone());
     c.app.relative_path_base = base.clone();
-    sequence(&mut c, "ycrk");
+    sequence(&mut c, "ycr");
     assert_eq!(c.path_copy_request.take().unwrap().text, "..");
     assert_eq!(
         relative(&base.join("a/../b"), &base).unwrap(),

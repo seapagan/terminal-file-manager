@@ -121,9 +121,7 @@ fn lifecycle(root: &std::path::Path, width: u16, dual: bool, maximized: bool) {
         KeyCode::Enter,
         KeyCode::Backspace,
         KeyCode::Enter,
-        KeyCode::Char('r'),
         KeyCode::Backspace,
-        KeyCode::Char('r'),
         KeyCode::Esc,
     ] {
         send(&mut c, key, width);
