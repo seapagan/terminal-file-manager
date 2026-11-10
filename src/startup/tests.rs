@@ -29,6 +29,8 @@ fn startup_parent_and_history_use_normalized_explicit_locations() {
     let mut app = startup.prepare(&Settings::default()).unwrap();
     assert_eq!(app.panes[0].path, start);
     assert_eq!(app.panes[1].path, start);
+    assert_eq!(app.launch_directory.as_ref(), Some(&start));
+    assert_eq!(app.relative_path_base, start);
     let initial = app.request_listing(0, app.panes[0].path.clone());
     install(&mut app, &initial);
     let mut controller = Controller::new(
@@ -109,4 +111,34 @@ fn windows_drive_unc_and_verbatim_roots_keep_their_prefixes() {
             std::path::Path::new(expected)
         );
     }
+}
+
+#[test]
+fn startup_base_uses_first_explicit_directory_or_process_cwd() {
+    let root = tempfile::tempdir().unwrap();
+    let first = root.path().join("first");
+    let second = root.path().join("second");
+    std::fs::create_dir(&first).unwrap();
+    std::fs::create_dir(&second).unwrap();
+    for paths in [vec![first.clone()], vec![first.clone(), second]] {
+        let app = Startup {
+            paths,
+            ..Startup::default()
+        }
+        .prepare(&Settings::default())
+        .unwrap();
+        assert_eq!(app.launch_directory.as_ref(), Some(&first));
+    }
+    let relative = Startup {
+        paths: vec![".".into()],
+        ..Startup::default()
+    }
+    .prepare(&Settings::default())
+    .unwrap();
+    assert_eq!(
+        relative.relative_path_base,
+        std::env::current_dir().unwrap()
+    );
+    let app = Startup::default().prepare(&Settings::default()).unwrap();
+    assert_eq!(app.launch_directory, Some(std::env::current_dir().unwrap()));
 }

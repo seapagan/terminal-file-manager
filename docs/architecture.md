@@ -124,7 +124,8 @@ edge when resize is returned first. Native PTY/ConPTY tests exercise resize,
 quit and error/unwind cleanup. `settings` loads before terminal setup and saves
 changed preferences after teardown through an owned same-directory stage.
 Linked config files fail explicitly. `session` owns a separate strict version-1
-navigation schema: current native locations and layout only. Unix byte arrays
+navigation schema: current native locations, relative-path base and layout.
+Unix byte arrays
 and Windows UTF-16 arrays preserve identity without Unicode coercion. Q saves
 after teardown through the same owned atomic staging; normal quit never replaces
 session bytes. Restore is opt-in and validates both paths without fallback.
@@ -351,7 +352,8 @@ Windows native paths are not remote identifiers. Stable entry/job identities,
 generation-tagged asynchronous results and bounded queues prevent stale results
 from authorizing mutations. Navigation sessions remain distinct from named
 view profiles: profiles contain only display/sort/visibility policies, while
-sessions contain local locations/layout. Full navigation history persistence
+sessions contain local locations, the captured relative-path base and layout.
+Full navigation history persistence
 remains outside the implemented contract. Future preference/bookmark/history
 writes must remain lazy and atomic.
 
@@ -578,8 +580,12 @@ Placement and expiry use the existing strict TOML settings and atomic save path.
 
 ## Footer workflows and OS path copy
 
-`workflow::Flow` owns ordered stages, enabled-choice defaults, highlights, Back,
+`workflow::Flow` owns ordered conditional stages, enabled-choice defaults,
+highlights, Back,
 cancellation, physical key/click history and the final semantic choice path.
+Consumer predicates select relevant stages from the accepted semantic path; Back
+visits the actual stage history. Letter shortcuts distinguish lowercase and Shift
+using the shared binding normalization and explicit Shift+letter display.
 Its opaque context and one-shot handler keep it independent of filesystem and
 clipboard rules. The measured workflow renderer shares complete text-cell
 rectangles with mouse input and occupies only `Geometry.footer`. Pane/status
@@ -588,10 +594,16 @@ the flow before the next draw; global toast dismissal retains priority.
 
 The path-copy consumer captures the originating pane, native highlighted and
 visible marked identities, current directory and relative reference. Startup
-captures the original launch directory separately from pane locations. Completion
-validates context and native identities, constructs the entire Unicode payload,
+captures the first explicit CLI directory (or process cwd without arguments) as
+an absolute native startup base. The selected relative base is session state.
+Only Relative opens a third stage: keep, capture this pane, capture the opposite
+pane, or reset to startup. Completion validates context and native identities, constructs the entire Unicode payload,
 and queues one write. Lexical relative paths never follow symlinks or cross
-incomparable roots; the configured opposite-pane base requires logical dual mode.
+incomparable roots. Capturing the opposite pane requires logical dual mode,
+including when maximised or hidden. Successful completion captures a path value,
+which subsequent navigation cannot change. Existing session saves persist native
+path units; explicit/automatic restoration uses that path, with the first restored
+pane as the fallback for older sessions. Ordinary exit does not save it.
 Remote source identity and host-qualified output require a separate future
 consumer; local paths never masquerade as remote references.
 
@@ -602,4 +614,4 @@ OSC52 preparation returns bytes to the terminal owner for serial emission betwee
 frames, and reports sent with acceptance unconfirmed. Local providers report
 copied only after a successful invocation. Preflight failures never invoke a
 provider or clear the clipboard. Clipboard settings use the existing strict,
-atomic preference storage; no workflow state persists across sessions.
+atomic preference storage. In-progress workflow state never persists.

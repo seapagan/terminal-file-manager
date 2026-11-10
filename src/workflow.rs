@@ -35,17 +35,24 @@ impl Choice {
         }
     }
 
+    pub fn key_label(&self) -> String {
+        crate::input::key_name(KeyCode::Char(self.key), KeyModifiers::NONE)
+    }
+
     pub fn disabled(mut self, reason: impl Into<String>) -> Self {
         self.disabled = Some(reason.into());
         self
     }
 }
 
+type Condition = Box<dyn Fn(&[Resolved]) -> bool>;
+
 /// Ordered stage with a semantic default; fallback is the first enabled option.
 pub struct Stage {
     pub label: String,
     pub choices: Vec<Choice>,
     selected: Option<usize>,
+    condition: Option<Condition>,
 }
 
 impl Stage {
@@ -58,7 +65,19 @@ impl Stage {
             label: label.into(),
             choices,
             selected,
+            condition: None,
         }
+    }
+    /// Consumer-owned eligibility evaluated against the accepted semantic path.
+    pub fn when(mut self, condition: impl Fn(&[Resolved]) -> bool + 'static) -> Self {
+        self.condition = Some(Box::new(condition));
+        self
+    }
+
+    fn available(&self, choices: &[Resolved]) -> bool {
+        self.condition
+            .as_ref()
+            .is_none_or(|condition| condition(choices))
     }
 }
 
@@ -92,6 +111,7 @@ pub struct Flow<C, O> {
     pub label: String,
     stages: Vec<Stage>,
     stage: usize,
+    history: Vec<usize>,
     inputs: Vec<Input>,
     choices: Vec<Resolved>,
     context: Option<C>,
@@ -118,15 +138,21 @@ impl<C, O> Flow<C, O> {
             },
             _ => None,
         };
+        let choices = vec![Resolved {
+            id: action,
+            key: trigger_key,
+        }];
+        let stage = stages
+            .iter()
+            .position(|s| s.available(&choices))
+            .ok_or("Workflow requires an available starting stage")?;
         Ok(Self {
             label: label.into(),
             stages,
-            stage: 0,
+            stage,
+            history: Vec::new(),
             inputs: vec![trigger],
-            choices: vec![Resolved {
-                id: action,
-                key: trigger_key,
-            }],
+            choices,
             context: Some(context),
             handler: Some(Box::new(handler)),
         })
@@ -137,6 +163,9 @@ impl<C, O> Flow<C, O> {
     }
     pub fn stage_index(&self) -> usize {
         self.stage
+    }
+    pub fn can_back(&self) -> bool {
+        !self.history.is_empty()
     }
     pub fn context(&self) -> Option<&C> {
         self.context.as_ref()
@@ -159,10 +188,10 @@ impl<C, O> Flow<C, O> {
         };
         match target {
             Some(Target::Cancel) => self.cancel(),
-            Some(Target::Back) if self.stage == 0 => self.cancel(),
+            Some(Target::Back) if !self.can_back() => self.cancel(),
             Some(Target::Back) => {
-                self.stage -= 1;
-                self.choices.truncate(self.stage + 1);
+                self.stage = self.history.pop().expect("previous stage");
+                self.choices.truncate(self.history.len() + 1);
                 Progress::Active
             }
             Some(Target::Choice(id)) => self.choose(id),
@@ -187,10 +216,11 @@ impl<C, O> Flow<C, O> {
             self.move_highlight(-1);
             return None;
         }
-        if !key.modifiers.is_empty() {
+        let (code, modifiers) = crate::input::normalize_chord(key.code, key.modifiers);
+        if !modifiers.is_empty() {
             return None;
         }
-        self.unmodified_key(key.code)
+        self.unmodified_key(code)
     }
 
     fn unmodified_key(&mut self, code: KeyCode) -> Option<Target> {
@@ -251,8 +281,11 @@ impl<C, O> Flow<C, O> {
             id,
             key: Some(choice.key),
         });
-        if self.stage + 1 < self.stages.len() {
-            self.stage += 1;
+        if let Some(next) =
+            (self.stage + 1..self.stages.len()).find(|i| self.stages[*i].available(&self.choices))
+        {
+            self.history.push(self.stage);
+            self.stage = next;
             return Progress::Active;
         }
         let handler = self.handler.take().expect("active handler");

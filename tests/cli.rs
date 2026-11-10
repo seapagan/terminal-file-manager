@@ -487,3 +487,6 @@ fn startup_option_termination_keeps_flags_and_validation_order() {
         "--restore-session cannot be combined with explicit paths"
     );
 }
+
+#[path = "cli/sessions.rs"]
+mod sessions;

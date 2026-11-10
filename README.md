@@ -266,10 +266,17 @@ Marked output includes only visible marks in the active pane, in displayed order
 with one path per line. Text is literal and unquoted. TFM rejects paths that a
 text clipboard cannot preserve, including non-Unicode names and control characters.
 
-Relative paths use the original launch directory throughout the session. Set
-`clipboard.relative_path_base = "opposite-pane"` to use the other pane's directory
-at the start of each copy instead. This requires logical two-pane mode and
-comparable roots or volumes; it works while a pane is maximised or hidden by width.
+Relative opens one more choice: `k` keeps the base (also the Enter default),
+`s` captures this pane's directory, `Shift+s` captures the other pane's directory,
+and `o` restores the startup base. Other pane requires logical two-pane mode;
+paths must share a comparable root or volume. Name and Full need no base choice.
+
+The startup base is the first explicit directory argument, resolved to an absolute
+native path, or the process working directory when no directory is supplied.
+A captured base stays fixed as you navigate. Saving the navigation session with
+`Shift+q` or `--save-session` saves the selected base; ordinary quit leaves the
+saved session unchanged. Explicit and automatic restoration restore that base;
+older sessions use the restored first-pane directory.
 Remap the activation action with `path-copy` in `[bindings]`.
 
 Local clipboard providers are `wl-copy` on Wayland, `xclip` or `xsel` on X11,
@@ -323,7 +330,6 @@ attributes = true
 owner = false
 
 [clipboard]
-relative_path_base = "launch" # "launch" or "opposite-pane"
 osc52_fallback = false # Opt in to terminal clipboard fallback
 
 [bindings]

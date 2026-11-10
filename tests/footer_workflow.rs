@@ -147,3 +147,139 @@ fn both_shift_tab_encodings_traverse_enabled_choices_and_unknown_clicks_are_iner
         Progress::Cancelled
     ));
 }
+
+#[test]
+fn lowercase_and_shift_letter_are_distinct_with_all_terminal_encodings() {
+    for (letter, modifiers, expected) in [
+        ('s', KeyModifiers::NONE, "this"),
+        ('s', KeyModifiers::SHIFT, "other"),
+        ('S', KeyModifiers::SHIFT, "other"),
+        ('S', KeyModifiers::NONE, "other"),
+    ] {
+        let mut flow = Flow::new(
+            "dummy",
+            "DUMMY",
+            key(KeyCode::Char('x')),
+            (),
+            vec![Stage::new(
+                "Base",
+                vec![
+                    Choice::new("this", 's', ["This"; 3]),
+                    Choice::new("other", 'S', ["Other"; 3]),
+                ],
+                "this",
+            )],
+            |done| done,
+        )
+        .unwrap();
+        let input = Input::Key(KeyEvent::new(KeyCode::Char(letter), modifiers));
+        let Progress::Complete(done) = flow.input(input.clone()) else {
+            panic!("completion")
+        };
+        assert_eq!(done.choices[1].id, expected);
+        assert_eq!(done.inputs.last(), Some(&input));
+    }
+}
+
+#[test]
+fn conditional_stages_skip_and_reenter_with_history_defaults_and_mouse_back() {
+    use terminal_file_manager::workflow::Target;
+    let mut flow = Flow::new(
+        "dummy",
+        "DUMMY",
+        key(KeyCode::Char('x')),
+        (),
+        vec![
+            Stage::new(
+                "Branch",
+                vec![
+                    Choice::new("short", 'a', ["Short"; 3]),
+                    Choice::new("long", 'b', ["Long"; 3]),
+                ],
+                "short",
+            ),
+            Stage::new(
+                "Extra",
+                vec![Choice::new("extra", 'e', ["Extra"; 3])],
+                "extra",
+            )
+            .when(|choices| choices.last().is_some_and(|c| c.id == "long")),
+            Stage::new("End", vec![Choice::new("end", 'f', ["End"; 3])], "end"),
+        ],
+        |done| done,
+    )
+    .unwrap();
+    flow.input(key(KeyCode::Enter));
+    assert_eq!(flow.stage().label, "End");
+    flow.input(Input::Click(Target::Back));
+    assert_eq!(flow.stage().label, "Branch");
+    flow.input(Input::Click(Target::Choice("long")));
+    assert_eq!(flow.stage().label, "Extra");
+    flow.input(key(KeyCode::Enter));
+    flow.input(key(KeyCode::Backspace));
+    assert_eq!(flow.highlighted().unwrap().id, "extra");
+    flow.input(key(KeyCode::Left));
+    assert_eq!(flow.highlighted().unwrap().id, "long");
+    flow.input(key(KeyCode::Char('a')));
+    let Progress::Complete(done) = flow.input(Input::Click(Target::Choice("end"))) else {
+        panic!("completion")
+    };
+    assert_eq!(
+        done.choices.iter().map(|c| c.id).collect::<Vec<_>>(),
+        ["dummy", "short", "end"]
+    );
+    assert!(done.inputs.contains(&Input::Click(Target::Choice("long"))));
+}
+
+#[test]
+fn conditional_start_has_no_back_and_empty_available_definition_is_rejected() {
+    use terminal_file_manager::workflow::Target;
+    for available in [true, false] {
+        let flow = Flow::new(
+            "dummy",
+            "DUMMY",
+            key(KeyCode::Char('x')),
+            (),
+            vec![
+                Stage::new(
+                    "Skipped",
+                    vec![Choice::new("skip", 'a', ["Skip"; 3])],
+                    "skip",
+                )
+                .when(|_| false),
+                Stage::new(
+                    "Start",
+                    vec![Choice::new("start", 's', ["Start"; 3])],
+                    "start",
+                )
+                .when(move |_| available),
+            ],
+            |done| done,
+        );
+        if available {
+            let mut flow = flow.unwrap();
+            assert_eq!(flow.stage().label, "Start");
+            assert!(!flow.can_back());
+            let layout = terminal_file_manager::ui::workflow::layout(
+                &flow,
+                ratatui::layout::Rect::new(0, 0, 120, 1),
+            );
+            assert!(
+                !layout
+                    .controls
+                    .iter()
+                    .any(|c| c.target == Some(Target::Back))
+            );
+            assert!(matches!(
+                flow.input(Input::Click(Target::Cancel)),
+                Progress::Cancelled
+            ));
+            assert!(matches!(
+                flow.input(key(KeyCode::Enter)),
+                Progress::Inactive
+            ));
+        } else {
+            assert!(flow.is_err());
+        }
+    }
+}

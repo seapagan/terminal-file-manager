@@ -1,11 +1,13 @@
 //! Local native-path clipboard consumer. Remote references require their own typed consumer.
+mod base;
 mod paths;
 /// Detailed Help remains available before activation, including at narrow widths.
 pub const HELP: &[&str] = &[
     "Choose m Marked, h Highlighted or c Current directory, then n Name, r Relative or f Full path. Example: y h f copies the highlighted path with the default binding.",
     "Enter accepts the highlighted choice: visible marks first, then the real highlighted entry, then current directory. Full path starts selected. The synthetic .. row is never Highlighted; Current still means this directory.",
     "Up/Down/Right and Tab/Shift+Tab change the choice. Left/Backspace goes back; Esc cancels. Click a displayed choice to activate it. Unsupported keys stay inside the workflow; there is no timeout.",
-    "Relative uses the original launch directory, including after navigation. Configure clipboard.relative_path_base = opposite-pane to use the other pane instead; logical two-pane mode and comparable roots are required, even when a pane is hidden or maximised.",
+    "Relative opens a Base choice: k Keep base (the default), s This pane, Shift+s Other pane, or o Startup base. Captured bases stay fixed across pane navigation. Other pane requires logical two-pane mode; incomparable roots are disabled.",
+    "The startup base is the first explicit CLI directory, or the process working directory when no directory is supplied. Saved navigation sessions restore their captured base; older sessions use the first pane. Shift+q and --save-session save it; ordinary quit does not. It is not a configuration preference.",
     "Only visible marks in the active pane are copied, in displayed order, one per LF-delimited line. Directories copy their own path, without traversal. Text is literal and unquoted. Non-Unicode or control-containing paths are rejected without changing the clipboard.",
     "Local providers: wl-copy on Wayland, xclip/xsel on X11, pbcopy on macOS and native Windows clipboard. Commands have a three-second deadline. Clipboard text is limited to 16 MiB.",
     "SSH sends OSC 52 to the terminal-side clipboard. Local OSC 52 fallback requires clipboard.osc52_fallback = true. Sent does not mean accepted; the terminal may refuse it. Limit: 74,991 UTF-8 bytes. Zellij uses standard framing; tmux needs set-clipboard on and outer terminal support. GNU screen and dumb/unknown terminals are unsupported.",
@@ -18,18 +20,9 @@ use crate::{
 pub use paths::relative;
 use std::path::PathBuf;
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum RelativeBase {
-    #[default]
-    Launch,
-    OppositePane,
-}
-
 #[derive(Clone, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Preferences {
-    pub relative_path_base: RelativeBase,
     pub osc52_fallback: bool,
 }
 
@@ -61,8 +54,7 @@ pub struct Snapshot {
     physical_directory: Option<Entry>,
     highlighted: Option<Entry>,
     marked: Vec<Entry>,
-    base: Result<PathBuf, String>,
-    opposite: Option<(usize, PathBuf, u64)>,
+    bases: base::Bases,
 }
 
 pub type Workflow = Flow<Snapshot, Completion<Snapshot>>;
@@ -74,8 +66,8 @@ pub struct CopyRequest {
     pub scope: String,
 }
 
-pub fn open(app: &App, preferences: &Preferences, trigger: Input) -> Result<Workflow, String> {
-    let snapshot = Snapshot::capture(app, preferences)?;
+pub fn open(app: &App, trigger: Input) -> Result<Workflow, String> {
+    let snapshot = Snapshot::capture(app)?;
     let mut marked = Choice::new("marked", 'm', ["Marked", "Marked", "Marks"]);
     marked.labels[0] = format!("Marked ({})", snapshot.marked.len());
     if snapshot.marked.is_empty() {
@@ -102,21 +94,21 @@ pub fn open(app: &App, preferences: &Preferences, trigger: Input) -> Result<Work
             ],
             default,
         ),
-        formats(&snapshot),
+        formats(),
+        snapshot
+            .bases
+            .stage()
+            .when(|choices| choices.last().is_some_and(|c| c.id == "relative")),
     ];
     Flow::new("path-copy", "YANK", trigger, snapshot, stages, |done| done).map_err(str::to_owned)
 }
 
-fn formats(snapshot: &Snapshot) -> Stage {
-    let mut relative = Choice::new("relative", 'r', ["Relative", "Relative", "Rel"]);
-    if let Err(reason) = &snapshot.base {
-        relative.disabled = Some(reason.clone());
-    }
+fn formats() -> Stage {
     Stage::new(
         "Format",
         vec![
-            Choice::new("name", 'n', ["Name", "Name", "Name"]),
-            relative,
+            Choice::new("name", 'n', ["Name"; 3]),
+            Choice::new("relative", 'r', ["Relative", "Relative", "Rel"]),
             Choice::new("full", 'f', ["Full path", "Full", "Full"]),
         ],
         "full",
@@ -132,7 +124,7 @@ impl Snapshot {
             && pane.pending.is_none()
             && pane.error.is_none()
     }
-    fn capture(app: &App, preferences: &Preferences) -> Result<Self, String> {
+    fn capture(app: &App) -> Result<Self, String> {
         let pane = &app.panes[app.active];
         if pane.pending.is_some() || pane.error.is_some() || !pane.path.is_absolute() {
             return Err("Wait for a valid local directory before copying paths".into());
@@ -151,22 +143,6 @@ impl Snapshot {
             })
             .cloned()
             .collect();
-        let opposite = (preferences.relative_path_base == RelativeBase::OppositePane && app.dual)
-            .then(|| {
-                let id = 1 - app.active;
-                (id, app.panes[id].path.clone(), app.panes[id].context)
-            });
-        let base = match preferences.relative_path_base {
-            RelativeBase::Launch => app
-                .launch_directory
-                .clone()
-                .ok_or_else(|| "Launch directory is unavailable".into()),
-            RelativeBase::OppositePane => opposite
-                .as_ref()
-                .map(|(_, path, _)| path.clone())
-                .ok_or_else(|| "Relative requires logical two-pane mode; enable two panes".into()),
-        }
-        .and_then(|base| relative(&pane.path, &base).map(|_| base));
         Ok(Self {
             pane: app.active,
             path: pane.path.clone(),
@@ -175,17 +151,13 @@ impl Snapshot {
             physical_directory: pane.directory.clone(),
             highlighted: pane.current().filter(|e| e.identity.is_some()).cloned(),
             marked,
-            base,
-            opposite,
+            bases: base::Bases::capture(app),
         })
     }
 
-    fn validate(&self, app: &App, source: Source, format: Format) -> Result<Vec<Entry>, String> {
+    fn validate(&self, app: &App, source: Source) -> Result<Vec<Entry>, String> {
         let pane = &app.panes[self.pane];
         self.validate_context(app)?;
-        if format == Format::Relative {
-            self.validate_base(app)?;
-        }
         let entries = match source {
             Source::Current => vec![self.directory.clone()],
             Source::Highlighted => self.validate_highlight(pane)?,
@@ -213,22 +185,6 @@ impl Snapshot {
             return Err("Highlighted entry changed; start again".into());
         }
         Ok(vec![entry.clone()])
-    }
-
-    fn validate_base(&self, app: &App) -> Result<(), String> {
-        self.base.as_ref().map_err(Clone::clone)?;
-        if let Some((id, path, context)) = &self.opposite {
-            let pane = &app.panes[*id];
-            if !app.dual
-                || pane.path != *path
-                || pane.context != *context
-                || pane.pending.is_some()
-                || pane.error.is_some()
-            {
-                return Err("Opposite pane reference changed; start again".into());
-            }
-        }
-        Ok(())
     }
 
     fn validate_marks(&self, app: &App) -> Result<Vec<Entry>, String> {
@@ -284,21 +240,22 @@ fn validate_directory(pane: &crate::app::Pane, directory: &Entry) -> Result<(), 
 }
 
 /// Resolve semantic IDs, validate the complete batch, then construct exact clipboard text.
-pub fn complete(done: Completion<Snapshot>, app: &App) -> Result<CopyRequest, String> {
+pub fn complete(done: Completion<Snapshot>, app: &mut App) -> Result<CopyRequest, String> {
     let ids: Vec<_> = done.choices.iter().map(|c| c.id).collect();
-    let ["path-copy", source, format] = ids.as_slice() else {
+    let ["path-copy", source, format, rest @ ..] = ids.as_slice() else {
         return Err("Incomplete path-copy choices".into());
     };
     let source = source_choice(source)?;
     let format = format_choice(format)?;
-    let entries = done.context.validate(app, source, format)?;
+    let base = done.context.bases.resolve(format, rest, app)?;
+    let entries = done.context.validate(app, source)?;
     let values = entries
         .iter()
         .map(|entry| {
             paths::text(
                 &SourceIdentity::Local(entry.clone()),
                 format,
-                done.context.base.as_ref().ok().map(PathBuf::as_path),
+                base.map(PathBuf::as_path),
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -307,6 +264,9 @@ pub fn complete(done: Completion<Snapshot>, app: &App) -> Result<CopyRequest, St
         return Err("Path text exceeds the 16 MiB clipboard limit; copy fewer entries".into());
     }
     let scope = scope(source, format, entries.len());
+    if let Some(base) = base {
+        app.relative_path_base = base.clone();
+    }
     Ok(CopyRequest { text, scope })
 }
 

@@ -55,7 +55,7 @@ fn literal_highlighted_current_and_visible_marked_outputs_use_native_paths() {
         c.path_copy_request.take().unwrap().text,
         "a λ;$(touch nope)"
     );
-    sequence(&mut c, "ycr");
+    sequence(&mut c, "ycrk");
     assert_eq!(c.path_copy_request.take().unwrap().text, ".");
     c.app.panes[0].select_all();
     sequence(&mut c, "ymn");
@@ -166,33 +166,14 @@ fn stale_directory_before_activation_cannot_copy_a_replacement_context() {
 }
 
 #[test]
-fn opposite_pane_requires_logical_dual_and_rejects_changed_base() {
-    let root = tempfile::tempdir().unwrap();
-    let mut c = controller(root.path());
-    c.preferences = Settings::parse("[clipboard]\nrelative_path_base = 'opposite-pane'").unwrap();
-    sequence(&mut c, "ycr");
-    assert!(c.path_copy_request.is_none());
-    send(&mut c, KeyCode::Esc);
-    c.app.dual = true;
-    c.app.maximized = true;
-    sequence(&mut c, "ycr");
-    assert_eq!(c.path_copy_request.take().unwrap().text, ".");
-    sequence(&mut c, "yc");
-    c.app.panes[1].path = root.path().join("different");
-    sequence(&mut c, "r");
-    assert!(c.path_copy_request.is_none());
-}
-
-#[test]
-fn relative_configuration_round_trips_and_rejects_unknown_values() {
-    let settings = Settings::parse("[clipboard]\nrelative_path_base = 'opposite-pane'").unwrap();
-    let encoded = toml::to_string(&settings).unwrap();
-    assert_eq!(
-        Settings::parse(&encoded).unwrap().clipboard,
-        settings.clipboard
+fn relative_base_is_session_state_and_config_rejects_the_removed_preference() {
+    let error = Settings::parse("[clipboard]\nrelative_path_base = 'opposite-pane'").unwrap_err();
+    assert!(error.contains("unknown field"));
+    assert!(
+        !toml::to_string(&Settings::default())
+            .unwrap()
+            .contains("relative_path_base")
     );
-    let error = Settings::parse("[clipboard]\nrelative_path_base = 'active'").unwrap_err();
-    assert!(error.contains("launch") && error.contains("opposite-pane"));
 }
 
 #[test]
@@ -329,7 +310,8 @@ fn launch_base_is_stable_and_lexical_relative_paths_handle_roots_and_parent_segm
     std::fs::create_dir(&base).unwrap();
     let mut c = controller(root.path());
     c.app.launch_directory = Some(base.clone());
-    sequence(&mut c, "ycr");
+    c.app.relative_path_base = base.clone();
+    sequence(&mut c, "ycrk");
     assert_eq!(c.path_copy_request.take().unwrap().text, "..");
     assert_eq!(
         relative(&base.join("a/../b"), &base).unwrap(),
@@ -406,3 +388,6 @@ fn click_choice(c: &mut Controller, target: &'static str, bounds: Rect) {
         Default::default(),
     );
 }
+
+#[path = "path_copy/session_base.rs"]
+mod session_base;

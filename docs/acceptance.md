@@ -1,21 +1,26 @@
 # Acceptance gates
 
-## PM3-07 implementation for draft review — 9 November 2026
+## PM3-07 implementation for draft review — 10 November 2026
 
 The implementation adds reusable one-row footer workflows and their local
-name/path-copy consumer. Default `y → m/h/c → n/r/f` sequences, contextual
-Enter defaults, Back/Esc, mouse choices, effective bindings and detailed Help
+name/path-copy consumer. Default `y → m/h/c → n/r/f` sequences, a Relative-only
+base choice, contextual Enter defaults, Back/Esc, mouse choices, effective bindings and detailed Help
 use the existing browser geometry and status owners. Ctrl+c Quit and direct
 F5/F6 operations retain their established ordinary-browser behavior.
 
-Native source snapshots, visible-mark order, lexical launch/opposite-pane
-relative paths, Unicode/control validation and all-or-nothing text precede
+Native source snapshots, visible-mark order, fixed session-relative bases,
+Unicode/control validation and all-or-nothing text precede
 clipboard submission. Platform providers and opt-in local OSC52 fallback run
 outside the UI thread; OSC52 reports sent without claiming terminal acceptance.
 The approved Windows provider adds clipboard-win5.4.3 and its BSL-1.0 notice.
 
-Automated coverage includes a non-clipboard consumer, ordered physical and
-semantic history, one-shot callbacks, source/default rules, stale identities,
+Relative bases initialise from the first CLI directory or cwd. Users can capture
+either pane or restore the startup base. Session saves persist the native base;
+restoration supports older sessions, and ordinary quit leaves saved data unchanged.
+
+Automated coverage includes conditional stages, modifier-sensitive shortcuts,
+startup/session compatibility, base capture and navigation persistence,
+a non-clipboard consumer, ordered physical and semantic history, one-shot callbacks, source/default rules, stale identities,
 relative bases, literal payloads, one-row geometry, theme emphasis, input
 ownership, provider/fallback failures, bounded I/O and asynchronous outcomes.
 Final-head local/hosted evidence belongs to the draft PR and ignored work

@@ -10,6 +10,7 @@ fn session_storage_round_trips_layout_and_both_native_locations() {
     let root = tempfile::tempdir().unwrap();
     let mut app = App::new(root.path().join("left"));
     app.panes[1].path = root.path().join("right");
+    app.relative_path_base = root.path().join("captured-base");
     app.active = 1;
     app.dual = true;
     app.maximized = true;
@@ -22,6 +23,7 @@ fn session_storage_round_trips_layout_and_both_native_locations() {
     let restored = session.restore(&Settings::default()).unwrap();
     assert_eq!(restored.panes[0].path, app.panes[0].path);
     assert_eq!(restored.panes[1].path, app.panes[1].path);
+    assert_eq!(restored.relative_path_base, app.relative_path_base);
     assert_eq!(restored.active, 1);
     assert!(restored.dual && restored.maximized);
     assert_eq!(restored.split_percent, 65);
@@ -91,7 +93,8 @@ fn unix_session_paths_retain_non_utf8_bytes() {
     let path = root
         .path()
         .join(std::ffi::OsString::from_vec(vec![b'x', 0xff, 0xfe]));
-    let app = App::new(path.clone());
+    let mut app = App::new(path.clone());
+    app.relative_path_base = path.clone();
     let store = SessionStore {
         path: root.path().join("session.toml"),
     };
@@ -99,6 +102,15 @@ fn unix_session_paths_retain_non_utf8_bytes() {
     assert_eq!(
         store.load().unwrap().locations().unwrap(),
         [path.clone(), path]
+    );
+    assert_eq!(
+        store
+            .load()
+            .unwrap()
+            .restore(&Settings::default())
+            .unwrap()
+            .relative_path_base,
+        app.relative_path_base
     );
 }
 
@@ -110,7 +122,8 @@ fn windows_session_paths_retain_unpaired_utf16_units() {
     let path = root
         .path()
         .join(std::ffi::OsString::from_wide(&[b'x' as u16, 0xd800]));
-    let app = App::new(path.clone());
+    let mut app = App::new(path.clone());
+    app.relative_path_base = path.clone();
     let store = SessionStore {
         path: root.path().join("session.toml"),
     };
@@ -118,6 +131,15 @@ fn windows_session_paths_retain_unpaired_utf16_units() {
     assert_eq!(
         store.load().unwrap().locations().unwrap(),
         [path.clone(), path]
+    );
+    assert_eq!(
+        store
+            .load()
+            .unwrap()
+            .restore(&Settings::default())
+            .unwrap()
+            .relative_path_base,
+        app.relative_path_base
     );
 }
 
@@ -158,4 +180,74 @@ fn session_refuses_linked_storage_without_touching_its_target() {
     assert!(store.save(&App::new(root.path().to_owned())).is_err());
     assert!(store.load().is_err());
     assert_eq!(std::fs::read(target).unwrap(), b"original");
+}
+
+#[test]
+fn legacy_session_uses_first_pane_and_base_validation_preserves_storage() {
+    let root = tempfile::tempdir().unwrap();
+    let mut app = App::new(root.path().join("left"));
+    app.panes[1].path = root.path().join("right");
+    app.active = 1;
+    app.relative_path_base = root.path().join("base");
+    let store = SessionStore {
+        path: root.path().join("session.toml"),
+    };
+    store.save(&app).unwrap();
+    let text = std::fs::read_to_string(&store.path).unwrap();
+    let mut legacy: toml::Value = toml::from_str(&text).unwrap();
+    let mut foreign = legacy.clone();
+    foreign["relative_path_base"]["encoding"] =
+        toml::Value::String(if cfg!(unix) { "windows" } else { "unix" }.into());
+    assert!(NavigationSession::parse(&toml::to_string(&foreign).unwrap()).is_err());
+    legacy.as_table_mut().unwrap().remove("relative_path_base");
+    let restored = NavigationSession::parse(&toml::to_string(&legacy).unwrap())
+        .unwrap()
+        .restore(&Settings::default())
+        .unwrap();
+    assert_eq!(restored.relative_path_base, app.panes[0].path);
+    app.relative_path_base = "relative".into();
+    assert!(store.save(&app).is_err());
+    assert_eq!(std::fs::read_to_string(&store.path).unwrap(), text);
+}
+
+#[test]
+fn ordinary_quit_does_not_capture_base_but_save_quit_captures_it() {
+    use terminal_file_manager::{
+        input::{Action, Bindings, Controller},
+        ui,
+    };
+    let root = tempfile::tempdir().unwrap();
+    let store = SessionStore {
+        path: root.path().join("session.toml"),
+    };
+    let app = App::new(root.path().to_owned());
+    store.save(&app).unwrap();
+    let saved = std::fs::read(&store.path).unwrap();
+    let mut c = Controller::new(
+        app,
+        Bindings::new(&Default::default()).unwrap(),
+        Settings::default(),
+    );
+    c.app.relative_path_base = root.path().join("captured");
+    let g = ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 120, 24));
+    c.dispatch(Action::Quit, &g);
+    assert!(c.quit && !c.save_session);
+    assert!(c.app.operations.exit_snapshot.is_none());
+    assert_eq!(std::fs::read(&store.path).unwrap(), saved);
+    c.quit = false;
+    c.dispatch(Action::SaveQuit, &g);
+    assert!(c.quit && c.save_session);
+    c.app.relative_path_base = root.path().join("later");
+    store
+        .save_snapshot(c.app.operations.exit_snapshot.as_ref().unwrap())
+        .unwrap();
+    assert_eq!(
+        store
+            .load()
+            .unwrap()
+            .restore(&Settings::default())
+            .unwrap()
+            .relative_path_base,
+        root.path().join("captured")
+    );
 }

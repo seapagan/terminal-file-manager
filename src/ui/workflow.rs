@@ -51,7 +51,7 @@ pub fn layout<C, O>(flow: &Flow<C, O>, area: Rect) -> Layout {
     let mut x = area.x;
     append(&mut layout, &mut x, area, title, None, true, false);
     choices(&mut layout, &mut x, area, flow, tier);
-    if flow.stage_index() > 0 {
+    if flow.can_back() {
         append(
             &mut layout,
             &mut x,
@@ -79,16 +79,22 @@ fn choices<C, O>(layout: &mut Layout, x: &mut u16, area: Rect, flow: &Flow<C, O>
         .stage()
         .choices
         .iter()
-        .map(|choice| super::modal::width(&format!("{} {}", choice.key, choice.labels[tier])) + 3)
+        .map(|choice| {
+            super::modal::width(&format!("{} {}", choice.key_label(), choice.labels[tier])) + 3
+        })
         .map(u32::from)
         .sum::<u32>()
         > u32::from(area.right().saturating_sub(*x));
     for choice in &flow.stage().choices {
         let selected = flow.highlighted().is_some_and(|c| c.id == choice.id);
         let text = if compact {
-            choice.key.to_string()
+            choice.key_label()
         } else {
-            format!("{} {}", choice.key, crate::ui::clean(&choice.labels[tier]))
+            format!(
+                "{} {}",
+                choice.key_label(),
+                crate::ui::clean(&choice.labels[tier])
+            )
         };
         let label = if selected {
             format!("[{text}]")

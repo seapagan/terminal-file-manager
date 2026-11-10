@@ -56,7 +56,7 @@ pub(super) fn action(c: &mut Controller, action: Action) -> bool {
 }
 
 fn activate(c: &mut Controller, trigger: Input) {
-    match path_copy::open(&c.app, &c.preferences.clipboard, trigger) {
+    match path_copy::open(&c.app, trigger) {
         Ok(flow) => {
             c.app.footer_workflow = Some(flow);
             c.last_click = None;
@@ -110,7 +110,7 @@ fn transition(c: &mut Controller, input: Input) {
     match result {
         Progress::Complete(done) => {
             c.app.footer_workflow = None;
-            match path_copy::complete(done, &c.app) {
+            match path_copy::complete(done, &mut c.app) {
                 Ok(request) => {
                     c.app.status = format!("Clipboard request ready: {}", request.scope).into();
                     c.path_copy_request = Some(request);

@@ -18,8 +18,10 @@ mod pattern;
 mod profiles;
 mod scroll;
 pub(crate) mod view;
+pub(crate) use bindings::normalize_chord;
 pub use bindings::{Bindings, chord};
 pub use controller::Controller;
+pub(crate) use help::key_name;
 pub use help::{
     ContextHelp, HelpEntry, HelpFragment, HelpHit, HelpParagraph, HelpPicker, HelpSection,
     HelpTarget, HelpTopic, ViewHelpTopic, help_hits,

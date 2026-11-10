@@ -33,8 +33,8 @@ Usage: tfm [OPTIONS] [DIRECTORY [OTHER_DIRECTORY]]
 
 Options:
   -2  --two-panes        Start with two panes
-      --save-session     Save selected locations/layout and exit
-      --restore-session  Restore saved locations/layout; no directory arguments
+      --save-session     Save locations, relative base and layout; exit
+      --restore-session  Restore saved navigation session; no directory arguments
   -h  --help             Print help and exit
   -V  --version          Print version and exit
       --                 Treat following arguments as directory paths

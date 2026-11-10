@@ -116,7 +116,10 @@ fn chord_modifiers(parts: &[&str], text: &str) -> Result<KeyModifiers, String> {
     Ok(modifiers)
 }
 
-fn normalize_chord(code: KeyCode, mut modifiers: KeyModifiers) -> (KeyCode, KeyModifiers) {
+pub(crate) fn normalize_chord(
+    code: KeyCode,
+    mut modifiers: KeyModifiers,
+) -> (KeyCode, KeyModifiers) {
     if let KeyCode::Char(c) = code
         && c.is_ascii_alphabetic()
         && modifiers.contains(KeyModifiers::SHIFT)

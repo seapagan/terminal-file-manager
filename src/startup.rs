@@ -75,7 +75,10 @@ impl Startup {
         &self,
         settings: &crate::settings::Settings,
     ) -> Result<crate::app::App, String> {
-        let launch_directory = capture_launch_directory()?;
+        let launch_directory = self
+            .paths
+            .first()
+            .map_or_else(capture_launch_directory, |path| validate_path(path))?;
         if self.paths.len() > 2 {
             return Err("at most two directory paths are supported".into());
         }
@@ -87,6 +90,7 @@ impl Startup {
             let mut app = crate::app::App::new(left);
             app.panes[1].path = right;
             settings.apply(&mut app);
+            app.relative_path_base = launch_directory.clone();
             app
         };
         for pane in &mut app.panes {
