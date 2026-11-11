@@ -1,6 +1,6 @@
 //! At most one clipboard command runs outside the UI event loop.
 use super::{ClipboardError, Delivery};
-use crate::path_copy::CopyRequest;
+use crate::path_copy::{BaseRequest, CopyRequest, ValidatedBase};
 use std::{
     io::Write,
     sync::mpsc::{self, Receiver, TryRecvError},
@@ -8,7 +8,17 @@ use std::{
 
 #[derive(Default)]
 pub struct Runtime {
-    pending: Option<(String, Receiver<Result<Delivery, ClipboardError>>)>,
+    pending: Option<(String, Receiver<Result<Work, String>>)>,
+}
+
+enum Work {
+    Copy(Delivery),
+    Base(ValidatedBase),
+}
+
+pub enum Completion {
+    Message(String),
+    Base(ValidatedBase),
 }
 
 impl Runtime {
@@ -25,6 +35,43 @@ impl Runtime {
         request: CopyRequest,
         copy: impl FnOnce(String) -> Result<Delivery, ClipboardError> + Send + 'static,
     ) -> Result<(), String> {
+        self.start_inspecting(request, crate::fs::inspect_identity, copy)
+    }
+
+    fn start_inspecting(
+        &mut self,
+        request: CopyRequest,
+        inspect: impl FnMut(&std::path::Path) -> crate::fs::Entry + Send + 'static,
+        copy: impl FnOnce(String) -> Result<Delivery, ClipboardError> + Send + 'static,
+    ) -> Result<(), String> {
+        let scope = request.scope.clone();
+        self.spawn(scope, move || {
+            let text = request.prepare_using(inspect)?;
+            copy(text)
+                .map(Work::Copy)
+                .map_err(|error| error.to_string())
+        })
+    }
+
+    pub fn start_base(&mut self, request: BaseRequest) -> Result<(), String> {
+        self.start_base_inspecting(request, crate::fs::inspect_identity)
+    }
+
+    fn start_base_inspecting(
+        &mut self,
+        request: BaseRequest,
+        inspect: impl FnMut(&std::path::Path) -> crate::fs::Entry + Send + 'static,
+    ) -> Result<(), String> {
+        self.spawn("relative-path base".into(), move || {
+            request.prepare_using(inspect).map(Work::Base)
+        })
+    }
+
+    fn spawn(
+        &mut self,
+        scope: String,
+        work: impl FnOnce() -> Result<Work, String> + Send + 'static,
+    ) -> Result<(), String> {
         if self.busy() {
             return Err("Clipboard request still running; wait before copying again".into());
         }
@@ -32,29 +79,28 @@ impl Runtime {
         std::thread::Builder::new()
             .name("tfm-clipboard".into())
             .spawn(move || {
-                let _ = send.send(copy(request.text));
+                let _ = send.send(work());
             })
             .map_err(|e| format!("Cannot start clipboard worker: {e}"))?;
-        self.pending = Some((request.scope, receive));
+        self.pending = Some((scope, receive));
         Ok(())
     }
 
     /// The UI thread emits terminal output serially between frame draws.
-    pub fn poll(&mut self, terminal: &mut dyn Write) -> Option<Result<String, String>> {
+    pub fn poll(&mut self, terminal: &mut dyn Write) -> Option<Result<Completion, String>> {
         let (_, receive) = self.pending.as_ref()?;
         let result = match receive.try_recv() {
             Ok(result) => result,
             Err(TryRecvError::Empty) => return None,
-            Err(TryRecvError::Disconnected) => Err(ClipboardError(
-                "Clipboard worker stopped without a result".into(),
-            )),
+            Err(TryRecvError::Disconnected) => {
+                Err("Clipboard worker stopped without a result".into())
+            }
         };
         let (scope, _) = self.pending.take().expect("pending result");
-        Some(
-            result
-                .map_err(|e| e.to_string())
-                .and_then(|delivery| finish(delivery, &scope, terminal)),
-        )
+        Some(result.and_then(|work| match work {
+            Work::Copy(delivery) => finish(delivery, &scope, terminal).map(Completion::Message),
+            Work::Base(request) => Ok(Completion::Base(request)),
+        }))
     }
 }
 

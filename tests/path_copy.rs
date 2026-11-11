@@ -23,6 +23,17 @@ fn controller(root: &Path) -> Controller {
     )
 }
 
+fn finish_base(c: &mut Controller) {
+    if let Some(request) = c.path_base_request.take() {
+        match request.prepare().and_then(|ready| ready.apply(&mut c.app)) {
+            Ok(message) => c.app.status = message.into(),
+            Err(error) => c
+                .app
+                .notify(terminal_file_manager::notifications::Severity::Error, error),
+        }
+    }
+}
+
 fn send(c: &mut Controller, code: KeyCode) {
     let g = ui::geometry(&c.app, Rect::new(0, 0, 120, 24));
     assert!(
@@ -33,6 +44,7 @@ fn send(c: &mut Controller, code: KeyCode) {
         )
         .is_empty()
     );
+    finish_base(c);
 }
 
 fn sequence(c: &mut Controller, keys: &str) {
@@ -52,15 +64,15 @@ fn literal_highlighted_current_and_visible_marked_outputs_use_native_paths() {
     c.app.panes[0].cursor = Some(root.path().join("a λ;$(touch nope)"));
     sequence(&mut c, "yhn");
     assert_eq!(
-        c.path_copy_request.take().unwrap().text,
+        c.path_copy_request.take().unwrap().prepare().unwrap(),
         "a λ;$(touch nope)"
     );
     sequence(&mut c, "ycr");
-    assert_eq!(c.path_copy_request.take().unwrap().text, ".");
+    assert_eq!(c.path_copy_request.take().unwrap().prepare().unwrap(), ".");
     c.app.panes[0].select_all();
     sequence(&mut c, "ymn");
     assert_eq!(
-        c.path_copy_request.take().unwrap().text,
+        c.path_copy_request.take().unwrap().prepare().unwrap(),
         "a λ;$(touch nope)\nb界"
     );
 }
@@ -105,7 +117,7 @@ fn parent_defaults_current_marks_win_and_back_does_not_navigate() {
     send(&mut c, KeyCode::Enter);
     send(&mut c, KeyCode::Enter);
     assert_eq!(
-        c.path_copy_request.take().unwrap().text,
+        c.path_copy_request.take().unwrap().prepare().unwrap(),
         root.path().join("file").to_str().unwrap()
     );
 }
@@ -124,17 +136,17 @@ fn snapshot_accepts_refresh_but_rejects_replaced_native_selection() {
         Ok(fs::list(root.path(), &Default::default(), &AtomicBool::new(false)).unwrap()),
     );
     sequence(&mut c, "f");
-    assert!(c.path_copy_request.take().is_some());
+    assert!(c.path_copy_request.take().unwrap().prepare().is_ok());
     sequence(&mut c, "yh");
     std::fs::rename(&file, root.path().join("old")).unwrap();
     std::fs::write(&file, "new").unwrap();
     sequence(&mut c, "f");
-    assert!(c.path_copy_request.is_none());
+    assert!(c.path_copy_request.take().unwrap().prepare().is_err());
     assert!(c.app.footer_workflow.is_none());
 }
 
 #[test]
-fn first_background_listing_preserves_a_current_directory_snapshot() {
+fn activation_waits_for_cached_identity_and_first_listing_enables_copy() {
     let root = tempfile::tempdir().unwrap();
     let mut app = App::new(root.path().into());
     app.launch_directory = Some(root.path().into());
@@ -143,14 +155,16 @@ fn first_background_listing_preserves_a_current_directory_snapshot() {
         Bindings::new(&Default::default()).unwrap(),
         Default::default(),
     );
-    sequence(&mut c, "yc");
+    sequence(&mut c, "y");
+    assert!(c.app.footer_workflow.is_none());
+    assert!(c.app.status.to_string().contains("listing"));
     c.app.complete_listing(
         0,
         1,
         Ok(fs::list(root.path(), &Default::default(), &AtomicBool::new(false)).unwrap()),
     );
-    sequence(&mut c, "f");
-    assert!(c.path_copy_request.is_some());
+    sequence(&mut c, "ycf");
+    assert!(c.path_copy_request.take().unwrap().prepare().is_ok());
 }
 
 #[test]
@@ -162,7 +176,7 @@ fn stale_directory_before_activation_cannot_copy_a_replacement_context() {
     std::fs::rename(&directory, root.path().join("old")).unwrap();
     std::fs::create_dir(&directory).unwrap();
     sequence(&mut c, "ycf");
-    assert!(c.path_copy_request.is_none());
+    assert!(c.path_copy_request.take().unwrap().prepare().is_err());
 }
 
 #[test]
@@ -269,17 +283,23 @@ fn filtered_marks_never_join_the_batch_and_control_names_reject_whole_batch() {
     c.app.panes[0].select_all();
     c.app.panes[0].set_filter("beta".into());
     sequence(&mut c, "ymn");
-    assert_eq!(c.path_copy_request.take().unwrap().text, "beta");
+    assert_eq!(
+        c.path_copy_request.take().unwrap().prepare().unwrap(),
+        "beta"
+    );
     c.app.panes[0].set_filter("界".into());
     sequence(&mut c, "yhn");
-    assert_eq!(c.path_copy_request.take().unwrap().text, "界e\u{301}👩");
+    assert_eq!(
+        c.path_copy_request.take().unwrap().prepare().unwrap(),
+        "界e\u{301}👩"
+    );
     #[cfg(unix)]
     {
         std::fs::write(root.path().join("bad\nname"), "").unwrap();
         let mut c = controller(root.path());
         c.app.panes[0].select_all();
         sequence(&mut c, "ymn");
-        assert!(c.path_copy_request.is_none());
+        assert!(c.path_copy_request.take().unwrap().prepare().is_err());
     }
 }
 
@@ -298,7 +318,7 @@ fn non_unicode_native_entry_rejects_the_entire_marked_batch() {
     let mut c = controller(root.path());
     c.app.panes[0].select_all();
     sequence(&mut c, "ymn");
-    assert!(c.path_copy_request.is_none());
+    assert!(c.path_copy_request.take().unwrap().prepare().is_err());
     assert!(c.app.footer_workflow.is_none());
 }
 
@@ -312,7 +332,7 @@ fn launch_base_is_stable_and_lexical_relative_paths_handle_roots_and_parent_segm
     c.app.launch_directory = Some(base.clone());
     c.app.relative_path_base = base.clone();
     sequence(&mut c, "ycr");
-    assert_eq!(c.path_copy_request.take().unwrap().text, "..");
+    assert_eq!(c.path_copy_request.take().unwrap().prepare().unwrap(), "..");
     assert_eq!(
         relative(&base.join("a/../b"), &base).unwrap(),
         Path::new("b")
@@ -358,10 +378,13 @@ fn symlink_name_and_full_path_never_copy_the_target_spelling() {
     std::os::unix::fs::symlink("missing", root.path().join("link")).unwrap();
     let mut c = controller(root.path());
     sequence(&mut c, "yhn");
-    assert_eq!(c.path_copy_request.take().unwrap().text, "link");
+    assert_eq!(
+        c.path_copy_request.take().unwrap().prepare().unwrap(),
+        "link"
+    );
     sequence(&mut c, "yhf");
     assert_eq!(
-        c.path_copy_request.take().unwrap().text,
+        c.path_copy_request.take().unwrap().prepare().unwrap(),
         root.path().join("link").to_str().unwrap()
     );
 }
@@ -387,6 +410,58 @@ fn click_choice(c: &mut Controller, target: &'static str, bounds: Rect) {
         &g,
         Default::default(),
     );
+    finish_base(c);
+}
+
+#[test]
+fn queued_copy_keeps_its_frozen_source_order_and_relative_base() {
+    let root = tempfile::tempdir().unwrap();
+    for name in ["alpha", "beta"] {
+        std::fs::write(root.path().join(name), "").unwrap();
+    }
+    let mut c = controller(root.path());
+    c.app.panes[0].select_all();
+    sequence(&mut c, "ymr");
+    let request = c.path_copy_request.take().unwrap();
+    c.app.panes[0].visible.reverse();
+    c.app.panes[0].marks.clear();
+    c.app.relative_path_base = root.path().join("other");
+    assert_eq!(request.prepare().unwrap(), "alpha\nbeta");
+}
+
+#[test]
+fn queued_copy_rejects_directory_replacement_after_ui_completion() {
+    let parent = tempfile::tempdir().unwrap();
+    let path = parent.path().join("directory");
+    std::fs::create_dir(&path).unwrap();
+    let mut c = controller(&path);
+    sequence(&mut c, "ycf");
+    let request = c.path_copy_request.take().unwrap();
+    std::fs::rename(&path, parent.path().join("old")).unwrap();
+    std::fs::create_dir(&path).unwrap();
+    assert!(request.prepare().is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn directory_symlink_preserves_lexical_spelling_and_rejects_retargeting() {
+    let root = tempfile::tempdir().unwrap();
+    for name in ["first", "second"] {
+        std::fs::create_dir(root.path().join(name)).unwrap();
+    }
+    let link = root.path().join("alias");
+    std::os::unix::fs::symlink("first", &link).unwrap();
+    let mut c = controller(&link);
+    sequence(&mut c, "ycf");
+    assert_eq!(
+        c.path_copy_request.take().unwrap().prepare().unwrap(),
+        link.to_str().unwrap()
+    );
+    sequence(&mut c, "ycf");
+    let request = c.path_copy_request.take().unwrap();
+    std::fs::remove_file(&link).unwrap();
+    std::os::unix::fs::symlink("second", &link).unwrap();
+    assert!(request.prepare().is_err());
 }
 
 #[path = "path_copy/session_base.rs"]

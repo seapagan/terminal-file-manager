@@ -115,8 +115,9 @@ fn transition(c: &mut Controller, input: Input) {
                     c.app.status = format!("Clipboard request ready: {}", request.scope).into();
                     c.path_copy_request = Some(request);
                 }
-                Ok(path_copy::Outcome::BaseSet(path)) => {
-                    c.app.status = format!("Relative-path base set: {}", path.display()).into();
+                Ok(path_copy::Outcome::BaseSet(request)) => {
+                    c.app.status = "Validating relative-path base…".into();
+                    c.path_base_request = Some(request);
                 }
                 Err(error) => c.app.notify(crate::notifications::Severity::Error, error),
             }

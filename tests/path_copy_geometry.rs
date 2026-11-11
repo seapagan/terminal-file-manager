@@ -8,6 +8,17 @@ use terminal_file_manager::{
     ui,
 };
 
+fn app(root: &std::path::Path) -> App {
+    let mut app = App::new(root.into());
+    for pane in 0..2 {
+        let listing =
+            terminal_file_manager::fs::list(root, &Default::default(), &Default::default())
+                .unwrap();
+        app.complete_listing(pane, 1, Ok(listing));
+    }
+    app
+}
+
 fn send(c: &mut Controller, code: KeyCode, width: u16) {
     let g = ui::geometry(&c.app, Rect::new(0, 0, width, 24));
     c.handle(
@@ -54,7 +65,7 @@ fn assert_selected_style(c: &Controller, g: &ui::Geometry, width: u16, level: Co
 #[test]
 fn active_resize_preserves_choice_and_scroll_even_at_zero_height_and_clipped_keyboard_completion() {
     let root = tempfile::tempdir().unwrap();
-    let mut app = App::new(root.path().into());
+    let mut app = app(root.path());
     app.launch_directory = Some(root.path().into());
     app.panes[0].scroll = 7;
     let mut c = Controller::new(
@@ -94,14 +105,14 @@ fn active_resize_preserves_choice_and_scroll_even_at_zero_height_and_clipped_key
         Default::default(),
     );
     assert_eq!(
-        c.path_copy_request.take().unwrap().text,
+        c.path_copy_request.take().unwrap().prepare().unwrap(),
         root.path().to_str().unwrap()
     );
     assert!(c.app.footer_workflow.is_none());
 }
 
 fn lifecycle(root: &std::path::Path, width: u16, dual: bool, maximized: bool) {
-    let mut app = App::new(root.into());
+    let mut app = app(root);
     app.launch_directory = Some(root.into());
     app.dual = dual;
     app.maximized = maximized;

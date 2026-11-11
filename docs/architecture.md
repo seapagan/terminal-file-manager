@@ -613,9 +613,15 @@ base-set outcome: they validate and capture a native directory path, confirm the
 change and do not queue clipboard text. Other base requires a valid logical
 opposite pane and revalidates its snapshot before setting the base.
 
-Copy completion validates context and native identities, constructs the entire
-Unicode payload and queues one write. Lexical relative paths never follow
-symlinks or cross incomparable roots. Capturing the opposite pane works while
+Activation captures cached directory identities and waits for a valid listing
+when identity evidence is unavailable. Completion checks current pane/selection
+state using a visible-path index, then queues frozen work. The existing clipboard
+worker revalidates lexical and physical directories and selected entries without
+owner/group resolution, constructs the bounded Unicode payload and invokes a
+provider only after the whole batch passes. Base actions use the same worker;
+the UI rechecks pane context before applying a validated base result. Lexical
+relative paths never follow symlinks or cross incomparable roots. Capturing the
+opposite pane works while
 maximised or hidden. Subsequent navigation cannot change a captured base.
 Existing session saves persist native path units; explicit/automatic restoration
 uses that path, with the first restored pane as the fallback for older sessions.

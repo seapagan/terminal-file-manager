@@ -12,6 +12,7 @@ use std::{path::PathBuf, time::Duration};
 
 /// Pure input controller; emitted requests are the only route to background I/O.
 pub struct Controller {
+    pub path_base_request: Option<crate::path_copy::BaseRequest>,
     pub path_copy_request: Option<crate::path_copy::CopyRequest>,
     pub app: App,
     pub quit: bool,
@@ -33,6 +34,7 @@ impl Controller {
         app.profile_names = preferences.profiles.keys().cloned().collect();
         Self {
             path_copy_request: None,
+            path_base_request: None,
             app,
             quit: false,
             save_session: false,

@@ -56,3 +56,33 @@ fn marked_snapshot_rejects_hidden_unmarked_replaced_and_reclassified_entries() {
         assert!(snapshot.validate_marks(&app).is_err());
     }
 }
+
+#[test]
+fn activation_uses_frozen_cached_directories_without_touching_the_filesystem() {
+    let (root, mut app) = marked_app(1);
+    app.dual = true;
+    let listing =
+        crate::fs::list(root.path(), &Default::default(), &AtomicBool::new(false)).unwrap();
+    app.complete_listing(1, 1, Ok(listing));
+    std::fs::rename(root.path().join("template"), root.path().join("moved")).unwrap();
+    let parent = tempfile::tempdir().unwrap();
+    std::fs::rename(root.path(), parent.path().join("moved-root")).unwrap();
+    let snapshot = Snapshot::capture(&app).expect("activation only captures cached state");
+    assert!(snapshot.bases.choices()[1].disabled.is_none());
+}
+
+#[test]
+fn identity_inspection_avoids_owner_resolution_and_preserves_native_evidence() {
+    let root = tempfile::tempdir().unwrap();
+    let file = root.path().join("file");
+    std::fs::write(&file, "content").unwrap();
+    let expected = crate::fs::inspect(&file);
+    let fresh = crate::fs::inspect_identity(&file);
+    assert!(fresh.owner.is_none());
+    assert!(same_entry(&expected, &fresh));
+    assert!(fresh.error.is_none());
+    std::fs::remove_file(&file).unwrap();
+    let missing = crate::fs::inspect_identity(&file);
+    assert!(missing.error.is_some());
+    assert!(missing.identity.is_none());
+}

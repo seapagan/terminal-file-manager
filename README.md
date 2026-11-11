@@ -145,6 +145,7 @@ safely; TFM waits for active work and cleanup before exiting.
 Press `y`, choose `m` Marked, `h` Highlighted or `c` Current folder, then choose
 `n` Name, `r` Relative or `f` Full path.
 For example, `y h f` copies the highlighted entry's full path.
+Wait for the directory listing to load before starting.
 Enter accepts defaults, Backspace goes back and Esc cancels.
 Copied text is plain and unquoted; marked entries use one line each.
 
@@ -152,6 +153,7 @@ Relative paths use a fixed session base, initially the first directory argument
 or the directory you launched TFM from.
 At **From**, use `s` for this pane's folder or `Shift+s` for the other pane's
 folder in two-pane mode. Both change the base without copying.
+Wait for confirmation before using the new base.
 
 On Linux, clipboard copying needs `wl-copy` (Wayland) or `xclip`/`xsel` (X11).
 Clipboard access over SSH uses OSC 52 and requires terminal support;

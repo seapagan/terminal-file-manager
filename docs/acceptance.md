@@ -14,6 +14,9 @@ Native source snapshots, visible-mark order, fixed session-relative bases,
 Unicode/control validation and all-or-nothing text precede
 clipboard submission. Platform providers and opt-in local OSC52 fallback run
 outside the UI thread; OSC52 reports sent without claiming terminal acceptance.
+Activation uses cached directory evidence and waits for a valid listing. Native
+identity checks, base validation and text preparation share the clipboard worker;
+late base results must still match the originating pane context.
 The approved Windows provider adds clipboard-win5.4.3 and its BSL-1.0 notice.
 
 Relative bases initialise from the first CLI directory or cwd. Users can capture
@@ -29,6 +32,8 @@ a non-clipboard consumer, ordered physical and semantic history, one-shot
 callbacks, source/default rules, stale identities,
 relative bases, literal payloads, one-row geometry, theme emphasis, input
 ownership, provider/fallback failures, bounded I/O and asynchronous outcomes.
+Review regressions cover 40,000 marked entries, frozen order and bases, stale
+native identities, blocked inspection, validation errors and worker failure.
 Final-head local/hosted evidence belongs to the draft PR and ignored work
 controller. Manual desktop/SSH/multiplexer clipboard acceptance and independent
 reviews remain outstanding; this implementation record grants no acceptance,

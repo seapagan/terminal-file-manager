@@ -1,5 +1,6 @@
 //! Frozen session base and independently validated capture actions.
-use crate::{app::App, fs::Entry, workflow::Choice};
+use super::Directory;
+use crate::{app::App, workflow::Choice};
 use std::path::PathBuf;
 
 pub(super) struct Bases {
@@ -11,7 +12,8 @@ pub(super) struct Bases {
 struct Reference {
     pane: usize,
     context: u64,
-    directory: Entry,
+    directory: Directory,
+    path: PathBuf,
 }
 
 impl Bases {
@@ -40,6 +42,21 @@ impl Bases {
         Ok(&self.selected)
     }
 
+    pub(super) fn validate_native(
+        &self,
+        id: &str,
+        inspect: &mut impl FnMut(&std::path::Path) -> crate::fs::Entry,
+    ) -> Result<(), String> {
+        if id == "opposite-base" {
+            self.opposite
+                .as_ref()
+                .map_err(Clone::clone)?
+                .directory
+                .validate(inspect)?;
+        }
+        Ok(())
+    }
+
     pub(super) fn select(&self, id: &str, app: &App) -> Result<PathBuf, String> {
         match id {
             "current-base" => Ok(self.current.clone()),
@@ -56,28 +73,25 @@ impl Reference {
         if !app.dual || pane.pending.is_some() || pane.error.is_some() || !pane.path.is_absolute() {
             return Err("Other base requires a valid directory in logical two-pane mode".into());
         }
-        let directory = crate::fs::inspect(&pane.path);
-        super::validate_directory(pane, &directory)?;
+        let directory = Directory::capture(pane)?;
         Ok(Self {
             pane: id,
             context: pane.context,
             directory,
+            path: pane.path.clone(),
         })
     }
 
     fn validate(&self, app: &App) -> Result<PathBuf, String> {
         let pane = &app.panes[self.pane];
-        let fresh = crate::fs::inspect(&self.directory.path);
         if !app.dual
-            || pane.path != self.directory.path
+            || pane.path != self.path
             || pane.context != self.context
             || pane.pending.is_some()
             || pane.error.is_some()
-            || !super::same_entry(&self.directory, &fresh)
         {
             return Err("Other pane reference changed; start again".into());
         }
-        super::validate_directory(pane, &fresh)?;
-        Ok(self.directory.path.clone())
+        Ok(self.path.clone())
     }
 }

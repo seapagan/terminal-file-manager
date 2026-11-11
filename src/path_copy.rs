@@ -1,5 +1,9 @@
 //! Local native-path clipboard consumer. Remote references require their own typed consumer.
 mod base;
+mod directory;
+mod request;
+use directory::Directory;
+pub use request::{BaseRequest, CopyRequest, ValidatedBase};
 mod paths;
 /// Detailed Help remains available before activation, including at narrow widths.
 pub const HELP: &[&str] = &[
@@ -8,6 +12,7 @@ pub const HELP: &[&str] = &[
     "Copy Path starts with From: choose a direct letter shortcut or press Enter for the highlighted default. Backspace returns to the previous stage; Esc cancels. Click a displayed choice to activate it. Arrow and Tab keys stay inside the workflow without changing the choice; there is no timeout.",
     "From also offers s Set base and Shift+s Other base. They capture the active or opposite pane directory, confirm the change and exit without copying. Other base requires a valid directory in logical two-pane mode. Relative copies immediately from Format using the selected session base; incomparable roots are disabled.",
     "The startup base is the first explicit CLI directory, or the process working directory when no directory is supplied. Saved navigation sessions restore their captured base; older sessions use the first pane. Shift+q and --save-session save it; ordinary quit does not. It is not a configuration preference.",
+    "Copy Path waits for a valid directory listing before activation. Base changes are confirmed after validation; wait for confirmation before copying relative paths.",
     "Only visible marks in the active pane are copied, in displayed order, one per LF-delimited line. Directories copy their own path, without traversal. Text is literal and unquoted. Non-Unicode or control-containing paths are rejected without changing the clipboard.",
     "Local providers: wl-copy on Wayland, xclip/xsel on X11, pbcopy on macOS and native Windows clipboard. Commands have a three-second deadline. Clipboard text is limited to 16 MiB.",
     "SSH sends OSC 52 to the terminal-side clipboard. Local OSC 52 fallback requires clipboard.osc52_fallback = true. Sent does not mean accepted; the terminal may refuse it. Limit: 74,991 UTF-8 bytes. Zellij uses standard framing; tmux needs set-clipboard on and outer terminal support. GNU screen and dumb/unknown terminals are unsupported.",
@@ -50,21 +55,13 @@ pub struct Snapshot {
     pane: usize,
     path: PathBuf,
     context: u64,
-    directory: Entry,
-    physical_directory: Option<Entry>,
+    directory: Directory,
     highlighted: Option<Entry>,
     marked: Vec<Entry>,
     bases: base::Bases,
 }
 
 pub type Workflow = Flow<Snapshot, Completion<Snapshot>>;
-
-/// Fully validated batch, ready for one asynchronous clipboard write.
-#[derive(Debug)]
-pub struct CopyRequest {
-    pub text: String,
-    pub scope: String,
-}
 
 pub fn open(app: &App, trigger: Input) -> Result<Workflow, String> {
     let snapshot = Snapshot::capture(app)?;
@@ -136,8 +133,7 @@ impl Snapshot {
         if pane.pending.is_some() || pane.error.is_some() || !pane.path.is_absolute() {
             return Err("Wait for a valid local directory before copying paths".into());
         }
-        let directory = crate::fs::inspect(&pane.path);
-        validate_directory(pane, &directory)?;
+        let directory = Directory::capture(pane)?;
         let marked = pane
             .visible
             .iter()
@@ -155,7 +151,6 @@ impl Snapshot {
             path: pane.path.clone(),
             context: pane.context,
             directory,
-            physical_directory: pane.directory.clone(),
             highlighted: pane.current().filter(|e| e.identity.is_some()).cloned(),
             marked,
             bases: base::Bases::capture(app),
@@ -166,22 +161,16 @@ impl Snapshot {
         let pane = &app.panes[self.pane];
         self.validate_context(app)?;
         let entries = match source {
-            Source::Current => vec![self.directory.clone()],
+            Source::Current => vec![self.directory.entry()],
             Source::Highlighted => self.validate_highlight(pane)?,
             Source::Marked => self.validate_marks(app)?,
         };
-        validate_entries(&entries)?;
         Ok(entries)
     }
 
     fn validate_context(&self, app: &App) -> Result<(), String> {
-        if !self.matches_context(app)
-            || !same_entry(&self.directory, &crate::fs::inspect(&self.path))
-        {
+        if !self.matches_context(app) {
             return Err("Path-copy context changed; start again".into());
-        }
-        if let Some(directory) = &self.physical_directory {
-            validate_entries(std::slice::from_ref(directory))?;
         }
         Ok(())
     }
@@ -219,55 +208,20 @@ impl Snapshot {
     }
 }
 
-fn validate_entries(entries: &[Entry]) -> Result<(), String> {
-    if entries.is_empty()
-        || entries
-            .iter()
-            .any(|e| !same_entry(e, &crate::fs::inspect(&e.path)))
-    {
-        return Err("Selected path was removed or replaced; refresh and start again".into());
-    }
-    Ok(())
-}
-
-fn validate_directory(pane: &crate::app::Pane, directory: &Entry) -> Result<(), String> {
-    if !directory.enterable || directory.error.is_some() {
-        return Err("Current path is not a valid local directory; refresh first".into());
-    }
-    if directory.identity.is_none() {
-        return Err("Current directory identity is unavailable; refresh first".into());
-    }
-    if let Some(expected) = &pane.entry_identity
-        && !directory
-            .identity
-            .as_ref()
-            .is_some_and(|fresh| same_identity(expected, fresh))
-    {
-        return Err(
-            "Current directory was replaced; refresh or reopen it before copying paths".into(),
-        );
-    }
-    if let Some(physical) = &pane.directory {
-        validate_entries(std::slice::from_ref(physical))?;
-    }
-    Ok(())
-}
-
-/// A completed flow either queues clipboard text or confirms a session-base change.
+/// A completed flow queues frozen work for copying or setting the session base.
 pub enum Outcome {
     Copy(CopyRequest),
-    BaseSet(PathBuf),
+    BaseSet(BaseRequest),
 }
 
-/// Resolve semantic choices and validate native identities before applying an action.
+/// Validate current app state and queue frozen native work without filesystem I/O.
 pub fn complete(done: Completion<Snapshot>, app: &mut App) -> Result<Outcome, String> {
     let ids: Vec<_> = done.choices.iter().map(|choice| choice.id).collect();
     match ids.as_slice() {
         ["path-copy", base] => {
             done.context.validate_context(app)?;
             let path = done.context.bases.select(base, app)?;
-            app.relative_path_base = path.clone();
-            Ok(Outcome::BaseSet(path))
+            Ok(Outcome::BaseSet(BaseRequest::new(done.context, base, path)))
         }
         ["path-copy", source, format] => copy_request(
             done.context,
@@ -292,22 +246,15 @@ fn copy_request(
         None
     };
     let entries = snapshot.validate(app, source)?;
-    let values = entries
-        .iter()
-        .map(|entry| {
-            paths::text(
-                &SourceIdentity::Local(entry.clone()),
-                format,
-                base.map(PathBuf::as_path),
-            )
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    let text = values.join("\n");
-    if text.len() > paths::MAX_BYTES {
-        return Err("Path text exceeds the 16 MiB clipboard limit; copy fewer entries".into());
-    }
     let scope = scope(source, format, entries.len());
-    Ok(CopyRequest { text, scope })
+    Ok(CopyRequest::new(
+        entries,
+        snapshot.directory,
+        source,
+        format,
+        base.cloned(),
+        scope,
+    ))
 }
 
 fn source_choice(source: &str) -> Result<Source, String> {

@@ -1,4 +1,4 @@
-use super::{click_choice, controller, send, sequence};
+use super::{click_choice, controller, finish_base, send, sequence};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
 use std::{path::Path, sync::atomic::AtomicBool};
@@ -18,7 +18,7 @@ fn relative_completes_at_format_and_base_setting_completes_at_from() {
     let root = tempfile::tempdir().unwrap();
     let mut c = controller(root.path());
     sequence(&mut c, "ycr");
-    assert_eq!(c.path_copy_request.take().unwrap().text, ".");
+    assert_eq!(c.path_copy_request.take().unwrap().prepare().unwrap(), ".");
     assert!(c.app.footer_workflow.is_none());
     sequence(&mut c, "ys");
     assert!(c.path_copy_request.is_none());
@@ -45,7 +45,7 @@ fn captured_bases_persist_across_navigation_without_copying_or_changing_preferen
     navigate(&mut c, 1, &left);
     sequence(&mut c, "ycr");
     assert_eq!(
-        c.path_copy_request.take().unwrap().text,
+        c.path_copy_request.take().unwrap().prepare().unwrap(),
         Path::new("..").join("left").to_str().unwrap()
     );
     sequence(&mut c, "y");
@@ -55,12 +55,16 @@ fn captured_bases_persist_across_navigation_without_copying_or_changing_preferen
         &g,
         Default::default(),
     );
+    finish_base(&mut c);
     assert!(c.app.footer_workflow.is_none());
     assert!(c.path_copy_request.is_none());
     assert_eq!(c.app.relative_path_base, root.path());
     navigate(&mut c, 0, &right);
     sequence(&mut c, "ycr");
-    assert_eq!(c.path_copy_request.take().unwrap().text, "left");
+    assert_eq!(
+        c.path_copy_request.take().unwrap().prepare().unwrap(),
+        "left"
+    );
     assert_eq!(c.app.relative_path_base, root.path());
     assert!(!c.preferences_changed);
 }
@@ -131,7 +135,7 @@ fn mouse_base_capture_and_backtracking_set_a_base_without_a_clipboard_request() 
 }
 
 #[test]
-fn unavailable_or_invalid_opposite_base_is_disabled_for_keyboard_and_mouse() {
+fn unavailable_opposite_base_is_disabled_and_invalid_native_base_is_rejected() {
     let root = tempfile::tempdir().unwrap();
     let file = root.path().join("file");
     std::fs::write(&file, "data").unwrap();
@@ -142,12 +146,20 @@ fn unavailable_or_invalid_opposite_base_is_disabled_for_keyboard_and_mouse() {
             0 => c.app.dual = false,
             1 => c.app.panes[1].pending = Some(root.path().into()),
             2 => c.app.panes[1].error = Some("unavailable".into()),
-            3 => c.app.panes[1].path = root.path().join("missing"),
-            4 => c.app.panes[1].path = file.clone(),
+            3 => {
+                c.app.panes[1].path = root.path().join("missing");
+            }
+            4 => {
+                c.app.panes[1].path = file.clone();
+            }
             _ => c.app.panes[1].path = "relative".into(),
         }
         sequence(&mut c, "yS");
-        assert_other_disabled(&c);
+        if matches!(case, 3 | 4) {
+            assert!(c.app.footer_workflow.is_none());
+        } else {
+            assert_other_disabled(&c);
+        }
         assert_eq!(c.app.relative_path_base, root.path());
         assert!(c.path_copy_request.is_none());
         send(&mut c, KeyCode::Esc);
@@ -225,7 +237,7 @@ fn incomparable_saved_base_disables_relative_but_not_explicit_set_base() {
     assert_eq!(c.app.relative_path_base, root.path());
     assert!(c.app.footer_workflow.is_none());
     sequence(&mut c, "ycr");
-    assert_eq!(c.path_copy_request.take().unwrap().text, ".");
+    assert_eq!(c.path_copy_request.take().unwrap().prepare().unwrap(), ".");
 }
 
 #[test]
@@ -268,5 +280,27 @@ fn copy_path_header_and_from_stage_ignore_old_navigation_keys() {
     }
     send(&mut c, KeyCode::Backspace);
     assert!(c.app.footer_workflow.is_none());
+    assert!(c.path_copy_request.is_none());
+}
+
+#[test]
+fn opposite_base_result_cannot_apply_after_late_navigation() {
+    let root = tempfile::tempdir().unwrap();
+    let child = root.path().join("child");
+    std::fs::create_dir(&child).unwrap();
+    let mut c = controller(root.path());
+    c.app.dual = true;
+    navigate(&mut c, 1, &child);
+    sequence(&mut c, "y");
+    let g = ui::geometry(&c.app, Rect::new(0, 0, 120, 24));
+    c.handle(
+        Event::Key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::SHIFT)),
+        &g,
+        Default::default(),
+    );
+    let validated = c.path_base_request.take().unwrap().prepare().unwrap();
+    navigate(&mut c, 1, root.path());
+    assert!(validated.apply(&mut c.app).is_err());
+    assert_eq!(c.app.relative_path_base, root.path());
     assert!(c.path_copy_request.is_none());
 }
