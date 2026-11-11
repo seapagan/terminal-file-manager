@@ -66,3 +66,65 @@ fn explicit_and_automatic_restore_keep_the_saved_base_instead_of_cwd() {
         );
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn explicit_and_automatic_restore_work_from_a_deleted_cwd() {
+    use terminal_file_manager::{app::App, session::SessionStore, settings::Settings};
+    let root = tempfile::tempdir().unwrap();
+    let store = SessionStore {
+        path: root.path().join("config/tfm/session.toml"),
+    };
+    let mut app = App::new(root.path().to_owned());
+    app.relative_path_base = root.path().join("saved-base");
+    store.save(&app).unwrap();
+    for explicit in [true, false] {
+        let deleted = root.path().join("deleted-cwd");
+        std::fs::create_dir(&deleted).unwrap();
+        if !explicit {
+            std::fs::write(
+                root.path().join("config/tfm/config.toml"),
+                "restore_session=true",
+            )
+            .unwrap();
+        }
+        let mut command = deleted_cwd_command(root.path(), &deleted);
+        if explicit {
+            command.arg("--restore-session");
+        }
+        let output = command.arg("--save-session").output().unwrap();
+        assert!(!deleted.exists());
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let restored = store.load().unwrap().restore(&Settings::default()).unwrap();
+        assert_eq!(restored.panes[0].path, root.path());
+        assert_eq!(restored.panes[1].path, root.path());
+        assert_eq!(restored.relative_path_base, app.relative_path_base);
+    }
+}
+
+#[cfg(unix)]
+fn deleted_cwd_command(root: &std::path::Path, cwd: &std::path::Path) -> std::process::Command {
+    let isolated = isolated_session_command(root);
+    let mut command = std::process::Command::new("sh");
+    command
+        .current_dir(cwd)
+        .args([
+            "-c",
+            "rmdir \"$1\" || exit; shift; exec \"$@\"",
+            "tfm-deleted-cwd",
+        ])
+        .arg(cwd)
+        .arg(isolated.get_program());
+    for (key, value) in isolated.get_envs() {
+        if let Some(value) = value {
+            command.env(key, value);
+        } else {
+            command.env_remove(key);
+        }
+    }
+    command
+}

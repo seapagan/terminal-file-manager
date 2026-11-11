@@ -29,7 +29,6 @@ fn startup_parent_and_history_use_normalized_explicit_locations() {
     let mut app = startup.prepare(&Settings::default()).unwrap();
     assert_eq!(app.panes[0].path, start);
     assert_eq!(app.panes[1].path, start);
-    assert_eq!(app.launch_directory.as_ref(), Some(&start));
     assert_eq!(app.relative_path_base, start);
     let initial = app.request_listing(0, app.panes[0].path.clone());
     install(&mut app, &initial);
@@ -127,7 +126,7 @@ fn startup_base_uses_first_explicit_directory_or_process_cwd() {
         }
         .prepare(&Settings::default())
         .unwrap();
-        assert_eq!(app.launch_directory.as_ref(), Some(&first));
+        assert_eq!(app.relative_path_base, first);
     }
     let relative = Startup {
         paths: vec![".".into()],
@@ -140,5 +139,18 @@ fn startup_base_uses_first_explicit_directory_or_process_cwd() {
         std::env::current_dir().unwrap()
     );
     let app = Startup::default().prepare(&Settings::default()).unwrap();
-    assert_eq!(app.launch_directory, Some(std::env::current_dir().unwrap()));
+    assert_eq!(app.relative_path_base, std::env::current_dir().unwrap());
+}
+
+#[test]
+fn too_many_startup_paths_fail_before_validating_the_first_path() {
+    let root = tempfile::tempdir().unwrap();
+    let startup = Startup {
+        paths: vec![root.path().join("missing"); 3],
+        ..Startup::default()
+    };
+    assert_eq!(
+        startup.prepare(&Settings::default()).err().unwrap(),
+        "at most two directory paths are supported"
+    );
 }

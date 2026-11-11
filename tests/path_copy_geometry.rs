@@ -66,7 +66,6 @@ fn assert_selected_style(c: &Controller, g: &ui::Geometry, width: u16, level: Co
 fn active_resize_preserves_choice_and_scroll_even_at_zero_height_and_clipped_keyboard_completion() {
     let root = tempfile::tempdir().unwrap();
     let mut app = app(root.path());
-    app.launch_directory = Some(root.path().into());
     app.panes[0].scroll = 7;
     let mut c = Controller::new(
         app,
@@ -113,7 +112,6 @@ fn active_resize_preserves_choice_and_scroll_even_at_zero_height_and_clipped_key
 
 fn lifecycle(root: &std::path::Path, width: u16, dual: bool, maximized: bool) {
     let mut app = app(root);
-    app.launch_directory = Some(root.into());
     app.dual = dual;
     app.maximized = maximized;
     app.sidebar = true;
