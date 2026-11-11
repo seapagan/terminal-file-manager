@@ -56,3 +56,6 @@ impl Directory {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -18,7 +18,11 @@ fn flow() -> Flow<usize, (usize, Vec<Input>, Vec<&'static str>)> {
                     Choice::new("disabled", 'd', ["Disabled", "Off", "Off"])
                         .disabled("Unavailable"),
                     Choice::new("first", 'a', ["First", "First", "A"]),
-                    Choice::new("second", 'b', ["Second界", "Second界", "B界"]),
+                    Choice::new(
+                        "second",
+                        'b',
+                        ["Second界e\u{301}", "Second界e\u{301}", "B界e\u{301}"],
+                    ),
                 ],
                 "disabled",
             ),
@@ -78,7 +82,7 @@ fn dummy_callback_gets_physical_detour_and_only_final_semantic_path_once() {
 }
 
 #[test]
-fn defaults_repeats_modifiers_and_cancel_never_activate_disabled_choices() {
+fn repeats_and_modified_choices_preserve_default_until_enter_and_escape_cancels() {
     let mut flow = flow();
     let mut repeated = KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
     repeated.kind = KeyEventKind::Repeat;
@@ -365,3 +369,33 @@ fn activation_revalidates_consumer_availability_and_falls_back_to_an_enabled_def
 
 #[path = "footer_workflow/early_completion.rs"]
 mod early_completion;
+
+#[path = "footer_workflow/input_limit.rs"]
+mod input_limit;
+
+#[test]
+fn malformed_choice_ids_and_shortcuts_are_rejected_before_activation() {
+    for choices in [
+        vec![Choice::new("first", '1', ["First"; 3])],
+        vec![
+            Choice::new("same", 'a', ["First"; 3]),
+            Choice::new("same", 'b', ["Second"; 3]),
+        ],
+        vec![
+            Choice::new("first", 'a', ["First"; 3]),
+            Choice::new("second", 'a', ["Second"; 3]),
+        ],
+    ] {
+        assert!(
+            Flow::new(
+                "dummy",
+                "DUMMY",
+                key(KeyCode::Char('x')),
+                (),
+                vec![Stage::new("Start", choices, "first")],
+                |_| panic!("invalid workflow must never activate"),
+            )
+            .is_err()
+        );
+    }
+}

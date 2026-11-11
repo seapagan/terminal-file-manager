@@ -1,6 +1,9 @@
 //! Clock-free staged footer commands, independent of consumer context and effects.
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
+/// Maximum retained physical inputs per flow, including its activation event.
+pub const MAX_INPUTS: usize = 1024;
+
 /// A measured mouse affordance retains semantic identity rather than fabricating a key.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Target {
@@ -107,6 +110,7 @@ pub struct Resolved {
 /// Owned callback data cannot outlive a cancelled flow or execute twice.
 pub struct Completion<C> {
     pub context: C,
+    /// Complete chronological history, including activation and unsupported events.
     pub inputs: Vec<Input>,
     pub choices: Vec<Resolved>,
 }
@@ -116,6 +120,8 @@ pub enum Progress<O> {
     Active,
     Disabled(String),
     Cancelled,
+    /// Terminal failure: the next event would exceed [`MAX_INPUTS`]. No callback runs.
+    InputLimitExceeded,
     Complete(O),
     Inactive,
 }
@@ -196,9 +202,16 @@ impl<C, O> Flow<C, O> {
     }
 
     /// Every event is consumed by the caller while active, even when unsupported.
+    /// At most [`MAX_INPUTS`] events, including activation, are retained. A further
+    /// event terminates the flow with [`Progress::InputLimitExceeded`], drops the
+    /// context and callback, and cannot complete with truncated input history.
     pub fn input(&mut self, input: Input) -> Progress<O> {
         if self.handler.is_none() {
             return Progress::Inactive;
+        }
+        if self.inputs.len() == MAX_INPUTS {
+            self.cancel();
+            return Progress::InputLimitExceeded;
         }
         self.inputs.push(input.clone());
         let target = match input {

@@ -35,6 +35,10 @@ fn check_layout(width: u16, level: colored_text::ColorLevel) {
             usize::from(control.area.width),
             ratatui::text::Line::raw(&control.label).width()
         );
+        assert_eq!(
+            rendered_text(control, terminal.backend().buffer()),
+            control.label
+        );
         for x in control.area.x..control.area.right() {
             assert_eq!(
                 layout.hit(x, area.y),
@@ -49,6 +53,67 @@ fn check_layout(width: u16, level: colored_text::ColorLevel) {
     for x in 0..width + 6 {
         assert!(layout.hit(x, 1).is_none());
         assert!(layout.hit(x, 3).is_none());
+    }
+}
+
+fn rendered_text(control: &Control, buffer: &ratatui::buffer::Buffer) -> String {
+    let mut text = String::new();
+    let mut x = control.area.x;
+    while x < control.area.right() {
+        let symbol = buffer[(x, control.area.y)].symbol();
+        text.push_str(symbol);
+        x += u16::try_from(ratatui::text::Line::raw(symbol).width().max(1)).unwrap();
+    }
+    text
+}
+
+#[test]
+fn unicode_choice_renders_wide_and_combining_glyphs_without_losing_label_text() {
+    let mut flow = super::flow();
+    flow.input(super::key(crossterm::event::KeyCode::Char('b')));
+    flow.input(super::key(crossterm::event::KeyCode::Backspace));
+    let layout = workflow::layout(&flow, Rect::new(0, 0, 160, 1));
+    let choice = layout
+        .controls
+        .iter()
+        .find(|c| c.target == Some(Target::Choice("second")))
+        .unwrap();
+    assert_eq!(choice.label, "[b Second界e\u{301}]");
+    let mut terminal = Terminal::new(TestBackend::new(160, 1)).unwrap();
+    terminal
+        .draw(|frame| {
+            workflow::render(
+                frame,
+                &layout,
+                &Theme::new(colored_text::ColorLevel::NoColor),
+            )
+        })
+        .unwrap();
+    assert_eq!(
+        rendered_text(choice, terminal.backend().buffer()),
+        "[b Second界e\u{301}]"
+    );
+}
+
+#[test]
+fn navigation_space_is_reserved_before_optional_title_and_choices() {
+    let mut flow = super::flow();
+    flow.input(super::key(crossterm::event::KeyCode::Enter));
+    for width in 3..=120 {
+        let layout = workflow::layout(&flow, Rect::new(3, 2, width, 1));
+        let cancel = layout
+            .controls
+            .iter()
+            .find(|c| c.target == Some(Target::Cancel))
+            .expect("Esc fits");
+        assert_eq!(layout.hit(cancel.area.x, 2), Some(Target::Cancel));
+        assert_eq!(
+            layout
+                .controls
+                .iter()
+                .any(|c| c.target == Some(Target::Back)),
+            width >= 13
+        );
     }
 }
 

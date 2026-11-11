@@ -601,6 +601,13 @@ selected choices retain bold/reverse emphasis, unselected brackets use Muted and
 disabled choices use Disabled. Higher input owners invalidate
 the flow before the next draw; global toast dismissal retains priority.
 
+The engine retains at most 1,024 physical inputs, including activation, for its
+completion callback. A successful callback receives the complete ordered history.
+The next event after the limit cancels with an explicit error and no callback;
+the engine does not truncate a successful history. Backspace at the root cancels.
+The renderer reserves the Esc mouse target when at least three cells are available,
+and Backspace plus Esc when a non-root stage has at least thirteen cells.
+
 The path-copy consumer presents Copy Path / From and captures the originating
 pane, native highlighted and
 visible marked identities, current directory and relative reference. Startup
@@ -623,6 +630,12 @@ the UI rechecks pane context before applying a validated base result. Lexical
 relative paths never follow symlinks or cross incomparable roots. Capturing the
 opposite pane works while
 maximised or hidden. Subsequent navigation cannot change a captured base.
+Normal path components retain exact case during lexical relative-path comparison.
+Windows supports per-directory case sensitivity, and macOS volumes may be case
+sensitive. Global case folding could therefore select a different path. TFM keeps
+exact component comparison without filesystem queries; paths can be non-minimal
+on case-insensitive filesystems. Windows drive-prefix comparison remains unchanged.
+
 Existing session saves persist native path units; explicit/automatic restoration
 uses that path, with the first restored pane as the fallback for older sessions.
 Ordinary exit does not save it.

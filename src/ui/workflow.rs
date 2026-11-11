@@ -54,13 +54,27 @@ pub fn layout<C, O>(flow: &Flow<C, O>, area: Rect) -> Layout {
     } else {
         format!("{} / {}", flow.label, flow.stage().label)
     };
+    let navigation_width = if flow.can_back() && area.width >= 13 {
+        13
+    } else {
+        3
+    };
+    let optional = Rect {
+        width: area.width.saturating_sub(navigation_width + 1),
+        ..area
+    };
     let mut x = area.x;
-    append(&mut layout, &mut x, area, title, None, true, false);
-    choices(&mut layout, &mut x, area, flow, tier);
-    if flow.can_back() {
+    append(&mut layout, &mut x, optional, title, None, true, false);
+    choices(&mut layout, &mut x, optional, flow, tier);
+    navigation(&mut layout, &mut x, area, flow.can_back());
+    layout
+}
+
+fn navigation(layout: &mut Layout, x: &mut u16, area: Rect, can_back: bool) {
+    if can_back && area.width >= 13 {
         append(
-            &mut layout,
-            &mut x,
+            layout,
+            x,
             area,
             "Backspace".into(),
             Some(Target::Back),
@@ -69,15 +83,14 @@ pub fn layout<C, O>(flow: &Flow<C, O>, area: Rect) -> Layout {
         );
     }
     append(
-        &mut layout,
-        &mut x,
+        layout,
+        x,
         area,
         "Esc".into(),
         Some(Target::Cancel),
         true,
         false,
     );
-    layout
 }
 
 fn choices<C, O>(layout: &mut Layout, x: &mut u16, area: Rect, flow: &Flow<C, O>, tier: usize) {

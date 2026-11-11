@@ -11,7 +11,6 @@ use terminal_file_manager::{
 
 fn controller(root: &Path) -> Controller {
     let mut app = App::new(root.into());
-    app.launch_directory = Some(root.into());
     for pane in 0..2 {
         let snapshot = fs::list(root, &Default::default(), &AtomicBool::new(false)).unwrap();
         app.complete_listing(pane, 1, Ok(snapshot));
@@ -148,8 +147,7 @@ fn snapshot_accepts_refresh_but_rejects_replaced_native_selection() {
 #[test]
 fn activation_waits_for_cached_identity_and_first_listing_enables_copy() {
     let root = tempfile::tempdir().unwrap();
-    let mut app = App::new(root.path().into());
-    app.launch_directory = Some(root.path().into());
+    let app = App::new(root.path().into());
     let mut c = Controller::new(
         app,
         Bindings::new(&Default::default()).unwrap(),
@@ -249,7 +247,8 @@ fn unknown_modified_repeated_and_mouse_inputs_preserve_ownership_and_write_once(
         click_choice(&mut c, target, bounds);
     }
     assert!(c.app.footer_workflow.is_none());
-    assert!(c.path_copy_request.take().is_some());
+    let request = c.path_copy_request.take().unwrap();
+    assert_eq!(request.prepare().unwrap(), root.path().to_str().unwrap());
     let g = ui::geometry(&c.app, bounds);
     let mut repeat = KeyEvent::new(KeyCode::Char('f'), KeyModifiers::NONE);
     repeat.kind = KeyEventKind::Repeat;
@@ -268,6 +267,7 @@ fn navigation_and_modal_ownership_invalidate_before_next_frame_without_stale_cal
     assert!(c.path_copy_request.is_none());
     c.app.panes[0].pending = None;
     sequence(&mut c, "yc");
+    assert!(c.app.footer_workflow.is_some());
     c.app.popup = true;
     assert!(c.reconcile_footer());
     assert!(c.app.footer_workflow.is_none());
@@ -323,13 +323,12 @@ fn non_unicode_native_entry_rejects_the_entire_marked_batch() {
 }
 
 #[test]
-fn launch_base_is_stable_and_lexical_relative_paths_handle_roots_and_parent_segments() {
+fn session_base_is_stable_and_lexical_relative_paths_handle_roots_and_parent_segments() {
     use terminal_file_manager::path_copy::relative;
     let root = tempfile::tempdir().unwrap();
     let base = root.path().join("base");
     std::fs::create_dir(&base).unwrap();
     let mut c = controller(root.path());
-    c.app.launch_directory = Some(base.clone());
     c.app.relative_path_base = base.clone();
     sequence(&mut c, "ycr");
     assert_eq!(c.path_copy_request.take().unwrap().prepare().unwrap(), "..");
@@ -463,6 +462,9 @@ fn directory_symlink_preserves_lexical_spelling_and_rejects_retargeting() {
     std::os::unix::fs::symlink("second", &link).unwrap();
     assert!(request.prepare().is_err());
 }
+
+#[path = "path_copy/review_regressions.rs"]
+mod review_regressions;
 
 #[path = "path_copy/session_base.rs"]
 mod session_base;

@@ -123,6 +123,13 @@ fn transition(c: &mut Controller, input: Input) {
             }
         }
         Progress::Cancelled | Progress::Inactive => c.app.footer_workflow = None,
+        Progress::InputLimitExceeded => {
+            c.app.footer_workflow = None;
+            c.app.notify(
+                crate::notifications::Severity::Error,
+                "Footer workflow cancelled: input history limit exceeded",
+            );
+        }
         Progress::Disabled(reason) => c.app.status = reason.into(),
         Progress::Active => {}
     }

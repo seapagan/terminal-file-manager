@@ -7,8 +7,9 @@ name/path-copy consumer. Two-stage `y → m/h/c → n/r/f` copying, immediate
 From-stage base actions, contextual Enter defaults, Backspace/Esc, mouse choices, effective
 bindings and detailed Help use the existing browser geometry and status owners.
 Copy Path / From presents bracketed options, including c Current folder; direct
-letters and Enter activate choices. Arrow and Tab keys do not navigate the workflow. Ctrl+c Quit and direct
-F5/F6 operations retain their established ordinary-browser behavior.
+letters and Enter activate choices. Arrow and Tab keys do not navigate the workflow.
+An open workflow consumes Ctrl+c, F5 and F6 without quitting or starting file
+operations; those bindings resume their ordinary-browser behavior after it closes.
 
 Native source snapshots, visible-mark order, fixed session-relative bases,
 Unicode/control validation and all-or-nothing text precede
@@ -29,7 +30,8 @@ outcomes, blocked and disabled conditional stages,
 bracket styling and mouse hitboxes, modifier-sensitive shortcuts,
 startup/session compatibility, base capture and navigation persistence,
 a non-clipboard consumer, ordered physical and semantic history, one-shot
-callbacks, source/default rules, stale identities,
+callbacks, bounded ordered input history with explicit overflow cancellation,
+source/default rules, stale identities,
 relative bases, literal payloads, one-row geometry, theme emphasis, input
 ownership, provider/fallback failures, bounded I/O and asynchronous outcomes.
 Review regressions cover 40,000 marked entries, frozen order and bases, stale
