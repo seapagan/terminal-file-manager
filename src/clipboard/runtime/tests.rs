@@ -191,6 +191,8 @@ fn stale_last_mark_rejects_the_entire_batch_before_provider_or_terminal_output()
 #[test]
 fn inspection_errors_with_identity_evidence_cannot_write_clipboard_text() {
     let root = root();
+    let reached = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let provider_reached = reached.clone();
     let mut runtime = Runtime::default();
     runtime
         .start_inspecting(
@@ -200,10 +202,17 @@ fn inspection_errors_with_identity_evidence_cannot_write_clipboard_text() {
                 entry.error = Some("metadata unavailable".into());
                 entry
             },
-            |_| panic!("failed validation must never reach provider"),
+            move |_| {
+                provider_reached.store(true, std::sync::atomic::Ordering::SeqCst);
+                Err(ClipboardError("provider was reached".into()))
+            },
         )
         .unwrap();
-    assert!(wait(&mut runtime, &mut Vec::new()).is_err());
+    assert_eq!(
+        wait(&mut runtime, &mut Vec::new()).unwrap_err(),
+        "Current directory was removed or replaced; refresh and start again"
+    );
+    assert!(!reached.load(std::sync::atomic::Ordering::SeqCst));
 }
 
 #[test]

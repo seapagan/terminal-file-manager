@@ -1,5 +1,5 @@
 //! Clipboard provider routing adapted from seapagan/git-diff-out.
-use std::{env, error::Error, ffi::OsStr, fmt, fs::OpenOptions, io::Write, path::Path};
+use std::{env, error::Error, ffi::OsStr, fmt};
 
 const OSC52_MAX_BYTES: usize = 74_991;
 const MAX_BYTES: usize = 16 * 1024 * 1024;
@@ -179,28 +179,6 @@ pub(crate) fn encode_osc52(payload: &[u8]) -> Result<Vec<u8>, ClipboardError> {
     Ok(encoded)
 }
 
-fn write_osc52(payload: &[u8], terminal: &mut dyn Write) -> Result<(), ClipboardError> {
-    let sequence = encode_osc52(payload)?;
-    terminal
-        .write_all(&sequence)
-        .and_then(|()| terminal.flush())
-        .map_err(|error| {
-            ClipboardError(format!(
-                "cannot write OSC 52 to the controlling terminal: {error}"
-            ))
-        })
-}
-
-fn write_osc52_path(path: &Path, payload: &[u8]) -> Result<(), ClipboardError> {
-    let mut terminal = OpenOptions::new().write(true).open(path).map_err(|error| {
-        ClipboardError(format!(
-            "cannot open a controlling terminal for OSC 52 at '{}': {error}",
-            path.display()
-        ))
-    })?;
-    write_osc52(payload, &mut terminal)
-}
-
 #[cfg(any(windows, test))]
 fn clipboard_text(payload: &[u8]) -> Result<&str, ClipboardError> {
     let text = std::str::from_utf8(payload).map_err(|error| {
@@ -272,16 +250,8 @@ fn copy_with_fallback(
 }
 
 fn copy_with_backend(backend: Backend, payload: &[u8]) -> Result<(), ClipboardError> {
-    copy_with_backend_at(backend, payload, controlling_terminal())
-}
-
-fn copy_with_backend_at(
-    backend: Backend,
-    payload: &[u8],
-    terminal: &Path,
-) -> Result<(), ClipboardError> {
     match backend {
-        Backend::Osc52 => write_osc52_path(terminal, payload),
+        Backend::Osc52 => unreachable!("OSC 52 is encoded for the terminal owner"),
         Backend::WlCopy | Backend::Xclip | Backend::Xsel | Backend::Pbcopy => {
             let (program, args) = provider_spec(backend);
             run_provider(program, program, args, payload)
@@ -349,16 +319,6 @@ fn current_platform() -> Platform {
     } else {
         Platform::Linux
     }
-}
-
-#[cfg(windows)]
-fn controlling_terminal() -> &'static Path {
-    Path::new("CONOUT$")
-}
-
-#[cfg(not(windows))]
-fn controlling_terminal() -> &'static Path {
-    Path::new("/dev/tty")
 }
 
 #[cfg(not(windows))]

@@ -7,7 +7,10 @@ use nix::{
 };
 use std::{
     io::{Read, Write},
-    os::{fd::AsFd, unix::process::CommandExt},
+    os::{
+        fd::AsFd,
+        unix::process::{CommandExt, ExitStatusExt},
+    },
     process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio},
     time::{Duration, Instant},
 };
@@ -38,12 +41,45 @@ fn run_with_deadline(
         .map_err(|e| ClipboardError(format!("cannot start clipboard provider '{name}': {e}")))?;
     let result = drive(name, &mut child, payload, Instant::now() + timeout);
     if result.is_err() {
-        // Only the dedicated provider group is terminated; successful clipboard daemons remain alive.
-        let _ = killpg(Pid::from_raw(child.id() as i32), Signal::SIGKILL);
-        let _ = child.kill();
+        let _ = terminate(&mut child);
     }
     let _ = child.wait();
     result
+}
+
+// WNOWAIT retains the leader PID until failure cleanup has signalled its group.
+fn observe_exit(child: &Child) -> std::io::Result<Option<std::process::ExitStatus>> {
+    use rustix::process::{Pid, WaitId, WaitIdOptions, waitid};
+    let options = WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT;
+    loop {
+        match waitid(
+            WaitId::Pid(Pid::from_raw(child.id() as i32).expect("child PID")),
+            options,
+        ) {
+            Ok(status) => {
+                return Ok(status.map(|status| {
+                    let raw = status.exit_status().map_or_else(
+                        || {
+                            status.terminating_signal().expect("terminal waitid status")
+                                | if status.dumped() { 0x80 } else { 0 }
+                        },
+                        |code| code << 8,
+                    );
+                    std::process::ExitStatus::from_raw(raw)
+                }));
+            }
+            Err(rustix::io::Errno::INTR) => continue,
+            Err(error) => return Err(error.into()),
+        }
+    }
+}
+
+fn terminate(child: &mut Child) -> std::io::Result<()> {
+    // An already-reaped child no longer owns its PID; never signal that group.
+    observe_exit(child)?;
+    let _ = killpg(Pid::from_raw(child.id() as i32), Signal::SIGKILL);
+    let _ = child.kill();
+    Ok(())
 }
 
 fn drive(
@@ -59,7 +95,7 @@ fn drive(
             ClipboardError(format!("cannot write to clipboard provider '{name}': {e}"))
         })?;
         pipes.read()?;
-        if let Some(status) = child.try_wait().map_err(|e| {
+        if let Some(status) = observe_exit(child).map_err(|e| {
             ClipboardError(format!("cannot wait for clipboard provider '{name}': {e}"))
         })? {
             pipes.read()?;
@@ -208,75 +244,4 @@ fn read_available(pipe: &mut impl Read, output: &mut Vec<u8>) -> Result<(), Clip
 }
 
 #[cfg(all(test, unix))]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn nonreading_provider_times_out_while_payload_exceeds_pipe_capacity() {
-        let error = run_with_deadline(
-            "hung",
-            "/bin/sh",
-            &["-c", "exec sleep 30"],
-            &vec![b'x'; 1024 * 1024],
-            Duration::from_millis(100),
-        )
-        .unwrap_err();
-        assert!(error.to_string().contains("timed out"));
-    }
-
-    #[test]
-    fn provider_receives_the_entire_maximum_payload_through_pipe_backpressure() {
-        let root = tempfile::tempdir().unwrap();
-        let output = root.path().join("clipboard.txt");
-        let payload = vec![b'x'; super::super::MAX_BYTES];
-        run_provider(
-            "large",
-            "/bin/sh",
-            &["-c", "cat > \"$1\"", "sh", output.to_str().unwrap()],
-            &payload,
-        )
-        .unwrap();
-        assert_eq!(std::fs::read(output).unwrap(), payload);
-    }
-
-    #[test]
-    fn unexpected_output_is_captured_instead_of_printed_over_the_tui() {
-        let error = run_provider(
-            "noisy",
-            "/bin/sh",
-            &["-c", "cat >/dev/null; printf '\\033[31mnoisy'"],
-            b"literal",
-        )
-        .unwrap_err();
-        assert!(error.to_string().contains("unexpected output"));
-        let error = run_provider(
-            "noisy",
-            "/bin/sh",
-            &["-c", "cat >/dev/null; head -c 9000 /dev/zero"],
-            b"literal",
-        )
-        .unwrap_err();
-        assert!(error.to_string().contains("8192"));
-    }
-
-    #[test]
-    fn successful_daemon_parent_does_not_wait_for_inherited_output_pipe_eof() {
-        let root = tempfile::tempdir().unwrap();
-        let pid_file = root.path().join("daemon.pid");
-        let result = run_with_deadline(
-            "daemon",
-            "/bin/sh",
-            &[
-                "-c",
-                "cat >/dev/null; sleep 30 >/dev/null & printf '%s' \"$!\" > \"$1\"",
-                "sh",
-                pid_file.to_str().unwrap(),
-            ],
-            b"text",
-            Duration::from_secs(3),
-        );
-        let pid: i32 = std::fs::read_to_string(pid_file).unwrap().parse().unwrap();
-        let _ = nix::sys::signal::kill(Pid::from_raw(pid), Signal::SIGKILL);
-        assert!(result.is_ok(), "{result:?}");
-    }
-}
+mod tests;

@@ -1,7 +1,4 @@
-use super::{
-    Backend, Platform, Selection, clipboard_text, copy_with_backend_at, encode_osc52,
-    select_backend, write_osc52, write_osc52_path,
-};
+use super::{Backend, Platform, Selection, clipboard_text, encode_osc52, select_backend};
 
 fn local_linux() -> Selection {
     Selection {
@@ -136,40 +133,6 @@ fn osc52_encodes_arbitrary_utf8_for_the_standard_clipboard() {
     );
 }
 
-#[test]
-fn osc52_writes_only_to_the_supplied_terminal() {
-    let mut terminal = Vec::new();
-    write_osc52(b"diff\n", &mut terminal).unwrap();
-
-    assert_eq!(terminal, b"\x1b]52;c;ZGlmZgo=\x1b\\");
-}
-
-#[test]
-fn osc52_reports_a_missing_controlling_terminal() {
-    let error = write_osc52_path(
-        std::path::Path::new("/definitely/missing/gd-controlling-terminal"),
-        b"diff",
-    )
-    .unwrap_err()
-    .to_string();
-
-    assert!(error.contains("controlling terminal"), "{error}");
-}
-
-#[test]
-fn osc52_backend_writes_the_exact_sequence_to_a_terminal_path() {
-    let temp = tempfile::tempdir().unwrap();
-    let terminal = temp.path().join("terminal");
-    std::fs::write(&terminal, []).unwrap();
-
-    copy_with_backend_at(Backend::Osc52, b"diff\n", &terminal).unwrap();
-
-    assert_eq!(
-        std::fs::read(terminal).unwrap(),
-        b"\x1b]52;c;ZGlmZgo=\x1b\\"
-    );
-}
-
 pub(super) struct FailingWriter;
 
 impl std::io::Write for FailingWriter {
@@ -180,18 +143,6 @@ impl std::io::Write for FailingWriter {
     fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }
-}
-
-#[test]
-fn osc52_reports_terminal_write_failures() {
-    let error = write_osc52(b"diff", &mut FailingWriter)
-        .unwrap_err()
-        .to_string();
-
-    assert_eq!(
-        error,
-        "cannot write OSC 52 to the controlling terminal: terminal failed"
-    );
 }
 
 #[test]
@@ -208,7 +159,7 @@ fn windows_text_conversion_rejects_invalid_utf8_and_embedded_nul() {
 #[cfg(windows)]
 #[test]
 fn windows_backend_rejects_invalid_utf8_before_clipboard_access() {
-    let error = copy_with_backend_at(Backend::Windows, &[0xff], std::path::Path::new("unused"))
+    let error = super::copy_with_backend(Backend::Windows, &[0xff])
         .unwrap_err()
         .to_string();
 
@@ -217,12 +168,8 @@ fn windows_backend_rejects_invalid_utf8_before_clipboard_access() {
 
 #[cfg(windows)]
 #[test]
-fn windows_runtime_uses_the_native_platform_and_console() {
+fn windows_runtime_selects_the_native_platform() {
     assert_eq!(super::current_platform(), Platform::Windows);
-    assert_eq!(
-        super::controlling_terminal(),
-        std::path::Path::new("CONOUT$")
-    );
 }
 
 #[test]
