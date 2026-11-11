@@ -18,7 +18,7 @@ use crate::{
     workflow::{Choice, Completion, Flow, Input, Stage},
 };
 pub use paths::relative;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -196,11 +196,15 @@ impl Snapshot {
 
     fn validate_marks(&self, app: &App) -> Result<Vec<Entry>, String> {
         let pane = &app.panes[self.pane];
+        let visible: HashMap<_, _> = pane
+            .visible
+            .iter()
+            .map(|i| (&pane.entries[*i].path, &pane.entries[*i]))
+            .collect();
         for entry in &self.marked {
-            let visible = pane
-                .visible
-                .iter()
-                .any(|i| same_entry(entry, &pane.entries[*i]));
+            let visible = visible
+                .get(&entry.path)
+                .is_some_and(|fresh| same_entry(entry, fresh));
             if !visible
                 || !entry
                     .identity
@@ -352,3 +356,6 @@ fn same_identity(a: &Identity, b: &Identity) -> bool {
         _ => a == b,
     }
 }
+
+#[cfg(test)]
+mod tests;
