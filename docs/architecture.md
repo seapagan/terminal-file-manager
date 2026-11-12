@@ -527,7 +527,10 @@ merged as `41a913e`, subsequently narrowed notification delivery to noteworthy
 events. PM3-06 path navigation is complete through
 [PR #13](https://github.com/seapagan/terminal-file-manager/pull/13), merged as
 `56bf891`; its [acceptance record](acceptance.md#pm3-06-accepted-and-merged--8-november-2026)
-records the final feature-head verification. PM3-07 provides OS path-text copying.
+records the final feature-head verification. PM3-07 OS path-text copying is complete
+through [PR #14](https://github.com/seapagan/terminal-file-manager/pull/14), merged
+as `7e55683`; its [acceptance record](acceptance.md#pm3-07-accepted-and-merged--12-november-2026)
+separates feature-head and merge-head proof.
 The internal file-operation clipboard is deferred indefinitely; snapshot testing
 remains deferred.
 
@@ -587,7 +590,7 @@ keys are consumed without traversal.
 Consumer predicates select relevant stages from the accepted semantic path; Back
 visits the actual stage history. Definitions require an enabled starting choice.
 If a reachable later stage has no enabled choices, the engine reports the blocked
-stage and retains the previous usable stage without accepting a partial path.
+stage and restores both stages' prior highlights without accepting a partial path.
 Consumer-marked completing choices bypass later stages and invoke the same
 one-shot callback with the accepted semantic path. The callback's generic result
 supports distinct actions without domain branching in the engine.
@@ -598,7 +601,9 @@ clipboard rules. The measured workflow renderer shares complete text-cell
 rectangles with mouse input and occupies only `Geometry.footer`. Pane/status
 allocation and scroll state remain unchanged. Choices share square brackets;
 selected choices retain bold/reverse emphasis, unselected brackets use Muted and
-disabled choices use Disabled. Higher input owners invalidate
+disabled choices use Disabled. Clicking a disabled choice returns its existing
+reason through the generic engine. Resize events reach normal viewport handling
+while the flow retains keyboard and mouse ownership. Higher input owners invalidate
 the flow before the next draw; global toast dismissal retains priority.
 
 The engine retains at most 1,024 physical inputs, including activation, for its
@@ -650,7 +655,11 @@ The clipboard router adapts git-diff-out's provider and fallback implementation
 and tests. External providers use literal stdin and bounded command/output I/O.
 One background request at a time keeps provider waits outside event processing.
 OSC52 preparation returns bytes to the terminal owner for serial emission between
-frames, and reports sent with acceptance unconfirmed. Local providers report
+frames, and reports sent with acceptance unconfirmed. Normal exit drains pending
+work for at most four seconds before terminal teardown; a blocked worker is not
+joined, and timeout/error reports remain visible after terminal restoration.
+External-provider EPIPE closes stdin while preserving stderr/exit diagnostics,
+the original deadline and failure process-group cleanup. Local providers report
 copied only after a successful invocation. Preflight failures never invoke a
 provider or clear the clipboard. Clipboard settings use the existing strict,
 atomic preference storage. In-progress workflow state never persists.

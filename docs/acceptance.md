@@ -1,6 +1,64 @@
 # Acceptance gates
 
-## PM3-07 implementation for draft review — 10 November 2026
+## PM3-07 accepted and merged — 12 November 2026
+
+PM3-07 is **Complete**. The maintainer merged
+[PR #14](https://github.com/seapagan/terminal-file-manager/pull/14) at
+**19:12:06 UTC** as
+[`7e55683`](https://github.com/seapagan/terminal-file-manager/commit/7e5568375be5d240b028f9edb3439a6bdaac8310).
+The final feature head was GPG-signed/Signed-off-by
+[`2c9516b`](https://github.com/seapagan/terminal-file-manager/commit/2c9516b8d1eb8b16f85cc79fb2453847e923a27d).
+The merge tree is identical to that feature head. The maintainer accepted the
+completed milestone by merging PR #14. Manual platform tests remain limited to
+the evidence recorded below; M3 still requires separate authorisation.
+
+### Final review dispositions
+
+The supplied DeepSeek findings led to provider process-identity/cleanup fixes,
+bounded ordered workflow history and recovery controls, stronger regressions,
+and startup/session recovery. The approved rustix 1.1.6 update resolved the
+dependency security gate. DeepSeek #3/#4 were dismissed: no session/config schema
+migration or public-release compatibility change was required.
+
+| Original Claude finding | Final disposition |
+| --- | --- |
+| #1 Resize ownership | Fixed: active workflows retain normal resize handling. |
+| #2 Pending OSC 52 on exit | Fixed: drain pending delivery before teardown with a bounded worker wait; report unconfirmed completion on timeout. |
+| #3 EPIPE diagnostics | Fixed: retain provider stderr/exit status, deadline and process-group cleanup. |
+| #4 Restored relative base | Fixed in `2c9516b`: validate existence, directory type and read access in the worker; preserve base and clipboard on failure. |
+| #5 Disabled mouse choice | Fixed generically: return the existing disabled reason. |
+| #6 Backtracking selection | Retained intentionally: Back preserves the previous selection. |
+| #7 Context exception | Removed: require exact pane-context equality. |
+| #8 Clipboard size limit | Consolidated into one authoritative constant. |
+| #9 Rejected advancement | Fixed: preserve prior highlights and accepted selections. |
+| #10 Public test APIs and source identity | Retained intentionally. |
+
+The supplied external reviews and their dispositions are recorded separately
+from GitHub approvals. GitHub reports no formal reviews or review threads for
+PR #14; no further independent-review sequence is inferred.
+
+### Verification evidence
+
+Final feature-head local verification passed full `cargo make verify`, including
+Linux Windows MSVC check/Clippy/build, in **112.92 s**: **1,161 native** and
+**1,161 instrumented** tests, with two established skips per run. Clean committed
+`cargo make verify-postcommit` passed in **68.19 s**, including full exact Rust
+**1.95.0** checks/package and strict current Rust **1.99.1** packaging, **339 files**
+each. Audit/deny passed; 30 retained Lizard advisories were inspected without
+new production hotspots or suppression changes.
+
+The feature head passed **19/19 checks** across five workflows, including
+[Rust CI 43283731938](https://github.com/seapagan/terminal-file-manager/actions/runs/43283731938).
+The merge independently passed all five push workflows. Its **16 checks** contain
+**14 successes** and two expected PR-only report skips; none failed.
+[Merge Rust CI 43287716543](https://github.com/seapagan/terminal-file-manager/actions/runs/43287716543)
+ran Linux **1,161 / 2 skipped**, macOS **1,135 / 2 skipped** and Windows
+**1,084 / 3 skipped**. Native paired LCOV/JSON and combined coverage passed:
+**96.3% lines**, with feature **19,179/19,921** and merge **19,178/19,921** covered
+lines. The feature's three Codacy checks passed with zero static annotations;
+no merge-head Codacy result is inferred from push CI.
+
+### Delivered behaviour
 
 The implementation adds reusable one-row footer workflows and their local
 name/path-copy consumer. Two-stage `y → m/h/c → n/r/f` copying, immediate
@@ -36,10 +94,18 @@ relative bases, literal payloads, one-row geometry, theme emphasis, input
 ownership, provider/fallback failures, bounded I/O and asynchronous outcomes.
 Review regressions cover 40,000 marked entries, frozen order and bases, stale
 native identities, blocked inspection, validation errors and worker failure.
-Final-head local/hosted evidence belongs to the draft PR and ignored work
-controller. Manual desktop/SSH/multiplexer clipboard acceptance and independent
-reviews remain outstanding; this implementation record grants no acceptance,
-merge, release or M3 authority.
+Final regressions also cover resize clamping, disabled-choice mouse feedback,
+failed-transition state, exact context, the shared payload limit, EPIPE diagnostics
+and bounded shutdown delivery. Relative-base tests cover valid, deleted,
+unreadable and non-directory bases, restored sessions, no provider invocation on
+failure and unchanged Name/Full copying. Native PTY/ConPTY tests prove serial OSC 52
+emission before terminal restoration.
+
+No real desktop or live SSH/Zellij/tmux clipboard receipt test is recorded.
+Fake providers and PTY/ConPTY emission tests establish the automated results above.
+These evidence limits remain separate from the maintainer's milestone acceptance.
+The internal file-operation clipboard and snapshot-testing proposal remain deferred.
+M3 requires the separate M3-GATE assessment and a new scope/branch authorisation.
 
 ## PM3-06 accepted and merged — 8 November 2026
 
@@ -51,10 +117,9 @@ The final feature head was GPG-signed/Signed-off-by
 [`7ac7fca`](https://github.com/seapagan/terminal-file-manager/commit/7ac7fca1d634421a44b2b303f8f688493e199af8)
 on `feat/pm3-06-path-navigation`, based on `151ddaef`.
 
-PM3-07 OS clipboard path copy is in **draft delivery**, authorised 9 November.
-Independent reviews, maintainer visual acceptance and merge remain outstanding.
-The internal file-operation clipboard is deferred indefinitely. M3-GATE remains
-**Not started** until PM3-07 is accepted. Earlier implementation, draft-delivery
+At this 8 November checkpoint PM3-07 was not yet implemented. Its subsequent
+accepted merge and final evidence are recorded above. The internal file-operation
+clipboard remains deferred indefinitely. Earlier implementation, draft-delivery
 and verification checkpoints below describe their recorded revisions.
 
 The synthetic `..` row remains outside filesystem entries, marking/counting and
@@ -871,9 +936,12 @@ The maintainer merged M1 in [PR #2](https://github.com/seapagan/terminal-file-ma
 on 18 October 2026 and M2 in [PR #3](https://github.com/seapagan/terminal-file-manager/pull/3)
 on 24 October 2026. Local live refresh is complete through PR #4, with Windows
 manual refresh, and PM3-01 through PM3-06 are merged. The PR #11/#12 follow-ups
-and PR #13 navigation closeout are recorded above. PM3-07 OS path-copy draft
-delivery is authorised; acceptance remains outstanding. M3–M8 cover the remaining
-application and final release.
+and PR #13 navigation closeout are recorded above. PM3-07 OS path copy is complete
+and merged through PR #14 at `7e55683`; its final review dispositions and feature/
+merge evidence appear above. M3-GATE is a separate readiness assessment, not SSH
+implementation authority. The open [Pre-M3 Windows Trash confirmation UX](../TODO.md#pre-m3-windows-trash-confirmation-ux)
+item still requires a recorded outcome or explicit deferral; this closeout does
+not silently reclassify it. M3–M8 cover the remaining application and final release.
 Genuine direct SSH-to-SSH transfer remains post-v1 work.
 
 | Checkpoint | Completed proof |
