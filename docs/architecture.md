@@ -625,7 +625,11 @@ when identity evidence is unavailable. Completion checks current pane/selection
 state using a visible-path index, then queues frozen work. The existing clipboard
 worker revalidates lexical and physical directories and selected entries without
 owner/group resolution, constructs the bounded Unicode payload and invokes a
-provider only after the whole batch passes. Base actions use the same worker;
+provider only after the whole batch passes. Relative copies also open the selected
+base directory in that worker to check existence, directory type and read access;
+failures preserve the selected base and clipboard. The lexical calculation retains
+the original native spelling, including directory links. Name and Full path do
+not validate the relative base. Base actions use the same worker;
 the UI rechecks pane context before applying a validated base result. Lexical
 relative paths never follow symlinks or cross incomparable roots. Capturing the
 opposite pane works while

@@ -154,6 +154,9 @@ or the directory you launched TFM from.
 At **From**, use `s` for this pane's folder or `Shift+s` for the other pane's
 folder in two-pane mode. Both change the base without copying.
 Wait for confirmation before using the new base.
+Relative copying requires an accessible base directory, including after restoring
+a session. If it becomes unavailable, TFM keeps the base and clipboard unchanged;
+choose another base or use Name or Full path.
 
 On Linux, clipboard copying needs `wl-copy` (Wayland) or `xclip`/`xsel` (X11).
 Clipboard access over SSH uses OSC 52 and requires terminal support;

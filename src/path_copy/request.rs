@@ -41,16 +41,7 @@ impl CopyRequest {
         self,
         mut inspect: impl FnMut(&Path) -> Entry,
     ) -> Result<String, String> {
-        self.directory.validate(&mut inspect)?;
-        if self.entries.is_empty()
-            || (self.source != Source::Current
-                && self.entries.iter().any(|entry| {
-                    let fresh = inspect(&entry.path);
-                    fresh.error.is_some() || !super::same_entry(entry, &fresh)
-                }))
-        {
-            return Err("Selected path was removed or replaced; refresh and start again".into());
-        }
+        self.validate(&mut inspect)?;
         let mut text = String::new();
         for entry in self.entries {
             let value = paths::text(
@@ -69,6 +60,34 @@ impl CopyRequest {
             text.push_str(&value);
         }
         Ok(text)
+    }
+
+    fn validate(&self, inspect: &mut impl FnMut(&Path) -> Entry) -> Result<(), String> {
+        self.directory.validate(inspect)?;
+        if self.entries.is_empty()
+            || (self.source != Source::Current
+                && self.entries.iter().any(|entry| {
+                    let fresh = inspect(&entry.path);
+                    fresh.error.is_some() || !super::same_entry(entry, &fresh)
+                }))
+        {
+            return Err("Selected path was removed or replaced; refresh and start again".into());
+        }
+        self.validate_base()
+    }
+
+    fn validate_base(&self) -> Result<(), String> {
+        if self.format == Format::Relative {
+            let base = self
+                .base
+                .as_ref()
+                .ok_or("Relative reference is unavailable")?;
+            std::fs::read_dir(base).map_err(|error| format!(
+                "Cannot read relative-path base '{}': {error}. Choose an accessible directory with Set base or Other base; selected base unchanged",
+                base.display()
+            ))?;
+        }
+        Ok(())
     }
 }
 

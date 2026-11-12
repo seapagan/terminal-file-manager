@@ -17,11 +17,19 @@ fn app(root: &std::path::Path) -> crate::app::App {
 }
 
 fn completion(app: &mut crate::app::App, source: &'static str) -> crate::path_copy::Outcome {
+    completion_as(app, source, "name")
+}
+
+fn completion_as(
+    app: &mut crate::app::App,
+    source: &'static str,
+    format: &'static str,
+) -> crate::path_copy::Outcome {
     use crate::workflow::{Input, Progress, Target};
     let mut flow = crate::path_copy::open(app, Input::Click(Target::Choice("path-copy"))).unwrap();
     let mut result = flow.input(Input::Click(Target::Choice(source)));
     if source != "current-base" && source != "opposite-base" {
-        result = flow.input(Input::Click(Target::Choice("name")));
+        result = flow.input(Input::Click(Target::Choice(format)));
     }
     let Progress::Complete(done) = result else {
         panic!("workflow completion")
@@ -359,3 +367,5 @@ fn shutdown_reports_provider_disconnect_and_terminal_write_failures() {
         assert!(!runtime.busy());
     }
 }
+
+mod relative_base;
