@@ -78,3 +78,39 @@ fn relative_paths_preserve_case_distinctions_without_filesystem_assumptions() {
         Path::new("..").join("Project/file")
     );
 }
+
+#[test]
+fn disabled_choice_mouse_click_reports_existing_reason_and_keeps_input_ownership() {
+    let root = tempfile::tempdir().unwrap();
+    let mut c = controller(root.path());
+    sequence(&mut c, "y");
+    let before = c
+        .app
+        .footer_workflow
+        .as_ref()
+        .unwrap()
+        .highlighted()
+        .unwrap()
+        .id;
+    let reason = c
+        .app
+        .footer_workflow
+        .as_ref()
+        .unwrap()
+        .stage()
+        .choices
+        .iter()
+        .find(|choice| choice.id == "opposite-base")
+        .unwrap()
+        .disabled
+        .clone()
+        .unwrap();
+    click_choice(&mut c, "opposite-base", Rect::new(0, 0, 240, 24));
+    assert_eq!(c.app.status.to_string(), reason);
+    let flow = c.app.footer_workflow.as_ref().unwrap();
+    assert_eq!(flow.stage_index(), 0);
+    assert_eq!(flow.highlighted().unwrap().id, before);
+    assert!(!c.quit);
+    assert!(c.path_copy_request.is_none());
+    assert!(c.path_base_request.is_none());
+}

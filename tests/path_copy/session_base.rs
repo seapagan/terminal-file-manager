@@ -190,7 +190,7 @@ fn assert_other_disabled(c: &Controller) {
                 ))
         })
         .unwrap();
-    assert_eq!(layout.hit(control.area.x, control.area.y), None);
+    assert_eq!(layout.hit(control.area.x, control.area.y), control.target);
 }
 
 #[test]

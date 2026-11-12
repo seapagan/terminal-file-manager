@@ -125,7 +125,7 @@ impl Snapshot {
         let pane = &app.panes[self.pane];
         app.active == self.pane
             && pane.path == self.path
-            && (pane.context == self.context || (self.context == 0 && pane.context == 1))
+            && pane.context == self.context
             && pane.pending.is_none()
             && pane.error.is_none()
     }

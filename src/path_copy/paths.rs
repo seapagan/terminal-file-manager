@@ -1,8 +1,6 @@
 use super::{Format, SourceIdentity};
 use std::path::{Component, Path, PathBuf};
 
-pub(super) const MAX_BYTES: usize = 16 * 1024 * 1024;
-
 /// Lexical native relative paths; incomparable volumes never become absolute fallbacks.
 pub fn relative(target: &Path, base: &Path) -> Result<PathBuf, String> {
     let target = components(target)?;

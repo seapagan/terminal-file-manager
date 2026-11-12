@@ -2,7 +2,7 @@
 use std::{env, error::Error, ffi::OsStr, fmt};
 
 const OSC52_MAX_BYTES: usize = 74_991;
-const MAX_BYTES: usize = 16 * 1024 * 1024;
+pub(crate) const MAX_BYTES: usize = 16 * 1024 * 1024;
 
 fn validate_payload(payload: &[u8]) -> Result<(), ClipboardError> {
     if payload.is_empty() || payload.len() > MAX_BYTES {

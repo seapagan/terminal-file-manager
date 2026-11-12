@@ -61,7 +61,7 @@ impl CopyRequest {
             if !text.is_empty() {
                 text.push('\n');
             }
-            if text.len().saturating_add(value.len()) > paths::MAX_BYTES {
+            if text.len().saturating_add(value.len()) > crate::clipboard::MAX_BYTES {
                 return Err(
                     "Path text exceeds the 16 MiB clipboard limit; copy fewer entries".into(),
                 );

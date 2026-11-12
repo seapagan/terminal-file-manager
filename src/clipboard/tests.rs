@@ -187,6 +187,7 @@ fn osc52_rejects_oversize_payloads_without_truncating() {
 
 #[test]
 fn payload_preflight_never_accepts_empty_invalid_or_oversized_text() {
+    assert!(super::validate_payload(&vec![b'x'; super::MAX_BYTES]).is_ok());
     for payload in [
         vec![],
         vec![0xff],

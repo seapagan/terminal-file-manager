@@ -29,7 +29,7 @@ impl Layout {
     pub fn hit(&self, column: u16, row: u16) -> Option<Target> {
         self.controls
             .iter()
-            .find(|c| c.enabled && c.area.contains((column, row).into()))
+            .find(|c| c.area.contains((column, row).into()))
             .and_then(|c| c.target)
     }
 }

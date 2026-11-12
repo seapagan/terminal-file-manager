@@ -272,6 +272,7 @@ impl<C, O> Flow<C, O> {
         if let Some(reason) = &choice.disabled {
             return Progress::Disabled(reason.clone());
         }
+        let previous = stage.selected;
         stage.selected = Some(index);
         self.choices.push(Resolved {
             id,
@@ -281,8 +282,11 @@ impl<C, O> Flow<C, O> {
             && let Some(next) = (self.stage + 1..self.stages.len())
                 .find(|i| self.stages[*i].available(&self.choices))
         {
+            let next_selected = self.stages[next].selected;
             if !self.stages[next].select_enabled() {
+                self.stages[next].selected = next_selected;
                 self.choices.pop();
+                self.stages[self.stage].selected = previous;
                 return Progress::Disabled(format!(
                     "No enabled choices in {}",
                     self.stages[next].label

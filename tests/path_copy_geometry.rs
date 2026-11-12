@@ -63,7 +63,7 @@ fn assert_selected_style(c: &Controller, g: &ui::Geometry, width: u16, level: Co
 }
 
 #[test]
-fn active_resize_preserves_choice_and_scroll_even_at_zero_height_and_clipped_keyboard_completion() {
+fn active_resize_clamps_view_scroll_preserves_choice_and_allows_clipped_completion() {
     let root = tempfile::tempdir().unwrap();
     let mut app = app(root.path());
     app.panes[0].scroll = 7;
@@ -77,7 +77,12 @@ fn active_resize_preserves_choice_and_scroll_even_at_zero_height_and_clipped_key
     for width in [0, 1, 2, 24, 40, 80, 120, 160] {
         for height in [0, 1, 2, 8, 24] {
             let old = ui::geometry(&c.app, Rect::new(0, 0, 120, 24));
+            c.app.overlay_scroll = u16::MAX;
+            c.app.metadata_scroll = u16::MAX;
             c.handle(Event::Resize(width, height), &old, Default::default());
+            let resized = ui::geometry(&c.app, Rect::new(0, 0, width, height));
+            assert_eq!(c.app.overlay_scroll, resized.overlay_scroll_limit);
+            assert_eq!(c.app.metadata_scroll, resized.metadata_scroll_limit);
             assert_eq!(c.app.panes[0].scroll, 7);
             assert_eq!(
                 c.app

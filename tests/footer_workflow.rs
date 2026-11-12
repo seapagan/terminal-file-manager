@@ -306,7 +306,7 @@ fn unusable_conditional_stage_keeps_previous_choice_and_cannot_complete_a_partia
                     Choice::new("long", 'l', ["Long"; 3]),
                     Choice::new("short", 's', ["Short"; 3]),
                 ],
-                "long",
+                "short",
             ),
             required.when(|choices| choices.last().is_some_and(|c| c.id == "long")),
         ],
@@ -314,16 +314,17 @@ fn unusable_conditional_stage_keeps_previous_choice_and_cannot_complete_a_partia
     )
     .unwrap();
     assert!(
-        matches!(flow.input(key(KeyCode::Enter)), Progress::Disabled(reason) if reason.contains("Required"))
+        matches!(flow.input(key(KeyCode::Char('l'))), Progress::Disabled(reason) if reason.contains("Required"))
     );
     assert_eq!(flow.stage_index(), 0);
-    assert_eq!(flow.highlighted().unwrap().id, "long");
+    assert_eq!(flow.highlighted().unwrap().id, "short");
     assert!(!flow.can_back());
     assert!(matches!(
         flow.input(Input::Click(Target::Choice("long"))),
         Progress::Disabled(_)
     ));
-    let Progress::Complete(done) = flow.input(Input::Click(Target::Choice("short"))) else {
+    assert_eq!(flow.highlighted().unwrap().id, "short");
+    let Progress::Complete(done) = flow.input(key(KeyCode::Enter)) else {
         panic!("completion")
     };
     assert_eq!(

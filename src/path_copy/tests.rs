@@ -86,3 +86,45 @@ fn identity_inspection_avoids_owner_resolution_and_preserves_native_evidence() {
     assert!(missing.error.is_some());
     assert!(missing.identity.is_none());
 }
+
+#[test]
+fn captured_context_requires_exact_equality_including_zero_to_one() {
+    let (_root, mut app) = marked_app(1);
+    app.panes[0].context = 0;
+    let snapshot = Snapshot::capture(&app).unwrap();
+    assert!(snapshot.matches_context(&app));
+    app.panes[0].context = 1;
+    assert!(!snapshot.matches_context(&app));
+}
+
+#[test]
+fn batch_text_and_provider_preflight_share_the_exact_payload_boundary() {
+    let (root, app) = marked_app(1);
+    for extra in [0, 1] {
+        let mut entry = app.panes[0].entries[0].clone();
+        entry.path = root
+            .path()
+            .join("x".repeat(crate::clipboard::MAX_BYTES + extra));
+        let request = CopyRequest::new(
+            vec![entry.clone()],
+            Directory::capture(&app.panes[0]).unwrap(),
+            Source::Highlighted,
+            Format::Name,
+            None,
+            "name".into(),
+        );
+        let result = request.prepare_using(|path| {
+            if path == entry.path {
+                entry.clone()
+            } else {
+                crate::fs::inspect_identity(path)
+            }
+        });
+        if extra == 0 {
+            let text = result.unwrap();
+            assert_eq!(text.len(), crate::clipboard::MAX_BYTES);
+        } else {
+            assert!(result.unwrap_err().contains("16 MiB"));
+        }
+    }
+}

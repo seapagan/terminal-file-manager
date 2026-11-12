@@ -40,10 +40,7 @@ fn check_layout(width: u16, level: colored_text::ColorLevel) {
             control.label
         );
         for x in control.area.x..control.area.right() {
-            assert_eq!(
-                layout.hit(x, area.y),
-                control.target.filter(|_| control.enabled)
-            );
+            assert_eq!(layout.hit(x, area.y), control.target);
         }
         assert!(layout.hit(control.area.right(), area.y).is_none());
         if matches!(control.target, Some(Target::Choice(_))) {
@@ -136,4 +133,19 @@ fn assert_choice(control: &Control, buffer: &ratatui::buffer::Buffer) {
         assert!(right.modifier.contains(Modifier::DIM));
         assert!(!middle.modifier.contains(Modifier::DIM));
     }
+}
+
+#[test]
+fn disabled_mouse_choice_reports_its_reason_without_advancing_or_completing() {
+    let mut flow = super::flow();
+    let layout = workflow::layout(&flow, Rect::new(0, 0, 160, 1));
+    let disabled = layout.controls.iter().find(|c| !c.enabled).unwrap();
+    let target = layout.hit(disabled.area.x, disabled.area.y).unwrap();
+    assert!(
+        matches!(flow.input(terminal_file_manager::workflow::Input::Click(target)),
+        terminal_file_manager::workflow::Progress::Disabled(reason) if reason == "Unavailable")
+    );
+    assert_eq!(flow.stage_index(), 0);
+    assert_eq!(flow.highlighted().unwrap().id, "first");
+    assert!(!flow.can_back());
 }

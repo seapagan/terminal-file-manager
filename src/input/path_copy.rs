@@ -73,6 +73,9 @@ pub(super) fn handle(c: &mut Controller, event: &Event, g: &Geometry) -> bool {
     if c.reconcile_footer() {
         return false;
     }
+    if matches!(event, Event::Resize(..)) {
+        return false;
+    }
     let input = match event {
         Event::Key(key) => Some(Input::Key(*key)),
         Event::Mouse(mouse) if mouse.kind == MouseEventKind::Down(MouseButton::Left) => g
