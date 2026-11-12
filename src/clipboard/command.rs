@@ -163,6 +163,10 @@ impl Pipes {
                         error.kind(),
                         std::io::ErrorKind::WouldBlock | std::io::ErrorKind::Interrupted
                     ) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::BrokenPipe => {
+                    // Keep draining diagnostics and observing exit under the original deadline.
+                    self.stdin = None;
+                }
                 Err(error) => return Err(error),
             }
             if *offset == payload.len() {

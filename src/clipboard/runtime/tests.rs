@@ -270,3 +270,92 @@ fn slow_base_validation_rechecks_app_context_before_changing_the_base() {
     }
     assert_eq!(app.relative_path_base, original);
 }
+
+#[test]
+fn shutdown_emits_pending_osc52_once_without_another_event_loop_poll() {
+    for queued in [true, false] {
+        let (send, receive) = mpsc::channel();
+        let sequence = super::super::encode_osc52(TEXT.as_bytes()).unwrap();
+        let expected = sequence.clone();
+        let worker = std::thread::spawn(move || {
+            send.send(Ok(Work::Copy(Delivery::Terminal(sequence))))
+                .unwrap();
+        });
+        if queued {
+            worker.join().unwrap();
+        }
+        let mut runtime = Runtime {
+            pending: Some(("name".into(), receive)),
+        };
+        let mut terminal = Vec::new();
+        let result = runtime
+            .shutdown(&mut terminal, Duration::from_secs(3))
+            .unwrap();
+        assert!(
+            matches!(result, Ok(Completion::Message(message)) if message.contains("acceptance unconfirmed"))
+        );
+        assert_eq!(terminal, expected);
+        assert!(!runtime.busy());
+        assert!(runtime.shutdown(&mut terminal, Duration::ZERO).is_none());
+        assert_eq!(terminal, expected);
+    }
+}
+
+#[test]
+fn shutdown_times_out_without_joining_a_blocked_worker_or_emitting_late_output() {
+    let (send, receive) = mpsc::channel();
+    let (release, blocked) = mpsc::channel();
+    let worker = std::thread::spawn(move || {
+        blocked.recv_timeout(Duration::from_secs(10)).unwrap();
+        send.send(Ok(Work::Copy(Delivery::Terminal(vec![1]))))
+            .is_err()
+    });
+    let mut runtime = Runtime {
+        pending: Some(("name".into(), receive)),
+    };
+    let mut terminal = Vec::new();
+    let started = Instant::now();
+    let error = runtime
+        .shutdown(&mut terminal, Duration::from_millis(20))
+        .unwrap()
+        .err()
+        .unwrap();
+    let elapsed = started.elapsed();
+    release.send(()).unwrap();
+    assert!(worker.join().unwrap());
+    assert!(elapsed < Duration::from_secs(3));
+    assert!(
+        error.contains("timed out") && error.contains("unconfirmed"),
+        "{error}"
+    );
+    assert!(terminal.is_empty());
+    assert!(!runtime.busy());
+}
+
+#[test]
+fn shutdown_reports_provider_disconnect_and_terminal_write_failures() {
+    for result in [
+        None,
+        Some(Err("provider failed".into())),
+        Some(Ok(Work::Copy(Delivery::Terminal(vec![1])))),
+    ] {
+        let (send, receive) = mpsc::channel();
+        if let Some(result) = result {
+            send.send(result).unwrap();
+        }
+        drop(send);
+        let mut runtime = Runtime {
+            pending: Some(("name".into(), receive)),
+        };
+        assert!(
+            runtime
+                .shutdown(
+                    &mut super::super::tests::FailingWriter,
+                    Duration::from_secs(3)
+                )
+                .unwrap()
+                .is_err()
+        );
+        assert!(!runtime.busy());
+    }
+}

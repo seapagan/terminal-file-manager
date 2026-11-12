@@ -136,7 +136,7 @@ fn drive(
             dirty = true;
         }
     }
-    Ok(())
+    clipboard::shutdown(controller, &mut clipboard)
 }
 
 fn submit_refreshes(app: &mut App, pool: &mut Pool) {

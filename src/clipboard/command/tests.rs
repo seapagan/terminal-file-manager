@@ -198,3 +198,43 @@ fn spawn_provider(script: &str, pid_file: &std::path::Path) -> Child {
         .spawn()
         .unwrap()
 }
+
+#[test]
+fn early_stdin_close_preserves_failure_diagnostics_and_rejects_incomplete_success() {
+    for (exit, expected) in [(7, "failed with exit status: 7"), (0, "complete payload")] {
+        let script = format!("exec 0<&-; printf 'display unavailable' >&2; exit {exit}");
+        let error = run_provider(
+            "closed",
+            "/bin/sh",
+            &["-c", &script],
+            &vec![b'x'; 1024 * 1024],
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains(expected), "{error}");
+        if exit != 0 {
+            assert!(error.contains("display unavailable"), "{error}");
+        }
+    }
+}
+
+#[test]
+fn closed_stdin_does_not_disable_deadline_or_descendant_cleanup() {
+    let root = tempfile::tempdir().unwrap();
+    let pid_file = root.path().join("descendant.pid");
+    let error = run_with_deadline(
+        "closed",
+        "/bin/sh",
+        &[
+            "-c",
+            "exec 0<&-; sleep 30 & printf '%s' \"$!\" > \"$1\"; wait",
+            "sh",
+            pid_file.to_str().unwrap(),
+        ],
+        &vec![b'x'; 1024 * 1024],
+        Duration::from_millis(100),
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("timed out"), "{error}");
+    assert_descendant_terminated(&pid_file);
+}

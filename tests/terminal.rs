@@ -503,3 +503,18 @@ fn save_quit_restores_both_navigated_locations_and_normal_quit_keeps_session() {
     drive(command, &[("left", "q")], false);
     assert_eq!(fs::read(&store.path).unwrap(), saved);
 }
+
+#[test]
+fn normal_exit_emits_accepted_osc52_before_terminal_restoration() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("osc-exit"), "read only").unwrap();
+    let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+    command.cwd(root.path());
+    isolate(&mut command, root.path());
+    command.env("SSH_CONNECTION", "isolated-test");
+    command.env_remove("STY");
+    let output = drive(command, &[("osc-exit", "yhnq")], false);
+    let sequence = "\x1b]52;c;b3NjLWV4aXQ=\x1b\\";
+    assert_eq!(output.matches(sequence).count(), 1, "{output:?}");
+    assert!(output.find(sequence).unwrap() < output.rfind("\x1b[?1049l").unwrap());
+}

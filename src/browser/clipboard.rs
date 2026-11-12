@@ -8,15 +8,34 @@ pub(super) fn collect(c: &mut Controller, runtime: &mut Runtime) -> bool {
     let Some(result) = runtime.poll(&mut std::io::stdout().lock()) else {
         return false;
     };
-    let message = result.and_then(|done| match done {
-        Completion::Message(message) => Ok(message),
-        Completion::Base(request) => request.apply(&mut c.app),
-    });
+    let message = result.and_then(|done| apply(c, done));
     match message {
         Ok(message) => c.app.status = message.into(),
         Err(error) => c.app.notify(Severity::Error, error),
     }
     true
+}
+
+pub(super) fn shutdown(c: &mut Controller, runtime: &mut Runtime) -> std::io::Result<()> {
+    let Some(result) = runtime.shutdown(
+        &mut std::io::stdout().lock(),
+        std::time::Duration::from_secs(4),
+    ) else {
+        return Ok(());
+    };
+    result
+        .and_then(|done| apply(c, done))
+        .map(|message| {
+            c.app.status = message.into();
+        })
+        .map_err(std::io::Error::other)
+}
+
+fn apply(c: &mut Controller, done: Completion) -> Result<String, String> {
+    match done {
+        Completion::Message(message) => Ok(message),
+        Completion::Base(request) => request.apply(&mut c.app),
+    }
 }
 
 pub(super) fn submit(c: &mut Controller, runtime: &mut Runtime) {

@@ -3,7 +3,8 @@ use super::{ClipboardError, Delivery};
 use crate::path_copy::{BaseRequest, CopyRequest, ValidatedBase};
 use std::{
     io::Write,
-    sync::mpsc::{self, Receiver, TryRecvError},
+    sync::mpsc::{self, Receiver, RecvTimeoutError, TryRecvError},
+    time::Duration,
 };
 
 #[derive(Default)]
@@ -97,11 +98,39 @@ impl Runtime {
             }
         };
         let (scope, _) = self.pending.take().expect("pending result");
-        Some(result.and_then(|work| match work {
-            Work::Copy(delivery) => finish(delivery, &scope, terminal).map(Completion::Message),
-            Work::Base(request) => Ok(Completion::Base(request)),
-        }))
+        Some(complete(result, &scope, terminal))
     }
+
+    /// Drain accepted work before terminal teardown; never join a blocked worker.
+    pub fn shutdown(
+        &mut self,
+        terminal: &mut dyn Write,
+        timeout: Duration,
+    ) -> Option<Result<Completion, String>> {
+        let (scope, receive) = self.pending.take()?;
+        let result = receive.recv_timeout(timeout).unwrap_or_else(|error| {
+            Err(match error {
+                RecvTimeoutError::Timeout => {
+                    format!("Clipboard shutdown timed out for {scope}; completion unconfirmed")
+                }
+                RecvTimeoutError::Disconnected => {
+                    "Clipboard worker stopped without a result".into()
+                }
+            })
+        });
+        Some(complete(result, &scope, terminal))
+    }
+}
+
+fn complete(
+    result: Result<Work, String>,
+    scope: &str,
+    terminal: &mut dyn Write,
+) -> Result<Completion, String> {
+    result.and_then(|work| match work {
+        Work::Copy(delivery) => finish(delivery, scope, terminal).map(Completion::Message),
+        Work::Base(request) => Ok(Completion::Base(request)),
+    })
 }
 
 fn finish(delivery: Delivery, scope: &str, terminal: &mut dyn Write) -> Result<String, String> {
