@@ -46,7 +46,7 @@ impl SelectionCounts {
 /// One independent session-only pane.
 pub struct Pane {
     pub directory: Option<Entry>,
-    pub(super) entry_identity: Option<Identity>,
+    pub(crate) entry_identity: Option<Identity>,
     pub path: PathBuf,
     pub entries: Vec<Entry>,
     pub visible: Vec<usize>,

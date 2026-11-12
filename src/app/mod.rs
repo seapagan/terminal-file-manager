@@ -51,6 +51,8 @@ pub struct Detail {
 
 /// Both panes remain alive when hidden or temporarily collapsed by width.
 pub struct App {
+    pub relative_path_base: PathBuf,
+    pub footer_workflow: Option<crate::path_copy::Workflow>,
     pub path_picker: Option<crate::navigation::PathPicker>,
     pub path_pointer: Option<(u16, u16)>,
     pub notifications: crate::notifications::Notifications,
@@ -90,6 +92,8 @@ impl App {
     /// Every invocation starts single-pane, with two independent original locations.
     pub fn new(path: PathBuf) -> Self {
         Self {
+            relative_path_base: path.clone(),
+            footer_workflow: None,
             path_picker: None,
             path_pointer: None,
             notifications: Default::default(),

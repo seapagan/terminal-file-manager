@@ -1,11 +1,11 @@
 # Terminal File Manager
 
 `tfm` is a keyboard-first terminal file manager for Linux, macOS and Windows.
-Browse local directories in one or two panes, sort and filter files, mark entries,
-and inspect file information without leaving the terminal.
+Browse in one or two panes, copy and move files, rename entries, filter and mark
+selections, and inspect file information without leaving the terminal.
 
-Copy, move, rename and organise local files. SSH/SFTP, file viewing and editing
-remain planned. Enter opens directories; it does not open or execute files.
+SSH/SFTP, file viewing and editing are planned. Enter opens directories; it does
+not open or execute files.
 
 ## Installation
 
@@ -18,8 +18,8 @@ cd terminal-file-manager
 cargo install --path . --locked
 ```
 
-The installed command is `tfm`. To try it from the checkout without installing,
-run `cargo run --locked` (add CLI arguments after `--`).
+The installed command is `tfm`. To try it without installing, use
+`cargo run --locked` and put CLI arguments after `--`.
 
 ## Getting started
 
@@ -31,26 +31,20 @@ tfm /path/to/left /path/to/right # Start with two different locations
 tfm --help                       # See command-line options
 ```
 
-A single directory argument sets both pane locations. You can switch between one
-and two visible panes at any time; each pane keeps its own directory and view
-settings. On a narrow terminal, `tfm` shows the active pane until there is
-room for both.
+A single directory argument sets both panes. Each pane keeps its own location
+and view settings; narrow terminals show the active pane.
 
-Use arrows (or `j`/`k`) to navigate, Enter to enter a directory and Backspace to
-go up. Click to focus, double-click a directory to enter it, and use the wheel
-to scroll. The `..` row opens the parent directory; it cannot be marked or used
-in file operations.
+Click to focus a pane, double-click a folder to enter it and use the wheel to
+scroll. Click a path component to jump to an ancestor, or use Alt+l to open
+**Go to directory**.
 
-Click a path component to jump to that ancestor. Press Alt+l or click `…` to open
-**Go to directory** at the current directory. Use arrows and Enter, or click a
-component, to choose an ancestor. The wheel scrolls long paths. Immediate Enter
-closes without navigating; Esc cancels. Press `?` or F1 for Help.
+Press `?` or F1 for searchable Help, including instructions for the current
+dialog. Use F1 while editing a text field, where `?` stays literal.
 
 ## Keyboard shortcuts
 
-These are the default bindings. You can customise them in `config.toml`.
-Uppercase letter bindings use `Shift+` plus the lowercase letter below; for
-example, `Shift+v` opens view options while `v` reverses the sort order.
+These are the defaults; customise them in `config.toml`. Uppercase letter
+bindings appear below as `Shift+` plus the lowercase letter.
 
 ### Navigation and layout
 
@@ -58,9 +52,9 @@ example, `Shift+v` opens view options while `v` reverses the sort order.
 | --- | --- |
 | Up/Down or `k`/`j` | Move through the listing |
 | Home / End / PageUp / PageDown | Jump or scroll through the listing |
-| Enter / Backspace (or Alt+Up) | Enter directory / go to parent, highlighting the directory just exited |
+| Enter / Backspace (or Alt+Up) | Enter a directory / go to its parent |
 | Alt+Left / Alt+Right | Go back / forward in directory history |
-| Alt+l | Open the full path picker, even when the header path fits |
+| Alt+l | Open Go to directory |
 | Alt+p | Toggle one or two panes |
 | Tab / Shift+Tab | Switch active pane |
 | Ctrl+Left / Ctrl+Right | Adjust the pane split |
@@ -73,56 +67,32 @@ example, `Shift+v` opens view options while `v` reverses the sort order.
 | Space / Insert | Toggle a mark / toggle a mark and advance |
 | Shift+Up / Shift+Down or Shift+click | Extend or shrink a marked range |
 | Ctrl+a / Ctrl+u | Mark all / clear marks in the visible listing |
-| Alt+b | Mark, unmark or replace visible marks by wildcard or regex |
-| `/` | Filter the current listing; Enter accepts, Esc cancels or clears |
+| Alt+b | Select by wildcard or regex |
+| `/` | Filter the listing; Enter accepts, Esc cancels or clears |
 | `h` | Show or hide hidden entries |
 | `i` | Cycle Git-ignore display: dim, hide, off |
 | `s` / `v` / `g` | Cycle sort order / reverse order / directory grouping |
 | `r` | Refresh the directory |
-| `Shift+v` / Alt+v | View options / view profiles |
+| Shift+v / Alt+v | View options / view profiles |
 
-Linux and macOS refresh both panes automatically, preserving the cursor and
-surviving marks. **On Windows, press `r` to see external changes.** Use `r` on
-any platform for a manual refresh.
-
-Automatic refresh retries after errors; slow or unavailable mounts can delay it.
-If a directory disappears or another replaces it, `tfm` keeps the last good
-listing and reports the error. Reopen the directory to continue.
-
-### Pattern selection
-
-Press **Alt+b** or click **Alt+b Mark** to select filenames by wildcard or regex.
-Choose matching options, then use **Mark**, **Unmark** or **Replace**. With a
-valid pattern, Enter from the Pattern field moves to Mark; a second Enter
-applies it. Esc cancels without changing marks.
-
-Tab or click to move between controls. Use **Alt+w / Alt+x / Alt+s** to change
-matching options while typing, and **Alt+m / Alt+u / Alt+r** to mark, unmark or
-replace. Outside the Pattern field, the control letters also work without Alt.
-You can assign another shortcut to `pattern-selection` in `[bindings]`.
-
-Wildcards match the whole filename, for example `*.rs`, `file?.txt` or `[abc]*`.
-Regex matches substrings; use anchors such as `^report.*\.txt$` to match a whole
-name. Matching starts case-sensitive in both modes.
-
-The preview counts matches across the visible listing, including directories.
-Hidden, ignored and filtered-out marks stay unchanged. **Replace can clear
-visible marks even when the pattern matches nothing.** Empty or invalid patterns
-cannot apply. If the listing changes while the dialog is open, reopen it to
-review the new matches. Enlarge the terminal if the controls cannot fit.
+Linux and macOS refresh automatically. **On Windows, press `r` to see external
+changes.** If a directory becomes unavailable or is replaced, reopen it after
+resolving the error.
 
 ### Information and exit
 
 | Keys | Action |
 | --- | --- |
 | Alt+i / Alt+Enter | Toggle metadata sidebar / open metadata popup |
-| F2 | Open the preferred metadata presentation |
-| `c` (in metadata view) | Count a directory's contents and size |
+| F2 | Open the preferred metadata view |
+| `c` (in metadata) | Count a directory's contents and size |
 | F12 | Toggle colour diagnostics |
 | Alt+PageUp / Alt+PageDown | Scroll colour diagnostics |
-| `?` | Show keyboard help |
+| `?` / F1 | Open Help |
+| Alt+h | Session notification history |
+| Alt+k / Ctrl+Alt+k | Dismiss oldest toast / dismiss all toasts |
 | `q` / F10 / Ctrl+c | Quit without saving a session |
-| `Shift+q` | Save the navigation session and quit |
+| Shift+q | Save the navigation session and quit |
 
 ### Local operations
 
@@ -130,129 +100,103 @@ review the new matches. Enlarge the terminal if the controls cannot fit.
 | --- | --- |
 | F5 / Alt+c | Copy the visible selection |
 | F6 / Alt+x | Move the visible selection |
+| Shift+F5 / Shift+c | Copy without multi-entry confirmation |
+| Shift+F6 / Shift+m | Move without multi-entry confirmation |
 | F7 | Create a directory |
 | Shift+F7 / Alt+n | Create an empty file |
 | Alt+r / Alt+a | Rename one entry / edit supported attributes |
 | F8 / Alt+t | Preview and move the selection to native Trash |
 | Shift+F8 / Alt+d | Preview permanent deletion; Enter cancels |
-| F9 / Alt+j | Jobs, progress and retained results |
-| Alt+h | Session notification history |
-| Alt+k | Dismiss oldest visible toast |
-| Ctrl+Alt+k | Dismiss all toasts |
+| F9 / Alt+j | Jobs, progress and results |
+| `y` | Copy names or paths to the clipboard |
 
-Create a file or directory in the active pane by entering one name. Existing
-entries stay intact. You can also click **Alt+n File** in the footer. `tfm`
-selects the new file if it is visible and you have not moved the cursor or
-changed the selection or directory while it was being created.
+## Working with files
 
-Other operations use visible marks, or the cursor when no visible marks remain.
+Operations use visible marks, or the highlighted entry when no visible marks
+remain. Marks hidden by filters or visibility settings stay marked but are
+excluded from operations. The `..` row is navigation only; it cannot be marked
+or used in file operations. Hidden entries start hidden, and Git-ignored entries
+start dimmed.
+
+Alt+b selects by wildcard or regex, for example `*.rs`. Wildcards match whole
+filenames; regex matches substrings. **Replace can clear visible marks even when
+nothing matches.** Review the preview before applying a pattern.
+
 With two panes, copy and move target the other pane: one entry starts at once,
-while multiple entries ask for confirmation. Shift+F5 / Shift+F6 or
-`Shift+c` / `Shift+m` bypass that confirmation. With one pane, choose the
-destination in the dialog. F2 in a transfer dialog toggles SHA-256 verification.
+while multiple entries ask for confirmation. With one pane, choose a destination
+in the dialog. F2 in a transfer dialog toggles SHA-256 verification. Conflicts
+default to Skip; directories merge.
 
-Trash and permanent deletion show a preview before confirmation. Wait for
-counting to finish and review the selection. Enlarge the terminal if the preview
-cannot fit. **Enter cancels permanent deletion.**
+When creating files or directories, enter a single name. Existing entries are
+not overwritten.
 
-Conflicts compare Incoming with Existing and default to Skip. Newer replaces
-Existing only when Incoming has a later modification time. `a Apply to all`
-applies your next choice to matching conflicts in the job; Esc cancels the job.
-Directories merge. Enlarge the terminal if the comparison cannot fit.
+Review Trash and permanent-deletion previews before confirming. **Enter cancels
+permanent deletion.** TFM does not use permanent deletion as a Trash fallback.
+If the OS reports irreversible deletion during a Trash request, review the
+critical incident in Jobs; acknowledgement cannot restore the data.
 
-Press F9 to inspect jobs and errors. Select a job with Up/Down or the mouse;
-PgUp/PgDown or the wheel scrolls its details. Jobs opens in Summary; `e` toggles
-Evidence.
-Available actions depend on the job's state:
+In Jobs, `c` requests cancellation, `r` retries incomplete work and `x` reconciles
+an unknown outcome. **Unknown outcomes block retries and normal safe exit until
+reconciled.** When quitting during an operation, choose whether to wait or cancel
+safely; TFM waits for active work and cleanup before exiting.
 
-- `c` requests cancellation.
-- `r` retries incomplete work, leaving completed entries untouched.
-- `x Reconcile` rechecks an eligible unknown outcome.
+## Copy names and paths
 
-**An unknown outcome blocks retries and normal safe exit until reconciled.**
-Critical irreversible Trash incidents require the separate acknowledgement below.
+Press `y`, choose `m` Marked, `h` Highlighted or `c` Current folder, then choose
+`n` Name, `r` Relative or `f` Full path.
+For example, `y h f` copies the highlighted entry's full path.
+Wait for the directory listing to load before starting.
+Enter accepts defaults, Backspace goes back and Esc cancels.
+Copied text is plain and unquoted; marked entries use one line each.
 
-Results stay in Jobs for the current session. `Shift+q` saves navigation, not job
-history. On quit, choose Return, Wait, or Cancel safely; `tfm` waits for active
-operations and cleanup.
+Relative paths use a fixed session base, initially the first directory argument
+or the directory you launched TFM from.
+At **From**, use `s` for this pane's folder or `Shift+s` for the other pane's
+folder in two-pane mode. Both change the base without copying.
+Wait for confirmation before using the new base.
+Relative copying requires an accessible base directory, including after restoring
+a session. If it becomes unavailable, TFM keeps the base and clipboard unchanged;
+choose another base or use Name or Full path.
 
-Trash can fail where the native facility cannot preserve the selected object.
-Permanent deletion requires separate confirmation; `tfm` does not use it as a
-fallback. If the OS reports permanent deletion during a Trash request, Jobs shows
-a critical incident. Acknowledgement cannot restore the data. After all workers
-stop, type `ACKNOWLEDGE` and press F10 in the exit dialog. Enter or Esc keeps
-`tfm` open.
-
-`tfm` hides hidden entries by default. Use `h` or the View menu to change
-between **Hidden: Hide** and **Hidden: Show**. A small `h` beside an entry's type
-marks it as hidden. `tfm` dims Git-ignored entries by default; choose `hide`
-or `off` if you prefer. It retains marks on entries hidden by a filter or
-visibility option; operations use the visible selection.
-
-## Notifications and status
-
-Toasts show operation results, background failures and safety or navigation
-problems without taking keyboard focus. Routine feedback stays in the status
-area or current form. Choose a toast corner and expiry in `config.toml`.
-Click a toast to dismiss its group; **Alt+k** dismisses the oldest visible group
-and **Ctrl+Alt+k** dismisses all, including inside dialogs. Remap these as
-`dismiss-toast` and `dismiss-toasts` in `[bindings]`.
-
-Press **Alt+h** for session notification history, including expired toasts.
-Use Up/Down, PgUp/PgDown or the wheel to select an event. Press **e** for full
-details, PgUp/PgDown to scroll, and **e** to return. Enter opens linked Jobs
-evidence; Esc returns to your previous view. Repeated failures share a toast
-with an occurrence count; each operation keeps its own history entry and Job.
-Incoming notifications appear in the open history viewer without queuing toasts.
-History lasts until you exit `tfm`.
-
-The status area shows current work and selection. Critical incidents and unknown
-outcomes remain available in Jobs after toast expiry.
+On Linux, clipboard copying needs `wl-copy` (Wayland) or `xclip`/`xsel` (X11).
+Clipboard access over SSH uses OSC 52 and requires terminal support;
+**sent does not guarantee accepted**.
+In-app Help covers clipboard setup, compatibility and limits.
 
 ## Views and metadata
 
-Press `Shift+v` to change the active pane's columns, sorting, file sizes,
-timestamps, permissions or ownership display. Press Alt+v for the built-in **Compact**,
-**Detailed** and **Minimal** profiles, or save your own named view. Apply a
-profile to the active pane with Enter; use Space to choose **Apply to both**
-before confirming. Changes to a saved profile must be saved again to update it.
+Use Shift+v to choose columns, sorting and size, date, permission or ownership
+formats. Alt+v offers **Compact**, **Detailed** and **Minimal** profiles, or you
+can save a named view. Profiles apply to the active pane unless you choose
+**Apply to both**.
 
-The metadata sidebar and popup display information about the selected entry.
-Within an open metadata view, click attributes, timestamps or owner/group to
-switch their presentation. Those temporary choices do not change your saved
-view preferences.
+Metadata views show the highlighted entry's details. Press `c` within one to
+count directory contents and size; press it again to refresh the count.
 
-Press `c` in a metadata view for an on-demand directory count and size. In the
-**sidebar**, Esc cancels an active count but does not close the sidebar. In the
-**popup**, Esc cancels the count or closes the popup.
-Counts are on-demand snapshots; press `c` again to update them.
-Close the floating popup with Esc before navigating or starting a file operation.
+## Notifications
+
+Results and errors appear in toasts or the status area. Notification history
+includes expired toasts and lasts until you quit. Critical incidents and unknown
+outcomes remain available in Jobs after their toasts expire.
 
 ## Saving and restoring sessions
 
-Press `Shift+q` to save both pane locations and the layout when quitting.
-Restore them later with:
+Shift+q saves both pane locations, the layout and relative-path base. Restore a
+saved session, or save locations without opening the interface, with:
 
 ```sh
 tfm --restore-session
-```
-
-Ordinary quit (`q`, F10 or Ctrl+c) does not overwrite your saved session. You
-can also enable automatic restoration on startup with `restore_session = true`.
-Explicit command-line paths take precedence over automatic restoration.
-
-To save a session without opening the interface:
-
-```sh
 tfm --save-session -2 /path/to/left /path/to/right
 ```
 
-Marks, filters and back/forward history last only for the current run.
+Ordinary quit does not overwrite the saved session. Set `restore_session = true`
+for automatic restoration; explicit CLI paths take precedence. Marks, filters,
+directory history, notifications and Jobs last only for the current run.
 
 ## Configuration
 
-`tfm` works without a configuration file and saves preferences when they change.
-The file is `tfm/config.toml` under your platform's configuration directory:
+TFM works without a configuration file and saves preferences when they change.
+It uses `tfm/config.toml` under your platform's configuration directory:
 
 | Platform | Configuration directory |
 | --- | --- |
@@ -271,12 +215,10 @@ fuzzy_timestamps = true
 owner_display = "names" # or "numeric"
 ignore = "dim" # "dim", "hide" or "off"
 mouse = true
-# Optional path hover colour.
 # path_hover = "#b4f5ff"
-# Optional inactive pane border colour.
 # inactive_pane_border = "#767676"
 toast_placement = "bottom-right" # top-left, top-right, bottom-left, bottom-right
-toast_expiry_seconds = 5 # Range: 1–60; history survives expiry
+toast_expiry_seconds = 5 # Range: 1–60
 
 [columns]
 size = true
@@ -284,34 +226,23 @@ modified = true
 attributes = true
 owner = false
 
+[clipboard]
+osc52_fallback = false # Opt in to terminal clipboard fallback
+
 [bindings]
 "Ctrl+f" = "filter"
-"Alt+l" = "full-path"
 ```
 
-In Help, press `/` or click **Jump** to find a section or search commands and
-your configured shortcuts. Use arrows and Enter, or click a result, to jump
-to its entry. Esc closes the picker first, then Help.
-
-In a dialog, including Go to directory, View options, View profiles and Save
-profile, press `?` or F1, or click **?** in its title, for contextual Help.
-While editing a text field, `?` stays literal; use F1 for Help. Esc returns to
-the same dialog, field and selection. Click **×** to cancel or close a dialog.
-
-Custom bindings override the defaults. For punctuation keys, use the character
-produced rather than a `Shift+` symbol combination; some modified-key combinations
-cannot be reliably distinguished by terminals.
-
-Set `NO_COLOR` to disable colours. Press F12 to inspect the terminal colour
-diagnostics when needed.
+Custom bindings override defaults. For punctuation, use the produced character
+rather than a `Shift+` symbol combination; terminals cannot distinguish every
+modified-key combination. Set `NO_COLOR` to disable colours.
 
 ## Contributing and licence
 
-See [Contributing](CONTRIBUTING.md) for development instructions and
-[security reporting](SECURITY.md) to report a vulnerability. Explore the
-[architecture](docs/architecture.md), [acceptance record](docs/acceptance.md)
-and [planned work](TODO.md) for more project detail.
+See [Contributing](CONTRIBUTING.md) for development instructions,
+[security reporting](SECURITY.md) to report a vulnerability, and the
+[architecture](docs/architecture.md) and [planned work](TODO.md) for project details.
 
-`tfm` is licensed under [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE).
-See [third-party notices](THIRD_PARTY_NOTICES.md) for dependency licences and
-[source attribution](docs/provenance.md) for adapted code.
+TFM is licensed under [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE).
+See [third-party notices](THIRD_PARTY_NOTICES.md) and
+[source attribution](docs/provenance.md) for dependency and adapted-code details.

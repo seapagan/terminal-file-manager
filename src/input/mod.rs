@@ -12,13 +12,16 @@ mod operation_dialog;
 mod operation_exit;
 mod operation_jobs;
 mod operations;
+mod path_copy;
 mod path_navigation;
 mod pattern;
 mod profiles;
 mod scroll;
 pub(crate) mod view;
+pub(crate) use bindings::normalize_chord;
 pub use bindings::{Bindings, chord};
 pub use controller::Controller;
+pub(crate) use help::key_name;
 pub use help::{
     ContextHelp, HelpEntry, HelpFragment, HelpHit, HelpParagraph, HelpPicker, HelpSection,
     HelpTarget, HelpTopic, ViewHelpTopic, help_hits,
@@ -30,6 +33,7 @@ pub use help::{
 )]
 #[serde(rename_all = "kebab-case")]
 pub enum Action {
+    PathCopy,
     Up,
     Down,
     ExtendUp,

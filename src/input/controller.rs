@@ -12,6 +12,8 @@ use std::{path::PathBuf, time::Duration};
 
 /// Pure input controller; emitted requests are the only route to background I/O.
 pub struct Controller {
+    pub path_base_request: Option<crate::path_copy::BaseRequest>,
+    pub path_copy_request: Option<crate::path_copy::CopyRequest>,
     pub app: App,
     pub quit: bool,
     pub save_session: bool,
@@ -31,6 +33,8 @@ impl Controller {
         app.metadata_presentation = preferences.metadata_presentation;
         app.profile_names = preferences.profiles.keys().cloned().collect();
         Self {
+            path_copy_request: None,
+            path_base_request: None,
             app,
             quit: false,
             save_session: false,
@@ -119,7 +123,7 @@ impl Controller {
             self.app.status = reason.into();
             return Vec::new();
         }
-        if self.application_action(action, geometry) {
+        if super::path_copy::action(self, action) || self.application_action(action, geometry) {
             return Vec::new();
         }
         self.pane_action(action, geometry)
@@ -176,7 +180,7 @@ impl Controller {
             | ToggleSidebar | Metadata | Help | Info | Viewer | Editor | Path | FullPath
             | Zoxide | OppositeZoxide | ExitDirectory | Copy | Move | Mkdir | CreateFile
             | Trash | Delete | Rename | Attributes | Jobs | Notifications | DismissToast
-            | DismissToasts | CopyQuick | MoveQuick => {}
+            | DismissToasts | CopyQuick | MoveQuick | PathCopy => {}
         }
         Vec::new()
     }

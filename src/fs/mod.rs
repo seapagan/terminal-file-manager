@@ -162,6 +162,12 @@ pub fn inspect(path: &Path) -> Entry {
     inspect_with_cache(path, &mut crate::owner::Cache::default())
 }
 
+/// Inspect no-follow kind and identity without account resolution or link-target reads.
+/// Intended for background identity revalidation, not presentation metadata.
+pub fn inspect_identity(path: &Path) -> Entry {
+    inspect_no_follow(path, None)
+}
+
 fn inspect_with_cache(path: &Path, owners: &mut crate::owner::Cache) -> Entry {
     let mut entry = inspect_no_follow(path, Some(owners));
     if matches!(entry.kind, EntryKind::Link | EntryKind::Junction) {

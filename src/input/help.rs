@@ -52,7 +52,7 @@ pub(super) fn accepts(action: Action) -> bool {
     )
 }
 
-pub(super) fn key_name(code: KeyCode, modifiers: KeyModifiers) -> String {
+pub(crate) fn key_name(code: KeyCode, modifiers: KeyModifiers) -> String {
     let mut modifiers = modifiers;
     let uppercase = matches!(code, KeyCode::Char(c) if c.is_ascii_uppercase());
     if uppercase {

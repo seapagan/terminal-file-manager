@@ -35,6 +35,7 @@ pub(super) fn controls(app: &crate::app::App, area: Rect) -> Vec<FooterControl> 
         ("Shift+v", "View", Action::ViewOptions),
         ("/", "Filter", Action::Filter),
         ("Alt+v", "Profiles", Action::ViewProfiles),
+        ("y", "Path", Action::PathCopy),
     ] {
         let Some(entry) = app.help_entry(action) else {
             continue;
@@ -53,6 +54,14 @@ pub(super) fn controls(app: &crate::app::App, area: Rect) -> Vec<FooterControl> 
         x = x.saturating_add(width + 2);
     }
     controls
+}
+
+pub(super) fn render_geometry(frame: &mut Frame, geometry: &super::Geometry, theme: &Theme) {
+    if let Some(layout) = &geometry.workflow {
+        super::workflow::render(frame, layout, theme);
+    } else {
+        render(frame, geometry.footer, &geometry.footer_controls, theme);
+    }
 }
 
 pub(super) fn render(frame: &mut Frame, area: Rect, controls: &[FooterControl], theme: &Theme) {

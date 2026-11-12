@@ -82,21 +82,34 @@ impl Startup {
         let mut app = if restore {
             session_store()?.load()?.restore(settings)?
         } else {
+            let relative_path_base = self
+                .paths
+                .first()
+                .map_or_else(capture_launch_directory, |path| validate_path(path))?;
             let [left, right] = self.locations();
             let mut app = crate::app::App::new(left);
             app.panes[1].path = right;
             settings.apply(&mut app);
+            app.relative_path_base = relative_path_base;
             app
         };
         for pane in &mut app.panes {
             pane.path = validate_path(&pane.path)?;
         }
-        if self.two_panes || self.paths.len() == 2 {
-            app.dual = true;
-            app.maximized = false;
-        }
-        Ok(app)
+        Ok(finish_layout(app, self.two_panes || self.paths.len() == 2))
     }
+}
+
+fn capture_launch_directory() -> Result<PathBuf, String> {
+    std::env::current_dir().map_err(|e| format!("Cannot capture launch directory: {e}"))
+}
+
+fn finish_layout(mut app: crate::app::App, dual: bool) -> crate::app::App {
+    if dual {
+        app.dual = true;
+        app.maximized = false;
+    }
+    app
 }
 
 fn validate_path(path: &std::path::Path) -> Result<PathBuf, String> {

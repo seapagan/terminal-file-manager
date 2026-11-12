@@ -124,7 +124,8 @@ edge when resize is returned first. Native PTY/ConPTY tests exercise resize,
 quit and error/unwind cleanup. `settings` loads before terminal setup and saves
 changed preferences after teardown through an owned same-directory stage.
 Linked config files fail explicitly. `session` owns a separate strict version-1
-navigation schema: current native locations and layout only. Unix byte arrays
+navigation schema: current native locations, relative-path base and layout.
+Unix byte arrays
 and Windows UTF-16 arrays preserve identity without Unicode coercion. Q saves
 after teardown through the same owned atomic staging; normal quit never replaces
 session bytes. Restore is opt-in and validates both paths without fallback.
@@ -351,7 +352,8 @@ Windows native paths are not remote identifiers. Stable entry/job identities,
 generation-tagged asynchronous results and bounded queues prevent stale results
 from authorizing mutations. Navigation sessions remain distinct from named
 view profiles: profiles contain only display/sort/visibility policies, while
-sessions contain local locations/layout. Full navigation history persistence
+sessions contain local locations, the captured relative-path base and layout.
+Full navigation history persistence
 remains outside the implemented contract. Future preference/bookmark/history
 writes must remain lazy and atomic.
 
@@ -525,8 +527,9 @@ merged as `41a913e`, subsequently narrowed notification delivery to noteworthy
 events. PM3-06 path navigation is complete through
 [PR #13](https://github.com/seapagan/terminal-file-manager/pull/13), merged as
 `56bf891`; its [acceptance record](acceptance.md#pm3-06-accepted-and-merged--8-november-2026)
-records the final feature-head verification. PM3-07's internal file-operation
-clipboard remains pending and not authorised; snapshot testing remains deferred.
+records the final feature-head verification. PM3-07 provides OS path-text copying.
+The internal file-operation clipboard is deferred indefinitely; snapshot testing
+remains deferred.
 
 The application owns notification events independently of filesystem jobs.
 Toasts reference those events in chronological order, with newer groups nearest
@@ -574,3 +577,80 @@ Neither action changes operation state, retained events or Jobs evidence.
 Passive per-entry metadata diagnostics stay inline; accepted worker failures
 and listing errors retain Error notifications. Watch recovery remains Info.
 Placement and expiry use the existing strict TOML settings and atomic save path.
+
+## Footer workflows and OS path copy
+
+`workflow::Flow` owns ordered conditional stages, enabled-choice defaults,
+highlights, Backspace, cancellation, physical key/click history and the final
+semantic choice path. Direct letters and Enter activate choices; arrow and Tab
+keys are consumed without traversal.
+Consumer predicates select relevant stages from the accepted semantic path; Back
+visits the actual stage history. Definitions require an enabled starting choice.
+If a reachable later stage has no enabled choices, the engine reports the blocked
+stage and retains the previous usable stage without accepting a partial path.
+Consumer-marked completing choices bypass later stages and invoke the same
+one-shot callback with the accepted semantic path. The callback's generic result
+supports distinct actions without domain branching in the engine.
+Letter shortcuts distinguish lowercase and Shift
+using the shared binding normalization and explicit Shift+letter display.
+Its opaque context and one-shot handler keep it independent of filesystem and
+clipboard rules. The measured workflow renderer shares complete text-cell
+rectangles with mouse input and occupies only `Geometry.footer`. Pane/status
+allocation and scroll state remain unchanged. Choices share square brackets;
+selected choices retain bold/reverse emphasis, unselected brackets use Muted and
+disabled choices use Disabled. Higher input owners invalidate
+the flow before the next draw; global toast dismissal retains priority.
+
+The engine retains at most 1,024 physical inputs, including activation, for its
+completion callback. A successful callback receives the complete ordered history.
+The next event after the limit cancels with an explicit error and no callback;
+the engine does not truncate a successful history. Backspace at the root cancels.
+The renderer reserves the Esc mouse target when at least three cells are available,
+and Backspace plus Esc when a non-root stage has at least thirteen cells.
+
+The path-copy consumer presents Copy Path / From and captures the originating
+pane, native highlighted and
+visible marked identities, current directory and relative reference. Startup
+captures the first explicit CLI directory (or process cwd without arguments) as
+an absolute native startup base. The selected relative base is session state.
+From offers Marked, Highlighted and Current folder sources followed by the Format stage.
+Each format completes immediately, including Relative using the captured session
+base. Set base and Other base complete directly from From with a distinct
+base-set outcome: they validate and capture a native directory path, confirm the
+change and do not queue clipboard text. Other base requires a valid logical
+opposite pane and revalidates its snapshot before setting the base.
+
+Activation captures cached directory identities and waits for a valid listing
+when identity evidence is unavailable. Completion checks current pane/selection
+state using a visible-path index, then queues frozen work. The existing clipboard
+worker revalidates lexical and physical directories and selected entries without
+owner/group resolution, constructs the bounded Unicode payload and invokes a
+provider only after the whole batch passes. Relative copies also open the selected
+base directory in that worker to check existence, directory type and read access;
+failures preserve the selected base and clipboard. The lexical calculation retains
+the original native spelling, including directory links. Name and Full path do
+not validate the relative base. Base actions use the same worker;
+the UI rechecks pane context before applying a validated base result. Lexical
+relative paths never follow symlinks or cross incomparable roots. Capturing the
+opposite pane works while
+maximised or hidden. Subsequent navigation cannot change a captured base.
+Normal path components retain exact case during lexical relative-path comparison.
+Windows supports per-directory case sensitivity, and macOS volumes may be case
+sensitive. Global case folding could therefore select a different path. TFM keeps
+exact component comparison without filesystem queries; paths can be non-minimal
+on case-insensitive filesystems. Windows drive-prefix comparison remains unchanged.
+
+Existing session saves persist native path units; explicit/automatic restoration
+uses that path, with the first restored pane as the fallback for older sessions.
+Ordinary exit does not save it.
+Remote source identity and host-qualified output require a separate future
+consumer; local paths never masquerade as remote references.
+
+The clipboard router adapts git-diff-out's provider and fallback implementation
+and tests. External providers use literal stdin and bounded command/output I/O.
+One background request at a time keeps provider waits outside event processing.
+OSC52 preparation returns bytes to the terminal owner for serial emission between
+frames, and reports sent with acceptance unconfirmed. Local providers report
+copied only after a successful invocation. Preflight failures never invoke a
+provider or clear the clipboard. Clipboard settings use the existing strict,
+atomic preference storage. In-progress workflow state never persists.

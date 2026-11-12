@@ -1,0 +1,216 @@
+use super::{Backend, Platform, Selection, clipboard_text, encode_osc52, select_backend};
+
+fn local_linux() -> Selection {
+    Selection {
+        platform: Platform::Linux,
+        ssh: false,
+        wayland: false,
+        x11: false,
+        wl_copy: false,
+        xclip: false,
+        xsel: false,
+        pbcopy: false,
+        osc52_fallback: false,
+    }
+}
+
+#[test]
+fn ssh_always_selects_osc52() {
+    for platform in [Platform::Linux, Platform::Macos, Platform::Windows] {
+        assert_eq!(
+            select_backend(&Selection {
+                platform,
+                ssh: true,
+                ..local_linux()
+            })
+            .unwrap(),
+            Backend::Osc52
+        );
+    }
+}
+
+#[test]
+fn linux_provider_selection_respects_the_display_session() {
+    let all = Selection {
+        wayland: true,
+        x11: true,
+        wl_copy: true,
+        xclip: true,
+        xsel: true,
+        ..local_linux()
+    };
+    assert_eq!(select_backend(&all).unwrap(), Backend::WlCopy);
+    assert_eq!(
+        select_backend(&Selection {
+            wl_copy: false,
+            ..all
+        })
+        .unwrap(),
+        Backend::Xclip
+    );
+    assert_eq!(
+        select_backend(&Selection {
+            wayland: false,
+            wl_copy: false,
+            xclip: false,
+            ..all
+        })
+        .unwrap(),
+        Backend::Xsel
+    );
+}
+
+#[test]
+fn linux_does_not_invoke_a_provider_for_an_incompatible_session() {
+    let error = select_backend(&Selection {
+        wl_copy: true,
+        xclip: true,
+        xsel: true,
+        ..local_linux()
+    })
+    .unwrap_err()
+    .to_string();
+
+    assert!(error.contains("wl-clipboard"), "{error}");
+    assert!(error.contains("xclip"), "{error}");
+    assert!(error.contains("xsel"), "{error}");
+}
+
+#[test]
+fn local_osc52_fallback_requires_opt_in() {
+    assert!(select_backend(&local_linux()).is_err());
+    assert_eq!(
+        select_backend(&Selection {
+            osc52_fallback: true,
+            ..local_linux()
+        })
+        .unwrap(),
+        Backend::Osc52
+    );
+}
+
+#[test]
+fn macos_and_windows_use_native_backends() {
+    assert_eq!(
+        select_backend(&Selection {
+            platform: Platform::Macos,
+            pbcopy: true,
+            ..local_linux()
+        })
+        .unwrap(),
+        Backend::Pbcopy
+    );
+    assert_eq!(
+        select_backend(&Selection {
+            platform: Platform::Windows,
+            ..local_linux()
+        })
+        .unwrap(),
+        Backend::Windows
+    );
+}
+
+#[test]
+fn macos_reports_when_pbcopy_is_unavailable() {
+    let error = select_backend(&Selection {
+        platform: Platform::Macos,
+        ..local_linux()
+    })
+    .unwrap_err()
+    .to_string();
+
+    assert_eq!(
+        error,
+        "the macOS clipboard provider 'pbcopy' is not available"
+    );
+}
+
+#[test]
+fn osc52_encodes_arbitrary_utf8_for_the_standard_clipboard() {
+    assert_eq!(
+        encode_osc52("diff café 😀\n".as_bytes()).unwrap(),
+        b"\x1b]52;c;ZGlmZiBjYWbDqSDwn5iACg==\x1b\\"
+    );
+}
+
+pub(super) struct FailingWriter;
+
+impl std::io::Write for FailingWriter {
+    fn write(&mut self, _buffer: &[u8]) -> std::io::Result<usize> {
+        Err(std::io::Error::other("terminal failed"))
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn windows_text_conversion_preserves_unicode() {
+    assert_eq!(clipboard_text("café 😀".as_bytes()).unwrap(), "café 😀");
+}
+
+#[test]
+fn windows_text_conversion_rejects_invalid_utf8_and_embedded_nul() {
+    assert!(clipboard_text(&[0xff]).is_err());
+    assert!(clipboard_text(b"before\0after").is_err());
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_backend_rejects_invalid_utf8_before_clipboard_access() {
+    let error = super::copy_with_backend(Backend::Windows, &[0xff])
+        .unwrap_err()
+        .to_string();
+
+    assert!(error.contains("not valid UTF-8"), "{error}");
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_runtime_selects_the_native_platform() {
+    assert_eq!(super::current_platform(), Platform::Windows);
+}
+
+#[test]
+fn osc52_rejects_oversize_payloads_without_truncating() {
+    let mut payload = Vec::new();
+    payload.resize(74_991, b'x');
+    let sequence = encode_osc52(&payload).unwrap();
+    assert_eq!(sequence.len(), 99_997);
+
+    payload.push(b'x');
+    let error = encode_osc52(&payload).unwrap_err().to_string();
+    assert!(error.contains("74992 bytes"), "{error}");
+    assert!(error.contains("maximum is 74991 bytes"), "{error}");
+}
+
+#[test]
+fn payload_preflight_never_accepts_empty_invalid_or_oversized_text() {
+    assert!(super::validate_payload(&vec![b'x'; super::MAX_BYTES]).is_ok());
+    for payload in [
+        vec![],
+        vec![0xff],
+        b"x\0y".to_vec(),
+        b"x\x1by".to_vec(),
+        vec![b'x'; super::MAX_BYTES + 1],
+    ] {
+        assert!(super::validate_payload(&payload).is_err());
+    }
+    assert!(super::validate_payload("界e\u{301}\nfile".as_bytes()).is_ok());
+}
+
+#[test]
+fn zellij_and_tmux_use_standard_framing_and_unsupported_terminals_refuse_emission() {
+    for terminal in [
+        super::TerminalKind::Plain,
+        super::TerminalKind::Zellij,
+        super::TerminalKind::Tmux,
+    ] {
+        assert_eq!(
+            super::terminal_sequence(b"file", &terminal).unwrap(),
+            encode_osc52(b"file").unwrap()
+        );
+    }
+    assert!(super::terminal_sequence(b"file", &super::TerminalKind::Unsupported).is_err());
+}

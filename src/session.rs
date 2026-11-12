@@ -1,4 +1,4 @@
-//! Versioned navigation only: native locations and layout, never view profiles/history.
+//! Versioned navigation session: native locations, relative base and layout.
 use crate::{app::App, settings::Settings};
 use serde::{Deserialize, Serialize};
 use std::{io::Read, path::PathBuf};
@@ -46,12 +46,14 @@ impl NativePath {
     }
 }
 
-/// Version 1 saves both current locations and layout only.
+/// Version 1 accepts older sessions without an explicitly captured relative base.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct NavigationSession {
     version: u32,
     locations: [NativePath; 2],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    relative_path_base: Option<NativePath>,
     active: usize,
     dual: bool,
     maximized: bool,
@@ -63,6 +65,7 @@ impl NavigationSession {
         Self {
             version: 1,
             locations: std::array::from_fn(|i| NativePath::capture(&app.panes[i].path)),
+            relative_path_base: Some(NativePath::capture(&app.relative_path_base)),
             active: app.active,
             dual: app.dual,
             maximized: app.maximized,
@@ -89,8 +92,13 @@ impl NavigationSession {
             return Err("unsupported session version or invalid layout".into());
         }
         let paths = [self.locations[0].decode()?, self.locations[1].decode()?];
-        if paths.iter().any(|p| !p.is_absolute()) {
-            return Err("session locations must be absolute native paths".into());
+        let base = self
+            .relative_path_base
+            .as_ref()
+            .map(NativePath::decode)
+            .transpose()?;
+        if paths.iter().any(|p| !p.is_absolute()) || base.is_some_and(|p| !p.is_absolute()) {
+            return Err("session locations and relative base must be absolute native paths".into());
         }
         Ok(paths)
     }
@@ -101,7 +109,14 @@ impl NavigationSession {
     /// Returns schema/path validation errors. The caller checks filesystem access.
     pub fn restore(&self, settings: &Settings) -> Result<App, String> {
         let [left, right] = self.locations()?;
+        let base = self
+            .relative_path_base
+            .as_ref()
+            .map(NativePath::decode)
+            .transpose()?
+            .unwrap_or_else(|| left.clone());
         let mut app = App::new(left);
+        app.relative_path_base = base;
         app.panes[1].path = right;
         settings.apply(&mut app);
         app.active = self.active;

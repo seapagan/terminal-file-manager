@@ -4,12 +4,14 @@ use std::ffi::OsString;
 
 pub mod app;
 pub mod browser;
+pub mod clipboard;
 pub mod color;
 pub mod fs;
 pub mod fuzzy_time;
 pub mod input;
 pub mod listing;
 pub mod notifications;
+pub mod path_copy;
 pub mod permissions;
 pub mod session;
 pub mod settings;
@@ -20,6 +22,7 @@ pub mod ui;
 pub mod view;
 pub mod watch;
 pub mod workers;
+pub mod workflow;
 
 /// Help for the implemented local browsing contract.
 pub const HELP: &str =
@@ -30,8 +33,8 @@ Usage: tfm [OPTIONS] [DIRECTORY [OTHER_DIRECTORY]]
 
 Options:
   -2  --two-panes        Start with two panes
-      --save-session     Save selected locations/layout and exit
-      --restore-session  Restore saved locations/layout; no directory arguments
+      --save-session     Save locations, relative base and layout; exit
+      --restore-session  Restore saved navigation session; no directory arguments
   -h  --help             Print help and exit
   -V  --version          Print version and exit
       --                 Treat following arguments as directory paths
