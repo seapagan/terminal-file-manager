@@ -51,6 +51,11 @@ and require validated evidence before cleanup or any new mutation. See the
 
 ## Pre-M3 Windows Trash confirmation UX
 
+**Deferred by the maintainer — 12 November 2026:** Move this investigation to a
+separate Windows-focused polish phase, planned before M3 implementation. It no
+longer blocks M3-GATE. Preserve the existing Windows Trash behaviour and safety
+guarantees. This deferral does not authorise investigation or implementation.
+
 Investigate removing the extra Windows Shell confirmation after TFM's own
 `F8` -> `T` Trash approval, without changing global Recycle Bin settings or
 requiring mouse interaction. The existing `IFileOperation` uses

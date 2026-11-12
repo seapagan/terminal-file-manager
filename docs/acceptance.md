@@ -1,5 +1,19 @@
 # Acceptance gates
 
+## M3-GATE closed — 12 November 2026
+
+PM3-01 through PM3-07 are accepted and merged. The maintainer has deferred the
+[Windows Trash confirmation UX investigation](../TODO.md#pre-m3-windows-trash-confirmation-ux)
+to a separate Windows-focused polish phase, planned before M3 implementation.
+Its full investigation and acceptance requirements remain in TODO.md; existing
+Windows Trash behaviour and safety guarantees remain unchanged.
+
+All four M3-GATE criteria are satisfied: merged milestone acceptance, reconciled
+implemented-behaviour documentation, full repository QC and native-platform
+evidence with stated limits, and the scope/binding/limitation handoff. The
+internal file-operation clipboard and snapshot testing remain explicitly deferred.
+Windows polish and M3 implementation each require a separate approved scope.
+
 ## PM3-07 accepted and merged — 12 November 2026
 
 PM3-07 is **Complete**. The maintainer merged
@@ -939,9 +953,10 @@ manual refresh, and PM3-01 through PM3-06 are merged. The PR #11/#12 follow-ups
 and PR #13 navigation closeout are recorded above. PM3-07 OS path copy is complete
 and merged through PR #14 at `7e55683`; its final review dispositions and feature/
 merge evidence appear above. M3-GATE is a separate readiness assessment, not SSH
-implementation authority. The open [Pre-M3 Windows Trash confirmation UX](../TODO.md#pre-m3-windows-trash-confirmation-ux)
-item still requires a recorded outcome or explicit deferral; this closeout does
-not silently reclassify it. M3–M8 cover the remaining application and final release.
+implementation authority. M3-GATE is closed following the maintainer's explicit
+Windows Trash investigation deferral recorded above. The Windows-focused polish
+phase is planned before M3 implementation. M3–M8 cover the remaining application
+and final release.
 Genuine direct SSH-to-SSH transfer remains post-v1 work.
 
 | Checkpoint | Completed proof |
