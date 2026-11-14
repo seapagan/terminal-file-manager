@@ -194,7 +194,7 @@ fn columns(pane: &Pane, width: u16) -> (Vec<Constraint>, Vec<Cell<'static>>) {
         (16, modified_header(pane.fuzzy_timestamps), columns.modified),
         (
             pane.measurements.attributes,
-            "Mode/attrs",
+            pane.permissions.column_heading(),
             columns.attributes,
         ),
         (pane.measurements.owner.min(24), "Owner", columns.owner),
@@ -339,7 +339,8 @@ pub(super) fn permission_spans(
     theme: &Theme,
 ) -> Vec<Span<'static>> {
     let text = crate::permissions::attributes(entry, permissions);
-    text.chars()
+    Line::raw(text)
+        .styled_graphemes(Style::default())
         .enumerate()
         .map(|(index, value)| {
             let style = if index == 0 {
@@ -347,11 +348,11 @@ pub(super) fn permission_spans(
             } else if entry.mode.is_some()
                 && permissions == crate::permissions::PermissionDisplay::Symbolic
             {
-                theme.permission_style(value)
+                theme.permission_style(value.symbol.chars().next().unwrap_or('?'))
             } else {
                 theme.style(Role::Warning)
             };
-            Span::styled(value.to_string(), style)
+            Span::styled(value.symbol.to_owned(), style)
         })
         .collect()
 }

@@ -94,6 +94,7 @@ fn native_attributes_render_in_listing_sidebar_and_popup_in_both_formats() {
         (PermissionDisplay::Octal, native),
     ] {
         app.panes[0].permissions = display;
+        app.panes[0].refilter();
         app.sidebar = false;
         app.popup = false;
         assert!(text(&draw(&app)).contains(&expected));

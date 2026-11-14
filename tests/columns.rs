@@ -4,6 +4,17 @@ use ratatui::{Terminal, backend::TestBackend};
 use std::sync::atomic::AtomicBool;
 use terminal_file_manager::{app::App, color::Theme, fs, ui, view::Columns};
 
+#[path = "columns/attributes.rs"]
+mod attributes;
+
+fn symbolic_heading() -> &'static str {
+    if cfg!(windows) { "RHSA" } else { "Mode" }
+}
+
+fn symbolic_width() -> u16 {
+    if cfg!(windows) { 4 } else { 10 }
+}
+
 fn loaded() -> (tempfile::TempDir, App) {
     let root = tempfile::tempdir().unwrap();
     std::fs::write(root.path().join("界e\u{301}"), "one").unwrap();
@@ -38,10 +49,14 @@ fn row(app: &App, width: u16, y: u16) -> String {
 #[test]
 fn attributes_fit_below_the_old_global_threshold_and_reflow_in_both_panes() {
     let (_root, mut app) = loaded();
-    // Four size digits, one unit, 16 timestamp cells, 10 attribute cells,
-    // 16 name cells, indicators and all six inter-column spaces: 58 cells.
-    for (width, attrs) in [(59, false), (60, true), (61, true), (70, true)] {
-        assert_eq!(row(&app, width, 1).contains("Mode/attrs"), attrs);
+    // The attribute value width joins the existing size/date/name/spacing budget.
+    let boundary = 50 + symbolic_width();
+    for (width, attrs) in [
+        (boundary - 1, false),
+        (boundary, true),
+        (boundary + 1, true),
+    ] {
+        assert_eq!(row(&app, width, 1).contains(symbolic_heading()), attrs);
     }
     app.dual = true;
     for active in 0..2 {
@@ -49,9 +64,10 @@ fn attributes_fit_below_the_old_global_threshold_and_reflow_in_both_panes() {
         for percent in [40, 45, 50, 55, 60] {
             app.split_percent = percent;
             let header = row(&app, 140, 1);
-            let expected = usize::from(percent >= 45) + usize::from(percent <= 55);
+            let expected = usize::from(140 * percent / 100 >= boundary)
+                + usize::from(140 * (100 - percent) / 100 >= boundary);
             assert_eq!(
-                header.matches("Mode/attrs").count(),
+                header.matches(symbolic_heading()).count(),
                 expected,
                 "{percent}: {header}"
             );
@@ -68,13 +84,14 @@ fn disabled_columns_release_width_and_cached_sizes_determine_boundaries() {
         attributes: true,
         owner: false,
     };
-    assert!(row(&app, 36, 1).contains("Mode/attrs"));
+    assert!(row(&app, 26 + symbolic_width(), 1).contains(symbolic_heading()));
     app.panes[0].columns = Columns::default();
     app.panes[0].entries[0].size = Some(1_234_567_890);
     app.panes[0].human_sizes = false;
     app.panes[0].refilter();
     assert_eq!(app.panes[0].measurements.number, 10);
-    assert!(!row(&app, 65, 1).contains("Mode/attrs"));
-    assert!(row(&app, 66, 1).contains("Mode/attrs"));
-    assert!(row(&app, 66, 3).contains("1234567890"));
+    let boundary = 56 + symbolic_width();
+    assert!(!row(&app, boundary - 1, 1).contains(symbolic_heading()));
+    assert!(row(&app, boundary, 1).contains(symbolic_heading()));
+    assert!(row(&app, boundary, 3).contains("1234567890"));
 }

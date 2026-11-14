@@ -6,12 +6,23 @@ use crate::{
 use ratatui::{style::Style, text::Line};
 
 /// Natural content widths, bounded to the terminal's addressable columns.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Measurements {
     pub name: u16,
     pub number: u16,
     pub owner: u16,
     pub attributes: u16,
+}
+
+impl Default for Measurements {
+    fn default() -> Self {
+        Self {
+            name: 0,
+            number: 0,
+            owner: 0,
+            attributes: width(crate::permissions::PermissionDisplay::default().column_heading()),
+        }
+    }
 }
 
 impl Measurements {
@@ -26,7 +37,7 @@ impl Measurements {
             name: 4,
             number: 4,
             owner: 5,
-            attributes: 10,
+            attributes: width(permissions.column_heading()),
         };
         for entry in entries {
             let name = name(entry, u16::MAX);
