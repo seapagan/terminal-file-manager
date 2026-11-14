@@ -41,12 +41,24 @@ $resolvedInstaller = (Resolve-Path -Path $installer).Path
 # Portable mapping tests override only OS architecture discovery, not parsing
 # or installation. Native success tests invoke the unmodified installer.
 $portableWrapper = Join-Path -Path $root -ChildPath 'portable.ps1'
+$nativeWrapper = Join-Path -Path $root -ChildPath 'native.ps1'
 $escapedInstaller = $resolvedInstaller.Replace("'", "''")
-[IO.File]::WriteAllText($portableWrapper, @"
+foreach ($wrapper in @($portableWrapper, $nativeWrapper)) {
+    $override = if ($wrapper -eq $portableWrapper) {
+        'function Get-NativeArchitecture { return $env:TFM_TEST_ARCHITECTURE }'
+    } else { '' }
+    # Capture the exception message before PowerShell's host formats/wraps it.
+    # The native wrapper invokes the production installer without overrides.
+    [IO.File]::WriteAllText($wrapper, @"
 . '$escapedInstaller'
-function Get-NativeArchitecture { return `$env:TFM_TEST_ARCHITECTURE }
-Invoke-Install
+$override
+try { Invoke-Install }
+catch {
+    [Console]::Error.WriteLine(`$_.Exception.Message)
+    exit 1
+}
 "@)
+}
 $hostExecutable = if ($PSVersionTable.PSVersion.Major -lt 6) {
     Join-Path -Path $PSHOME -ChildPath 'powershell.exe'
 } else { Join-Path -Path $PSHOME -ChildPath $(if ($nativeWindows) { 'pwsh.exe' } else { 'pwsh' }) }
@@ -100,7 +112,7 @@ function Invoke-Installer([string]$Mirror, [string]$InstallDir, [string]$Version
     }
     $psi = [System.Diagnostics.ProcessStartInfo]::new()
     $psi.FileName = $hostExecutable
-    $entry = if ($Native) { $resolvedInstaller } else { $portableWrapper }
+    $entry = if ($Native) { $nativeWrapper } else { $portableWrapper }
     $psi.Arguments = "-NoProfile -File `"$entry`""
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true

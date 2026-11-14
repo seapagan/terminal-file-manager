@@ -7,6 +7,23 @@ New-Item -ItemType Directory -Path $securityRoot | Out-Null
 $securityPasses = 0
 $securitySkipped = 0
 . (Join-Path -Path $PSScriptRoot -ChildPath '../../install.ps1')
+# Invalid PE fixtures must return loader errors without interactive Windows UI.
+# Process-wide scope also covers native invocation threads and child processes.
+$savedErrorMode = $null
+if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+    Add-Type -TypeDefinition @'
+using System.Runtime.InteropServices;
+public static class TfmFixtureErrorMode {
+    [DllImport("kernel32.dll")]
+    public static extern uint GetErrorMode();
+    [DllImport("kernel32.dll")]
+    public static extern uint SetErrorMode(uint mode);
+}
+'@
+    $savedErrorMode = [TfmFixtureErrorMode]::GetErrorMode()
+    # SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX; retain existing flags.
+    [void][TfmFixtureErrorMode]::SetErrorMode($savedErrorMode -bor 0x8001)
+}
 # A test-only exception boundary permits independent negative assertions.
 function Die([string]$Message) { throw $Message }
 
@@ -556,6 +573,7 @@ fn main() {
         Write-Information -MessageData 'SKIP: eighteen native Windows candidate-launch/running-file/preflight/architecture/lock/read-only/denied-path/junction assertions; transaction successes above are Unix simulations.' -InformationAction Continue
     }
 } finally {
+    if ($null -ne $savedErrorMode) { [void][TfmFixtureErrorMode]::SetErrorMode($savedErrorMode) }
     Remove-Item -LiteralPath $securityRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 Write-Information -MessageData "PowerShell security tests passed: $securityPasses assertions ($securitySkipped native assertions skipped)." -InformationAction Continue
