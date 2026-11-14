@@ -284,7 +284,7 @@ fn identity_cells(
         if pane.ignore == IgnoreMode::Dim && entry.ignored == Some(true) {
             theme.ignored_name_style(entry, active)
         } else {
-            theme.entry_style(entry)
+            theme.name_style(entry)
         },
     );
     let marked = pane.marks.contains_key(&entry.path);

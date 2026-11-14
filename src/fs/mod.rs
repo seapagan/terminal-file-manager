@@ -63,6 +63,11 @@ pub struct Entry {
 }
 
 impl Entry {
+    /// Cached Windows System attribute; this is not an access-rights check.
+    pub fn is_system(&self) -> bool {
+        self.windows_attributes.is_some_and(|bits| bits & 0x4 != 0)
+    }
+
     /// Format cached account data without resolving accounts on the render thread.
     pub fn owner_display(&self, mode: crate::owner::OwnerDisplay) -> String {
         self.owner

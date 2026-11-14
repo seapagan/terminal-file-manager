@@ -11,6 +11,10 @@ use terminal_file_manager::{
     ui,
 };
 
+#[cfg(windows)]
+#[path = "colours/windows.rs"]
+mod windows;
+
 #[test]
 fn lsplus_type_accents_preserve_semantics_without_ansi_strings() {
     let root = tempfile::tempdir().unwrap();
