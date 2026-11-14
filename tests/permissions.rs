@@ -63,14 +63,11 @@ fn native_symlink_modes_describe_the_link_itself() {
 
 #[cfg(windows)]
 #[test]
-fn windows_native_attributes_survive_both_permission_preferences() {
+fn windows_native_attributes_support_symbolic_and_native_preferences() {
     let root = tempfile::tempdir().unwrap();
     let entry = fs::inspect(root.path());
     assert!(entry.mode.is_none());
-    assert_eq!(
-        attributes(&entry, PermissionDisplay::Symbolic),
-        entry.attributes
-    );
+    assert_eq!(attributes(&entry, PermissionDisplay::Symbolic), "----");
     assert_eq!(
         attributes(&entry, PermissionDisplay::Octal),
         entry.attributes

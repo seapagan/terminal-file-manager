@@ -1,4 +1,4 @@
-//! Native attribute strings remain visible without a Unix formatting control.
+//! Opaque attribute strings remain visible without an invented formatting control.
 use colored_text::ColorLevel;
 use crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::{Terminal, backend::TestBackend, buffer::Buffer, layout::Rect};
@@ -30,6 +30,7 @@ fn native_attributes_and_wrapped_continuations_are_read_only_in_both_views() {
     let mut app = App::new(root.path().into());
     let mut entry = fs::inspect(root.path());
     entry.mode = None;
+    entry.windows_attributes = None;
     entry.attributes = "readonly, hidden".into();
     app.details[0].entry = Some(entry);
     app.sidebar = true;

@@ -118,6 +118,9 @@ excluded from operations. The `..` row is navigation only; it cannot be marked
 or used in file operations. Hidden entries start hidden, and Git-ignored entries
 start dimmed.
 
+On Windows, red filenames identify files and directories with the System
+attribute. Windows permissions still determine access.
+
 Alt+b selects by wildcard or regex, for example `*.rs`. Wildcards match whole
 filenames; regex matches substrings. **Replace can clear visible marks even when
 nothing matches.** Review the preview before applying a pattern.
@@ -172,6 +175,10 @@ can save a named view. Profiles apply to the active pane unless you choose
 
 Metadata views show the highlighted entry's details. Press `c` within one to
 count directory contents and size; press it again to refresh the count.
+
+On Windows, **Symbolic** shows `RHSA` (read-only, hidden, system, archive),
+with `-` for unset attributes. **Native hex** shows the full Windows bitmask.
+Click an attribute value in a metadata view to toggle that view's format.
 
 ## Notifications
 

@@ -45,8 +45,10 @@ Permission rendering ports `src/utils/format.rs`'s complete `mode_to_rwx`,
 `src/platform/unix.rs`/`src/platform/mod.rs` at the same lsplus revision.
 The five original permission tests from `tests/format.rs` are retained alongside
 native link/special-bit and missing-metadata tests. TFM uses cached full native
-mode bits, never follows link targets for permissions, and leaves Windows
-attributes intact for either preference. No Unix permissions are fabricated.
+mode and Windows attribute bits without following link targets for permissions.
+Windows RHSA positions adapt `MINIMAL_ATTRIBUTES` in `src/platform/windows.rs`
+at that revision; native hexadecimal display retains the full attribute mask.
+No Unix permissions are fabricated.
 
 Entry/column colours adapt `src/utils/file.rs::colorize_name` and
 `src/utils/render.rs`'s permission, size and timestamp style classifiers at that

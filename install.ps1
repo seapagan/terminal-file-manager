@@ -197,6 +197,15 @@ function Save-Asset([string]$Url, [string]$Destination) {
     Save-RemoteAsset -Url $Url -Destination $Destination
 }
 
+function Get-Sha256([string]$Path) {
+    # PS5.1's path-based Get-FileHash uses a module-scoped ForEach-Object
+    # property lookup that inherited WhatIf preferences can decline. Hash the
+    # literal file stream so approved verification and rollback still run.
+    $stream = [IO.File]::OpenRead($Path)
+    try { return (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash }
+    finally { $stream.Dispose() }
+}
+
 function Assert-Checksum([string]$Archive, [string]$Sidecar) {
     if (-not (Test-Path -LiteralPath $Sidecar -PathType Leaf)) { Die -Message 'checksum sidecar is missing' }
     $bytes = [IO.File]::ReadAllBytes($Sidecar)
@@ -207,7 +216,7 @@ function Assert-Checksum([string]$Archive, [string]$Sidecar) {
         Die -Message 'checksum verification failed'
     }
     $expected = $Matches[1]
-    $actual = (Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash
+    $actual = Get-Sha256 -Path $Archive
     if (-not $actual.Equals($expected, [StringComparison]::OrdinalIgnoreCase)) {
         Die -Message 'checksum verification failed'
     }
@@ -344,7 +353,7 @@ function Get-FinalIdentity([string]$Path) {
     $item = Get-PathItem -Path $Path
     if (-not $item) { return 'absent' }
     Assert-RegularFile -Path $Path
-    return "$($item.CreationTimeUtc.Ticks):$($item.LastWriteTimeUtc.Ticks):$($item.Length):$((Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash)"
+    return "$($item.CreationTimeUtc.Ticks):$($item.LastWriteTimeUtc.Ticks):$($item.Length):$(Get-Sha256 -Path $Path)"
 }
 
 function New-OwnedFile {
@@ -359,7 +368,7 @@ function New-OwnedFile {
 
 function Restore-Backup([string]$Backup, [string]$Final, [string]$OldHash) {
     if (-not (Test-Path -LiteralPath $Backup -PathType Leaf) -or
-        (Get-FileHash -LiteralPath $Backup -Algorithm SHA256).Hash -ne $OldHash) {
+        (Get-Sha256 -Path $Backup) -ne $OldHash) {
         Die -Message "replacement failed; recovery material retained at $Backup"
     }
     try {
@@ -413,7 +422,7 @@ function Complete-BackupCleanup([string]$Backup, [string]$Final, [string]$OldHas
         $verified = $false
         try {
             $verified = (Test-Path -LiteralPath $Backup -PathType Leaf) -and
-                (Get-FileHash -LiteralPath $Backup -Algorithm SHA256).Hash -eq $OldHash
+                (Get-Sha256 -Path $Backup) -eq $OldHash
         } catch { $verified = $false }
         if ($verified) {
             Die -Message "replacement succeeded; backup cleanup failed; recovery required; SHA256-verified original retained at ${Backup}: $($_.Exception.Message)"
@@ -445,7 +454,7 @@ function Install-Candidate {
         if ($before -eq 'absent') { [IO.File]::Move($stage, $final) }
         else {
             Assert-ReplaceableFile -Final $final
-            $oldHash = (Get-FileHash -LiteralPath $final -Algorithm SHA256).Hash
+            $oldHash = Get-Sha256 -Path $final
             $backup = New-OwnedFile -Directory $installDir -Confirm:$false -WhatIf:$false
             try { Move-StagedFile -Stage $stage -Final $final -Backup $backup }
             catch {
@@ -461,8 +470,8 @@ function Install-Candidate {
             }
         }
         Assert-RegularFile -Path $final
-        if ((Get-FileHash -LiteralPath $final -Algorithm SHA256).Hash -ne
-            (Get-FileHash -LiteralPath $Candidate -Algorithm SHA256).Hash) {
+        if ((Get-Sha256 -Path $final) -ne
+            (Get-Sha256 -Path $Candidate)) {
             if ($backup) { Restore-Backup -Backup $backup -Final $final -OldHash $oldHash }
             Die -Message 'replacement did not preserve candidate bytes'
         }

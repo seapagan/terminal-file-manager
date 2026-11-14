@@ -1,5 +1,34 @@
 use super::*;
 
+#[cfg(windows)]
+#[test]
+fn native_windows_attribute_click_toggles_only_the_open_metadata_view() {
+    for floating in [false, true] {
+        let (_root, mut c) = loaded();
+        let path = c.app.details[0].path.as_ref().unwrap();
+        let entry = fs::inspect(path);
+        assert!(entry.mode.is_none());
+        let symbolic =
+            terminal_file_manager::permissions::attributes(&entry, PermissionDisplay::Symbolic);
+        let native = entry.attributes.clone();
+        c.app.details[0].entry = Some(entry);
+        c.app.popup = floating;
+        let buffer = draw(&c.app, 120, 32, ColorLevel::NoColor);
+        let geometry = ui::geometry(&c.app, buffer.area);
+        let (x, y) = visible_value(&buffer, &geometry, &symbolic);
+        click(&mut c, x, y, &geometry);
+        assert_eq!(
+            c.app.metadata_format(floating).permissions,
+            PermissionDisplay::Octal
+        );
+        assert_eq!(c.app.panes[0].permissions, PermissionDisplay::Symbolic);
+        assert_eq!(c.preferences.permissions, PermissionDisplay::Symbolic);
+        assert!(!c.preferences_changed);
+        let buffer = draw(&c.app, 120, 32, ColorLevel::NoColor);
+        visible_value(&buffer, &ui::geometry(&c.app, buffer.area), &native);
+    }
+}
+
 #[test]
 fn metadata_attributes_keep_symbolic_and_octal_character_styles_at_every_depth() {
     let (_root, mut c) = loaded();
@@ -157,6 +186,7 @@ fn native_attribute_text_survives_both_formats_and_excess_scroll_resize() {
     let (_root, mut c) = loaded();
     let entry = c.app.details[0].entry.as_mut().unwrap();
     entry.mode = None;
+    entry.windows_attributes = None;
     entry.attributes = "readonly, hidden".into();
     for format in [PermissionDisplay::Symbolic, PermissionDisplay::Octal] {
         c.app.panes[0].permissions = format;

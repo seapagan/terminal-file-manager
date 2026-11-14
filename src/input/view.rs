@@ -112,7 +112,7 @@ pub(crate) fn rows(app: &App, preferred: MetadataPresentation) -> Vec<(String, S
     let values = vec![
         check(pane.human_sizes),
         check(pane.fuzzy_timestamps),
-        format!("{:?}", pane.permissions),
+        pane.permissions.label().into(),
         if pane.show_hidden { "Show" } else { "Hide" }.into(),
         format!("{:?}", pane.ignore),
         format!("{:?}", pane.sort.grouping),
