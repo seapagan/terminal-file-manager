@@ -9,7 +9,7 @@ use terminal_file_manager::{
 fn formats() -> [(PermissionDisplay, &'static str, u16); 2] {
     if cfg!(windows) {
         [
-            (PermissionDisplay::Symbolic, "RHSA", 4),
+            (PermissionDisplay::Symbolic, "Attr", 4),
             (PermissionDisplay::Octal, "Hex", 10),
         ]
     } else {

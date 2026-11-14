@@ -14,7 +14,7 @@ impl PermissionDisplay {
     /// Compact listing heading for the host's existing attribute formats.
     pub const fn column_heading(self) -> &'static str {
         match self {
-            Self::Symbolic if cfg!(windows) => "RHSA",
+            Self::Symbolic if cfg!(windows) => "Attr",
             Self::Symbolic => "Mode",
             Self::Octal if cfg!(windows) => "Hex",
             Self::Octal => "Octal",
