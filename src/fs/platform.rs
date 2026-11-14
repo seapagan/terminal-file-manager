@@ -89,6 +89,17 @@ pub(super) fn attributes(metadata: &Metadata) -> String {
     format!("0x{:08x}", metadata.file_attributes())
 }
 
+#[cfg(windows)]
+pub(super) fn windows_attributes(metadata: &Metadata) -> Option<u32> {
+    use std::os::windows::fs::MetadataExt;
+    Some(metadata.file_attributes())
+}
+
+#[cfg(unix)]
+pub(super) fn windows_attributes(_metadata: &Metadata) -> Option<u32> {
+    None
+}
+
 #[cfg(unix)]
 pub(super) fn object(_path: &Path, metadata: &Metadata) -> io::Result<Option<(u64, u64)>> {
     use std::os::unix::fs::MetadataExt;

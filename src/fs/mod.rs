@@ -50,6 +50,8 @@ pub struct Entry {
     pub created: Option<SystemTime>,
     pub accessed: Option<SystemTime>,
     pub attributes: String,
+    /// Full no-follow Windows attribute bits; absent on Unix or metadata failure.
+    pub windows_attributes: Option<u32>,
     pub mode: Option<u32>,
     pub owner: Option<crate::owner::Ownership>,
     pub hidden: bool,
@@ -195,6 +197,7 @@ fn inspect_no_follow(path: &Path, owners: Option<&mut crate::owner::Cache>) -> E
         created: None,
         accessed: None,
         attributes: String::new(),
+        windows_attributes: None,
         mode: None,
         owner: None,
         hidden: false,
@@ -219,6 +222,7 @@ fn fill(entry: &mut Entry, metadata: &Metadata, owners: Option<&mut crate::owner
     entry.hidden = platform::hidden(&entry.name, metadata);
     entry.executable = platform::executable(metadata);
     entry.attributes = platform::attributes(metadata);
+    entry.windows_attributes = platform::windows_attributes(metadata);
     entry.mode = platform::mode(metadata);
     entry.owner = owners.and_then(|owners| platform::owner(metadata, owners));
     entry.size = Some(metadata.len());
