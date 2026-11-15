@@ -4,10 +4,20 @@ use crate::fs::Entry;
 use ratatui::style::Style;
 
 impl Theme {
+    /// System filenames use the shared red accent; type indicators keep their style.
+    pub fn name_style(&self, entry: &Entry) -> Style {
+        let style = self.entry_style(entry);
+        if entry.is_system() {
+            style.patch(self.style(Role::System))
+        } else {
+            style
+        }
+    }
+
     /// Keep faint effective on VTE, which ignores it on direct RGB foregrounds.
     /// Cursor styling is applied afterwards and retains precedence.
     pub fn ignored_name_style(&self, entry: &Entry, active: bool) -> Style {
-        let style = self.entry_style(entry).patch(self.style(Role::Ignored));
+        let style = self.name_style(entry).patch(self.style(Role::Ignored));
         let inherited = active
             .then(|| self.style(Role::ActivePane))
             .and_then(|s| s.fg);

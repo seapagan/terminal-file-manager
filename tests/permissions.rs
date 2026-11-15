@@ -9,7 +9,9 @@ fn unix_modes_preserve_special_bits_and_file_types() {
     let root = tempfile::tempdir().unwrap();
     for (mode, symbolic, octal) in [
         (0o100644, "-rw-r--r--", "0644"),
+        (0o100664, "-rw-rw-r--", "0664"),
         (0o040755, "drwxr-xr-x", "0755"),
+        (0o040775, "drwxrwxr-x", "0775"),
         (0o120777, "lrwxrwxrwx", "0777"),
         (0o104755, "-rwsr-xr-x", "4755"),
         (0o104644, "-rwSr--r--", "4644"),
@@ -18,16 +20,18 @@ fn unix_modes_preserve_special_bits_and_file_types() {
         (0o041755, "drwxr-xr-t", "1755"),
         (0o041644, "drw-r--r-T", "1644"),
         (0o107777, "-rwsrwsrwt", "7777"),
+        (0o010000, "p---------", "0000"),
+        (0o020600, "crw-------", "0600"),
+        (0o060660, "brw-rw----", "0660"),
+        (0o140600, "srw-------", "0600"),
+        (0o177777, "?rwsrwsrwt", "7777"),
     ] {
         assert_eq!(mode_to_rwx(mode), &symbolic[1..]);
         assert_eq!(mode_to_octal(mode), octal);
         let mut entry = fs::inspect(&root.path().join("missing"));
         entry.mode = Some(mode);
         assert_eq!(attributes(&entry, PermissionDisplay::Symbolic), symbolic);
-        assert_eq!(
-            attributes(&entry, PermissionDisplay::Octal),
-            format!("{} {octal}", &symbolic[..1])
-        );
+        assert_eq!(attributes(&entry, PermissionDisplay::Octal), octal);
     }
 }
 
@@ -40,6 +44,21 @@ fn unavailable_modes_never_invent_unix_permissions() {
         "unavailable"
     );
     assert_eq!(attributes(&entry, PermissionDisplay::Octal), "unavailable");
+}
+
+#[test]
+fn cached_windows_bits_determine_both_formats_without_filesystem_access() {
+    let root = tempfile::tempdir().unwrap();
+    let mut entry = fs::inspect(&root.path().join("missing"));
+    for (bits, symbolic, native) in [
+        (0, "----", "0x00000000"),
+        (0x8000_0027, "RHSA", "0x80000027"),
+        (0x10, "----", "0x00000010"),
+    ] {
+        entry.windows_attributes = Some(bits);
+        assert_eq!(attributes(&entry, PermissionDisplay::Symbolic), symbolic);
+        assert_eq!(attributes(&entry, PermissionDisplay::Octal), native);
+    }
 }
 
 #[cfg(unix)]
@@ -63,17 +82,18 @@ fn native_symlink_modes_describe_the_link_itself() {
 
 #[cfg(windows)]
 #[test]
-fn windows_native_attributes_survive_both_permission_preferences() {
+fn windows_native_attributes_support_symbolic_and_native_preferences() {
+    use std::os::windows::fs::MetadataExt;
     let root = tempfile::tempdir().unwrap();
     let entry = fs::inspect(root.path());
     assert!(entry.mode.is_none());
-    assert_eq!(
-        attributes(&entry, PermissionDisplay::Symbolic),
-        entry.attributes
-    );
+    assert_eq!(attributes(&entry, PermissionDisplay::Symbolic), "----");
+    let native = std::fs::symlink_metadata(root.path())
+        .unwrap()
+        .file_attributes();
     assert_eq!(
         attributes(&entry, PermissionDisplay::Octal),
-        entry.attributes
+        format!("0x{native:08x}")
     );
 }
 

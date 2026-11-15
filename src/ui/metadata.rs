@@ -42,7 +42,8 @@ impl Field {
             && let Some(entry) = &detail.entry
         {
             self.value = Line::from(permission_spans(entry, format.permissions, theme));
-            self.action = entry.mode.map(|_| Action::Permissions);
+            self.action = (entry.mode.is_some() || entry.windows_attributes.is_some())
+                .then_some(Action::Permissions);
         } else if self.label == "Owner/group" {
             self.action = Some(Action::OwnerDisplay);
         } else if time_label(self.label) {

@@ -73,8 +73,10 @@ fn assert_detected_policy(expected: &str) {
         expected
     };
     assert_eq!(format!("{terminal:?}"), terminal_expected);
-    let style = Theme::new(level).style(Role::Directory);
-    assert_eq!(style.fg.is_none(), expected == "NoColor");
+    for role in [Role::Directory, Role::Attribute] {
+        let style = Theme::new(level).style(role);
+        assert_eq!(style.fg.is_none(), expected == "NoColor");
+    }
     assert_rendered_policy(level);
 }
 

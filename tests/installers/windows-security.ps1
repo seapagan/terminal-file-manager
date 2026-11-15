@@ -7,6 +7,25 @@ New-Item -ItemType Directory -Path $securityRoot | Out-Null
 $securityPasses = 0
 $securitySkipped = 0
 . (Join-Path -Path $PSScriptRoot -ChildPath '../../install.ps1')
+# Invalid PE fixtures must return loader errors without interactive Windows UI.
+# Process-wide scope also covers native invocation threads and child processes.
+$savedErrorMode = $null
+if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+    if (-not ('TfmFixtureErrorMode' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System.Runtime.InteropServices;
+public static class TfmFixtureErrorMode {
+    [DllImport("kernel32.dll")]
+    public static extern uint GetErrorMode();
+    [DllImport("kernel32.dll")]
+    public static extern uint SetErrorMode(uint mode);
+}
+'@
+    }
+    $savedErrorMode = [TfmFixtureErrorMode]::GetErrorMode()
+    # SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX; retain existing flags.
+    [void][TfmFixtureErrorMode]::SetErrorMode($savedErrorMode -bor 0x8001)
+}
 # A test-only exception boundary permits independent negative assertions.
 function Die([string]$Message) { throw $Message }
 
@@ -25,6 +44,23 @@ function Assert-Rejected([scriptblock]$Action, [string]$Reason, [string]$Expecte
 function Assert-Equal([object]$Actual, [object]$Expected, [string]$Reason) {
     if ($Actual -cne $Expected) { throw "${Reason}: expected $Expected, got $Actual" }
     $script:securityPasses++
+}
+
+function Assert-RelativeHash {
+    $path = Join-Path -Path $securityRoot -ChildPath 'hash[fixture].txt'
+    [IO.File]::WriteAllText($path, 'abc', [Text.Encoding]::ASCII)
+    $processDirectory = [Environment]::CurrentDirectory
+    Push-Location -LiteralPath $securityRoot
+    try {
+        [Environment]::CurrentDirectory = [IO.Path]::GetTempPath()
+        $WhatIfPreference = $true
+        Assert-Equal -Actual (Get-Sha256 -Path 'hash[fixture].txt') `
+            -Expected 'BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD' `
+            -Reason 'relative literal hash under inherited WhatIf'
+    } finally {
+        [Environment]::CurrentDirectory = $processDirectory
+        Pop-Location
+    }
 }
 
 function Assert-VersionMessages {
@@ -166,9 +202,11 @@ function Invoke-ControlledAction([string]$Action, [string]$Answer = 'N') {
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 try {
+    Assert-RelativeHash
     Assert-InstallRejectionOrder
     # Inject failures into the real legacy TLS block without changing host TLS.
-    Add-Type -TypeDefinition @'
+    if (-not ('TfmTlsFixture' -as [type])) {
+        Add-Type -TypeDefinition @'
 using System;
 using System.Net;
 public static class TfmTlsFixture {
@@ -184,12 +222,14 @@ public static class TfmTlsFixture {
     }
 }
 '@
+    }
     $installerPath = Join-Path -Path $PSScriptRoot -ChildPath '../../install.ps1'
     $installerAst = [Management.Automation.Language.Parser]::ParseFile($installerPath, [ref]$null, [ref]$null)
     $legacy = @($installerAst.EndBlock.Statements | Where-Object -FilterScript {
         $_ -is [Management.Automation.Language.IfStatementAst]
     })[0].Clauses[0].Item2.Statements[0].Extent.Text
     $tlsAction = [scriptblock]::Create($legacy.Replace('[Net.ServicePointManager]', '[TfmTlsFixture]'))
+    [TfmTlsFixture]::Failure = 0
     [TfmTlsFixture]::Protocol = 0
     & $tlsAction
     Assert-Equal -Actual ([int][TfmTlsFixture]::Protocol) -Expected 3072 -Reason 'TLS 1.2 not enabled'
@@ -556,6 +596,7 @@ fn main() {
         Write-Information -MessageData 'SKIP: eighteen native Windows candidate-launch/running-file/preflight/architecture/lock/read-only/denied-path/junction assertions; transaction successes above are Unix simulations.' -InformationAction Continue
     }
 } finally {
+    if ($null -ne $savedErrorMode) { [void][TfmFixtureErrorMode]::SetErrorMode($savedErrorMode) }
     Remove-Item -LiteralPath $securityRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 Write-Information -MessageData "PowerShell security tests passed: $securityPasses assertions ($securitySkipped native assertions skipped)." -InformationAction Continue

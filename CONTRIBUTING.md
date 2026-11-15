@@ -75,12 +75,27 @@ input tests use cached state/TestBackend, independently of a real terminal.
 
 ## Local verification
 
-Install stable Rust with `rustfmt`, Clippy and `llvm-tools-preview`, plus
+Install [stable Rust](https://www.rust-lang.org/tools/install) with `rustfmt`,
+Clippy and `llvm-tools-preview`, plus
 `cargo-make`, `cargo-nextest`, `cargo-llvm-cov`, `cargo-audit`, `cargo-deny`,
 `actionlint`, `ShellCheck` and `zizmor`. Full verification also uses Python
 3.10+, Ruff, mypy and Lizard 1.24.3 for static support-code checks and source
 complexity analysis. Install and verify required tools before running the
 corresponding tasks; missing prerequisites must not be treated as passing.
+
+On Windows, Linux and macOS, [uv-managed Python](https://docs.astral.sh/uv/guides/install-python/)
+is an alternative when your system interpreter is missing or unsuitable. To
+expose unversioned `python` and `python3` executables on PATH:
+
+```sh
+uv python install --default
+uv python update-shell
+```
+
+Open a new terminal after updating PATH and check `python --version` (Windows)
+or `python3 --version` (Unix). These commands expose a base interpreter;
+project virtual environments remain separate. You do not need a repository
+`.venv` to run the support scripts. Install the listed QC tools on PATH too.
 
 | Command | Purpose |
 | --- | --- |
@@ -128,6 +143,21 @@ The individual `msrv`, `msrv-version`, `package` and
 `package-list` commands remain available and strict. No aggregate requires
 `package-list`. CI continues to enforce its separate exact-MSRV and Source
 Package jobs, including the hosted package inventory policy.
+
+### Native Windows setup
+
+Enable [Windows Developer Mode](https://learn.microsoft.com/en-us/windows/advanced-settings/developer-mode)
+for symbolic-link test fixtures. Without the required privilege, Windows can
+return error 1314 (`ERROR_PRIVILEGE_NOT_HELD`). An elevated terminal is an
+alternative; ordinary development does not require elevation.
+
+`verify-infra` exercises PowerShell 7 and Windows PowerShell 5.1. Both hosts must
+permit the local scripts under your approved execution policy. If launching
+5.1 from Store-installed PS7 resolves PS7's built-in modules instead of its own
+(for example, `Get-FileHash` is missing), remove PS7's built-in `Modules` directory
+from the parent session's `PSModulePath` before running the task. Keep the native
+Windows PowerShell and shared module directories. This is a session environment
+correction; do not change installed modules or machine policy to bypass a gate.
 
 ### Linux Windows cross-verification
 

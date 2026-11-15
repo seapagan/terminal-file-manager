@@ -194,7 +194,7 @@ fn columns(pane: &Pane, width: u16) -> (Vec<Constraint>, Vec<Cell<'static>>) {
         (16, modified_header(pane.fuzzy_timestamps), columns.modified),
         (
             pane.measurements.attributes,
-            "Mode/attrs",
+            pane.permissions.column_heading(),
             columns.attributes,
         ),
         (pane.measurements.owner.min(24), "Owner", columns.owner),
@@ -284,7 +284,7 @@ fn identity_cells(
         if pane.ignore == IgnoreMode::Dim && entry.ignored == Some(true) {
             theme.ignored_name_style(entry, active)
         } else {
-            theme.entry_style(entry)
+            theme.name_style(entry)
         },
     );
     let marked = pane.marks.contains_key(&entry.path);
@@ -339,19 +339,32 @@ pub(super) fn permission_spans(
     theme: &Theme,
 ) -> Vec<Span<'static>> {
     let text = crate::permissions::attributes(entry, permissions);
-    text.chars()
+    let windows_symbolic =
+        crate::permissions::windows_symbolic_attributes(entry, permissions).is_some();
+    let numeric_attributes = permissions == crate::permissions::PermissionDisplay::Octal
+        && (entry.mode.is_some() || entry.windows_attributes.is_some());
+    Line::raw(text)
+        .styled_graphemes(Style::default())
         .enumerate()
         .map(|(index, value)| {
-            let style = if index == 0 {
+            let style = if windows_symbolic {
+                theme.style(if value.symbol == "-" {
+                    Role::Muted
+                } else {
+                    Role::Attribute
+                })
+            } else if numeric_attributes {
+                theme.style(Role::Attribute)
+            } else if index == 0 {
                 theme.entry_style(entry)
             } else if entry.mode.is_some()
                 && permissions == crate::permissions::PermissionDisplay::Symbolic
             {
-                theme.permission_style(value)
+                theme.permission_style(value.symbol.chars().next().unwrap_or('?'))
             } else {
                 theme.style(Role::Warning)
             };
-            Span::styled(value.to_string(), style)
+            Span::styled(value.symbol.to_owned(), style)
         })
         .collect()
 }

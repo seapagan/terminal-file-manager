@@ -51,7 +51,7 @@ pub(super) fn revalidate(expected: &Entry, contents: bool) -> Result<()> {
     if fresh.kind != expected.kind
         || !same
         || fresh.link_target != expected.link_target
-        || fresh.attributes != expected.attributes
+        || fresh.native_attributes() != expected.native_attributes()
         || ownership(&fresh) != ownership(expected)
     {
         return Err(changed("Source/object changed; fresh review required"));

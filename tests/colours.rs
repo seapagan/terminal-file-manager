@@ -11,6 +11,13 @@ use terminal_file_manager::{
     ui,
 };
 
+#[cfg(windows)]
+#[path = "colours/windows.rs"]
+mod windows;
+
+#[path = "colours/unix_attributes.rs"]
+mod unix_attributes;
+
 #[test]
 fn lsplus_type_accents_preserve_semantics_without_ansi_strings() {
     let root = tempfile::tempdir().unwrap();
@@ -243,6 +250,17 @@ fn permission_spans_preserve_exact_styles_at_each_colour_depth() {
                 expected_style(level, colour, bold, dim)
             );
         }
+    }
+}
+
+#[test]
+fn attribute_role_resolves_restrained_green_at_each_colour_depth() {
+    use terminal_file_manager::color::Role;
+    for level in LEVELS {
+        assert_eq!(
+            Theme::new(level).style(Role::Attribute),
+            expected_style(level, Some(Color::Green), false, false)
+        );
     }
 }
 

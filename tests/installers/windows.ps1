@@ -42,10 +42,15 @@ $resolvedInstaller = (Resolve-Path -Path $installer).Path
 # or installation. Native success tests invoke the unmodified installer.
 $portableWrapper = Join-Path -Path $root -ChildPath 'portable.ps1'
 $escapedInstaller = $resolvedInstaller.Replace("'", "''")
+# Capture portable errors before host formatting; native cases use the entry point.
 [IO.File]::WriteAllText($portableWrapper, @"
 . '$escapedInstaller'
 function Get-NativeArchitecture { return `$env:TFM_TEST_ARCHITECTURE }
-Invoke-Install
+try { Invoke-Install }
+catch {
+    [Console]::Error.WriteLine(`$_.Exception.Message)
+    exit 1
+}
 "@)
 $hostExecutable = if ($PSVersionTable.PSVersion.Major -lt 6) {
     Join-Path -Path $PSHOME -ChildPath 'powershell.exe'

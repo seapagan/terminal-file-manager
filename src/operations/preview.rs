@@ -246,7 +246,7 @@ fn same_entry(before: &Entry, after: &Entry) -> bool {
     let ownership = |entry: &Entry| entry.owner.as_ref().map(|owner| (owner.uid, owner.gid));
     before.identity == after.identity
         && before.kind == after.kind
-        && before.attributes == after.attributes
+        && before.native_attributes() == after.native_attributes()
         && before.link_target == after.link_target
         && ownership(before) == ownership(after)
 }

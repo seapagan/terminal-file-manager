@@ -244,7 +244,7 @@ fn native_metadata_changes_update_the_selected_detail_without_cursor_motion() {
             p.current().is_some_and(|e| {
                 e.size == expected.size
                     && e.mode == expected.mode
-                    && e.attributes == expected.attributes
+                    && e.native_attributes() == expected.native_attributes()
             })
         })
     });
@@ -252,8 +252,8 @@ fn native_metadata_changes_update_the_selected_detail_without_cursor_motion() {
     assert_eq!(app.details[0].entry.as_ref().unwrap().mode, expected.mode);
     assert_eq!(app.details[0].entry.as_ref().unwrap().size, Some(24));
     assert_eq!(
-        app.details[0].entry.as_ref().unwrap().attributes,
-        expected.attributes
+        app.details[0].entry.as_ref().unwrap().native_attributes(),
+        expected.native_attributes()
     );
     assert_eq!(app.panes[0].cursor.as_deref(), Some(path.as_path()));
     assert!(app.popup);
