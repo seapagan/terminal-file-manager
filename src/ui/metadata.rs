@@ -215,6 +215,10 @@ fn entry_fields(
         ),
         ("Owner/group", entry.owner_display(pane.owner_display)),
     ];
+    #[cfg(windows)]
+    if let Some(error) = entry.windows_owner.error() {
+        fields.push(("Owner error", error.into()));
+    }
     fields.extend(link_field(entry));
     if let Some(error) = &entry.error {
         fields.push(("Error", error.clone()));
