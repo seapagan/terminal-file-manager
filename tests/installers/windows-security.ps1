@@ -205,7 +205,8 @@ try {
     Assert-RelativeHash
     Assert-InstallRejectionOrder
     # Inject failures into the real legacy TLS block without changing host TLS.
-    Add-Type -TypeDefinition @'
+    if (-not ('TfmTlsFixture' -as [type])) {
+        Add-Type -TypeDefinition @'
 using System;
 using System.Net;
 public static class TfmTlsFixture {
@@ -221,6 +222,7 @@ public static class TfmTlsFixture {
     }
 }
 '@
+    }
     $installerPath = Join-Path -Path $PSScriptRoot -ChildPath '../../install.ps1'
     $installerAst = [Management.Automation.Language.Parser]::ParseFile($installerPath, [ref]$null, [ref]$null)
     $legacy = @($installerAst.EndBlock.Statements | Where-Object -FilterScript {
