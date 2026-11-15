@@ -21,6 +21,7 @@ pub enum Role {
     Directory,
     Executable,
     System,
+    Attribute,
     Link,
     Warning,
     Ignored,
@@ -347,7 +348,7 @@ fn role_accent(role: Role) -> Option<AnsiColor> {
     match role {
         Role::Header | Role::Link | Role::Label | Role::Key | Role::Hidden => Some(AnsiColor::Cyan),
         Role::Muted => Some(AnsiColor::BrightBlack),
-        Role::Status => Some(AnsiColor::Green),
+        Role::Status | Role::Attribute => Some(AnsiColor::Green),
         Role::Error | Role::System => Some(AnsiColor::Red),
         Role::Directory => Some(AnsiColor::Blue),
         Role::Executable => Some(AnsiColor::Green),

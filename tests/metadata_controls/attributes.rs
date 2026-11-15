@@ -54,7 +54,7 @@ fn metadata_attributes_keep_symbolic_and_octal_character_styles_at_every_depth()
                     } else if format == PermissionDisplay::Symbolic {
                         theme.permission_style(ch)
                     } else {
-                        theme.style(Role::Warning)
+                        theme.style(Role::Attribute)
                     };
                     let cell = &buffer[(x + i as u16, y)];
                     assert_eq!(cell.fg, style.fg.unwrap_or_default(), "{level:?} {ch}");

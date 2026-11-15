@@ -253,6 +253,17 @@ fn permission_spans_preserve_exact_styles_at_each_colour_depth() {
     }
 }
 
+#[test]
+fn attribute_role_resolves_restrained_green_at_each_colour_depth() {
+    use terminal_file_manager::color::Role;
+    for level in LEVELS {
+        assert_eq!(
+            Theme::new(level).style(Role::Attribute),
+            expected_style(level, Some(Color::Green), false, false)
+        );
+    }
+}
+
 fn ignored_executable_app(root: &std::path::Path) -> App {
     let mut app = App::new(root.to_path_buf());
     app.complete_listing(

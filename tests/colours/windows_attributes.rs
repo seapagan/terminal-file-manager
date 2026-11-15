@@ -40,7 +40,7 @@ fn prepare_attributes(app: &mut App, flags: u32, state: u8, display: PermissionD
 }
 
 #[test]
-fn windows_symbolic_flags_use_normal_or_muted_cells_with_cursor_precedence() {
+fn windows_symbolic_flags_use_attribute_or_muted_cells_with_cursor_precedence() {
     for directory in [false, true] {
         let (_root, mut app) = system_fixture(directory);
         for level in LEVELS {
@@ -56,20 +56,20 @@ fn windows_symbolic_flags_use_normal_or_muted_cells_with_cursor_precedence() {
 }
 
 #[test]
-fn windows_hexadecimal_cells_keep_type_warning_and_cursor_styles() {
+fn windows_hexadecimal_cells_use_attribute_style_with_cursor_precedence() {
     for directory in [false, true] {
         let (_root, mut app) = system_fixture(directory);
         for level in LEVELS {
             for state in 0..4 {
                 prepare_attributes(&mut app, 4, state, PermissionDisplay::Octal);
                 let buffer = draw(&app, &Theme::new(level), 240);
-                assert_hex_cells(&buffer, &app, level, directory);
+                assert_hex_cells(&buffer, &app, level);
             }
         }
     }
 }
 
-fn assert_hex_cells(buffer: &Buffer, app: &App, level: ColorLevel, directory: bool) {
+fn assert_hex_cells(buffer: &Buffer, app: &App, level: ColorLevel) {
     for (id, area) in ui::geometry(app, buffer.area).panes.iter().enumerate() {
         let area = area.unwrap();
         let (x, y) = (area.x + 25, area.y + 3);
@@ -80,14 +80,7 @@ fn assert_hex_cells(buffer: &Buffer, app: &App, level: ColorLevel, directory: bo
             let mut expected = normal.clone();
             expected.set_symbol(&symbol.to_string());
             if pane.cursor.is_none() {
-                let colour = if offset != 0 {
-                    Color::Yellow
-                } else if directory {
-                    Color::Blue
-                } else {
-                    Color::Green
-                };
-                let style = expected_style(level, Some(colour), offset == 0 && !directory, false);
+                let style = expected_style(level, Some(Color::Green), false, false);
                 expected.fg = style.fg.unwrap_or(normal.fg);
                 expected.modifier |= style.add_modifier;
             }
@@ -123,6 +116,9 @@ fn assert_attribute_cells(
                 if level != ColorLevel::NoColor {
                     expected.fg = Color::DarkGray;
                 }
+            } else if !cursor {
+                let style = expected_style(level, Some(Color::Green), false, false);
+                expected.fg = style.fg.unwrap_or(normal.fg);
             }
             assert_eq!(cell, &expected, "{level:?} {flags:#x} pane {id}");
         }

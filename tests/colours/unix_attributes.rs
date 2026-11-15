@@ -15,7 +15,6 @@ fn unix_octal_digits_keep_the_same_style_for_different_file_types() {
         (EntryKind::Unknown, 0o177777, "7777"),
     ] {
         let pane = &mut app.panes[0];
-        pane.marks.clear();
         pane.entries[0].kind = kind;
         pane.entries[0].mode = Some(mode);
         pane.entries[0].hidden = false;
@@ -29,9 +28,11 @@ fn unix_octal_digits_keep_the_same_style_for_different_file_types() {
             owner: false,
         };
         pane.refilter();
-        pane.cursor = None;
-        for level in LEVELS {
-            assert_octal_cells(&app, level, octal);
+        for cursor in [false, true] {
+            app.panes[0].cursor = cursor.then(|| app.panes[0].entries[0].path.clone());
+            for level in LEVELS {
+                assert_octal_cells(&app, level, octal);
+            }
         }
     }
 }
@@ -45,7 +46,11 @@ fn assert_octal_cells(app: &App, level: ColorLevel, octal: &str) {
         })
         .unwrap();
     let buffer = terminal.backend().buffer();
-    let expected = expected_style(level, Some(Color::Yellow), false, false);
+    let expected = if app.panes[0].cursor.is_some() {
+        theme.style(terminal_file_manager::color::Role::Cursor)
+    } else {
+        expected_style(level, Some(Color::Green), false, false)
+    };
     for (offset, ch) in octal.chars().enumerate() {
         let cell = &buffer[(25 + offset as u16, 3)];
         assert_eq!(cell.symbol(), ch.to_string());
