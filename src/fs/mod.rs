@@ -69,6 +69,16 @@ pub struct Entry {
 }
 
 impl Entry {
+    /// Windows account resolution and access-time sampling do not change count inputs.
+    pub(crate) fn same_count_inputs(mut self, fresh: &Self) -> bool {
+        self.accessed = fresh.accessed;
+        #[cfg(windows)]
+        {
+            self.windows_owner = fresh.windows_owner.clone();
+        }
+        self.identity.is_some() && self.error.is_none() && self == *fresh
+    }
+
     /// Native attribute text from cached metadata, without filesystem access.
     pub fn native_attributes(&self) -> std::borrow::Cow<'_, str> {
         #[cfg(unix)]

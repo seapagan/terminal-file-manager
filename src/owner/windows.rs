@@ -1,6 +1,8 @@
 //! Cached Windows owner state. Native queries belong exclusively to workers.
 use super::OwnerDisplay;
 
+pub mod runtime;
+
 // Maintainer-approved exception for this read-only adapter. Keep pointer and
 // allocation ownership within native.rs; reassess when adding another API.
 #[allow(unsafe_code, reason = "Audited read-only Windows owner/SID adapter")]

@@ -135,8 +135,25 @@ fn show_time_tail(c: &mut Controller, bounds: Rect, floating: bool, tail: &str) 
 fn timestamp_continuations_remain_clickable_after_narrow_overlay_and_sidebar_scroll() {
     for (floating, width, tail) in [
         (true, 24, "00 (UTC)"),
-        (true, 40, "23456700 (UTC)"),
-        (false, 120, "6700 (UTC)"),
+        // Windows' Owner label leaves one more value cell than Owner/group.
+        (
+            true,
+            40,
+            if cfg!(windows) {
+                "3456700 (UTC)"
+            } else {
+                "23456700 (UTC)"
+            },
+        ),
+        (
+            false,
+            120,
+            if cfg!(windows) {
+                "700 (UTC)"
+            } else {
+                "6700 (UTC)"
+            },
+        ),
     ] {
         let (_root, mut c) = loaded();
         cached_times(&mut c);

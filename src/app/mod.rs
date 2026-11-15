@@ -344,11 +344,7 @@ impl App {
         let state = &self.panes[pane];
         let unchanged = previous
             .zip(state.current())
-            .is_some_and(|(mut old, fresh)| {
-                // Enumeration/counting can change access time without changing count inputs.
-                old.accessed = fresh.accessed;
-                old.identity.is_some() && old.error.is_none() && old == *fresh
-            });
+            .is_some_and(|(old, fresh)| old.same_count_inputs(fresh));
         if !unchanged {
             self.invalidate_listing_details(pane);
         } else if let Some(entry) = self.details[pane].entry.as_mut() {

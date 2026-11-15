@@ -3,6 +3,135 @@
 use std::sync::atomic::AtomicBool;
 use terminal_file_manager::{fs, owner::OwnerDisplay};
 
+fn security_owner_sid(path: &std::path::Path, root: &std::path::Path) -> String {
+    use std::{
+        process::{Command, Stdio},
+        time::{Duration, Instant},
+    };
+    let modules = std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap())
+        .join("System32/WindowsPowerShell/v1.0/Modules");
+    let mut child = Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command",
+            "(Get-Acl -LiteralPath $env:TFM_OWNER_FIXTURE).GetOwner([System.Security.Principal.SecurityIdentifier]).Value"])
+        .env("TFM_OWNER_FIXTURE", path).env("PSModulePath", modules)
+        .env("HOME", root).env("APPDATA", root).env("USERPROFILE", root)
+        .current_dir(root).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped())
+        .spawn().unwrap();
+    let deadline = Instant::now() + Duration::from_secs(15);
+    while child.try_wait().unwrap().is_none() {
+        if Instant::now() >= deadline {
+            child.kill().unwrap();
+            child.wait().unwrap();
+            panic!("Windows Get-Acl reference timed out");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let output = child.wait_with_output().unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout).unwrap().trim().to_owned()
+}
+
+fn loaded_numeric_view(
+    root: &std::path::Path,
+    path: &std::path::Path,
+) -> (terminal_file_manager::app::App, usize) {
+    use terminal_file_manager::app::App;
+    let snapshot = fs::list(
+        root,
+        &fs::IgnoreContext::isolated(),
+        &AtomicBool::new(false),
+    )
+    .unwrap();
+    let mut app = App::new(root.into());
+    for pane in &mut app.panes {
+        pane.owner_display = OwnerDisplay::Numeric;
+    }
+    app.panes[0].columns.owner = true;
+    app.complete_listing(0, 1, Ok(snapshot.clone()));
+    app.complete_listing(1, 1, Ok(snapshot));
+    let index = app.panes[0]
+        .entries
+        .iter()
+        .position(|entry| entry.path == path)
+        .unwrap();
+    app.panes[0].cursor = Some(path.into());
+    app.request_metadata(0).unwrap();
+    app.popup = true;
+    (app, index)
+}
+
+fn rendered_owner_text(app: &terminal_file_manager::app::App) -> String {
+    use ratatui::{Terminal, backend::TestBackend};
+    use terminal_file_manager::{color::Theme, ui};
+    let mut terminal = Terminal::new(TestBackend::new(240, 40)).unwrap();
+    terminal
+        .draw(|frame| {
+            ui::render(frame, app, &Theme::new(colored_text::ColorLevel::NoColor));
+        })
+        .unwrap();
+    terminal
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect()
+}
+
+#[test]
+fn native_runtime_updates_listing_popup_and_sidebar_to_the_actual_security_owner() {
+    use ratatui::layout::Rect;
+    use std::time::{Duration, Instant};
+    use terminal_file_manager::{
+        owner::windows::{Ownership, runtime::Runtime},
+        ui,
+    };
+    for directory in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let path = root
+            .path()
+            .join(if directory { "directory" } else { "file" });
+        if directory {
+            std::fs::create_dir(&path).unwrap();
+        } else {
+            std::fs::write(&path, b"x").unwrap();
+        }
+        let expected = security_owner_sid(&path, root.path());
+        assert!(expected.starts_with("S-1-"));
+        let (mut app, index) = loaded_numeric_view(root.path(), &path);
+        let geometry = ui::geometry(&app, Rect::new(0, 0, 240, 40));
+        let mut runtime = Runtime::new().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while matches!(
+            app.panes[0].entries[index].windows_owner,
+            Ownership::Pending
+        ) {
+            runtime.poll(&mut app, &geometry);
+            assert!(Instant::now() < deadline, "native ownership timed out");
+            std::thread::yield_now();
+        }
+        assert_eq!(
+            app.panes[0].entries[index].owner_display(OwnerDisplay::Numeric),
+            expected
+        );
+        assert_eq!(
+            app.details[0].entry.as_ref().unwrap().windows_owner,
+            app.panes[0].entries[index].windows_owner
+        );
+        for popup in [true, false] {
+            app.popup = popup;
+            app.sidebar = !popup;
+            let text = rendered_owner_text(&app);
+            assert!(text.contains("Owner:"), "{text}");
+            assert!(!text.contains("Owner/group:"));
+        }
+    }
+}
+
 #[test]
 fn native_owner_sid_and_known_account_preserve_numeric_identity() {
     use terminal_file_manager::owner::windows::{Name, read_sid, resolve_name};

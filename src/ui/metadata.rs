@@ -27,7 +27,7 @@ struct Field {
 impl Field {
     fn plain(label: &'static str, value: String, theme: &Theme) -> Self {
         let role = match label {
-            "Error" => Role::Error,
+            "Error" | "Owner error" => Role::Error,
             "Keys" => Role::Key,
             _ => Role::Value,
         };
@@ -44,7 +44,7 @@ impl Field {
             self.value = Line::from(permission_spans(entry, format.permissions, theme));
             self.action = (entry.mode.is_some() || entry.windows_attributes.is_some())
                 .then_some(Action::Permissions);
-        } else if self.label == "Owner/group" {
+        } else if self.label == crate::owner::METADATA_LABEL {
             self.action = Some(Action::OwnerDisplay);
         } else if time_label(self.label) {
             self.action = Some(Action::FuzzyTimestamps);
@@ -213,7 +213,10 @@ fn entry_fields(
             "Attributes",
             crate::permissions::attributes(entry, pane.permissions),
         ),
-        ("Owner/group", entry.owner_display(pane.owner_display)),
+        (
+            crate::owner::METADATA_LABEL,
+            entry.owner_display(pane.owner_display),
+        ),
     ];
     #[cfg(windows)]
     if let Some(error) = entry.windows_owner.error() {
