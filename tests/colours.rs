@@ -15,6 +15,9 @@ use terminal_file_manager::{
 #[path = "colours/windows.rs"]
 mod windows;
 
+#[path = "colours/unix_attributes.rs"]
+mod unix_attributes;
+
 #[test]
 fn lsplus_type_accents_preserve_semantics_without_ansi_strings() {
     let root = tempfile::tempdir().unwrap();

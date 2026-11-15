@@ -176,6 +176,9 @@ can save a named view. Profiles apply to the active pane unless you choose
 Metadata views show the highlighted entry's details. Press `c` within one to
 count directory contents and size; press it again to refresh the count.
 
+On Unix, choose **Symbolic** for the file type and permissions (`drwxrwxr-x`),
+or **Octal** for four permission digits (`0775`).
+
 On Windows, **Symbolic** shows `RHSA` (read-only, hidden, system, archive),
 with `-` for unset attributes. **Native hex** shows the full Windows bitmask.
 Click an attribute value in a metadata view to toggle that view's format.

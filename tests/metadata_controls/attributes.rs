@@ -49,7 +49,7 @@ fn metadata_attributes_keep_symbolic_and_octal_character_styles_at_every_depth()
                 let geometry = ui::geometry(&c.app, Rect::new(0, 0, 120, 32));
                 let (x, y) = visible_value(&buffer, &geometry, &value);
                 for (i, ch) in value.chars().enumerate() {
-                    let style = if i == 0 {
+                    let style = if i == 0 && format == PermissionDisplay::Symbolic {
                         theme.entry_style(entry)
                     } else if format == PermissionDisplay::Symbolic {
                         theme.permission_style(ch)
@@ -92,7 +92,7 @@ fn attribute_value_click_changes_only_the_open_metadata_view() {
         assert_eq!(restored.permissions, PermissionDisplay::Symbolic);
         let buffer = draw(&c.app, 120, 32, ColorLevel::NoColor);
         let geometry = ui::geometry(&c.app, Rect::new(0, 0, 120, 32));
-        let (x, y) = visible_value(&buffer, &geometry, "- 4754");
+        let (x, y) = visible_value(&buffer, &geometry, "4754");
         click(&mut c, x, y, &geometry);
         assert_eq!(c.app.panes[0].permissions, PermissionDisplay::Symbolic);
     }

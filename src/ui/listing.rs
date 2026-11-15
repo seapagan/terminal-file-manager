@@ -341,6 +341,8 @@ pub(super) fn permission_spans(
     let text = crate::permissions::attributes(entry, permissions);
     let windows_symbolic =
         crate::permissions::windows_symbolic_attributes(entry, permissions).is_some();
+    let unix_octal =
+        entry.mode.is_some() && permissions == crate::permissions::PermissionDisplay::Octal;
     Line::raw(text)
         .styled_graphemes(Style::default())
         .enumerate()
@@ -351,7 +353,7 @@ pub(super) fn permission_spans(
                 } else {
                     Role::Normal
                 })
-            } else if index == 0 {
+            } else if index == 0 && !unix_octal {
                 theme.entry_style(entry)
             } else if entry.mode.is_some()
                 && permissions == crate::permissions::PermissionDisplay::Symbolic

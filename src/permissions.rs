@@ -37,7 +37,7 @@ pub fn attributes(entry: &Entry, display: PermissionDisplay) -> String {
         let kind = file_type(mode);
         match display {
             PermissionDisplay::Symbolic => format!("{kind}{}", mode_to_rwx(mode)),
-            PermissionDisplay::Octal => format!("{kind} {}", mode_to_octal(mode)),
+            PermissionDisplay::Octal => mode_to_octal(mode),
         }
     } else if let Some(flags) = windows_symbolic_attributes(entry, display) {
         windows_symbolic(flags)

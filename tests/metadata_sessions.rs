@@ -129,7 +129,7 @@ fn both_panes_and_surfaces_toggle_locally_without_saving_or_changing_profiles() 
             assert_eq!(std::fs::read_to_string(&store.path).unwrap(), before);
             let rendered = text(&c);
             assert!(
-                rendered.contains("- 4754")
+                rendered.contains("4754")
                     && rendered.contains("yesterday")
                     && rendered.contains("12:34")
             );
@@ -183,7 +183,7 @@ fn popup_and_sidebar_invocations_are_independent_and_entry_changes_retain_choice
     let request = c.app.request_metadata(0).unwrap();
     assert_eq!(request.path, next.path);
     assert!(c.app.complete_metadata(&request, next, None));
-    assert!(text(&c).contains("- 4754"));
+    assert!(text(&c).contains("4754"));
     action(&mut c, Action::Metadata);
     assert_eq!(
         c.app.metadata_format(true).permissions,

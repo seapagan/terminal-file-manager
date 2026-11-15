@@ -15,7 +15,7 @@ fn formats() -> [(PermissionDisplay, &'static str, u16); 2] {
     } else {
         [
             (PermissionDisplay::Symbolic, "Attributes", 10),
-            (PermissionDisplay::Octal, "Attr", 6),
+            (PermissionDisplay::Octal, "Attr", 4),
         ]
     }
 }
@@ -46,6 +46,36 @@ fn native_attribute_widths_include_headings_values_and_only_visible_unavailable_
         pane.set_filter("界".into());
         assert_eq!(pane.measurements.attributes, expected);
         pane.entries.pop();
+    }
+}
+
+#[test]
+fn octal_unavailable_metadata_reflows_with_the_displayed_value() {
+    let (root, mut app) = loaded();
+    app.panes[0].permissions = PermissionDisplay::Octal;
+    app.panes[0].columns = Columns {
+        size: false,
+        modified: false,
+        attributes: true,
+        owner: false,
+    };
+    let heading = PermissionDisplay::Octal.column_heading();
+    let digits_width = 4.max(Line::raw(heading).width() as u16);
+    for (mode, value, expected) in [
+        (Some(0o040775), "0775", digits_width),
+        (None, "unavailable", 11),
+        (Some(0o177777), "7777", digits_width),
+    ] {
+        let mut entry = fs::inspect(&root.path().join("missing"));
+        entry.mode = mode;
+        app.panes[0].entries[0] = entry;
+        app.panes[0].refilter();
+        assert_eq!(
+            attributes(&app.panes[0].entries[0], PermissionDisplay::Octal),
+            value
+        );
+        assert_eq!(app.panes[0].measurements.attributes, expected);
+        assert_reflow(&app, heading, expected);
     }
 }
 
