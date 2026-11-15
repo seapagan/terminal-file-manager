@@ -76,7 +76,7 @@ fn assert_hex_cells(buffer: &Buffer, app: &App, level: ColorLevel, directory: bo
         let normal = &buffer[(area.right() - 2, y)];
         let pane = &app.panes[id];
         assert_eq!(pane.measurements.attributes, 10);
-        for (offset, symbol) in pane.entries[0].attributes.chars().enumerate() {
+        for (offset, symbol) in pane.entries[0].native_attributes().chars().enumerate() {
             let mut expected = normal.clone();
             expected.set_symbol(&symbol.to_string());
             if pane.cursor.is_none() {

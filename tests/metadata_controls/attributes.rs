@@ -10,7 +10,7 @@ fn native_windows_attribute_click_toggles_only_the_open_metadata_view() {
         assert!(entry.mode.is_none());
         let symbolic =
             terminal_file_manager::permissions::attributes(&entry, PermissionDisplay::Symbolic);
-        let native = entry.attributes.clone();
+        let native = entry.native_attributes().into_owned();
         c.app.details[0].entry = Some(entry);
         c.app.popup = floating;
         let buffer = draw(&c.app, 120, 32, ColorLevel::NoColor);
@@ -182,6 +182,7 @@ fn wrapped_scrolled_values_match_click_regions_and_exclude_padding_and_overlays(
 }
 
 #[test]
+#[cfg(unix)]
 fn native_attribute_text_survives_both_formats_and_excess_scroll_resize() {
     let (_root, mut c) = loaded();
     let entry = c.app.details[0].entry.as_mut().unwrap();

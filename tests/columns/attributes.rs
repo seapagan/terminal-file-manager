@@ -120,6 +120,7 @@ fn click_metadata_attributes(c: &mut Controller, geometry: &ui::Geometry) {
 }
 
 #[test]
+#[cfg(unix)]
 fn opaque_unicode_attributes_use_display_cells_and_render_without_clipping() {
     let (_root, mut app) = loaded();
     let pane = &mut app.panes[0];
@@ -155,6 +156,7 @@ fn draw(app: &App, width: u16) -> Buffer {
     terminal.backend().buffer().clone()
 }
 
+#[cfg(unix)]
 fn find(buffer: &Buffer, y: u16, text: &str) -> u16 {
     (0..buffer.area.width)
         .find(|x| {

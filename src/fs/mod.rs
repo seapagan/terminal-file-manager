@@ -51,6 +51,7 @@ pub struct Entry {
     pub modified: Option<SystemTime>,
     pub created: Option<SystemTime>,
     pub accessed: Option<SystemTime>,
+    #[cfg(unix)]
     pub attributes: String,
     /// Full no-follow Windows attribute bits; absent on Unix or metadata failure.
     pub windows_attributes: Option<u32>,
@@ -65,6 +66,21 @@ pub struct Entry {
 }
 
 impl Entry {
+    /// Native attribute text from cached metadata, without filesystem access.
+    pub fn native_attributes(&self) -> std::borrow::Cow<'_, str> {
+        #[cfg(unix)]
+        {
+            std::borrow::Cow::Borrowed(&self.attributes)
+        }
+        #[cfg(windows)]
+        {
+            std::borrow::Cow::Owned(
+                self.windows_attributes
+                    .map_or_else(String::new, |bits| format!("0x{bits:08x}")),
+            )
+        }
+    }
+
     /// Cached Windows System attribute; this is not an access-rights check.
     pub fn is_system(&self) -> bool {
         self.windows_attributes
@@ -204,6 +220,7 @@ fn inspect_no_follow(path: &Path, owners: Option<&mut crate::owner::Cache>) -> E
         modified: None,
         created: None,
         accessed: None,
+        #[cfg(unix)]
         attributes: String::new(),
         windows_attributes: None,
         mode: None,
@@ -229,7 +246,10 @@ fn fill(entry: &mut Entry, metadata: &Metadata, owners: Option<&mut crate::owner
     });
     entry.hidden = platform::hidden(&entry.name, metadata);
     entry.executable = platform::executable(metadata);
-    entry.attributes = platform::attributes(metadata);
+    #[cfg(unix)]
+    {
+        entry.attributes = platform::attributes(metadata);
+    }
     entry.windows_attributes = platform::windows_attributes(metadata);
     entry.mode = platform::mode(metadata);
     entry.owner = owners.and_then(|owners| platform::owner(metadata, owners));

@@ -49,6 +49,34 @@ fn native_rhsa_positions_preserve_full_hex_and_use_cached_metadata() {
     assert_eq!(attributes(&cached, PermissionDisplay::Symbolic), "-HSA");
 }
 
+#[test]
+fn directory_copy_finalizes_readonly_from_cached_native_bits() {
+    use terminal_file_manager::operations::{Decision, Operation, Options, Outcome, Plan, execute};
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("source");
+    let destination = root.path().join("destination");
+    fs::create_dir(&source).unwrap();
+    fs::create_dir(&destination).unwrap();
+    fs::write(source.join("child"), b"data").unwrap();
+    set_attributes(&source, "R---");
+    let plan = Plan::paths(
+        Operation::Copy,
+        vec![source.clone()],
+        Some(destination.clone()),
+    )
+    .unwrap();
+    let record = execute(&plan, Options::default(), &AtomicBool::new(false), |_| {
+        Decision::Skip
+    });
+    let copied = destination.join("source");
+    let copied_flags = fs::symlink_metadata(&copied).unwrap().file_attributes();
+    set_attributes(&source, "----");
+    set_attributes(&copied, "----");
+    assert_eq!(record.entries[0].outcome, Outcome::Completed, "{record:?}");
+    assert_eq!(copied_flags & 1, 1);
+    assert_eq!(fs::read(copied.join("child")).unwrap(), b"data");
+}
+
 fn draw(app: &App) -> Buffer {
     let mut terminal = Terminal::new(TestBackend::new(160, 30)).unwrap();
     terminal
@@ -88,7 +116,12 @@ fn cached_directory_app() -> (tempfile::TempDir, App) {
 #[test]
 fn native_attributes_render_in_listing_sidebar_and_popup_in_both_formats() {
     let (_root, mut app) = cached_directory_app();
-    let native = app.details[0].entry.as_ref().unwrap().attributes.clone();
+    let native = app.details[0]
+        .entry
+        .as_ref()
+        .unwrap()
+        .native_attributes()
+        .into_owned();
     for (display, expected) in [
         (PermissionDisplay::Symbolic, "R-SA".to_owned()),
         (PermissionDisplay::Octal, native),

@@ -1,4 +1,5 @@
 //! Opaque attribute strings remain visible without an invented formatting control.
+#![cfg(unix)]
 use colored_text::ColorLevel;
 use crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::{Terminal, backend::TestBackend, buffer::Buffer, layout::Rect};

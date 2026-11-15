@@ -41,10 +41,15 @@ pub fn attributes(entry: &Entry, display: PermissionDisplay) -> String {
         }
     } else if let Some(flags) = windows_symbolic_attributes(entry, display) {
         windows_symbolic(flags)
-    } else if entry.attributes.is_empty() {
-        "unavailable".into()
+    } else if let Some(flags) = entry.windows_attributes {
+        format!("0x{flags:08x}")
     } else {
-        entry.attributes.clone()
+        let native = entry.native_attributes();
+        if native.is_empty() {
+            "unavailable".into()
+        } else {
+            native.into_owned()
+        }
     }
 }
 

@@ -42,6 +42,21 @@ fn unavailable_modes_never_invent_unix_permissions() {
     assert_eq!(attributes(&entry, PermissionDisplay::Octal), "unavailable");
 }
 
+#[test]
+fn cached_windows_bits_determine_both_formats_without_filesystem_access() {
+    let root = tempfile::tempdir().unwrap();
+    let mut entry = fs::inspect(&root.path().join("missing"));
+    for (bits, symbolic, native) in [
+        (0, "----", "0x00000000"),
+        (0x8000_0027, "RHSA", "0x80000027"),
+        (0x10, "----", "0x00000010"),
+    ] {
+        entry.windows_attributes = Some(bits);
+        assert_eq!(attributes(&entry, PermissionDisplay::Symbolic), symbolic);
+        assert_eq!(attributes(&entry, PermissionDisplay::Octal), native);
+    }
+}
+
 #[cfg(unix)]
 #[test]
 fn native_symlink_modes_describe_the_link_itself() {
@@ -64,13 +79,17 @@ fn native_symlink_modes_describe_the_link_itself() {
 #[cfg(windows)]
 #[test]
 fn windows_native_attributes_support_symbolic_and_native_preferences() {
+    use std::os::windows::fs::MetadataExt;
     let root = tempfile::tempdir().unwrap();
     let entry = fs::inspect(root.path());
     assert!(entry.mode.is_none());
     assert_eq!(attributes(&entry, PermissionDisplay::Symbolic), "----");
+    let native = std::fs::symlink_metadata(root.path())
+        .unwrap()
+        .file_attributes();
     assert_eq!(
         attributes(&entry, PermissionDisplay::Octal),
-        entry.attributes
+        format!("0x{native:08x}")
     );
 }
 

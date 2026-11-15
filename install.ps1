@@ -201,7 +201,8 @@ function Get-Sha256([string]$Path) {
     # PS5.1's path-based Get-FileHash uses a module-scoped ForEach-Object
     # property lookup that inherited WhatIf preferences can decline. Hash the
     # literal file stream so approved verification and rollback still run.
-    $stream = [IO.File]::OpenRead($Path)
+    $resolvedPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+    $stream = [IO.File]::OpenRead($resolvedPath)
     try { return (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash }
     finally { $stream.Dispose() }
 }

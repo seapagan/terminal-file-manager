@@ -134,7 +134,7 @@ fn finish_permissions(
         safety::opened_object(target, &file)?;
         crate::operations::mutations::set_attributes(&file, directory_permissions(source, &file)?)?;
         let mut expected = target.clone();
-        expected.attributes = permission_attributes(source, target)?;
+        update_permission_attributes(source, &mut expected)?;
         safety::revalidate(&expected, false)?;
         *target = expected;
     }
@@ -153,32 +153,33 @@ fn directory_permissions(source: &Entry, _file: &fs::File) -> Result<fs::Permiss
     #[cfg(windows)]
     {
         let mut permissions = _file.metadata()?.permissions();
-        let flags = u32::from_str_radix(source.attributes.trim_start_matches("0x"), 16)
-            .map_err(std::io::Error::other)?;
+        let flags = source.windows_attributes.ok_or_else(|| {
+            crate::operations::plan::invalid("Source directory attributes unavailable")
+        })?;
         permissions.set_readonly(flags & 1 != 0);
         Ok(permissions)
     }
 }
 
-fn permission_attributes(source: &Entry, _target: &Entry) -> Result<String> {
+fn update_permission_attributes(source: &Entry, target: &mut Entry) -> Result<()> {
     #[cfg(unix)]
     {
         let mode = source.mode.ok_or_else(|| {
             crate::operations::plan::invalid("Source directory permissions unavailable")
         })?;
-        Ok(crate::permissions::mode_to_octal(mode))
+        target.attributes = crate::permissions::mode_to_octal(mode);
     }
     #[cfg(windows)]
     {
-        let flags = |entry: &Entry| {
-            u32::from_str_radix(entry.attributes.trim_start_matches("0x"), 16)
-                .map_err(std::io::Error::other)
-        };
-        Ok(format!(
-            "0x{:08x}",
-            (flags(_target)? & !1) | (flags(source)? & 1)
-        ))
+        let source_flags = source.windows_attributes.ok_or_else(|| {
+            crate::operations::plan::invalid("Source directory attributes unavailable")
+        })?;
+        let target_flags = target.windows_attributes.ok_or_else(|| {
+            crate::operations::plan::invalid("Destination directory attributes unavailable")
+        })?;
+        target.windows_attributes = Some((target_flags & !1) | (source_flags & 1));
     }
+    Ok(())
 }
 
 pub(super) fn failure(result: &EntryResult, mut error: Failure, unknown_children: bool) -> Failure {
