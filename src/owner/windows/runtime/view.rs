@@ -36,7 +36,9 @@ pub(super) fn targets(app: &App, geometry: &Geometry) -> Vec<Target> {
     for id in [app.active, 1 - app.active] {
         let pane = &app.panes[id];
         let height = geometry.listing_rows[id];
-        if geometry.panes[id].is_none() || pane.listing || height == 0 {
+        // Listing columns use the inner width after both pane borders.
+        let width = geometry.panes[id].map_or(0, |area| area.width.saturating_sub(2));
+        if pane.listing || height == 0 || !pane.columns.visible(width, &pane.measurements).owner {
             continue;
         }
         let (start, _) = viewport(pane, height);

@@ -12,6 +12,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod visibility;
+
 fn loaded(count: usize) -> (tempfile::TempDir, App, Geometry) {
     let root = tempfile::tempdir().unwrap();
     for index in 0..count {
