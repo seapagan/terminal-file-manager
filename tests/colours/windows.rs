@@ -3,6 +3,9 @@ use super::*;
 use ratatui::buffer::Buffer;
 use std::{path::Path, process::Command};
 
+#[path = "windows_attributes.rs"]
+mod attribute_column;
+
 fn system_fixture(directory: bool) -> (tempfile::TempDir, App) {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("fixture");

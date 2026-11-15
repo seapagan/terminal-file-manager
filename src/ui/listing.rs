@@ -339,11 +339,20 @@ pub(super) fn permission_spans(
     theme: &Theme,
 ) -> Vec<Span<'static>> {
     let text = crate::permissions::attributes(entry, permissions);
+    let windows_symbolic = entry.mode.is_none()
+        && entry.windows_attributes.is_some()
+        && permissions == crate::permissions::PermissionDisplay::Symbolic;
     Line::raw(text)
         .styled_graphemes(Style::default())
         .enumerate()
         .map(|(index, value)| {
-            let style = if index == 0 {
+            let style = if windows_symbolic {
+                theme.style(if value.symbol == "-" {
+                    Role::Muted
+                } else {
+                    Role::Normal
+                })
+            } else if index == 0 {
                 theme.entry_style(entry)
             } else if entry.mode.is_some()
                 && permissions == crate::permissions::PermissionDisplay::Symbolic
