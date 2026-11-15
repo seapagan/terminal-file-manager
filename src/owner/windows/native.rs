@@ -28,6 +28,7 @@ impl Drop for Local {
     fn drop(&mut self) {
         // SAFETY: Local owns an allocation returned by a successful Win32
         // security conversion/query, never a borrowed SID within that allocation.
+        // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
         unsafe {
             LocalFree(self.0);
         }
@@ -50,6 +51,7 @@ pub fn read_sid(path: &Path, expected: &Identity) -> io::Result<String> {
     // SAFETY: file retains the handle; all outputs are initialized pointers.
     // Only owner information is requested. The returned SID is borrowed from
     // descriptor and consumed before descriptor's Local allocation is released.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     let status = unsafe {
         GetSecurityInfo(
             file.as_raw_handle(),
@@ -71,6 +73,7 @@ pub fn read_sid(path: &Path, expected: &Identity) -> io::Result<String> {
     }
     let mut string = ptr::null_mut();
     // SAFETY: owner remains valid inside descriptor, and string is writable.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     if unsafe { ConvertSidToStringSidW(owner, &mut string) } == 0 {
         return Err(io::Error::last_os_error());
     }
@@ -79,6 +82,7 @@ pub fn read_sid(path: &Path, expected: &Identity) -> io::Result<String> {
     let mut length = 0;
     // SAFETY: successful conversion returns a NUL-terminated UTF-16 allocation;
     // the Local guard keeps it live throughout the scan and copy.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     unsafe {
         while *string.add(length) != 0 {
             length += 1;
@@ -92,10 +96,12 @@ pub fn read_sid(path: &Path, expected: &Identity) -> io::Result<String> {
 fn verify_identity(file: &std::fs::File, expected: &Identity) -> io::Result<()> {
     let mut info = std::mem::MaybeUninit::<BY_HANDLE_FILE_INFORMATION>::zeroed();
     // SAFETY: file retains its handle; info provides the exact writable SDK layout.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     if unsafe { GetFileInformationByHandle(file.as_raw_handle(), info.as_mut_ptr()) } == 0 {
         return Err(io::Error::last_os_error());
     }
     // SAFETY: successful query initialized the zero-backed structure.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     let info = unsafe { info.assume_init() };
     let object = (
         u64::from(info.dwVolumeSerialNumber),
@@ -123,12 +129,14 @@ fn account_name(sid: &str) -> io::Result<Option<String>> {
     let wide: Vec<_> = sid.encode_utf16().chain([0]).collect();
     let mut native = ptr::null_mut();
     // SAFETY: input is NUL-terminated and lives through the synchronous call.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     if unsafe { ConvertStringSidToSidW(wide.as_ptr(), &mut native) } == 0 {
         return Err(io::Error::last_os_error());
     }
     let _native = Local(native);
     let (mut names, mut domains, mut kind) = (0, 0, 0);
     // SAFETY: native is a valid owned SID; zero sizes request output lengths.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     let ok = unsafe {
         LookupAccountSidW(
             ptr::null(),
@@ -166,6 +174,7 @@ fn lookup(
         let mut domain = vec![0u16; domains as usize];
         // SAFETY: SID's Local guard in account_name outlives this call; buffers
         // have exactly the declared capacities, and kind is writable SDK output.
+        // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
         if unsafe {
             LookupAccountSidW(
                 ptr::null(),
