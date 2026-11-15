@@ -339,9 +339,8 @@ pub(super) fn permission_spans(
     theme: &Theme,
 ) -> Vec<Span<'static>> {
     let text = crate::permissions::attributes(entry, permissions);
-    let windows_symbolic = entry.mode.is_none()
-        && entry.windows_attributes.is_some()
-        && permissions == crate::permissions::PermissionDisplay::Symbolic;
+    let windows_symbolic =
+        crate::permissions::windows_symbolic_attributes(entry, permissions).is_some();
     Line::raw(text)
         .styled_graphemes(Style::default())
         .enumerate()

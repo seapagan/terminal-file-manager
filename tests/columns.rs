@@ -47,7 +47,7 @@ fn row(app: &App, width: u16, y: u16) -> String {
 }
 
 #[test]
-fn attributes_fit_below_the_old_global_threshold_and_reflow_in_both_panes() {
+fn attributes_fit_at_the_calculated_width_boundary_and_reflow_in_both_panes() {
     let (_root, mut app) = loaded();
     // The attribute value width joins the existing size/date/name/spacing budget.
     let boundary = 50 + symbolic_width();

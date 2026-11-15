@@ -15,6 +15,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::SystemTime;
 pub use totals::{Totals, totals};
 
+const FILE_ATTRIBUTE_SYSTEM: u32 = 0x4;
+
 /// No-follow classification; links may be entered but never recursively scanned.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum EntryKind {
@@ -65,7 +67,8 @@ pub struct Entry {
 impl Entry {
     /// Cached Windows System attribute; this is not an access-rights check.
     pub fn is_system(&self) -> bool {
-        self.windows_attributes.is_some_and(|bits| bits & 0x4 != 0)
+        self.windows_attributes
+            .is_some_and(|bits| bits & FILE_ATTRIBUTE_SYSTEM != 0)
     }
 
     /// Format cached account data without resolving accounts on the render thread.

@@ -39,12 +39,24 @@ pub fn attributes(entry: &Entry, display: PermissionDisplay) -> String {
             PermissionDisplay::Symbolic => format!("{kind}{}", mode_to_rwx(mode)),
             PermissionDisplay::Octal => format!("{kind} {}", mode_to_octal(mode)),
         }
-    } else if let (Some(flags), PermissionDisplay::Symbolic) = (entry.windows_attributes, display) {
+    } else if let Some(flags) = windows_symbolic_attributes(entry, display) {
         windows_symbolic(flags)
     } else if entry.attributes.is_empty() {
         "unavailable".into()
     } else {
         entry.attributes.clone()
+    }
+}
+
+/// Cached Windows flags when symbolic formatting applies instead of Unix modes.
+pub(crate) fn windows_symbolic_attributes(
+    entry: &Entry,
+    display: PermissionDisplay,
+) -> Option<u32> {
+    if entry.mode.is_none() && display == PermissionDisplay::Symbolic {
+        entry.windows_attributes
+    } else {
+        None
     }
 }
 
