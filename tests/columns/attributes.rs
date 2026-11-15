@@ -10,12 +10,12 @@ fn formats() -> [(PermissionDisplay, &'static str, u16); 2] {
     if cfg!(windows) {
         [
             (PermissionDisplay::Symbolic, "Attr", 4),
-            (PermissionDisplay::Octal, "Hex", 10),
+            (PermissionDisplay::Octal, "Attributes", 10),
         ]
     } else {
         [
-            (PermissionDisplay::Symbolic, "Mode", 10),
-            (PermissionDisplay::Octal, "Octal", 6),
+            (PermissionDisplay::Symbolic, "Attributes", 10),
+            (PermissionDisplay::Octal, "Attr", 6),
         ]
     }
 }
@@ -135,13 +135,14 @@ fn opaque_unicode_attributes_use_display_cells_and_render_without_clipping() {
         owner: true,
     };
     pane.refilter();
-    assert_eq!(pane.measurements.attributes, 5);
+    let expected_width = 5.max(Line::raw(formats()[1].1).width() as u16);
+    assert_eq!(pane.measurements.attributes, expected_width);
     let buffer = draw(&app, 80);
     let x = find(&buffer, 1, formats()[1].1);
     assert_eq!(buffer[(x, 3)].symbol(), "界");
     assert_eq!(buffer[(x + 2, 3)].symbol(), "界");
     assert_eq!(buffer[(x + 4, 3)].symbol(), "e\u{301}");
-    assert_eq!(find(&buffer, 1, "Owner"), x + 6);
+    assert_eq!(find(&buffer, 1, "Owner"), x + expected_width + 1);
 }
 
 fn draw(app: &App, width: u16) -> Buffer {

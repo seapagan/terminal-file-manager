@@ -8,7 +8,7 @@ use terminal_file_manager::{app::App, color::Theme, fs, ui, view::Columns};
 mod attributes;
 
 fn symbolic_heading() -> &'static str {
-    if cfg!(windows) { "Attr" } else { "Mode" }
+    if cfg!(windows) { "Attr" } else { "Attributes" }
 }
 
 fn symbolic_width() -> u16 {

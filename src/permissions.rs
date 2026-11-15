@@ -15,9 +15,9 @@ impl PermissionDisplay {
     pub const fn column_heading(self) -> &'static str {
         match self {
             Self::Symbolic if cfg!(windows) => "Attr",
-            Self::Symbolic => "Mode",
-            Self::Octal if cfg!(windows) => "Hex",
-            Self::Octal => "Octal",
+            Self::Symbolic => "Attributes",
+            Self::Octal if cfg!(windows) => "Attributes",
+            Self::Octal => "Attr",
         }
     }
 

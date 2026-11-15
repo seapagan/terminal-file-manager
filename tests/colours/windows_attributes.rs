@@ -93,10 +93,10 @@ fn assert_hex_cells(buffer: &Buffer, app: &App, level: ColorLevel, directory: bo
             }
             assert_eq!(buffer[(x + offset as u16, y)], expected);
         }
-        let heading = (x..x + 3)
+        let heading = (x..x + 10)
             .map(|x| buffer[(x, area.y + 1)].symbol())
             .collect::<String>();
-        assert_eq!(heading, "Hex");
+        assert_eq!(heading, "Attributes");
     }
 }
 
