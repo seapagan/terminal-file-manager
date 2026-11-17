@@ -1,5 +1,10 @@
 [advisories]
 version = 2
+# Maintainer-approved exception for chrono's unmaintained notice only; no
+# patched version exists. Remove after replacing Linux-only chrono (TODO.md).
+ignore = [
+    { id = "RUSTSEC-2026-0543", reason = "Preserve Linux Trash local timestamps pending the replacement investigation in TODO.md." },
+]
 
 [licenses]
 version = 2

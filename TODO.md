@@ -1,5 +1,14 @@
 # TODO
 
+## Replace Linux-only chrono
+
+Investigate replacing the Linux-only `chrono` dependency with the existing
+`time` crate following `RUSTSEC-2026-0543`. Identify and enable the features
+needed for local-time conversion and formatting. Preserve local Trash
+`DeletionDate` timestamps, their format and timezone/daylight-saving behaviour.
+Remove the advisory-specific exception from `deny.toml` after replacement.
+Implementation requires separate approval.
+
 ## Terminal-default colour audit
 
 Audit TFM's reliance on terminal-default foreground and background colours.
