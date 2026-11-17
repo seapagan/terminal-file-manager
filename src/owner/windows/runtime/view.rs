@@ -29,6 +29,19 @@ impl Target {
 }
 
 pub(super) fn targets(app: &App, geometry: &Geometry) -> Vec<Target> {
+    current(app, geometry)
+        .into_iter()
+        .filter(|target| {
+            let pane = &app.panes[target.pane];
+            // Listing columns use the inner width after both pane borders.
+            let width = geometry.panes[target.pane].map_or(0, |area| area.width.saturating_sub(2));
+            target.detail || pane.columns.visible(width, &pane.measurements).owner
+        })
+        .collect()
+}
+
+// Applying requested results must not depend on their temporary display width.
+pub(super) fn current(app: &App, geometry: &Geometry) -> Vec<Target> {
     let mut targets = Vec::new();
     if let Some(target) = metadata(app, geometry) {
         targets.push(target);
@@ -36,9 +49,7 @@ pub(super) fn targets(app: &App, geometry: &Geometry) -> Vec<Target> {
     for id in [app.active, 1 - app.active] {
         let pane = &app.panes[id];
         let height = geometry.listing_rows[id];
-        // Listing columns use the inner width after both pane borders.
-        let width = geometry.panes[id].map_or(0, |area| area.width.saturating_sub(2));
-        if pane.listing || height == 0 || !pane.columns.visible(width, &pane.measurements).owner {
+        if pane.listing || height == 0 {
             continue;
         }
         let (start, _) = viewport(pane, height);

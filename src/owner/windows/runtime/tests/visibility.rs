@@ -33,6 +33,44 @@ fn viewport_work_requires_a_rendered_owner_column_including_pane_borders() {
 }
 
 #[test]
+fn completed_name_restores_owner_column_after_pending_sid_hides_it() {
+    use crate::owner::OwnerDisplay;
+    let (_root, mut app, _) = loaded(1);
+    app.dual = false;
+    app.sidebar = false;
+    app.popup = false;
+    let geometry = ui::geometry(&app, Rect::new(0, 0, 64, 40));
+    assert!(geometry.sidebar.is_none());
+    assert_eq!(
+        app.panes[0].entries[0].owner_display(OwnerDisplay::Names),
+        "resolving"
+    );
+    assert!(owner_heading(&app, 64));
+    let gate = Release::new();
+    let wait = gate.0.clone();
+    let (started, entered) = mpsc::channel();
+    let mut runtime = Runtime::using(
+        |_, _| Ok("S-1-5-21-123456789-123456789-123456789-1001".into()),
+        move |_| {
+            started.send(()).unwrap();
+            blocked(&wait);
+            Name::Resolved("Alice".into())
+        },
+    );
+    until(&mut runtime, &mut app, &geometry, |app| {
+        app.panes[0].entries[0].owner_display(OwnerDisplay::Names)
+            == "S-1-5-21-123456789-123456789-123456789-1001 (resolving)"
+    });
+    entered.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert!(!owner_heading(&app, 64));
+    drop(gate);
+    until(&mut runtime, &mut app, &geometry, |app| {
+        app.panes[0].entries[0].owner_display(OwnerDisplay::Names) == "Alice"
+    });
+    assert!(owner_heading(&app, 64));
+}
+
+#[test]
 fn viewport_owner_columns_respect_independent_pane_settings_and_focus() {
     let (_root, mut app, _) = loaded(3);
     for enabled in [[false, true], [true, false], [false, false], [true, true]] {

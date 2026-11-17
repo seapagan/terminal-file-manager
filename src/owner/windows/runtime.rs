@@ -107,26 +107,31 @@ impl Runtime {
         Self::with_backend(read, name).unwrap()
     }
 
-    /// Resolve only requested metadata and visible rows. Never wait for a worker.
+    /// Schedule only requested metadata and rendered owners. Never wait for a worker.
     /// Obsolete native calls retain their slot until they finish; cancellation
     /// cannot forcibly interrupt a kernel or domain lookup.
     pub fn poll(&mut self, app: &mut App, geometry: &Geometry) -> bool {
         self.synchronize(app);
-        let targets = view::targets(app, geometry);
-        let wanted: Vec<_> = targets.iter().map(|target| target.key.clone()).collect();
+        let current = view::current(app, geometry);
+        let wanted: Vec<_> = current.iter().map(|target| target.key.clone()).collect();
         self.readers.cancel_except(&wanted, self.epoch);
         let now = Instant::now();
         self.collect(now);
         let listing = app.panes.iter().any(|pane| pane.listing);
         let mut changed = false;
-        for target in targets {
-            if let Some(owner) = self.cached(&target.key, target.known(app), target.names, now) {
-                changed |= view::apply(app, &target, owner);
-            } else if !listing
+        for target in view::targets(app, geometry) {
+            if self
+                .cached(&target.key, target.known(app), target.names, now)
+                .is_none()
+                && !listing
                 && let Err(error) = self.readers.start(target.key.clone(), self.epoch)
             {
                 let owner = Ownership::Unavailable(error);
-                self.paths.insert(target.key.clone(), owner.clone(), now);
+                self.paths.insert(target.key, owner, now);
+            }
+        }
+        for target in current {
+            if let Some(owner) = self.cached(&target.key, target.known(app), false, now) {
                 changed |= view::apply(app, &target, owner);
             }
         }
