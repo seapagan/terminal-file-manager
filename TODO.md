@@ -1,5 +1,17 @@
 # TODO
 
+## Windows ownership worker cancellation
+
+An in-flight ownership job cancelled by `cancel_except` stays cancelled if the
+same key and epoch become wanted again before it finishes. The job retains its
+worker slot until completion and discards its result, delaying the requested
+owner display and potentially repeating a native SID or account lookup.
+
+Before changing this behaviour, add deterministic concurrency tests for
+cancellation followed by renewed demand, completion races, stale epochs and
+bounded worker slots. Preserve cancellation and stale-result safety. Runtime
+changes require separate approval.
+
 ## Replace Linux-only chrono
 
 Investigate replacing the Linux-only `chrono` dependency with the existing

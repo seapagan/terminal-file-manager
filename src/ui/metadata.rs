@@ -219,7 +219,9 @@ fn entry_fields(
         ),
     ];
     #[cfg(windows)]
-    if let Some(error) = entry.windows_owner.error() {
+    if let Some(error) = entry.windows_owner.error()
+        && entry.error.as_deref() != Some(error)
+    {
         fields.push(("Owner error", error.into()));
     }
     fields.extend(link_field(entry));

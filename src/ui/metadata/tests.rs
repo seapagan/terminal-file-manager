@@ -2,6 +2,37 @@ use super::*;
 use crate::ui::text::wrap_value;
 use colored_text::ColorLevel;
 
+#[cfg(windows)]
+#[test]
+fn ownership_diagnostics_hide_only_identical_entry_errors() {
+    use crate::owner::windows::Ownership;
+    let root = tempfile::tempdir().unwrap();
+    let mut app = App::new(root.path().into());
+    for (entry_error, owner_error, expected_rows) in [
+        (Some("stat denied"), "stat denied", 0),
+        (Some("stat denied"), "owner denied", 1),
+        (None, "owner denied", 1),
+    ] {
+        let mut entry = crate::fs::inspect(root.path());
+        entry.error = entry_error.map(str::to_owned);
+        entry.windows_owner = Ownership::Unavailable(owner_error.into());
+        app.details[0].entry = Some(entry);
+        for floating in [false, true] {
+            let text = metadata_text(&app, floating);
+            assert_eq!(
+                text.matches("Owner error:").count(),
+                expected_rows,
+                "{text}"
+            );
+            assert!(text.contains(owner_error), "{text}");
+            if let Some(error) = entry_error {
+                assert!(text.contains("Error:"), "{text}");
+                assert!(text.contains(error), "{text}");
+            }
+        }
+    }
+}
+
 #[test]
 fn detailed_sizes_agree_for_all_kinds_independently_of_compact_row_sizes() {
     use crate::fs::EntryKind;

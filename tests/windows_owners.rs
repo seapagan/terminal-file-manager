@@ -3,21 +3,27 @@
 use std::sync::atomic::AtomicBool;
 use terminal_file_manager::{fs, owner::OwnerDisplay};
 
-fn security_owner_sid(path: &std::path::Path, root: &std::path::Path) -> String {
+fn security_owner_sid(path: &std::path::Path, root: &std::path::Path) -> Option<String> {
     use std::{
         process::{Command, Stdio},
         time::{Duration, Instant},
     };
-    let modules = std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap())
-        .join("System32/WindowsPowerShell/v1.0/Modules");
-    let mut child = Command::new("powershell.exe")
+    let powershell = security_oracle_directory()?;
+    let mut child = match Command::new(powershell.join("powershell.exe"))
         .args(["-NoProfile", "-NonInteractive", "-Command",
-            "(Get-Acl -LiteralPath $env:TFM_OWNER_FIXTURE).GetOwner([System.Security.Principal.SecurityIdentifier]).Value"])
-        .env("TFM_OWNER_FIXTURE", path).env("PSModulePath", modules)
+            "$ErrorActionPreference = 'Stop'; (Get-Acl -LiteralPath $env:TFM_OWNER_FIXTURE).GetOwner([System.Security.Principal.SecurityIdentifier]).Value"])
+        .env("TFM_OWNER_FIXTURE", path).env("PSModulePath", powershell.join("Modules"))
         .env("HOME", root).env("APPDATA", root).env("USERPROFILE", root)
         .current_dir(root).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped())
-        .spawn().unwrap();
-    let deadline = Instant::now() + Duration::from_secs(15);
+        .spawn() {
+            Ok(child) => child,
+            Err(error) => {
+                assert_eq!(error.kind(), std::io::ErrorKind::NotFound, "PowerShell launch failed: {error}");
+                eprintln!("Skipping Get-Acl oracle: PowerShell unavailable: {error}");
+                return None;
+            }
+        };
+    let deadline = Instant::now() + Duration::from_secs(60);
     while child.try_wait().unwrap().is_none() {
         if Instant::now() >= deadline {
             child.kill().unwrap();
@@ -32,7 +38,27 @@ fn security_owner_sid(path: &std::path::Path, root: &std::path::Path) -> String 
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    String::from_utf8(output.stdout).unwrap().trim().to_owned()
+    Some(String::from_utf8(output.stdout).unwrap().trim().to_owned())
+}
+
+fn security_oracle_directory() -> Option<std::path::PathBuf> {
+    let Some(system_root) = std::env::var_os("SystemRoot").filter(|value| !value.is_empty()) else {
+        eprintln!("Skipping Get-Acl oracle: SystemRoot unavailable");
+        return None;
+    };
+    let directory = std::path::PathBuf::from(system_root).join("System32/WindowsPowerShell/v1.0");
+    let manifest =
+        directory.join("Modules/Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1");
+    if let Err(error) = std::fs::metadata(&manifest) {
+        assert_eq!(
+            error.kind(),
+            std::io::ErrorKind::NotFound,
+            "PowerShell Security module inspection failed: {error}"
+        );
+        eprintln!("Skipping Get-Acl oracle: Security module unavailable: {error}");
+        return None;
+    }
+    Some(directory)
 }
 
 fn loaded_numeric_view(
@@ -100,7 +126,9 @@ fn native_runtime_updates_listing_popup_and_sidebar_to_the_actual_security_owner
         } else {
             std::fs::write(&path, b"x").unwrap();
         }
-        let expected = security_owner_sid(&path, root.path());
+        let Some(expected) = security_owner_sid(&path, root.path()) else {
+            return;
+        };
         assert!(expected.starts_with("S-1-"));
         let (mut app, index) = loaded_numeric_view(root.path(), &path);
         let geometry = ui::geometry(&app, Rect::new(0, 0, 240, 40));
@@ -179,7 +207,15 @@ fn no_follow_query_rejects_a_different_object_and_accepts_the_link_itself() {
     let file = root.path().join("target");
     let link = root.path().join("link");
     std::fs::write(&file, b"x").unwrap();
-    std::os::windows::fs::symlink_file(&file, &link).unwrap();
+    if let Err(error) = std::os::windows::fs::symlink_file(&file, &link) {
+        assert_eq!(
+            error.raw_os_error(),
+            Some(1314),
+            "unexpected symlink failure"
+        );
+        eprintln!("File symlink creation unavailable: {error}");
+        return;
+    }
     let target = fs::inspect_identity(&file);
     let symlink = fs::inspect_identity(&link);
     assert!(read_sid(&link, target.identity.as_ref().unwrap()).is_err());
