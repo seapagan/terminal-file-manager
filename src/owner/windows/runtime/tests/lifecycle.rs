@@ -68,7 +68,7 @@ fn manual_refresh_preserves_presentation_then_revalidates_same_identity() {
 
 #[test]
 fn expired_path_revalidates_known_owner_and_updates_sidebar() {
-    let (_root, mut app, geometry) = loaded(1);
+    let (_root, mut app, _) = loaded(1);
     let gate = Release::new();
     let wait = gate.0.clone();
     let mut runtime = Runtime::using(
@@ -84,7 +84,13 @@ fn expired_path_revalidates_known_owner_and_updates_sidebar() {
         Instant::now() - Duration::from_secs(31),
     );
     app.request_metadata(0).unwrap();
+    app.dual = false;
     app.sidebar = true;
+    for pane in &mut app.panes {
+        pane.columns.owner = false;
+    }
+    let geometry = ui::geometry(&app, Rect::new(0, 0, 240, 40));
+    assert!(geometry.sidebar.is_some());
     runtime.poll(&mut app, &geometry);
     assert!(!runtime.readers.active.is_empty());
     assert_eq!(
