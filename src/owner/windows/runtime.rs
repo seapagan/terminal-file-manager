@@ -26,6 +26,7 @@ pub struct Runtime {
     paths: Cache<Key, Ownership>,
     names: Cache<String, Name>,
     generations: [u64; 2],
+    contexts: [u64; 2],
     epoch: u64,
 }
 
@@ -95,6 +96,7 @@ impl Runtime {
             paths: Cache::new(512, Duration::from_secs(30)),
             names: Cache::new(256, Duration::from_secs(300)),
             generations: [0; 2],
+            contexts: [0; 2],
             epoch: 0,
         })
     }
@@ -119,19 +121,21 @@ impl Runtime {
         self.collect(now);
         let listing = app.panes.iter().any(|pane| pane.listing);
         let mut changed = false;
-        for target in view::targets(app, geometry) {
-            if self
-                .cached(&target.key, target.known(app), target.names, now)
-                .is_none()
+        for target in current {
+            if target.requested
+                && self.paths.get(&target.key, now).is_none()
                 && !listing
                 && let Err(error) = self.readers.start(target.key.clone(), self.epoch)
             {
                 let owner = Ownership::Unavailable(error);
-                self.paths.insert(target.key, owner, now);
+                self.paths.insert(target.key.clone(), owner, now);
             }
-        }
-        for target in current {
-            if let Some(owner) = self.cached(&target.key, target.known(app), false, now) {
+            if let Some(owner) = self.cached(
+                &target.key,
+                target.known(app),
+                target.requested && target.names,
+                now,
+            ) {
                 changed |= view::apply(app, &target, owner);
             }
         }
@@ -139,11 +143,16 @@ impl Runtime {
     }
 
     fn synchronize(&mut self, app: &App) {
+        let contexts = [app.panes[0].context, app.panes[1].context];
+        if self.contexts != contexts {
+            self.contexts = contexts;
+            self.paths.clear();
+        }
         let generations = [app.panes[0].generation, app.panes[1].generation];
         if self.generations != generations {
             self.generations = generations;
             self.epoch = self.epoch.wrapping_add(1);
-            self.paths.clear();
+            self.paths.invalidate();
             self.readers.cancel_except(&[], self.epoch);
         }
     }
@@ -181,21 +190,37 @@ impl Runtime {
     ) -> Option<Ownership> {
         let mut owner = self
             .paths
-            .get(key, now)
+            .peek(key)
             .or_else(|| (!matches!(known, Ownership::Pending)).then_some(known))
             .cloned()?;
         if let Ownership::Sid { sid, name } = &mut owner {
+            if matches!(name, Name::Pending) {
+                *name = self.previous_name(sid, known);
+            }
             if let Some(cached) = self.names.get(sid, now) {
                 *name = cached.clone();
-            } else if names {
-                *name = Name::Pending;
-                if let Err(error) = self.namers.start(sid.clone(), 0) {
-                    *name = Name::Failed(error);
-                    self.names.insert(sid.clone(), name.clone(), now);
-                }
+            } else if names && let Err(error) = self.namers.start(sid.clone(), 0) {
+                *name = Name::Failed(error);
+                self.names.insert(sid.clone(), name.clone(), now);
             }
         }
         Some(owner)
+    }
+
+    fn previous_name(&self, sid: &str, known: &Ownership) -> Name {
+        if let Ownership::Sid {
+            sid: known_sid,
+            name,
+        } = known
+            && sid == known_sid
+            && !matches!(name, Name::Pending)
+        {
+            return name.clone();
+        }
+        self.names
+            .peek(&sid.to_owned())
+            .cloned()
+            .unwrap_or(Name::Pending)
     }
 }
 

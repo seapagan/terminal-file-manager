@@ -20,6 +20,9 @@ pub(crate) const OPTIONS: &[(&str, Action)] = &[
     ("Owner column", Action::ColumnOwner),
     ("Metadata sidebar", Action::ToggleSidebar),
     ("Preferred metadata", Action::MetadataPresentation),
+    #[cfg(windows)]
+    ("Owner display", Action::OwnerDisplay),
+    #[cfg(not(windows))]
     ("Owner/group display", Action::OwnerDisplay),
 ];
 

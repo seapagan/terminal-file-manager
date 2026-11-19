@@ -156,6 +156,8 @@ impl Pane {
     pub(super) fn install(&mut self, snapshot: Snapshot) {
         let previous_index = self.cursor_index().unwrap_or(0);
         let continuous = self.accepts_refresh(&snapshot);
+        #[cfg(windows)]
+        let snapshot = self.preserve_owners(snapshot, continuous);
         let creation = self.take_creation(continuous);
         let range = self.range.take().filter(|_| continuous);
         if !continuous {
@@ -212,6 +214,30 @@ impl Pane {
                 same_object(previous, fresh).then(|| (entry.path.clone(), previous.clone()))
             })
             .collect();
+    }
+
+    #[cfg(windows)]
+    fn preserve_owners(&self, mut snapshot: Snapshot, continuous: bool) -> Snapshot {
+        if !continuous {
+            return snapshot;
+        }
+        let previous: HashMap<_, _> = self
+            .entries
+            .iter()
+            .map(|entry| (&entry.path, entry))
+            .collect();
+        for fresh in &mut snapshot.entries {
+            if let Some(old) = previous.get(&fresh.path)
+                && old
+                    .identity
+                    .as_ref()
+                    .zip(fresh.identity.as_ref())
+                    .is_some_and(|(a, b)| a.object.is_some() && same_object(a, b))
+            {
+                fresh.windows_owner = old.windows_owner.clone();
+            }
+        }
+        snapshot
     }
 
     /// Apply sort/grouping while preserving cursor and raw marked paths.

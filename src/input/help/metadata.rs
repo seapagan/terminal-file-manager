@@ -20,7 +20,7 @@ impl Action {
 
 // The same rows produce the table and match: a new Action without metadata is a compile error.
 macro_rules! define_commands {
-    ($(($action:path, $section:expr, $description:literal $(,)?)),* $(,)?) => {
+    ($(($action:path, $section:expr, $description:expr $(,)?)),* $(,)?) => {
         const COMMANDS: &[(Action, HelpSection, &str)] = &[
             $(($action, $section, $description)),*
         ];
@@ -266,7 +266,7 @@ define_commands! {
     (
         Action::OwnerDisplay,
         HelpSection::Views,
-        "Toggle owner/group names or numeric IDs",
+        if cfg!(windows) { "Toggle owner names or SIDs" } else { "Toggle owner/group names or numeric IDs" },
     ),
     (Action::ColumnSize, HelpSection::Views, "Toggle size column"),
     (

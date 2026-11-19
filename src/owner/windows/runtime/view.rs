@@ -12,6 +12,7 @@ pub(super) struct Target {
     index: Option<usize>,
     detail: bool,
     pub names: bool,
+    pub requested: bool,
 }
 
 impl Target {
@@ -28,15 +29,11 @@ impl Target {
     }
 }
 
+#[cfg(test)]
 pub(super) fn targets(app: &App, geometry: &Geometry) -> Vec<Target> {
     current(app, geometry)
         .into_iter()
-        .filter(|target| {
-            let pane = &app.panes[target.pane];
-            // Listing columns use the inner width after both pane borders.
-            let width = geometry.panes[target.pane].map_or(0, |area| area.width.saturating_sub(2));
-            target.detail || pane.columns.visible(width, &pane.measurements).owner
-        })
+        .filter(|target| target.requested)
         .collect()
 }
 
@@ -49,6 +46,8 @@ pub(super) fn current(app: &App, geometry: &Geometry) -> Vec<Target> {
     for id in [app.active, 1 - app.active] {
         let pane = &app.panes[id];
         let height = geometry.listing_rows[id];
+        let width = geometry.panes[id].map_or(0, |area| area.width.saturating_sub(2));
+        let requested = pane.columns.visible(width, &pane.measurements).owner;
         if pane.listing || height == 0 {
             continue;
         }
@@ -69,6 +68,7 @@ pub(super) fn current(app: &App, geometry: &Geometry) -> Vec<Target> {
                     index: Some(index),
                     detail: false,
                     names: pane.owner_display == OwnerDisplay::Names,
+                    requested,
                 });
             }
         }
@@ -99,6 +99,7 @@ fn metadata(app: &App, geometry: &Geometry) -> Option<Target> {
         index,
         detail: true,
         names,
+        requested: true,
     })
 }
 

@@ -12,6 +12,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod lifecycle;
 mod visibility;
 
 fn loaded(count: usize) -> (tempfile::TempDir, App, Geometry) {

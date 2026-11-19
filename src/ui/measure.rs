@@ -112,6 +112,9 @@ fn width(text: &str) -> u16 {
     u16::try_from(Line::raw(text).width()).unwrap_or(u16::MAX)
 }
 
+#[cfg(all(test, windows))]
+mod tests;
+
 pub(super) fn parts(entry: &Entry, human: bool) -> (String, &'static str) {
     if entry.enterable {
         ("—".into(), "")

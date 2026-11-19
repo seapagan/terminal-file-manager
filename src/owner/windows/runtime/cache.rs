@@ -6,7 +6,7 @@ use std::{
 };
 
 pub(super) struct Cache<K, V> {
-    values: HashMap<K, (V, Instant)>,
+    values: HashMap<K, (V, Option<Instant>)>,
     order: VecDeque<K>,
     capacity: usize,
     ttl: Duration,
@@ -25,7 +25,9 @@ impl<K: Eq + Hash + Clone, V> Cache<K, V> {
     pub fn get(&self, key: &K, now: Instant) -> Option<&V> {
         self.values
             .get(key)
-            .filter(|(_, inserted)| now.saturating_duration_since(*inserted) < self.ttl)
+            .filter(|(_, inserted)| {
+                inserted.is_some_and(|inserted| now.saturating_duration_since(inserted) < self.ttl)
+            })
             .map(|(value, _)| value)
     }
 
@@ -38,7 +40,18 @@ impl<K: Eq + Hash + Clone, V> Cache<K, V> {
             }
             self.order.push_back(key.clone());
         }
-        self.values.insert(key, (value, now));
+        self.values.insert(key, (value, Some(now)));
+    }
+
+    // Stale values remain presentation fallbacks, never evidence of freshness.
+    pub fn peek(&self, key: &K) -> Option<&V> {
+        self.values.get(key).map(|(value, _)| value)
+    }
+
+    pub fn invalidate(&mut self) {
+        for (_, inserted) in self.values.values_mut() {
+            *inserted = None;
+        }
     }
 
     pub fn clear(&mut self) {
