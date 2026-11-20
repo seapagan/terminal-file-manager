@@ -135,6 +135,9 @@ not overwritten.
 
 Review Trash and permanent-deletion previews before confirming. **Enter cancels
 permanent deletion.** TFM does not use permanent deletion as a Trash fallback.
+On Windows, TFM skips the ordinary Recycle Bin confirmation after its own
+approval. Windows still warns before permanently deleting an item it cannot
+recycle: **No keeps the item; Yes permits permanent deletion.**
 If the OS reports irreversible deletion during a Trash request, review the
 critical incident in Jobs; acknowledgement cannot restore the data.
 

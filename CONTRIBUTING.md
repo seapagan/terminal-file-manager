@@ -272,6 +272,26 @@ are required. Installer tests must not download public releases by default.
 These checks belong to infrastructure verification or release certification,
 not every ordinary Rust CI run.
 
+## Windows Trash confirmation checks
+
+The ignored `manual_windows_trash_` library tests use owned native fixtures.
+Announce each test and obtain the maintainer's readiness before running it.
+Run one at a time with `cargo nextest run --lib --all-features --locked
+--run-ignored only --no-capture -E 'test(TEST_NAME)'`. Ordinary recycling should
+need no Shell response. The refusal test requires **No**; the approval test
+requires **Yes** in the permanent-deletion warning. Never automate these answers.
+
+For the warning tests, set `TFM_WINDOWS_TRASH_TEST_BYTES` above the existing
+volume's Recycle Bin limit, up to 64 GiB. They create a sparse file and an owned
+hard-link recovery anchor; do not change Windows settings or fill the bin.
+The approval test expects conservative incident reporting because the native
+completion callback does not prove that a human approved permanent deletion.
+
+The executable ConPTY approval test runs on hosted Windows or with
+`TFM_WINDOWS_TRASH_NATIVE=owned-fixtures`. It leaves one owned recoverable fixture
+in the native bin. The library receipt test separately restores its exact native
+receipt and verifies the original object and payload.
+
 ## Changes, commits and reviews
 
 Keep commits coherent and use imperative Conventional Commit subjects.

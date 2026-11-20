@@ -60,6 +60,11 @@ fn retained_refusal(ack: &Acknowledgement, retained: bool) -> Option<Failure> {
             outcome: Outcome::Skipped,
             detail: "Windows recycling skipped; approved source retained".into(),
         }),
+        (true, false, status) if status == 0x8027_0000_u32 as i32 => Some(Failure {
+            outcome: Outcome::Cancelled,
+            detail: "Windows recycling cancelled; approved source identity remains intact".into(),
+        }),
+        (_, _, status) if status == 0x8027_0000_u32 as i32 => None,
         (true, _, status) if status < 0 => Some(Failure {
             outcome: Outcome::Failed,
             detail: format!(
@@ -81,7 +86,11 @@ fn recycle_acknowledged(ack: &Acknowledgement) -> bool {
 }
 
 fn permanent_deletion(callbacks: &[Acknowledgement]) -> bool {
-    callbacks.iter().any(|ack| ack.status == 0 && !ack.recycled)
+    // COPYENGINE_S_DONT_PROCESS_CHILDREN also completes an atomic native delete.
+    // Neither status proves that a human approved the Shell's permanent-delete warning.
+    callbacks
+        .iter()
+        .any(|ack| matches!(ack.status, 0 | 0x0027_0008) && !ack.recycled)
 }
 
 #[cfg(test)]
@@ -148,6 +157,64 @@ mod tests {
                         .outcome,
                     Outcome::SafetyIncident
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn completed_nonzero_deletion_without_a_receipt_is_critical() {
+        let mut deleted = ack(true, false);
+        deleted.status = 0x0027_0008;
+        for retained in [true, false] {
+            for performed in [true, false] {
+                for aborted in [Some(false), Some(true), None] {
+                    assert_eq!(
+                        classify(performed, aborted, &[deleted.clone()], retained)
+                            .unwrap_err()
+                            .outcome,
+                        Outcome::SafetyIncident
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn native_user_cancellation_requires_the_original_source_identity() {
+        let mut cancelled = ack(false, false);
+        cancelled.status = 0x8027_0000_u32 as i32;
+        for performed in [true, false] {
+            for aborted in [Some(false), Some(true), None] {
+                assert_eq!(
+                    classify(performed, aborted, &[cancelled.clone()], true)
+                        .unwrap_err()
+                        .outcome,
+                    Outcome::Cancelled
+                );
+                assert_eq!(
+                    classify(performed, aborted, &[cancelled.clone()], false)
+                        .unwrap_err()
+                        .outcome,
+                    Outcome::OutcomeUnknown
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn native_cancellation_with_a_recycle_receipt_remains_unknown() {
+        let mut cancelled = ack(false, true);
+        cancelled.status = 0x8027_0000_u32 as i32;
+        for retained in [true, false] {
+            for performed in [true, false] {
+                for aborted in [Some(false), Some(true), None] {
+                    assert_eq!(
+                        classify(performed, aborted, &[cancelled.clone()], retained)
+                            .unwrap_err()
+                            .outcome,
+                        Outcome::OutcomeUnknown
+                    );
+                }
             }
         }
     }

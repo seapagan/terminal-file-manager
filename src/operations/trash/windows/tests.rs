@@ -1,6 +1,8 @@
 use super::*;
 use std::{fs, path::PathBuf};
 
+mod native;
+
 #[test]
 fn callback_refusal_preserves_known_failure_classification_only_with_retained_identity() {
     let root = tempfile::tempdir().unwrap();
