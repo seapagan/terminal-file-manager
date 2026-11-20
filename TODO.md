@@ -1,5 +1,26 @@
 # TODO
 
+## Windows ownership worker cancellation
+
+An in-flight ownership job cancelled by `cancel_except` stays cancelled if the
+same key and epoch become wanted again before it finishes. The job retains its
+worker slot until completion and discards its result, delaying the requested
+owner display and potentially repeating a native SID or account lookup.
+
+Before changing this behaviour, add deterministic concurrency tests for
+cancellation followed by renewed demand, completion races, stale epochs and
+bounded worker slots. Preserve cancellation and stale-result safety. Runtime
+changes require separate approval.
+
+## Replace Linux-only chrono
+
+Investigate replacing the Linux-only `chrono` dependency with the existing
+`time` crate following `RUSTSEC-2026-0543`. Identify and enable the features
+needed for local-time conversion and formatting. Preserve local Trash
+`DeletionDate` timestamps, their format and timezone/daylight-saving behaviour.
+Remove the advisory-specific exception from `deny.toml` after replacement.
+Implementation requires separate approval.
+
 ## Terminal-default colour audit
 
 Audit TFM's reliance on terminal-default foreground and background colours.

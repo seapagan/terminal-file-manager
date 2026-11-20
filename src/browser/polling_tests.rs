@@ -1,6 +1,50 @@
 use super::tests::{collect_until_idle, counting_controller, hold_first_count};
 use super::*;
 
+#[cfg(windows)]
+#[test]
+fn ownership_presentation_updates_do_not_invalidate_unchanged_directory_counts() {
+    use crate::owner::windows::{Name, Ownership};
+    use std::sync::atomic::AtomicBool;
+    for finished in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let mut controller = counting_controller(root.path());
+        let app = &mut controller.app;
+        let metadata = app.request_metadata(0).unwrap();
+        let owner = Ownership::Sid {
+            sid: "S-1-5-18".into(),
+            name: Name::Resolved("SYSTEM".into()),
+        };
+        app.panes[0].entries[0].windows_owner = owner.clone();
+        let mut entry = app.details[0].entry.clone().unwrap();
+        entry.windows_owner = owner;
+        app.complete_metadata(&metadata, entry, None);
+        let count = app.request_totals().unwrap();
+        if finished {
+            app.complete_totals(
+                &count,
+                Ok(crate::fs::totals(&count.path, &AtomicBool::new(false)).unwrap()),
+            );
+        }
+        app.metadata_scroll = 3;
+        let request = app.request_reconciliation(0).unwrap();
+        let snapshot = crate::fs::list(
+            root.path(),
+            &IgnoreContext::isolated(),
+            &AtomicBool::new(false),
+        )
+        .unwrap();
+        app.complete_listing(0, request.generation, Ok(snapshot));
+        assert_eq!(app.details[0].totals_generation, count.generation);
+        assert_eq!(app.details[0].counting, !finished);
+        assert_eq!(app.metadata_scroll, 3);
+        if finished {
+            let totals = app.details[0].totals.as_ref().unwrap().as_ref().unwrap();
+            assert_eq!(totals.bytes, 4);
+        }
+    }
+}
+
 #[test]
 fn open_notification_history_requests_clock_redraw_after_toast_expiry() {
     let mut app = App::new("owned-history".into());

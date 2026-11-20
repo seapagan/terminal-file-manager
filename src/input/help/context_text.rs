@@ -143,7 +143,11 @@ fn bound(app: &App, action: Action) -> &str {
 fn metadata(app: &App) -> Vec<HelpParagraph> {
     vec![
         paragraph(
-            "Inspect the selected entry without changing files. Click attributes, times or owner/group to change how they are shown.",
+            if cfg!(windows) {
+                "Inspect the selected entry without changing files. Windows owners show account names or SIDs; unresolved names keep the SID. Click attributes, times or owner to change their format."
+            } else {
+                "Inspect the selected entry without changing files. Click attributes, times or owner/group to change how they are shown."
+            },
             &[],
         ),
         paragraph(

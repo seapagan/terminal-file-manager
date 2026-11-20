@@ -179,12 +179,12 @@ fn unix_snapshot_retains_ids_and_cached_names_remeasure_after_toggle() {
 
 #[cfg(windows)]
 #[test]
-fn windows_ownership_remains_unavailable_in_both_representations() {
+fn windows_ownership_stays_pending_until_background_resolution() {
     let (_root, c) = loaded();
     let entry = &c.app.panes[0].entries[0];
     assert!(entry.owner.is_none());
     for mode in [OwnerDisplay::Names, OwnerDisplay::Numeric] {
-        assert_eq!(entry.owner_display(mode), "unavailable");
+        assert_eq!(entry.owner_display(mode), "resolving");
     }
 }
 

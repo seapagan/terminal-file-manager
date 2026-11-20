@@ -57,6 +57,9 @@ pub struct Entry {
     pub windows_attributes: Option<u32>,
     pub mode: Option<u32>,
     pub owner: Option<crate::owner::Ownership>,
+    /// Windows has an owner SID, with no Unix-style owning group.
+    #[cfg(windows)]
+    pub windows_owner: crate::owner::windows::Ownership,
     pub hidden: bool,
     pub executable: bool,
     pub enterable: bool,
@@ -66,6 +69,16 @@ pub struct Entry {
 }
 
 impl Entry {
+    /// Windows account resolution and access-time sampling do not change count inputs.
+    pub(crate) fn same_count_inputs(mut self, fresh: &Self) -> bool {
+        self.accessed = fresh.accessed;
+        #[cfg(windows)]
+        {
+            self.windows_owner = fresh.windows_owner.clone();
+        }
+        self.identity.is_some() && self.error.is_none() && self == *fresh
+    }
+
     /// Native attribute text from cached metadata, without filesystem access.
     pub fn native_attributes(&self) -> std::borrow::Cow<'_, str> {
         #[cfg(unix)]
@@ -89,6 +102,10 @@ impl Entry {
 
     /// Format cached account data without resolving accounts on the render thread.
     pub fn owner_display(&self, mode: crate::owner::OwnerDisplay) -> String {
+        #[cfg(windows)]
+        if self.owner.is_none() {
+            return self.windows_owner.display(mode);
+        }
         self.owner
             .as_ref()
             .map_or_else(|| "unavailable".into(), |owner| owner.display(mode))
@@ -225,6 +242,8 @@ fn inspect_no_follow(path: &Path, owners: Option<&mut crate::owner::Cache>) -> E
         windows_attributes: None,
         mode: None,
         owner: None,
+        #[cfg(windows)]
+        windows_owner: crate::owner::windows::Ownership::Pending,
         hidden: false,
         executable: false,
         enterable: false,
@@ -234,7 +253,14 @@ fn inspect_no_follow(path: &Path, owners: Option<&mut crate::owner::Cache>) -> E
     };
     match fs::symlink_metadata(path) {
         Ok(metadata) => fill(&mut entry, &metadata, owners),
-        Err(error) => entry.error = Some(error.to_string()),
+        Err(error) => {
+            #[cfg(windows)]
+            {
+                entry.windows_owner =
+                    crate::owner::windows::Ownership::Unavailable(error.to_string());
+            }
+            entry.error = Some(error.to_string());
+        }
     }
     entry
 }
@@ -266,6 +292,20 @@ fn fill(entry: &mut Entry, metadata: &Metadata, owners: Option<&mut crate::owner
         modified: entry.modified,
         length: metadata.len(),
     });
+    #[cfg(windows)]
+    if entry
+        .identity
+        .as_ref()
+        .and_then(|identity| identity.object)
+        .is_none()
+    {
+        entry.windows_owner = crate::owner::windows::Ownership::Unavailable(
+            entry
+                .error
+                .clone()
+                .unwrap_or_else(|| "Native identity unavailable".into()),
+        );
+    }
     entry.enterable = metadata.is_dir();
     if entry.kind == EntryKind::ReparsePoint {
         entry.enterable = false;

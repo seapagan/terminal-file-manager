@@ -1,5 +1,14 @@
 //! Unix account resolution adapted from lsplus d30ea4a (MIT, Grant Ramsay).
 
+#[cfg(windows)]
+pub mod windows;
+
+pub(crate) const METADATA_LABEL: &str = if cfg!(windows) {
+    "Owner"
+} else {
+    "Owner/group"
+};
+
 /// Names and numeric IDs are independent per-pane view preferences.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]

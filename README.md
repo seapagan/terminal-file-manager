@@ -183,6 +183,10 @@ On Windows, **Symbolic** shows `RHSA` (read-only, hidden, system, archive),
 with `-` for unset attributes. **Native hex** shows the full Windows bitmask.
 Click an attribute value in a metadata view to toggle that view's format.
 
+Windows owners appear as `DOMAIN\user`; **Numeric** shows the SID. Names load
+in the background. If a name cannot be resolved, TFM keeps the SID. Ownership
+lookup errors appear in metadata.
+
 ## Notifications
 
 Results and errors appear in toasts or the status area. Notification history

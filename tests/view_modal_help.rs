@@ -195,7 +195,11 @@ fn common_terminals_show_every_view_option_and_fifteen_profile_rows() {
         if open == "V" {
             assert!(shown.contains("Human sizes"));
             assert!(shown.contains("Preferred metadata"));
-            assert!(shown.contains("Owner/group display"));
+            assert!(shown.contains(if cfg!(windows) {
+                "Owner display"
+            } else {
+                "Owner/group display"
+            }));
         } else {
             assert!(shown.contains("Profile 00"));
             assert!(shown.contains("Profile 12"));
@@ -220,7 +224,11 @@ fn short_menus_use_available_height_and_keep_last_selection_clickable() {
         let shell = g.menu_layout.unwrap();
         assert_eq!(shell.outer.height, 8);
         assert!(text(&buffer).contains(if open == "V" {
-            "Owner/group display"
+            if cfg!(windows) {
+                "Owner display"
+            } else {
+                "Owner/group display"
+            }
         } else {
             "Save active as…"
         }));

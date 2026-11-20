@@ -144,7 +144,11 @@ fn assert_cached_fields(text: &str, name: &str, size: &str) {
         "Size:",
         "Modified:",
         "Attributes:",
-        "Owner/group:",
+        if cfg!(windows) {
+            "Owner:"
+        } else {
+            "Owner/group:"
+        },
     ] {
         assert!(text.contains(label), "{text}");
     }

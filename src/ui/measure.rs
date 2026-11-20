@@ -12,6 +12,8 @@ pub struct Measurements {
     pub number: u16,
     pub owner: u16,
     pub attributes: u16,
+    #[cfg(windows)]
+    owner_widths: std::collections::BTreeMap<u16, usize>,
 }
 
 impl Default for Measurements {
@@ -21,6 +23,8 @@ impl Default for Measurements {
             number: 0,
             owner: 0,
             attributes: width(crate::permissions::PermissionDisplay::default().column_heading()),
+            #[cfg(windows)]
+            owner_widths: Default::default(),
         }
     }
 }
@@ -38,6 +42,8 @@ impl Measurements {
             number: 4,
             owner: 5,
             attributes: width(permissions.column_heading()),
+            #[cfg(windows)]
+            owner_widths: Default::default(),
         };
         for entry in entries {
             let name = name(entry, u16::MAX);
@@ -47,11 +53,36 @@ impl Measurements {
                 .max(width(&crate::permissions::attributes(entry, permissions)));
             let (number, _) = parts(entry, human);
             measured.number = measured.number.max(width(&number));
-            measured.owner = measured
-                .owner
-                .max(width(&super::clean(&entry.owner_display(owner_display))));
+            let owner = width(&super::clean(&entry.owner_display(owner_display)));
+            measured.owner = measured.owner.max(owner);
+            #[cfg(windows)]
+            {
+                *measured.owner_widths.entry(owner).or_default() += 1;
+            }
         }
         measured
+    }
+
+    /// Adjust one resolved owner without rescanning the directory. Counts are
+    /// bounded by u16 display widths and rebuilt by existing view transitions.
+    #[cfg(windows)]
+    pub(crate) fn update_owner(&mut self, before: &str, after: &str) {
+        let before = width(&super::clean(before));
+        let after = width(&super::clean(after));
+        if before == after {
+            return;
+        }
+        if let Some(count) = self.owner_widths.get_mut(&before) {
+            *count -= 1;
+            if *count == 0 {
+                self.owner_widths.remove(&before);
+            }
+        }
+        *self.owner_widths.entry(after).or_default() += 1;
+        self.owner = self
+            .owner_widths
+            .last_key_value()
+            .map_or(5, |(width, _)| (*width).max(5));
     }
 }
 
@@ -80,6 +111,9 @@ pub(super) fn name(entry: &Entry, width: u16) -> String {
 fn width(text: &str) -> u16 {
     u16::try_from(Line::raw(text).width()).unwrap_or(u16::MAX)
 }
+
+#[cfg(all(test, windows))]
+mod tests;
 
 pub(super) fn parts(entry: &Entry, human: bool) -> (String, &'static str) {
     if entry.enterable {

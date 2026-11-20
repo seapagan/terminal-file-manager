@@ -61,6 +61,9 @@ fn browse(app: App, settings: Settings, store: &mut Option<Store>) -> Result<(),
         .map_err(|e| e.to_string())?;
     let mut pool = Pool::new(IgnoreContext::default()).map_err(|e| e.to_string())?;
     let mut jobs = crate::operations::Queue::new().map_err(|error| error.to_string())?;
+    #[cfg(windows)]
+    let mut owners =
+        crate::owner::windows::runtime::Runtime::new().map_err(|error| error.to_string())?;
     for pane in 0..2 {
         pool.submit(Request {
             pane,
@@ -70,7 +73,21 @@ fn browse(app: App, settings: Settings, store: &mut Option<Store>) -> Result<(),
         });
     }
     terminal::with_terminal(settings.mouse, |terminal| {
-        drive(terminal, &mut controller, &mut pool, &mut jobs, &theme)
+        #[cfg(windows)]
+        {
+            drive(
+                terminal,
+                &mut controller,
+                &mut pool,
+                &mut jobs,
+                &theme,
+                &mut owners,
+            )
+        }
+        #[cfg(not(windows))]
+        {
+            drive(terminal, &mut controller, &mut pool, &mut jobs, &theme)
+        }
     })
     .map_err(|e| e.to_string())?;
     save_state(controller, store)
@@ -100,6 +117,7 @@ fn drive(
     pool: &mut Pool,
     jobs: &mut crate::operations::Queue,
     theme: &Theme,
+    #[cfg(windows)] owners: &mut crate::owner::windows::runtime::Runtime,
 ) -> io::Result<()> {
     let started = Instant::now();
     let mut metadata: [Option<(Request, Instant)>; 2] = [None, None];
@@ -118,6 +136,10 @@ fn drive(
         dirty |= clipboard::collect(controller, &mut clipboard);
         submit_refreshes(&mut controller.app, pool);
         dirty |= schedule_metadata(controller, pool, &mut metadata);
+        #[cfg(windows)]
+        {
+            dirty |= owners.poll(&mut controller.app, &geometry);
+        }
         if dirty {
             ui::prepare_notifications(&mut controller.app, terminal.size()?.into());
             terminal.draw(|frame| {
