@@ -25,7 +25,7 @@ fn constrained_choice_geometry_stays_inside_offset_terminal_bounds() {
             action: Action::Sort,
             area: Rect::new(bounds.right() - 1, bounds.bottom() - 1, 1, 1),
         }];
-        let layout = layout(&app, bounds, &controls).unwrap();
+        let layout = layout(&app, bounds, &controls, &[Some(bounds), None]).unwrap();
         assert_eq!(layout.shell.outer.width, width.min(17));
         assert_eq!(layout.shell.outer.intersection(bounds), layout.shell.outer);
         if let Some(help) = layout.shell.help {
@@ -36,5 +36,34 @@ fn constrained_choice_geometry_stays_inside_offset_terminal_bounds() {
             assert!(width < 5);
         }
         assert_eq!(layout.start + usize::from(layout.shell.body.height), 9);
+    }
+}
+
+#[test]
+fn choice_popups_clamp_to_each_owning_pane_even_when_content_is_wider() {
+    let mut app = App::new("owned".into());
+    for pane in 0..2 {
+        app.policy_menu = Some(PolicyMenu {
+            pane,
+            action: Action::Sort,
+            selected: 8,
+        });
+        for width in [8, 24, 40] {
+            let bounds = Rect::new(3, 5, width * 2, 20);
+            let panes = [
+                Some(Rect::new(3, 5, width, 20)),
+                Some(Rect::new(3 + width, 5, width, 20)),
+            ];
+            let owner = panes[pane].unwrap();
+            let controls = [PolicyControl {
+                pane,
+                action: Action::Sort,
+                area: Rect::new(owner.right() - 2, 23, 1, 1),
+            }];
+            let popup = layout(&app, bounds, &controls, &panes).unwrap();
+            assert_eq!(popup.shell.outer.intersection(owner), popup.shell.outer);
+            assert_eq!(popup.shell.outer.width, width.min(17));
+            assert_eq!(popup.shell.outer.bottom(), 23);
+        }
     }
 }

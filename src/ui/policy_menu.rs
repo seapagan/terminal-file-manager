@@ -26,7 +26,12 @@ pub struct PolicyLayout {
     pub start: usize,
 }
 
-pub(super) fn layout(app: &App, area: Rect, controls: &[PolicyControl]) -> Option<PolicyLayout> {
+pub(super) fn layout(
+    app: &App,
+    area: Rect,
+    controls: &[PolicyControl],
+    panes: &[Option<Rect>; 2],
+) -> Option<PolicyLayout> {
     let menu = app
         .policy_menu
         .as_ref()
@@ -37,14 +42,23 @@ pub(super) fn layout(app: &App, area: Rect, controls: &[PolicyControl]) -> Optio
         .area;
     let choices = policy_menu::choices(menu.action);
     let content_width = choice_width(choices);
-    let width = content_width.saturating_add(4).min(area.width);
+    let owner = panes
+        .get(menu.pane)
+        .copied()
+        .flatten()
+        .unwrap_or(area)
+        .intersection(area);
+    let width = content_width.saturating_add(4).min(owner.width);
     let available = anchor.y.saturating_sub(area.y);
     let height = (choices.len() as u16 + 2).min(if available >= 3 {
         available
     } else {
         area.height
     });
-    let x = anchor.x.min(area.right().saturating_sub(width)).max(area.x);
+    let x = anchor
+        .x
+        .min(owner.right().saturating_sub(width))
+        .max(owner.x);
     let y = if available >= 3 {
         anchor.y.saturating_sub(height)
     } else {
@@ -53,7 +67,8 @@ pub(super) fn layout(app: &App, area: Rect, controls: &[PolicyControl]) -> Optio
     let spec = super::modal::Spec {
         title: "",
         help: true,
-        content_width: usize::from(content_width),
+        // viewport uses the already measured rectangle, not content_width.
+        content_width: 0,
         pinned_rows: 0,
         footer_rows: 0,
         actions: &[],

@@ -13,6 +13,48 @@ pub(super) fn open(c: &mut Controller, action: Action, bounds: Rect) -> Rect {
 }
 
 #[test]
+fn narrow_dual_pane_popups_stay_in_the_owner_and_activate_its_choice() {
+    let bounds = Rect::new(0, 0, 80, 24);
+    for pane in 0..2 {
+        let mut c = controller();
+        c.app.dual = true;
+        c.app.split_percent = if pane == 0 { 20 } else { 80 };
+        let g = ui::geometry(&c.app, bounds);
+        let owner = g.panes[pane].unwrap();
+        let anchor = g
+            .policy_controls
+            .iter()
+            .find(|control| control.pane == pane && control.action == Action::Sort)
+            .unwrap()
+            .area;
+        click(&mut c, anchor.x, anchor.y, bounds);
+        key(&mut c, "End", bounds);
+        let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+        let mut g = ui::geometry(&c.app, bounds);
+        terminal
+            .draw(|frame| {
+                g = ui::render(
+                    frame,
+                    &c.app,
+                    &Theme::new(colored_text::ColorLevel::NoColor),
+                );
+            })
+            .unwrap();
+        let popup = g.policy_menu.unwrap();
+        assert_eq!(popup.shell.outer.intersection(owner), popup.shell.outer);
+        assert_choice_rows(terminal.backend().buffer(), popup.shell.body, "Unsorted");
+        click(
+            &mut c,
+            popup.shell.body.x,
+            popup.shell.body.bottom() - 1,
+            bounds,
+        );
+        assert_eq!(c.app.panes[pane].sort.sort, Sort::Unsorted);
+        assert_eq!(c.app.panes[1 - pane].sort.sort, Sort::Natural);
+    }
+}
+
+#[test]
 fn all_policy_popups_render_only_choice_rows_between_the_borders() {
     let bounds = Rect::new(0, 0, 120, 30);
     for (action, count, last) in [
@@ -59,7 +101,7 @@ fn resized_sort_popup_keeps_the_scrolled_last_row_clickable() {
     let large = Rect::new(0, 0, 120, 30);
     open(&mut c, Action::Sort, large);
     key(&mut c, "End", large);
-    let small = Rect::new(3, 5, 120, 9);
+    let small = Rect::new(0, 0, 120, 9);
     let g = ui::geometry(&c.app, small);
     c.handle(
         Event::Resize(small.width, small.height),
@@ -70,7 +112,17 @@ fn resized_sort_popup_keeps_the_scrolled_last_row_clickable() {
     let layout = g.policy_menu.unwrap();
     assert_eq!(layout.shell.outer.intersection(small), layout.shell.outer);
     assert!(layout.start > 0);
-    assert_eq!(layout.start + usize::from(layout.shell.body.height), 9);
+    let mut terminal = Terminal::new(TestBackend::new(small.right(), small.bottom())).unwrap();
+    terminal
+        .draw(|frame| {
+            ui::render(
+                frame,
+                &c.app,
+                &Theme::new(colored_text::ColorLevel::NoColor),
+            );
+        })
+        .unwrap();
+    assert_choice_rows(terminal.backend().buffer(), layout.shell.body, "Unsorted");
     click(
         &mut c,
         layout.shell.body.x,

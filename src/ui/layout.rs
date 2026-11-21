@@ -120,7 +120,8 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
             )
         });
     geometry.policy_controls = super::policy::controls(app, &geometry.panes);
-    geometry.policy_menu = super::policy_menu::layout(app, area, &geometry.policy_controls);
+    geometry.policy_menu =
+        super::policy_menu::layout(app, area, &geometry.policy_controls, &geometry.panes);
     geometry.path_controls = super::path_navigation::headers(app, &geometry.panes);
     finish_geometry(app, area, &mut geometry);
     geometry
