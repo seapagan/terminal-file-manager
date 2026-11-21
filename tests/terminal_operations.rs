@@ -426,10 +426,9 @@ fn editing_keys_correct_a_filename_through_native_terminal_input() {
         command(root.path(), root.path(), None),
         &[
             ("editor-ready", "\x1bn"),
-            (
-                "Create empty file",
-                "abx\x1b[H\x1b[C\x1b[3~c\x1b[F\x7f\x1b[2~\x1b[2~\r",
-            ),
+            ("Create empty file", "abx"),
+            ("abx", "\x1b[H\x1b[C\x1b[3~c\x1b[F\x7f\x1b[2~"),
+            ("ac", "\x1b[2~\r"),
             ("Create file complete", "q"),
         ],
         false,
