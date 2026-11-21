@@ -226,6 +226,10 @@ lookup errors appear in metadata.
 
 ## Notifications
 
+Open history with `Alt+h` or `Shift+F9`. Zellij and Herdr GUI can capture
+`Alt+h` for pane navigation; use `Shift+F9`, configure terminal passthrough,
+or use Zellij's locked mode. TFM keeps both history shortcuts configurable.
+
 Results and errors appear in toasts or the status area. Notification history
 includes expired toasts and lasts until you quit. Critical incidents and unknown
 outcomes remain available in Jobs after their toasts expire.

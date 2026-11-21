@@ -509,3 +509,21 @@ fn editing_keys_correct_a_filename_through_native_terminal_input() {
     assert!(root.path().join("ac").is_file());
     assert!(!root.path().join("abx").exists());
 }
+
+#[test]
+fn notification_history_shift_f9_arrives_through_native_terminal_input() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("notification-alias-ready"), "owned").unwrap();
+    drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("notification-alias-ready", "\x1b[20;2~"),
+            ("Notifications", "\x03"),
+        ],
+        false,
+    );
+    assert_eq!(
+        fs::read(root.path().join("notification-alias-ready")).unwrap(),
+        b"owned"
+    );
+}

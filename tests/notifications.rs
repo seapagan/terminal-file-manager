@@ -345,3 +345,29 @@ fn current_error_precedes_running_jobs_and_decorative_history_on_narrow_status()
     assert_eq!(g.status_controls[0].1, Action::Notifications);
     assert_eq!(g.status.height, 1);
 }
+
+#[test]
+fn shift_f9_opens_notifications_and_alt_h_remains_bound() {
+    let mut c = controller();
+    let bindings = Bindings::new(&Default::default()).unwrap();
+    for key in [
+        KeyEvent::new(KeyCode::F(9), KeyModifiers::SHIFT),
+        KeyEvent::new(KeyCode::Char('h'), KeyModifiers::ALT),
+    ] {
+        assert_eq!(bindings.action(key), Some(Action::Notifications));
+        let g = ui::geometry(&c.app, Rect::new(0, 0, 100, 24));
+        assert!(c.handle(Event::Key(key), &g, Duration::ZERO).is_empty());
+        assert!(c.app.notifications.open);
+        assert!(draw(&c.app, 100, 24).0.contains("Notifications"));
+        c.app.notifications.open = false;
+    }
+    let remapped = Bindings::new(&std::collections::BTreeMap::from([(
+        "Shift+F9".into(),
+        Action::Jobs,
+    )]))
+    .unwrap();
+    assert_eq!(
+        remapped.action(KeyEvent::new(KeyCode::F(9), KeyModifiers::SHIFT)),
+        Some(Action::Jobs)
+    );
+}
