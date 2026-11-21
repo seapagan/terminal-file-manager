@@ -33,13 +33,13 @@ pub(super) fn layout(app: &App, area: Rect, controls: &[PolicyControl]) -> Optio
     let choices = policy_menu::choices(menu.action);
     let width = 24.min(area.width);
     let available = anchor.y.saturating_sub(area.y);
-    let height = (choices.len() as u16 + 4).min(if available >= 5 {
+    let height = (choices.len() as u16 + 2).min(if available >= 3 {
         available
     } else {
         area.height
     });
     let x = anchor.x.min(area.right().saturating_sub(width)).max(area.x);
-    let y = if available >= 5 {
+    let y = if available >= 3 {
         anchor.y.saturating_sub(height)
     } else {
         area.y
@@ -52,7 +52,19 @@ pub(super) fn layout(app: &App, area: Rect, controls: &[PolicyControl]) -> Optio
         footer_rows: 0,
         actions: &[],
     };
-    let shell = super::modal::Layout::viewport(&spec, Rect::new(x, y, width, height));
+    let mut shell = super::modal::Layout::viewport(&spec, Rect::new(x, y, width, height));
+    // Choice rows sit directly inside the border, without form padding.
+    shell.body.y = y.saturating_add(u16::from(height > 0));
+    shell.body.height = height.saturating_sub(2);
+    shell.pinned = Rect {
+        height: 0,
+        ..shell.body
+    };
+    shell.footer = Rect {
+        y: shell.body.bottom(),
+        ..shell.pinned
+    };
+    shell.cue = shell.footer;
     let start = menu
         .selected
         .saturating_sub(usize::from(shell.body.height.saturating_sub(1)));
