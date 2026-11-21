@@ -76,7 +76,7 @@ fn apply(
         result.outcome = error.outcome;
         result.detail = error.detail;
     }
-    let complete = result.outcome == Outcome::Completed;
+    let complete = result.outcome.successful();
     record.entries.push(result);
     complete
 }
