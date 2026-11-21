@@ -125,6 +125,28 @@ choice, or press Esc to cancel. Keyboard policy shortcuts continue cycling.
 View Options (`V`) includes a Single/Dual pane choice for the running session.
 The `two_panes` setting continues to control the startup default.
 
+### Terminal shortcut conflicts
+
+Terminal emulators, multiplexers and desktop terminal hosts can capture a key
+before TFM receives it. Windows Terminal can use `Alt+Enter` for fullscreen;
+use TFM's `Alt+o` metadata shortcut instead. Zellij and Herdr GUI can use
+`Alt+h` for pane focus; `Shift+F9` opens TFM notification history. Herdr GUI
+may also reserve `Alt+j`, `Alt+k`, `Alt+l` and F2.
+
+In Zellij, press **Ctrl+G** to toggle locked mode. While locked, Zellij passes
+its usual shortcuts through to TFM; press Ctrl+G again to unlock.
+
+If a host still captures a shortcut, choose a chord it passes through and map
+it in TFM's `config.toml`. For example, add these entries to `[bindings]`:
+
+```toml
+"Ctrl+F9" = "notifications"
+"Ctrl+F2" = "metadata"
+```
+
+TFM's configurable bindings let you keep your terminal application's setup.
+Help shows the effective bindings after your overrides.
+
 ## Working with files
 
 Operations use visible marks, or the highlighted entry when no visible marks
@@ -226,9 +248,7 @@ lookup errors appear in metadata.
 
 ## Notifications
 
-Open history with `Alt+h` or `Shift+F9`. Zellij and Herdr GUI can capture
-`Alt+h` for pane navigation; use `Shift+F9`, configure terminal passthrough,
-or use Zellij's locked mode. TFM keeps both history shortcuts configurable.
+Open history with `Alt+h` or `Shift+F9`.
 
 Results and errors appear in toasts or the status area. Notification history
 includes expired toasts and lasts until you quit. Critical incidents and unknown
