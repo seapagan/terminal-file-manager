@@ -1,6 +1,9 @@
 //! Apply read-only worker completions and avoid redraws for unchanged listings.
 use super::{App, Controller, Duration, NativeTerminal, Pool, Theme, Value, io, ui};
 
+#[cfg(test)]
+mod tests;
+
 pub(super) fn tick(app: &mut App) -> bool {
     let now = std::time::SystemTime::now();
     let elapsed = now.duration_since(app.now).unwrap_or(Duration::MAX);
@@ -57,11 +60,12 @@ pub(super) fn collect(controller: &mut Controller, pool: &mut Pool) -> bool {
 fn listing_presentation(
     app: &App,
     pane: usize,
-) -> (u64, Option<String>, Option<std::time::SystemTime>) {
+) -> (u64, Option<String>, Option<std::time::SystemTime>, bool) {
     (
         app.panes[pane].listing_installs,
         app.panes[pane].error.clone(),
         app.details[pane].entry.as_ref().and_then(|e| e.accessed),
+        app.pattern.as_ref().is_some_and(|state| state.pane == pane) && app.panes[pane].listing,
     )
 }
 
