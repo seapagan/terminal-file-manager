@@ -122,8 +122,10 @@ fn profile_text_and_browsing_navigation_repeat_without_repeating_confirmation() 
     let before = c.app.profile_name.clone().unwrap();
     key(&mut c, "x", Repeat);
     assert_eq!(c.app.profile_name.as_ref().unwrap(), &format!("{before}x"));
-    key(&mut c, "Enter", Repeat);
-    assert!(c.app.profile_name.is_some() && !c.preferences_changed);
+    for text in ["Enter", "Esc"] {
+        key(&mut c, text, Repeat);
+        assert!(c.app.profile_name.is_some() && !c.preferences_changed);
+    }
     key(&mut c, "Esc", Press);
     key(&mut c, "Esc", Press);
     key(&mut c, "V", Repeat);

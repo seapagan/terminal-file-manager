@@ -104,11 +104,11 @@ fn choose(controller: &mut Controller) {
 
 fn edit(controller: &mut Controller, key: KeyEvent) {
     match key.code {
-        KeyCode::Esc => {
+        KeyCode::Esc if key.kind == KeyEventKind::Press => {
             controller.app.profile_name = None;
             controller.app.profile_error = None;
         }
-        KeyCode::Enter => save(controller),
+        KeyCode::Enter if key.kind == KeyEventKind::Press => save(controller),
         _ => {
             let mut editor = controller.app.profile_editor;
             let mut text = controller.app.profile_name.as_ref().unwrap().clone();
