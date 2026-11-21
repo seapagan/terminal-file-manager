@@ -360,7 +360,14 @@ fn popup_layout(
         .measure(bounds, |width| {
             measured_rows = rows(fields, width, theme);
             if let Some(entry) = detail.entry.as_ref().filter(|_| detail.stale.is_none()) {
-                let row = super::modal::entry_row::<()>(entry, std::path::Path::new(&entry.name));
+                let row = super::modal::Row::<()>::file(
+                    entry.name.to_string_lossy().into_owned(),
+                    if entry.kind == crate::fs::EntryKind::File {
+                        super::modal::file_size(entry.size)
+                    } else {
+                        "—".into()
+                    },
+                );
                 let row = row.wrap(width).remove(0).line(width, theme);
                 measured_rows.insert(0, (row, None, 0));
             }
