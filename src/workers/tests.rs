@@ -2,6 +2,38 @@ use super::*;
 use std::sync::Mutex;
 
 #[test]
+fn listing_metrics_count_only_successful_targeted_refreshes() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("known");
+    std::fs::write(&path, "old").unwrap();
+    let context = IgnoreContext::isolated();
+    let seed = fs::list(root.path(), &context, &AtomicBool::new(false)).unwrap();
+    let request = Request {
+        pane: 0,
+        kind: RequestKind::Listing,
+        generation: 1,
+        path: root.path().into(),
+    };
+    for (paths, cancelled, targeted, scans) in [
+        (vec![path.clone()], false, 1, 0),
+        (vec![path], true, 0, 0),
+        (vec![root.path().join("unknown")], false, 0, 1),
+    ] {
+        let metrics = Metrics::default();
+        let value = execute_work(
+            &request,
+            &context,
+            &AtomicBool::new(cancelled),
+            Some((seed.clone(), paths)),
+            &metrics,
+        );
+        assert_eq!(matches!(value, Value::Listing(Err(_))), cancelled);
+        assert_eq!(metrics.metadata_refreshes.load(Ordering::Relaxed), targeted);
+        assert_eq!(metrics.full_scans.load(Ordering::Relaxed), scans);
+    }
+}
+
+#[test]
 fn panic_releases_each_lane_and_runs_only_the_latest_pending_request() {
     for kind in [
         RequestKind::Listing,

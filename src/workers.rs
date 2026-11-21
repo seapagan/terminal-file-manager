@@ -241,9 +241,11 @@ fn execute_work(
     metrics: &Metrics,
 ) -> Value {
     if let Some((seed, paths)) = refresh {
-        metrics.metadata_refreshes.fetch_add(1, Ordering::Relaxed);
         match fs::refresh_metadata(seed, &paths, cancelled) {
-            Ok(Some(snapshot)) => return Value::Listing(Ok(snapshot)),
+            Ok(Some(snapshot)) => {
+                metrics.metadata_refreshes.fetch_add(1, Ordering::Relaxed);
+                return Value::Listing(Ok(snapshot));
+            }
             Err(error) => return Value::Listing(Err(error.to_string())),
             Ok(None) => {}
         }
