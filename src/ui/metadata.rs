@@ -361,7 +361,17 @@ fn popup_layout(
             measured_rows = rows(fields, width, theme);
             if let Some(entry) = detail.entry.as_ref().filter(|_| detail.stale.is_none()) {
                 let row = super::modal::Row::<()>::file(
-                    entry.name.to_string_lossy().into_owned(),
+                    format!(
+                        "{}{}",
+                        entry.name.to_string_lossy(),
+                        if entry.kind == crate::fs::EntryKind::Directory
+                            || (entry.kind == crate::fs::EntryKind::Junction && entry.enterable)
+                        {
+                            "/"
+                        } else {
+                            ""
+                        }
+                    ),
                     if entry.kind == crate::fs::EntryKind::File {
                         super::modal::file_size(entry.size)
                     } else {

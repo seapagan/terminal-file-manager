@@ -112,11 +112,9 @@ fn floating_metadata_uses_the_file_row_without_changing_the_sidebar() {
     app.panes[0].entries.clear();
     app.panes[0].visible.clear();
     let text = rendered(&app, 120, 40).join("\n");
-    assert!(text.contains("d  child/"));
-    let row = text
-        .lines()
-        .find(|line| line.contains("d  child/"))
-        .unwrap();
+    assert!(text.contains("child/"));
+    assert!(!text.contains("d  child/"));
+    let row = text.lines().find(|line| line.contains("child/")).unwrap();
     assert!(row.contains("—"));
 }
 
