@@ -6,6 +6,7 @@ use terminal_file_manager::{
 pub fn dialog(plan: Plan) -> App {
     let mut app = App::new("/controlled".into());
     app.operations.dialog = Some(Dialog::Operation(Box::new(OperationDialog {
+        editors: Default::default(),
         plan,
         pane: 0,
         base: "/controlled".into(),

@@ -30,6 +30,7 @@ fn unedited_native_destination_remains_visible_without_a_duplicate_path() {
     let root = tempfile::tempdir().unwrap();
     let target = root
         .path()
+        .join("native-preview-".repeat(6))
         .join(OsString::from_vec(b"destination\xff".to_vec()));
     let file = root.path().join("file");
     std::fs::write(&file, b"data").unwrap();
@@ -37,8 +38,10 @@ fn unedited_native_destination_remains_visible_without_a_duplicate_path() {
     if let Some(Dialog::Operation(d)) = &mut app.operations.dialog {
         d.native_target = target.clone();
     }
-    let text = rendered(&app, 120, 40).join("\n");
-    assert!(text.contains(&ui::clean(&format!("{target:?}"))));
+    let display = ui::clean(&format!("{target:?}"));
+    let width = ui::modal::width(&display) + 60;
+    let text = rendered(&app, width, 40).join("\n");
+    assert!(text.contains(&display));
     assert!(!text.contains("Approved destination:"));
     assert!(
         matches!(&app.operations.dialog,Some(Dialog::Operation(d)) if d.text.is_empty() && !d.edited && d.native_target == target)
@@ -77,7 +80,7 @@ fn populated_form_values_keep_normal_styles_and_a_separate_caret() {
             let (x, y) = (0..40)
                 .find_map(|y| {
                     let row: String = (0..120).map(|x| buffer[(x, y)].symbol()).collect();
-                    row.find("typed-value▏")
+                    row.find("typed-value")
                         .map(|start| (ratatui::text::Line::raw(&row[..start]).width() as u16, y))
                 })
                 .unwrap();
@@ -90,7 +93,9 @@ fn populated_form_values_keep_normal_styles_and_a_separate_caret() {
                     .modifier
                     .contains(ratatui::style::Modifier::REVERSED)
             );
-            assert_eq!(buffer[(x + 11, y)].symbol(), "▏");
+            assert_eq!(buffer[(x + 11, y)].symbol(), " ");
+            assert!(terminal.backend().cursor_visible());
+            assert_eq!(terminal.backend().cursor_position(), (x + 11, y).into());
         }
     }
 }
@@ -112,11 +117,9 @@ fn floating_metadata_uses_the_file_row_without_changing_the_sidebar() {
     app.panes[0].entries.clear();
     app.panes[0].visible.clear();
     let text = rendered(&app, 120, 40).join("\n");
-    assert!(text.contains("d  child/"));
-    let row = text
-        .lines()
-        .find(|line| line.contains("d  child/"))
-        .unwrap();
+    assert!(text.contains("child/"));
+    assert!(!text.contains("d  child/"));
+    let row = text.lines().find(|line| line.contains("child/")).unwrap();
     assert!(row.contains("—"));
 }
 
@@ -266,9 +269,20 @@ fn mkdir_orders_context_before_a_precisely_styled_field() {
         .unwrap();
     assert!(parent < field);
     assert!(!rows[field].contains('>'));
-    assert!(rows[field].contains('▏'));
+    assert!(terminal.backend().cursor_visible());
+    let label = rows[field].find("Directory name:").unwrap();
+    let field_x = ratatui::text::Line::raw(&rows[field][..label]).width() as u16;
+    assert_eq!(
+        terminal.backend().cursor_position(),
+        (field_x + "Directory name: ".len() as u16, field as u16).into()
+    );
+    assert!(
+        rows[field][label + "Directory name:".len()..]
+            .trim_matches(|c: char| c.is_whitespace() || c == '│')
+            .is_empty()
+    );
     assert!(rows.iter().any(|row| row.contains("[Enter Create]")));
-    let x = rows[field].find("Directory name:").unwrap() as u16;
+    let x = field_x;
     assert_eq!(
         buffer[(x, field as u16)].fg,
         theme.style(Role::Label).fg.unwrap()

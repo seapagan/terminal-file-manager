@@ -21,6 +21,7 @@ pub struct HelpHit {
 /// Search text and selected result belong only to the current Help session.
 #[derive(Clone, Debug, Default)]
 pub struct HelpPicker {
+    pub editor: crate::editor::Editor,
     pub query: String,
     pub selected: usize,
     results: RefCell<Option<CachedHits>>,

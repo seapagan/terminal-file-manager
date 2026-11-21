@@ -354,3 +354,34 @@ mod accessibility;
 
 #[path = "pattern_modal/review.rs"]
 mod review;
+
+#[test]
+fn matching_preferences_survive_reopen_but_expression_and_scope_are_fresh() {
+    let (_root, mut c) = loaded();
+    key(&mut c, "Alt+b");
+    key(&mut c, "a");
+    key(&mut c, "Alt+x");
+    key(&mut c, "Alt+s");
+    key(&mut c, "Esc");
+    key(&mut c, "Alt+b");
+    let pattern = c.app.pattern.as_ref().unwrap();
+    assert_eq!(pattern.mode, PatternMode::Regex);
+    assert!(!pattern.case_sensitive);
+    assert!(pattern.expression().is_empty());
+    assert!(!c.preferences_changed);
+    let settings = terminal_file_manager::settings::Settings::parse(
+        "pattern_mode = 'regex'\npattern_case_sensitive = false",
+    )
+    .unwrap();
+    let mut fresh = Controller::new(
+        App::new("owned".into()),
+        Bindings::new(&Default::default()).unwrap(),
+        settings,
+    );
+    key(&mut fresh, "Alt+b");
+    let pattern = fresh.app.pattern.as_ref().unwrap();
+    assert_eq!(pattern.mode, PatternMode::Regex);
+    assert!(!pattern.case_sensitive);
+    assert!(pattern.expression().is_empty());
+    assert!(terminal_file_manager::settings::Settings::parse("pattern_mode = 'unknown'").is_err());
+}

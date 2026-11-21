@@ -120,6 +120,10 @@ fn render_with_help(
 
 /// Narrow shells retain their title and F1 access without an overlapping control.
 pub fn help_area(outer: Rect, title: &str, enabled: bool) -> Option<Rect> {
+    if title.is_empty() {
+        return (enabled && outer.height > 0 && outer.width >= 5)
+            .then(|| Rect::new(outer.right() - 4, outer.y, 3, 1));
+    }
     (enabled && outer.height > 0 && width(title).saturating_add(11) <= outer.width)
         .then(|| Rect::new(outer.right() - 8, outer.y, 3, 1))
 }

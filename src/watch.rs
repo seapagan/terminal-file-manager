@@ -49,6 +49,7 @@ struct Slot {
     fallback: Backoff,
     retry: Option<Duration>,
     retry_backoff: Backoff,
+    hints: signals::Hints,
 }
 
 impl Default for Runtime {
@@ -77,6 +78,7 @@ impl Runtime {
                 fallback: Backoff::default(),
                 retry: None,
                 retry_backoff: Backoff::default(),
+                hints: Default::default(),
             }),
         }
     }
@@ -101,16 +103,7 @@ impl Runtime {
             if slot.due(&app.panes[pane], now)
                 && let Some(request) = app.request_reconciliation(pane)
             {
-                slot.schedule.started(now);
-                slot.urgent = false;
-                slot.sweep = now
-                    + if slot.failed {
-                        (slot.fallback.next() * 2).min(Duration::from_secs(30))
-                    } else {
-                        Duration::from_secs(30)
-                    };
-                slot.retry = None;
-                pool.submit(request);
+                slot.submit(request, &app.panes[pane], pool, now);
             }
         }
         changed
@@ -118,6 +111,37 @@ impl Runtime {
 }
 
 impl Slot {
+    fn submit(
+        &mut self,
+        request: crate::app::Request,
+        pane: &crate::app::Pane,
+        pool: &mut Pool,
+        now: Duration,
+    ) {
+        let full = self.urgent || self.failed || self.hints.full;
+        let hints = std::mem::take(&mut self.hints);
+        self.schedule.started(now);
+        self.urgent = false;
+        if full {
+            self.sweep = now
+                + if self.failed {
+                    (self.fallback.next() * 2).min(Duration::from_secs(30))
+                } else {
+                    Duration::from_secs(30)
+                };
+        }
+        self.retry = None;
+        if full || hints.children.is_empty() {
+            pool.submit(request);
+        } else {
+            pool.submit_metadata_refresh(
+                request,
+                pane.cached_snapshot(),
+                hints.children.into_iter().collect(),
+            );
+        }
+    }
+
     fn due(&mut self, pane: &crate::app::Pane, now: Duration) -> bool {
         if pane.pending.is_some() || pane.listing {
             return false;
@@ -141,6 +165,7 @@ impl Slot {
         self.context = pane.context;
         self.signals = Arc::default();
         self.schedule = Schedule::default();
+        self.hints = Default::default();
         self.sweep = now + Duration::from_secs(30);
         self.urgent = false;
         self.fallback = Backoff::default();
@@ -162,6 +187,9 @@ impl Slot {
     fn consume(&mut self, app: &mut App, pane: usize, now: Duration) -> bool {
         let bits = self.signals.bits.swap(0, Ordering::AcqRel);
         // Repeated backend failures are covered by fallback, not fresh dirty work.
+        if bits & DIRTY != 0 {
+            self.hints.merge(self.signals.take_hints());
+        }
         if bits & (DIRTY | ERROR) == DIRTY {
             self.schedule.dirty(now);
         }

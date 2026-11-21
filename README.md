@@ -75,7 +75,8 @@ bindings appear below as `Shift+` plus the lowercase letter.
 | `r` | Refresh the directory |
 | Shift+v / Alt+v | View options / view profiles |
 
-Linux and macOS refresh automatically. **On Windows, press `r` to see external
+Linux and macOS refresh automatically, including file size and modification
+time changes. **On Windows, press `r` to see external
 changes.** If a directory becomes unavailable or is replaced, reopen it after
 resolving the error.
 
@@ -105,10 +106,48 @@ resolving the error.
 | F7 | Create a directory |
 | Shift+F7 / Alt+n | Create an empty file |
 | Alt+r / Alt+a | Rename one entry / edit supported attributes |
-| F8 / Alt+t | Preview and move the selection to native Trash |
-| Shift+F8 / Alt+d | Preview permanent deletion; Enter cancels |
+| F8 / Delete / Alt+t | Preview and move the selection to native Trash |
+| Shift+F8 / Shift+Delete / Alt+d | Preview permanent deletion; Enter cancels |
 | F9 / Alt+j | Jobs, progress and results |
 | `y` | Copy names or paths to the clipboard |
+
+An active filter appears as **FILTER:** in the pane policy row; an empty
+filtered view shows **No matches**.
+
+Filters clear after successful navigation to another folder. Enable
+`keep_filter_on_navigation = true` in TOML or **Keep filter on navigation**
+in View Options (`V`) to retain them. Refreshes and failed navigation keep filters.
+
+Click **Sort**, **Group**, **Hidden** or **Ignore** in a pane's policy row to
+choose a value. Menus open above the control; use arrows and Enter, click a
+choice, or press Esc to cancel. Press F1 or click `[?]` for an explanation of
+each option; Esc returns from Help to the same highlighted choice. Keyboard
+policy shortcuts continue cycling.
+
+View Options (`V`) includes a Single/Dual pane choice for the running session.
+The `two_panes` setting continues to control the startup default.
+
+### Terminal shortcut conflicts
+
+Terminal emulators, multiplexers and desktop terminal hosts can capture a key
+before TFM receives it. Windows Terminal can use `Alt+Enter` for fullscreen;
+use TFM's `Alt+o` metadata shortcut instead. Zellij and Herdr GUI can use
+`Alt+h` for pane focus; `Shift+F9` opens TFM notification history. Herdr GUI
+may also reserve `Alt+j`, `Alt+k`, `Alt+l` and F2.
+
+In Zellij, press **Ctrl+G** to toggle locked mode. While locked, Zellij passes
+its usual shortcuts through to TFM; press Ctrl+G again to unlock.
+
+If a host still captures a shortcut, choose a chord it passes through and map
+it in TFM's `config.toml`. For example, add these entries to `[bindings]`:
+
+```toml
+"Ctrl+F9" = "notifications"
+"Ctrl+F2" = "metadata"
+```
+
+TFM's configurable bindings let you keep your terminal application's setup.
+Help shows the effective bindings after your overrides.
 
 ## Working with files
 
@@ -121,14 +160,29 @@ start dimmed.
 On Windows, red filenames identify files and directories with the System
 attribute. Windows permissions still determine access.
 
+Use `Alt+e` to replace visible marks with files in the highlighted file's
+extension class. Configured compound suffixes such as `.tar.gz` stay distinct
+from `.gz`; `Alt+Shift+e` matches the final extension across both classes.
+Set `compound_extensions = [".tar.gz", ".tar.xz", ".tar.bz2", ".tar.zst"]`
+in TOML to customize the recognized compounds. Marks outside the visible
+working set remain. Extensionless entries leave marks unchanged.
+
 Alt+b selects by wildcard or regex, for example `*.rs`. Wildcards match whole
 filenames; regex matches substrings. **Replace can clear visible marks even when
-nothing matches.** Review the preview before applying a pattern.
+nothing matches.** Review the preview before applying a pattern. Matching mode
+and case sensitivity carry over between opens during the session; expressions
+start empty. Set `pattern_mode = "wildcard"` (or `"regex"`) and
+`pattern_case_sensitive = true` in TOML to choose startup defaults.
 
 With two panes, copy and move target the other pane: one entry starts at once,
 while multiple entries ask for confirmation. With one pane, choose a destination
 in the dialog. F2 in a transfer dialog toggles SHA-256 verification. Conflicts
 default to Skip; directories merge.
+
+Text fields support Left/Right, Home/End, Backspace and Delete at the cursor.
+Insert toggles overwrite mode. Where supported, the terminal cursor uses a bar
+for insertion and a block for overwrite.
+Pasted text goes at the cursor, and long fields scroll horizontally.
 
 When creating files or directories, enter a single name. Existing entries are
 not overwritten.
@@ -176,6 +230,10 @@ formats. Alt+v offers **Compact**, **Detailed** and **Minimal** profiles, or you
 can save a named view. Profiles apply to the active pane unless you choose
 **Apply to both**.
 
+Use `Alt+o` for the floating metadata popup when Windows Terminal captures
+`Alt+Enter`. Both shortcuts invoke the configurable `metadata` action,
+independently of the F2 sidebar/popup preference.
+
 Metadata views show the highlighted entry's details. Press `c` within one to
 count directory contents and size; press it again to refresh the count.
 
@@ -184,13 +242,16 @@ or **Octal** for four permission digits (`0775`).
 
 On Windows, **Symbolic** shows `RHSA` (read-only, hidden, system, archive),
 with `-` for unset attributes. **Native hex** shows the full Windows bitmask.
-Click an attribute value in a metadata view to toggle that view's format.
+Click metadata attributes, owner or time values to change their format.
+The popup and sidebar share these choices for each pane during the session.
 
 Windows owners appear as `DOMAIN\user`; **Numeric** shows the SID. Names load
 in the background. If a name cannot be resolved, TFM keeps the SID. Ownership
 lookup errors appear in metadata.
 
 ## Notifications
+
+Open history with `Alt+h` or `Shift+F9`.
 
 Results and errors appear in toasts or the status area. Notification history
 includes expired toasts and lasts until you quit. Critical incidents and unknown

@@ -278,3 +278,51 @@ fn hidden_menu_labels_follow_the_existing_toggle_and_preference() {
         key(&mut controller, "Space");
     }
 }
+
+#[test]
+fn view_menu_switches_live_layout_without_changing_startup_default() {
+    let mut c = Controller::new(
+        App::new(".".into()),
+        Bindings::new(&Default::default()).unwrap(),
+        Settings::default(),
+    );
+    let default = c.preferences.two_panes;
+    let paths = [c.app.panes[0].path.clone(), c.app.panes[1].path.clone()];
+    key(&mut c, "V");
+    for _ in 0..15 {
+        key(&mut c, "Down");
+    }
+    key(&mut c, "Enter");
+    assert!(c.app.dual);
+    assert_eq!(c.preferences.two_panes, default);
+    assert!(!c.preferences_changed);
+    assert_eq!(
+        [c.app.panes[0].path.clone(), c.app.panes[1].path.clone()],
+        paths
+    );
+    key(&mut c, "Enter");
+    assert!(!c.app.dual);
+}
+
+#[test]
+fn retain_filter_menu_choice_round_trips_and_applies_to_navigation() {
+    let settings = Settings::parse("keep_filter_on_navigation = true").unwrap();
+    let mut c = Controller::new(
+        App::new(".".into()),
+        Bindings::new(&Default::default()).unwrap(),
+        settings,
+    );
+    assert!(c.app.keep_filter_on_navigation);
+    key(&mut c, "V");
+    for _ in 0..16 {
+        key(&mut c, "Down");
+    }
+    key(&mut c, "Enter");
+    assert!(!c.app.keep_filter_on_navigation);
+    assert!(c.preferences_changed);
+    assert!(
+        !Settings::parse(&toml::to_string(&c.preferences).unwrap())
+            .unwrap()
+            .keep_filter_on_navigation
+    );
+}

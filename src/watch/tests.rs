@@ -212,3 +212,25 @@ fn recovery_before_the_next_ui_poll_does_not_leave_fallback_stuck() {
     assert_eq!(app.notifications.history.len(), 1);
     assert!(app.notifications.history[0].text.contains("recovered"));
 }
+
+#[test]
+fn targeted_refreshes_do_not_postpone_the_periodic_full_sweep() {
+    let (root, mut app, mut pool, mut runtime) = prepared();
+    let path = root.path().join("known");
+    std::fs::write(&path, "owned").unwrap();
+    pool.submit(app.request_refresh(0).unwrap());
+    finish(&mut app, &mut pool);
+    let before = pool.listing_metrics();
+    runtime.slots[0].signals.children([path]);
+    runtime.poll(&mut app, &mut pool, Duration::from_secs(1));
+    runtime.poll(&mut app, &mut pool, Duration::from_millis(1200));
+    finish(&mut app, &mut pool);
+    assert_eq!(
+        pool.listing_metrics().metadata_refreshes - before.metadata_refreshes,
+        1
+    );
+    assert_eq!(pool.listing_metrics().full_scans, before.full_scans);
+    runtime.poll(&mut app, &mut pool, Duration::from_secs(30));
+    finish(&mut app, &mut pool);
+    assert_eq!(pool.listing_metrics().full_scans - before.full_scans, 2);
+}

@@ -104,6 +104,7 @@ fn retry(controller: &mut Controller, queue: &mut Queue, id: u64) -> std::io::Re
         controller.app.operations.scroll = 0;
         controller.app.operations.dialog = Some(Dialog::Operation(Box::new(
             crate::operations::OperationDialog {
+                editors: Default::default(),
                 plan,
                 pane: controller.app.active,
                 native_target: base.clone(),

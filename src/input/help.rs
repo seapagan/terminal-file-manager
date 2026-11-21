@@ -1,5 +1,6 @@
 mod context;
 mod context_text;
+mod policy_text;
 pub(super) use context::handle as context_handle;
 pub use context::{ContextHelp, HelpTopic, ViewHelpTopic};
 pub use context_text::{HelpFragment, HelpParagraph};

@@ -18,6 +18,7 @@ pub enum Dialog {
 }
 
 pub struct OperationDialog {
+    pub editors: [crate::editor::Editor; 2],
     pub plan: Plan,
     pub pane: usize,
     pub base: PathBuf,
@@ -159,6 +160,7 @@ pub struct PendingConflict {
 /// Session-only operation state. Toast expiry never removes the job's result evidence.
 #[derive(Default)]
 pub struct State {
+    pub incident_editor: crate::editor::Editor,
     pub dialog: Option<Dialog>,
     /// Linked Jobs temporarily owns input; the pending dialog and viewport survive.
     pub suspended_dialog: Option<Box<(Dialog, usize)>>,

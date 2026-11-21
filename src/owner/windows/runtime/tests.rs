@@ -142,7 +142,7 @@ fn numeric_views_skip_name_translation_until_metadata_requests_names() {
     app.popup = true;
     let mut format = app.metadata_format(true);
     format.owner_display = OwnerDisplay::Names;
-    app.metadata_formats[1] = Some(format);
+    app.metadata_formats[app.active] = Some(format);
     let geometry = ui::geometry(&app, Rect::new(0, 0, 240, 40));
     until(&mut runtime, &mut app, &geometry, |app| {
         app.details[0]

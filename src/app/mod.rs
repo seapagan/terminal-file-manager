@@ -1,11 +1,14 @@
 //! Authoritative pane state and pure transitions. No filesystem calls.
 mod creation;
+mod extensions;
 mod metadata;
 mod navigation;
 mod notifications;
 mod pane;
 pub use metadata::MetadataFormat;
 mod pattern;
+mod policy;
+mod refresh;
 mod selection;
 mod status;
 use crate::fs::{Entry, Snapshot, Totals};
@@ -51,6 +54,7 @@ pub struct Detail {
 
 /// Both panes remain alive when hidden or temporarily collapsed by width.
 pub struct App {
+    pub keep_filter_on_navigation: bool,
     pub relative_path_base: PathBuf,
     pub footer_workflow: Option<crate::path_copy::Workflow>,
     pub path_picker: Option<crate::navigation::PathPicker>,
@@ -72,9 +76,11 @@ pub struct App {
     pub pattern: Option<PatternSelection>,
     pub diagnostics: bool,
     pub diagnostics_scroll: u16,
+    pub policy_menu: Option<crate::input::PolicyMenu>,
     pub view_menu: Option<usize>,
     pub profile_menu: Option<usize>,
     pub profile_choice: usize,
+    pub profile_editor: crate::editor::Editor,
     pub profile_name: Option<String>,
     pub profile_error: Option<String>,
     pub profile_names: Vec<String>,
@@ -92,6 +98,7 @@ impl App {
     /// Every invocation starts single-pane, with two independent original locations.
     pub fn new(path: PathBuf) -> Self {
         Self {
+            keep_filter_on_navigation: false,
             relative_path_base: path.clone(),
             footer_workflow: None,
             path_picker: None,
@@ -113,9 +120,11 @@ impl App {
             pattern: None,
             diagnostics: false,
             diagnostics_scroll: 0,
+            policy_menu: None,
             view_menu: None,
             profile_menu: None,
             profile_choice: 0,
+            profile_editor: Default::default(),
             profile_name: None,
             profile_error: None,
             profile_names: Vec::new(),
@@ -321,23 +330,7 @@ impl App {
             self.invalidate_listing_details(pane);
             return true;
         }
-        let previous = if attempted.is_none() && state.error.is_none() && snapshot.errors.is_empty()
-        {
-            state.current().cloned()
-        } else {
-            None
-        };
-        state.error = snapshot.directory.is_none().then(|| {
-            "Directory identity unavailable; reopen the directory before using this context".into()
-        });
-        if attempted.is_some() || state.context == 0 {
-            state.context += 1;
-            state.entry_identity = snapshot.entry_identity.clone();
-        }
-        state.install(snapshot);
-        self.close_stale_path_picker(pane);
-        self.reconcile_listing_details(pane, previous);
-        true
+        self.apply_listing(pane, attempted, snapshot)
     }
 
     fn reconcile_listing_details(&mut self, pane: usize, previous: Option<Entry>) {

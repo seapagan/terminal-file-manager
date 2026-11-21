@@ -54,14 +54,21 @@ fn policy_uses_labels_and_semantic_styles_without_changing_selection_summary() {
 }
 
 #[test]
-fn narrow_policy_omits_whole_segments_and_retains_reverse_filter_when_they_fit() {
+fn narrow_policy_prioritizes_filter_then_keeps_other_segments_whole() {
     let mut app = App::new(".".into());
     app.panes[0].sort.reverse = true;
     app.panes[0].filter = "abc".into();
     for width in [3, 8, 20, 40, 80, 120] {
         let buffer = draw(&app, width, ColorLevel::NoColor);
         let line = policy(&buffer, width);
-        for segment in line.split(" │ ").filter(|s| !s.is_empty()) {
+        let mut segments = line.split(" │ ");
+        let filter = segments.next().unwrap();
+        assert!(!filter.is_empty());
+        assert!("FILTER: abc".starts_with(filter.trim_end_matches('…')));
+        if width >= 13 {
+            assert_eq!(filter, "FILTER: abc");
+        }
+        for segment in segments {
             assert!(
                 [
                     "Custom",
@@ -69,15 +76,14 @@ fn narrow_policy_omits_whole_segments_and_retains_reverse_filter_when_they_fit()
                     "Group: First",
                     "Hidden: Hide",
                     "Ignore: Dim",
-                    "Reverse: On",
-                    "Filter: abc"
+                    "Reverse: On"
                 ]
                 .contains(&segment),
                 "{width}: {segment}"
             );
         }
         if width >= 80 {
-            assert!(line.contains("Reverse: On") && line.contains("Filter: abc"));
+            assert!(line.contains("Reverse: On") && line.contains("FILTER: abc"));
         }
     }
 }

@@ -7,6 +7,16 @@ pub(super) fn frame(
     height: u16,
     level: ColorLevel,
 ) -> (Buffer, ui::PatternLayout) {
+    let (buffer, layout, _) = frame_with_cursor(c, width, height, level);
+    (buffer, layout)
+}
+
+pub(super) fn frame_with_cursor(
+    c: &Controller,
+    width: u16,
+    height: u16,
+    level: ColorLevel,
+) -> (Buffer, ui::PatternLayout, TestBackend) {
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
     let mut geometry = ui::geometry(&c.app, Rect::new(0, 0, width, height));
     terminal
@@ -15,6 +25,7 @@ pub(super) fn frame(
     (
         terminal.backend().buffer().clone(),
         geometry.pattern.unwrap(),
+        terminal.backend().clone(),
     )
 }
 
@@ -22,6 +33,20 @@ pub(super) fn text_at(buffer: &Buffer, area: Rect) -> String {
     (area.x..area.right())
         .map(|x| buffer[(x, area.y)].symbol())
         .collect()
+}
+
+pub(super) fn assert_editor_cursor(backend: &TestBackend, area: Rect, value: &str) {
+    let row = text_at(backend.buffer(), area);
+    assert!(row.trim_end().ends_with(value), "{row:?}");
+    assert!(backend.cursor_visible());
+    assert_eq!(
+        backend.cursor_position(),
+        (
+            area.x + ratatui::text::Line::raw(row.trim_end()).width() as u16,
+            area.y
+        )
+            .into()
+    );
 }
 
 fn assert_control_cells(buffer: &Buffer, layout: &ui::PatternLayout) {
@@ -71,7 +96,7 @@ fn selected_and_focused_controls_have_distinct_stable_monochrome_cells() {
             event(&mut c, Event::Paste("alpha".into()), (width, 24));
             key(&mut c, "Tab");
             key(&mut c, "Tab");
-            let (before, layout) = frame(&c, width, 24, level);
+            let (before, layout, cursor) = frame_with_cursor(&c, width, 24, level);
             assert_control_cells(&before, &layout);
             key(&mut c, "Shift+Tab");
             let (focused, _) = frame(&c, width, 24, level);
@@ -96,7 +121,12 @@ fn selected_and_focused_controls_have_distinct_stable_monochrome_cells() {
             assert_eq!(changed[0], "(●) x Regex");
             assert_eq!(changed[1], "( ) x Regex");
             assert_eq!(layout.hit(wildcard.x - 1, wildcard.y), None);
-            assert!(!text_at(&before, layout.fields[0].0).contains('▏'));
+            assert!(
+                text_at(&before, layout.fields[0].0)
+                    .trim_end()
+                    .ends_with("alpha")
+            );
+            assert!(!cursor.cursor_visible());
         }
     }
 }

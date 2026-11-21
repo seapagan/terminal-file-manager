@@ -38,6 +38,7 @@ fn stopped(controller: &mut Controller, save: bool) {
         );
     } else if controller.app.operations.incidents() {
         controller.app.operations.scroll = 0;
+        controller.app.operations.incident_editor = Default::default();
         controller.app.operations.dialog = Some(Dialog::IncidentExit {
             save,
             typed: String::new(),
@@ -88,27 +89,26 @@ pub(super) fn incident(
     event: &Event,
 ) -> Option<Dialog> {
     if let Event::Key(key) = event
-        && key.kind == KeyEventKind::Press
+        && key.kind != KeyEventKind::Release
     {
         match key.code {
-            KeyCode::Esc | KeyCode::Enter => return stay(controller),
-            KeyCode::F(10) if ready(controller, &typed, key.modifiers) => {
+            KeyCode::Esc | KeyCode::Enter if key.kind == KeyEventKind::Press => {
+                return stay(controller);
+            }
+            KeyCode::F(10)
+                if key.kind == KeyEventKind::Press && ready(controller, &typed, key.modifiers) =>
+            {
                 controller.save_session = save;
                 controller.quit = true;
                 return None;
             }
-            KeyCode::Backspace => {
-                typed.pop();
+            _ => {
+                controller
+                    .app
+                    .operations
+                    .incident_editor
+                    .key(&mut typed, *key, 11);
             }
-            KeyCode::Char(c)
-                if !key
-                    .modifiers
-                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
-                    && typed.len() < 11 =>
-            {
-                typed.push(c)
-            }
-            _ => {}
         }
     }
     Some(Dialog::IncidentExit { save, typed })

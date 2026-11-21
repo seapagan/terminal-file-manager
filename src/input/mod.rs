@@ -15,6 +15,8 @@ mod operations;
 mod path_copy;
 mod path_navigation;
 mod pattern;
+pub(crate) mod policy_menu;
+pub use policy_menu::PolicyMenu;
 mod profiles;
 mod scroll;
 pub(crate) mod view;
@@ -61,6 +63,7 @@ pub enum Action {
     Metadata,
     Info,
     ViewOptions,
+    KeepFilter,
     ViewProfiles,
     HumanSizes,
     FuzzyTimestamps,
@@ -76,6 +79,8 @@ pub enum Action {
     Mark,
     MarkNext,
     SelectAll,
+    MarkExtension,
+    MarkFinalExtension,
     ClearVisible,
     PatternSelection,
     Filter,

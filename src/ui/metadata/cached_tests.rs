@@ -282,7 +282,7 @@ fn immediate_refresh_fills_canonical_without_a_loading_transition() {
 }
 
 #[test]
-fn pending_metadata_and_errors_stay_pane_local_with_independent_surface_formats() {
+fn pending_metadata_and_errors_stay_pane_local_with_shared_surface_formats() {
     let (_root, mut c) = loaded();
     c.app.popup = true;
     c.app.sync_metadata_views(true);
@@ -292,6 +292,7 @@ fn pending_metadata_and_errors_stay_pane_local_with_independent_surface_formats(
         .toggle(Action::Permissions);
     let sidebar_format = c.app.metadata_format(false);
     let popup_format = c.app.metadata_format(true);
+    assert_eq!(sidebar_format, popup_format);
     let first = c.app.request_metadata(0).unwrap();
     assert_eq!(c.app.metadata_format(false), sidebar_format);
     assert_eq!(c.app.metadata_format(true), popup_format);

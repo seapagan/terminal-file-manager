@@ -216,7 +216,7 @@ fn short_menus_use_available_height_and_keep_last_selection_clickable() {
         let bounds = Rect::new(0, 0, 80, 10);
         key_at(&mut c, "End", bounds);
         if open == "V" {
-            for _ in 0..15 {
+            for _ in 0..32 {
                 key_at(&mut c, "Down", bounds);
             }
         }
@@ -224,11 +224,7 @@ fn short_menus_use_available_height_and_keep_last_selection_clickable() {
         let shell = g.menu_layout.unwrap();
         assert_eq!(shell.outer.height, 8);
         assert!(text(&buffer).contains(if open == "V" {
-            if cfg!(windows) {
-                "Owner display"
-            } else {
-                "Owner/group display"
-            }
+            "Keep filter on navigation"
         } else {
             "Save active as…"
         }));
@@ -236,6 +232,7 @@ fn short_menus_use_available_height_and_keep_last_selection_clickable() {
         click(&mut c, row, bounds);
         if open == "V" {
             assert!(c.preferences_changed);
+            assert!(c.app.keep_filter_on_navigation);
         } else {
             assert_eq!(c.app.profile_name.as_deref(), Some(""));
         }

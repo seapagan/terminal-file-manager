@@ -74,7 +74,8 @@ fn rows(state: &crate::app::PatternSelection, width: u16) -> Vec<Row<PatternCont
             state.expression(),
             PatternControl::Expression,
             state.focus == PatternControl::Expression,
-        ),
+        )
+        .editor(&state.editor),
         Row::plain(""),
     ];
     let controls = controls(width);
@@ -401,4 +402,25 @@ fn measure(
     .measure(bounds, |width| {
         rows.iter().cloned().flat_map(|row| row.wrap(width)).count()
     })
+}
+
+pub(super) fn cursor(layout: &PatternLayout) -> Option<super::text_input::Cursor> {
+    layout
+        .rows
+        .iter()
+        .skip(layout.scroll)
+        .take(usize::from(layout.shell.body.height))
+        .enumerate()
+        .find_map(|(row, field)| {
+            field
+                .cursor(layout.shell.body.width)
+                .map(|(column, overwrite)| super::text_input::Cursor {
+                    position: (
+                        layout.shell.body.x + column,
+                        layout.shell.body.y + row as u16,
+                    )
+                        .into(),
+                    overwrite,
+                })
+        })
 }

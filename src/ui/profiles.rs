@@ -69,9 +69,11 @@ pub(super) fn render(frame: &mut Frame, app: &App, shell: &modal::Layout<()>, th
 }
 
 fn save_lines(app: &App, width: u16, theme: &Theme) -> Vec<Line<'static>> {
-    let name = super::clean(app.profile_name.as_deref().unwrap_or_default());
+    let name = app.profile_name.as_deref().unwrap_or_default();
     let mut rows = vec![
-        modal::Row::field("Name", &name, (), true).line(width, theme),
+        modal::Row::field("Name", name, (), true)
+            .editor(&app.profile_editor)
+            .line(width, theme),
         Line::default(),
     ];
     let (feedback, role) = app
@@ -112,4 +114,13 @@ fn render_rows(frame: &mut Frame, app: &App, area: Rect, start: usize, theme: &T
         })
         .collect();
     frame.render_widget(Paragraph::new(lines), area);
+}
+
+pub(super) fn cursor(app: &App, shell: &modal::Layout<()>) -> Option<super::text_input::Cursor> {
+    super::text_input::field_cursor(
+        app.profile_name.as_ref()?,
+        &app.profile_editor,
+        modal::width("Name: "),
+        shell.body,
+    )
 }

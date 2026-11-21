@@ -24,6 +24,8 @@ pub(crate) const OPTIONS: &[(&str, Action)] = &[
     ("Owner display", Action::OwnerDisplay),
     #[cfg(not(windows))]
     ("Owner/group display", Action::OwnerDisplay),
+    ("Pane layout", Action::TogglePanes),
+    ("Keep filter on navigation", Action::KeepFilter),
 ];
 
 pub(super) fn key(controller: &mut Controller, key: KeyEvent, geometry: &Geometry) {
@@ -65,6 +67,16 @@ pub(super) fn mouse(controller: &mut Controller, event: MouseEvent, geometry: &G
 }
 
 pub(super) fn formatting(controller: &mut Controller, action: Action) {
+    if action == Action::KeepFilter {
+        controller.app.keep_filter_on_navigation = !controller.app.keep_filter_on_navigation;
+        controller.preferences.keep_filter_on_navigation = controller.app.keep_filter_on_navigation;
+        controller.preferences_changed = true;
+        return;
+    }
+    format_display(controller, action);
+}
+
+fn format_display(controller: &mut Controller, action: Action) {
     let pane = &mut controller.app.panes[controller.app.active];
     match action {
         Action::MetadataPresentation => {
@@ -128,6 +140,8 @@ pub(crate) fn rows(app: &App, preferred: MetadataPresentation) -> Vec<(String, S
         check(app.sidebar),
         format!("{preferred:?}"),
         format!("{:?}", pane.owner_display),
+        if app.dual { "Dual" } else { "Single" }.into(),
+        check(app.keep_filter_on_navigation),
     ];
     OPTIONS
         .iter()

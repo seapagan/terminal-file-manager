@@ -35,6 +35,7 @@ macro_rules! define_commands {
 
 // Row position is display priority; bindings remain in the effective keymap.
 define_commands! {
+    (Action::KeepFilter, HelpSection::Views, "Keep filters across directory navigation"),
     (Action::Up, HelpSection::Navigation, "Move cursor up"),
     (Action::Down, HelpSection::Navigation, "Move cursor down"),
     (
@@ -109,7 +110,9 @@ define_commands! {
         HelpSection::Selection,
         "Clear visible marks",
     ),
-    (Action::PathCopy, HelpSection::Selection, "Copy names or paths to OS clipboard"),
+    (Action::MarkExtension, HelpSection::Selection, "Mark visible files with the highlighted extension class"),
+    (Action::MarkFinalExtension, HelpSection::Selection, "Mark visible files with the highlighted final extension"),
+    (Action::PathCopy, HelpSection::Selection, "Copy selected names or paths to the clipboard"),
     (
         Action::PatternSelection,
         HelpSection::Selection,
@@ -225,7 +228,7 @@ define_commands! {
     (
         Action::Metadata,
         HelpSection::Views,
-        "Show or hide file information",
+        "Open or close the floating metadata popup",
     ),
     (
         Action::ToggleSidebar,

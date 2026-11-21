@@ -21,7 +21,8 @@ struct CachedPreview {
 }
 
 /// Filename matching syntax, independent of the listing's fuzzy filter.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum PatternMode {
     /// Globset whole-filename wildcards.
     Wildcard,
@@ -69,6 +70,7 @@ pub struct PatternSelection {
     pub mode: PatternMode,
     pub case_sensitive: bool,
     expression: String,
+    pub editor: crate::editor::Editor,
     matcher: Result<regex::bytes::Regex, String>,
     path: PathBuf,
     context: u64,
@@ -91,6 +93,7 @@ impl PatternSelection {
             mode: PatternMode::Wildcard,
             case_sensitive: true,
             expression: String::new(),
+            editor: Default::default(),
             preview_cache: RefCell::new(None),
             matcher: Err("Enter a non-empty pattern".into()),
             path: pane.path.clone(),
@@ -127,15 +130,31 @@ impl PatternSelection {
         if self.rejected_edit {
             return;
         }
+        let incoming: String = text.chars().filter(|c| !c.is_control()).collect();
         let mut expression = self.expression.clone();
-        for c in text.chars().filter(|c| !c.is_control()) {
-            if expression.len() + c.len_utf8() > 4096 {
-                self.reject_edit();
-                return;
-            }
-            expression.push(c);
+        match self.editor.insert(&mut expression, &incoming, 4096) {
+            crate::editor::Edit::Rejected => self.reject_edit(),
+            crate::editor::Edit::Changed => self.set_expression(expression),
+            _ => {}
         }
-        self.set_expression(expression);
+    }
+
+    /// Cursor edits invalidate the matcher only when text changes.
+    pub fn edit_key(&mut self, key: crossterm::event::KeyEvent) {
+        use crate::editor::Edit;
+        use crossterm::event::KeyCode;
+        if self.rejected_edit && matches!(key.code, KeyCode::Char(_)) {
+            return;
+        }
+        let mut expression = self.expression.clone();
+        match self.editor.key(&mut expression, key, 4096) {
+            Edit::Rejected => self.reject_edit(),
+            Edit::Changed => self.set_expression(expression),
+            _ if self.rejected_edit && key.code == KeyCode::Backspace => {
+                self.set_expression(expression)
+            }
+            _ => {}
+        }
     }
 
     fn reject_edit(&mut self) {
@@ -152,7 +171,7 @@ impl PatternSelection {
         self.matcher = self.compile();
     }
 
-    /// Matching starts case-sensitive on every open.
+    /// Toggle the session-initialized case preference.
     pub fn toggle_case(&mut self) {
         self.preview_cache.get_mut().take();
         self.feedback = None;

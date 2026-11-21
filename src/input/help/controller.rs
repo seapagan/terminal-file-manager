@@ -66,23 +66,14 @@ fn picker_key(c: &mut Controller, key: &KeyEvent, geometry: &Geometry) {
                 jump(c, hit.target, geometry);
             }
         }
-        KeyCode::Backspace => {
+        code => {
             let state = c.app.help_picker.as_mut().expect("picker");
-            state.query.pop();
-            state.selected = 0;
+            match state.editor.key(&mut state.query, *key, 4096) {
+                crate::editor::Edit::Changed => state.selected = 0,
+                crate::editor::Edit::Ignored => picker_movement(c, code),
+                _ => {}
+            }
         }
-        KeyCode::Char(ch)
-            if !key.modifiers.intersects(
-                KeyModifiers::CONTROL
-                    | KeyModifiers::ALT
-                    | KeyModifiers::SUPER
-                    | KeyModifiers::META
-                    | KeyModifiers::HYPER,
-            ) =>
-        {
-            append(c, &ch.to_string())
-        }
-        code => picker_movement(c, code),
     }
 }
 
@@ -123,13 +114,10 @@ fn mouse_picker(c: &mut Controller, mouse: &crossterm::event::MouseEvent, geomet
 
 fn append(c: &mut Controller, text: &str) {
     let state = c.app.help_picker.as_mut().expect("picker");
-    for ch in text.chars().filter(|ch| !ch.is_control()) {
-        if state.query.len() + ch.len_utf8() > 4096 {
-            break;
-        }
-        state.query.push(ch);
+    let incoming: String = text.chars().filter(|c| !c.is_control()).collect();
+    if state.editor.insert(&mut state.query, &incoming, 4096) == crate::editor::Edit::Changed {
+        state.selected = 0;
     }
-    state.selected = 0;
 }
 
 fn select(c: &mut Controller, delta: isize) {

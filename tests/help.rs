@@ -53,6 +53,17 @@ fn continuous_document_has_distinct_sections_and_keeps_all_effective_actions() {
     let mut c = controller();
     key(&mut c, "?");
     let text = draw(&c, 160, 160);
+    let prose = text
+        .lines()
+        .map(|line| {
+            line.split('│')
+                .max_by_key(|part| part.len())
+                .unwrap_or("")
+                .trim()
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    let prose: String = prose.chars().filter(|c| !c.is_whitespace()).collect();
     for section in [
         "Navigation",
         "Selection & Marking",
@@ -66,7 +77,13 @@ fn continuous_document_has_distinct_sections_and_keeps_all_effective_actions() {
     }
     for entry in &c.app.help_rows {
         assert!(
-            text.contains(entry.description),
+            prose.contains(
+                &entry
+                    .description
+                    .chars()
+                    .filter(|c| !c.is_whitespace())
+                    .collect::<String>()
+            ),
             "missing {}",
             entry.description
         );

@@ -10,6 +10,10 @@ use terminal_file_manager::{
 };
 mod dialog_fixture;
 fn draw(app: &App, level: ColorLevel) -> (Buffer, ui::Geometry) {
+    let (buffer, geometry, _) = draw_with_cursor(app, level);
+    (buffer, geometry)
+}
+fn draw_with_cursor(app: &App, level: ColorLevel) -> (Buffer, ui::Geometry, TestBackend) {
     let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
     terminal
         .draw(|f| {
@@ -19,6 +23,7 @@ fn draw(app: &App, level: ColorLevel) -> (Buffer, ui::Geometry) {
     (
         terminal.backend().buffer().clone(),
         ui::geometry(app, Rect::new(0, 0, 120, 40)),
+        terminal.backend().clone(),
     )
 }
 fn at(buffer: &Buffer, text: &str) -> (u16, u16) {
@@ -78,7 +83,7 @@ fn assert_create_form(plan: Plan) {
     );
 }
 fn assert_create_style(app: &App, level: ColorLevel) {
-    let (buffer, g) = draw(app, level);
+    let (buffer, g, cursor) = draw_with_cursor(app, level);
     assert!(g.operation_enabled(KeyCode::Enter));
     let theme = Theme::new(level);
     let (x, y) = at(&buffer, "Parent:");
@@ -108,7 +113,11 @@ fn assert_create_style(app: &App, level: ColorLevel) {
             .modifier
             .contains(ratatui::style::Modifier::REVERSED)
     );
-    at(&buffer, "▏");
+    assert_eq!(buffer[(x, y)].symbol(), "資");
+    assert_eq!(buffer[(x + 2, y)].symbol(), "料");
+    assert_eq!(buffer[(x + 4, y)].symbol(), "e\u{301}");
+    assert!(cursor.cursor_visible());
+    assert_eq!(cursor.cursor_position(), (x + 5, y).into());
     let button = g
         .operation_controls
         .iter()
@@ -139,7 +148,7 @@ fn f2_describes_the_next_action_and_keeps_hitboxes_and_labels_aligned() {
         );
         let mut positions = Vec::new();
         for enabled in [false, true, false] {
-            let (buffer, g) = draw(&c.app, ColorLevel::NoColor);
+            let (buffer, g, cursor) = draw_with_cursor(&c.app, ColorLevel::NoColor);
             let button = g
                 .operation_controls
                 .iter()
@@ -155,6 +164,9 @@ fn f2_describes_the_next_action_and_keeps_hitboxes_and_labels_aligned() {
             );
             positions.push(button.area);
             assert_transfer_text(&buffer, enabled);
+            let (x, y) = at(&buffer, "target");
+            assert!(cursor.cursor_visible());
+            assert_eq!(cursor.cursor_position(), (x + 6, y).into());
             c.handle(
                 Event::Key(KeyEvent::new(KeyCode::F(2), KeyModifiers::NONE)),
                 &g,
@@ -170,7 +182,7 @@ fn assert_transfer_text(buffer: &Buffer, enabled: bool) {
     let (from, _) = at(buffer, "From:");
     let (to, _) = at(buffer, "To:");
     assert_eq!(from, to);
-    let (value, _) = at(buffer, "target▏");
+    let (value, _) = at(buffer, "target");
     assert_eq!(value, from + 6);
     let text: String = buffer.content.iter().map(|c| c.symbol()).collect();
     assert!(text.contains(if enabled {

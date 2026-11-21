@@ -55,6 +55,10 @@ fn owner_values_and_continuations_exclude_labels_padding_and_borders() {
             c.app.metadata_format(floating).owner_display,
             OwnerDisplay::Numeric
         );
+        assert_eq!(
+            c.app.metadata_format(!floating).owner_display,
+            OwnerDisplay::Numeric
+        );
         assert_eq!(c.app.panes[0].owner_display, OwnerDisplay::Names);
         assert_eq!(c.preferences.owner_display, OwnerDisplay::Names);
         assert!(!c.preferences_changed);
