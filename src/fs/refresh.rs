@@ -104,11 +104,11 @@ mod tests {
         assert_eq!(refreshed.entries[0].ignored, Some(true));
     }
     #[test]
-    fn namespace_changes_and_unknown_or_replaced_children_require_full_reconciliation() {
+    fn stale_directory_and_unknown_or_replaced_children_require_full_reconciliation() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("known");
         fs::write(&path, "old").unwrap();
-        let old = seed(root.path());
+        let mut old = seed(root.path());
         let missing = root.path().join("unknown");
         assert!(
             refresh_metadata(
@@ -120,6 +120,13 @@ mod tests {
             .is_none()
         );
         fs::write(&missing, "new").unwrap();
+        // NTFS need not publish a new directory timestamp before this query.
+        // Exercise the stale-stamp guard without depending on timestamp timing.
+        let identity = old.directory.as_mut().unwrap().identity.as_mut().unwrap();
+        identity.modified = match identity.modified {
+            Some(_) => None,
+            None => Some(std::time::SystemTime::UNIX_EPOCH),
+        };
         assert!(
             refresh_metadata(old, std::slice::from_ref(&path), &AtomicBool::new(false))
                 .unwrap()
