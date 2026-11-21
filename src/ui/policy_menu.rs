@@ -41,14 +41,44 @@ pub(super) fn layout(
         .find(|c| c.pane == menu.pane && c.action == menu.action)?
         .area;
     let choices = policy_menu::choices(menu.action);
-    let content_width = choice_width(choices);
     let owner = panes
         .get(menu.pane)
         .copied()
         .flatten()
         .unwrap_or(area)
         .intersection(area);
-    let width = content_width.saturating_add(4).min(owner.width);
+    let outer = popup_bounds(area, owner, anchor, choices);
+    let spec = super::modal::Spec {
+        title: "",
+        help: true,
+        // viewport uses the already measured rectangle, not content_width.
+        content_width: 0,
+        pinned_rows: 0,
+        footer_rows: 0,
+        actions: &[],
+    };
+    let mut shell = super::modal::Layout::viewport(&spec, outer);
+    shell.close = None;
+    // Choice rows sit directly inside the border, without form padding.
+    shell.body.y = outer.y.saturating_add(u16::from(outer.height > 0));
+    shell.body.height = outer.height.saturating_sub(2);
+    shell.pinned = Rect {
+        height: 0,
+        ..shell.body
+    };
+    shell.footer = Rect {
+        y: shell.body.bottom(),
+        ..shell.pinned
+    };
+    shell.cue = shell.footer;
+    let start = menu
+        .selected
+        .saturating_sub(usize::from(shell.body.height.saturating_sub(1)));
+    Some(PolicyLayout { shell, start })
+}
+
+fn popup_bounds(area: Rect, owner: Rect, anchor: Rect, choices: &[&str]) -> Rect {
+    let width = choice_width(choices).saturating_add(4).min(owner.width);
     let available = anchor.y.saturating_sub(area.y);
     let height = (choices.len() as u16 + 2).min(if available >= 3 {
         available
@@ -64,33 +94,7 @@ pub(super) fn layout(
     } else {
         area.y
     };
-    let spec = super::modal::Spec {
-        title: "",
-        help: true,
-        // viewport uses the already measured rectangle, not content_width.
-        content_width: 0,
-        pinned_rows: 0,
-        footer_rows: 0,
-        actions: &[],
-    };
-    let mut shell = super::modal::Layout::viewport(&spec, Rect::new(x, y, width, height));
-    shell.close = None;
-    // Choice rows sit directly inside the border, without form padding.
-    shell.body.y = y.saturating_add(u16::from(height > 0));
-    shell.body.height = height.saturating_sub(2);
-    shell.pinned = Rect {
-        height: 0,
-        ..shell.body
-    };
-    shell.footer = Rect {
-        y: shell.body.bottom(),
-        ..shell.pinned
-    };
-    shell.cue = shell.footer;
-    let start = menu
-        .selected
-        .saturating_sub(usize::from(shell.body.height.saturating_sub(1)));
-    Some(PolicyLayout { shell, start })
+    Rect::new(x, y, width, height)
 }
 
 pub(super) fn render(frame: &mut Frame, app: &App, layout: &PolicyLayout, theme: &Theme) {
