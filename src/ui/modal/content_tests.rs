@@ -59,3 +59,15 @@ fn rendered_fields(bounds: Rect, first_focused: bool) -> (Rect, Rect, Vec<String
         .collect();
     (layout.outer, layout.body, text)
 }
+
+#[test]
+fn exact_fit_native_preview_keeps_its_text_when_focus_changes() {
+    let value = "\"native/long-destination\\xFF\"";
+    let theme = Theme::new(colored_text::ColorLevel::NoColor);
+    for focused in [false, true] {
+        let row = Row::field("To", value, (), focused).placeholder();
+        let width = row.width() as u16;
+        assert_eq!(row.line(width, &theme).to_string(), format!("To: {value}"));
+        assert_eq!(row.cursor(width), focused.then_some((4, false)));
+    }
+}

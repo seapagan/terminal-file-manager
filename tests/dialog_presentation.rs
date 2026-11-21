@@ -30,6 +30,7 @@ fn unedited_native_destination_remains_visible_without_a_duplicate_path() {
     let root = tempfile::tempdir().unwrap();
     let target = root
         .path()
+        .join("native-preview-".repeat(6))
         .join(OsString::from_vec(b"destination\xff".to_vec()));
     let file = root.path().join("file");
     std::fs::write(&file, b"data").unwrap();
@@ -37,8 +38,10 @@ fn unedited_native_destination_remains_visible_without_a_duplicate_path() {
     if let Some(Dialog::Operation(d)) = &mut app.operations.dialog {
         d.native_target = target.clone();
     }
-    let text = rendered(&app, 120, 40).join("\n");
-    assert!(text.contains(&ui::clean(&format!("{target:?}"))));
+    let display = ui::clean(&format!("{target:?}"));
+    let width = ui::modal::width(&display) + 60;
+    let text = rendered(&app, width, 40).join("\n");
+    assert!(text.contains(&display));
     assert!(!text.contains("Approved destination:"));
     assert!(
         matches!(&app.operations.dialog,Some(Dialog::Operation(d)) if d.text.is_empty() && !d.edited && d.native_target == target)

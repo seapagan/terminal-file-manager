@@ -81,6 +81,13 @@ impl<T: Clone> Row<T> {
         self
     }
 
+    /// Display a native preview at the start of an otherwise empty editable field.
+    pub(crate) fn placeholder(mut self) -> Self {
+        self.text = super::super::clean(&self.text);
+        self.editor = Some((0, false));
+        self
+    }
+
     /// Keep a changing summary to one measured line.
     pub fn single_line(mut self) -> Self {
         self.single_line = true;

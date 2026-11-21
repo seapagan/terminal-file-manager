@@ -188,8 +188,12 @@ fn primary_field(dialog: &OperationDialog) -> Row {
         &value,
         0,
         dialog.field == 0,
-    )
-    .editor(&dialog.editors[0]);
+    );
+    let field = if native_destination(dialog) {
+        field.placeholder()
+    } else {
+        field.editor(&dialog.editors[0])
+    };
     if matches!(dialog.plan.operation, Operation::Copy | Operation::Move) {
         field.label_width(6)
     } else {
