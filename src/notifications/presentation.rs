@@ -53,7 +53,7 @@ fn success_title(operation: Operation) -> String {
 }
 
 fn success(job: &Job, name: String) -> String {
-    #[cfg(windows)]
+    #[cfg(any(windows, test))]
     if job.plan.operation == Operation::Trash
         && job.record.as_ref().is_some_and(|record| {
             record

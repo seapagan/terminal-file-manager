@@ -75,7 +75,6 @@ fn permissions_and_destructive_success_keep_source_scope() {
 }
 
 #[test]
-#[cfg(windows)]
 fn permanent_trash_success_is_distinct_and_never_retried() {
     use crate::operations::Decision;
     let (_root, mut job) = completed(Operation::Trash, 2);
