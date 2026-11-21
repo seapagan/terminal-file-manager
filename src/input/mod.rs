@@ -77,6 +77,8 @@ pub enum Action {
     Mark,
     MarkNext,
     SelectAll,
+    MarkExtension,
+    MarkFinalExtension,
     ClearVisible,
     PatternSelection,
     Filter,

@@ -131,6 +131,13 @@ start dimmed.
 On Windows, red filenames identify files and directories with the System
 attribute. Windows permissions still determine access.
 
+Use `Alt+e` to replace visible marks with files in the highlighted file's
+extension class. Configured compound suffixes such as `.tar.gz` stay distinct
+from `.gz`; `Alt+Shift+e` matches the final extension across both classes.
+Set `compound_extensions = [".tar.gz", ".tar.xz", ".tar.bz2", ".tar.zst"]`
+in TOML to customize the recognized compounds. Marks outside the visible
+working set remain. Extensionless entries leave marks unchanged.
+
 Alt+b selects by wildcard or regex, for example `*.rs`. Wildcards match whole
 filenames; regex matches substrings. **Replace can clear visible marks even when
 nothing matches.** Review the preview before applying a pattern. Matching mode

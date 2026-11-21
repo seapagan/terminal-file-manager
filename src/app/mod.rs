@@ -1,5 +1,6 @@
 //! Authoritative pane state and pure transitions. No filesystem calls.
 mod creation;
+mod extensions;
 mod metadata;
 mod navigation;
 mod notifications;

@@ -205,6 +205,8 @@ const DEFAULT_BINDINGS: &[(&str, Action)] = &[
     ("Ctrl+a", SelectAll),
     ("Ctrl+u", ClearVisible),
     ("Alt+b", PatternSelection),
+    ("Alt+e", MarkExtension),
+    ("Alt+Shift+e", MarkFinalExtension),
     ("/", Filter),
     ("h", Hidden),
     ("i", Ignore),

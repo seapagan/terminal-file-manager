@@ -175,6 +175,10 @@ impl Controller {
             ExtendUp | ExtendDown => self.extend_selection(action, geometry),
             Enter | Parent | Back | Forward | Refresh => return self.navigate(action),
             Mark | MarkNext | SelectAll | ClearVisible => self.selection(action, geometry),
+            MarkExtension | MarkFinalExtension => self.app.panes[self.app.active].mark_extension(
+                &self.preferences.compound_extensions,
+                action == MarkFinalExtension,
+            ),
             Hidden | Ignore | Sort | Reverse | Group => self.policy(action),
             Filter => self.begin_filter(),
             PatternSelection => super::pattern::open(self),

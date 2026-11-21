@@ -479,3 +479,16 @@ fn alternate_metadata_popup_opens_through_native_terminal_input() {
         b"preserved"
     );
 }
+
+#[test]
+fn extension_selection_chords_arrive_through_native_terminal_input() {
+    let root = tempfile::tempdir().unwrap();
+    for name in ["a.tar.gz", "b.tar.gz", "c.gz"] {
+        fs::write(root.path().join(name), "owned").unwrap();
+    }
+    drive(
+        command(root.path(), root.path(), None),
+        &[("a.tar.gz", "\x1be"), ("Selected:", "\x1bE"), ("3", "q")],
+        false,
+    );
+}

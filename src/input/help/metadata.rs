@@ -110,6 +110,8 @@ define_commands! {
         HelpSection::Selection,
         "Clear visible marks",
     ),
+    (Action::MarkExtension, HelpSection::Selection, "Mark visible files with the highlighted extension class"),
+    (Action::MarkFinalExtension, HelpSection::Selection, "Mark visible files with the highlighted final extension"),
     (Action::PathCopy, HelpSection::Selection, "Copy selected names or paths to the clipboard"),
     (
         Action::PatternSelection,

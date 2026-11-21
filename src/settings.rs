@@ -25,6 +25,7 @@ pub enum MetadataPresentation {
 #[serde(default, deny_unknown_fields)]
 pub struct Settings {
     pub keep_filter_on_navigation: bool,
+    pub compound_extensions: Vec<String>,
     pub pattern_mode: crate::app::PatternMode,
     pub pattern_case_sensitive: bool,
     pub clipboard: crate::path_copy::Preferences,
@@ -57,6 +58,17 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             keep_filter_on_navigation: false,
+            compound_extensions: [
+                ".tar.gz",
+                ".tar.xz",
+                ".tar.bz2",
+                ".tar.zst",
+                ".tar.lz",
+                ".tar.lzma",
+                ".tar.Z",
+            ]
+            .map(str::to_owned)
+            .to_vec(),
             pattern_mode: crate::app::PatternMode::Wildcard,
             pattern_case_sensitive: true,
             clipboard: Default::default(),
@@ -118,6 +130,17 @@ impl Settings {
             return Err("toast_expiry_seconds must be between 1 and 60".into());
         }
         settings.validate_colours()?;
+        if settings.compound_extensions.iter().any(|s| {
+            !s.starts_with('.')
+                || s.len() < 2
+                || s.ends_with('.')
+                || s.chars().any(|c| c.is_control() || matches!(c, '/' | '\\'))
+        }) {
+            return Err(
+                "compound_extensions must contain dotted filename suffixes without path separators"
+                    .into(),
+            );
+        }
         for name in settings.profiles.keys() {
             validate_profile_name(name)?;
         }
