@@ -26,6 +26,18 @@ fn mark_enabled(geometry: &ui::Geometry) -> bool {
 }
 
 #[test]
+fn invalid_listing_completion_has_no_presentation_or_effect() {
+    let mut app = App::new("owned".into());
+    let before = listing_presentation(&app, 0);
+    for pane in [2, usize::MAX] {
+        assert_eq!(listing_presentation(&app, pane), None);
+        app.complete_listing(pane, 1, Err("invalid pane".into()));
+        assert_eq!(listing_presentation(&app, pane), None);
+        assert_eq!(listing_presentation(&app, 0), before);
+    }
+}
+
+#[test]
 fn unchanged_refresh_reenables_rendered_pattern_apply_without_an_input_event() {
     let root = tempfile::tempdir().unwrap();
     let mut controller = crate::browser::tests::counting_controller(root.path());
