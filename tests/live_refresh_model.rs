@@ -328,3 +328,18 @@ fn configured_retention_keeps_filter_after_successful_navigation() {
     app.complete_listing(0, request.generation, Ok(snapshot(other.path())));
     assert_eq!(app.panes[0].filter, "kept");
 }
+
+#[test]
+fn identical_refresh_does_not_reinstall_or_disturb_selection() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(root.path().join("kept"), "data").unwrap();
+    let mut app = loaded(root.path());
+    app.panes[0].toggle_mark();
+    let installs = app.panes[0].listing_installs;
+    let marks = app.panes[0].marks.clone();
+    let request = app.request_refresh(0).unwrap();
+    assert!(app.complete_listing(0, request.generation, Ok(snapshot(root.path()))));
+    assert_eq!(app.panes[0].listing_installs, installs);
+    assert_eq!(app.panes[0].marks, marks);
+    assert_eq!(app.panes[0].current().unwrap().name, "kept");
+}

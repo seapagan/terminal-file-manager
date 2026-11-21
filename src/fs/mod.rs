@@ -1,6 +1,8 @@
 //! Read-only local filesystem snapshots. Native paths never come from display text.
 
 mod platform;
+mod refresh;
+pub(crate) use refresh::refresh_metadata;
 mod rules;
 mod totals;
 #[cfg(windows)]

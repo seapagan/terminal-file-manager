@@ -55,9 +55,18 @@ errors, cancellation and overflow never become complete totals.
 On Linux and macOS, `watch` keeps one logical native subscription per local pane,
 including hidden panes, with nonrecursive current-directory and immediate-parent targets.
 Two bounded background owners register, retry and release native watchers;
-callbacks coalesce invalidations and errors into pane-local atomic flags.
+callbacks coalesce invalidations and errors into pane-local atomic flags and
+a bounded set of precise immediate-child metadata hints.
 Changing the directory context replaces those flags, so old callbacks cannot
 invalidate the new context. Registration completion requests a catch-up scan.
+
+Precise known-child writes use the existing listing lane to inspect only affected
+metadata, bracket physical and lexical directory identities, and preserve ignore
+evidence. Missing/replaced children, namespace changes, ignore-policy inputs,
+overflow and ambiguous events fall back to full enumeration. Targeted work never
+postpones the unconditional full sweep. Unchanged snapshots preserve existing
+rows and selection without reinstalling or requesting a listing redraw. Windows
+retains its manual-refresh policy; ambiguous macOS events remain conservative.
 
 The deterministic coordinator debounces changes for 200 ms, caps continuous
 deferral at one second and spaces sustained scan starts by at least one second.

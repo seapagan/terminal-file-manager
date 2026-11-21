@@ -53,6 +53,7 @@ pub struct Pane {
     pub cursor: Option<PathBuf>,
     pub marks: HashMap<PathBuf, Identity>,
     pub scroll: usize,
+    pub listing_installs: u64,
     pub filter: String,
     pub filter_editor: Option<crate::editor::Editor>,
     pub sort: SortPolicy,
@@ -77,7 +78,7 @@ pub struct Pane {
     pub error: Option<String>,
     pub warnings: Vec<String>,
     pub(super) range: Option<super::selection::RangeSelection>,
-    listing_order: HashMap<PathBuf, usize>,
+    pub(super) listing_order: HashMap<PathBuf, usize>,
     pub(super) back: Vec<Visit>,
     pub(super) forward: Vec<Visit>,
     pub(super) restoring: Option<Visit>,
@@ -122,6 +123,7 @@ impl Pane {
             cursor: None,
             marks: HashMap::new(),
             scroll: 0,
+            listing_installs: 0,
             filter: String::new(),
             filter_editor: None,
             sort: SortPolicy::default(),
@@ -156,6 +158,7 @@ impl Pane {
     }
 
     pub(super) fn install(&mut self, snapshot: Snapshot) {
+        self.listing_installs += 1;
         let previous_index = self.cursor_index().unwrap_or(0);
         let continuous = self.accepts_refresh(&snapshot);
         #[cfg(windows)]

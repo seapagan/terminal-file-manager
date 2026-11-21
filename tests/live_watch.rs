@@ -42,6 +42,10 @@ fn assert_manual_listing_matches(app: &App, path: &Path) {
     for pane in &app.panes {
         let actual: BTreeMap<_, _> = pane.entries.iter().map(|e| (&e.path, e.size)).collect();
         assert_eq!(actual, expected);
+        assert_eq!(
+            pane.directory.as_ref().and_then(|e| e.modified),
+            manual.directory.as_ref().and_then(|e| e.modified)
+        );
     }
 }
 
@@ -476,3 +480,11 @@ fn native_external_create_refreshes_both_panes_without_input_including_registrat
     converge(&mut app, &mut pool, &mut watch, started, "external-create");
     assert!(!app.dual);
 }
+
+#[cfg(target_os = "linux")]
+#[path = "live_watch/content.rs"]
+mod content;
+
+#[cfg(not(windows))]
+#[path = "live_watch/git.rs"]
+mod git;

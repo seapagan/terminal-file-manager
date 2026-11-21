@@ -7,6 +7,7 @@ mod notifications;
 mod pane;
 pub use metadata::MetadataFormat;
 mod pattern;
+mod refresh;
 mod selection;
 mod status;
 use crate::fs::{Entry, Snapshot, Totals};
@@ -334,6 +335,11 @@ impl App {
         } else {
             None
         };
+        if attempted.is_none() && state.error.is_none() && state.unchanged_listing(&snapshot) {
+            state.update_access_times(snapshot);
+            self.reconcile_listing_details(pane, previous);
+            return true;
+        }
         state.error = snapshot.directory.is_none().then(|| {
             "Directory identity unavailable; reopen the directory before using this context".into()
         });

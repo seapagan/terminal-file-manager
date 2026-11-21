@@ -75,7 +75,8 @@ bindings appear below as `Shift+` plus the lowercase letter.
 | `r` | Refresh the directory |
 | Shift+v / Alt+v | View options / view profiles |
 
-Linux and macOS refresh automatically. **On Windows, press `r` to see external
+Linux and macOS refresh automatically, including file size and modification
+time changes. **On Windows, press `r` to see external
 changes.** If a directory becomes unavailable or is replaced, reopen it after
 resolving the error.
 
