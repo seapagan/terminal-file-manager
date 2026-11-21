@@ -1,3 +1,6 @@
+#[cfg(test)]
+#[path = "content_tests.rs"]
+mod tests;
 use crate::color::{Role, Theme};
 use ratatui::{
     style::Modifier,
@@ -122,7 +125,6 @@ impl<T: Clone> Row<T> {
                 .label
                 .as_ref()
                 .map_or(0, |label| Line::raw(label).width())
-            + usize::from(self.focused)
             + Line::raw(super::super::clean(&self.text)).width()
             + self
                 .trailing
