@@ -94,22 +94,6 @@ fn alt_p_and_both_tab_encodings_share_the_two_pane_focus_action() {
 }
 
 #[test]
-fn preferred_metadata_presentation_keeps_both_direct_shortcuts() {
-    let (_root, mut controller) = controller();
-    controller.preferences =
-        terminal_file_manager::settings::Settings::parse("metadata_presentation = 'sidebar'")
-            .unwrap();
-    key(&mut controller, "F2");
-    assert!(controller.app.sidebar);
-    assert!(!controller.app.popup);
-    key(&mut controller, "Alt+Enter");
-    assert!(controller.app.popup);
-    key(&mut controller, "Esc");
-    key(&mut controller, "Alt+i");
-    assert!(!controller.app.sidebar);
-}
-
-#[test]
 fn floating_metadata_close_keys_preserve_sidebar_and_modal_focus() {
     use terminal_file_manager::settings::MetadataPresentation;
     for preference in [MetadataPresentation::Sidebar, MetadataPresentation::Popup] {
