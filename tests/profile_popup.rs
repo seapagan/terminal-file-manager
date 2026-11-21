@@ -23,12 +23,24 @@ fn controller() -> Controller {
     c
 }
 fn draw(c: &Controller, width: u16, height: u16) -> (Buffer, ui::Geometry) {
+    let (buffer, geometry, _) = draw_with_cursor(c, width, height);
+    (buffer, geometry)
+}
+fn draw_with_cursor(
+    c: &Controller,
+    width: u16,
+    height: u16,
+) -> (Buffer, ui::Geometry, TestBackend) {
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
     let mut geometry = None;
     terminal
         .draw(|f| geometry = Some(ui::render(f, &c.app, &Theme::new(ColorLevel::NoColor))))
         .unwrap();
-    (terminal.backend().buffer().clone(), geometry.unwrap())
+    (
+        terminal.backend().buffer().clone(),
+        geometry.unwrap(),
+        terminal.backend().clone(),
+    )
 }
 fn key(c: &mut Controller, code: KeyCode, width: u16, height: u16) {
     let g = ui::geometry(&c.app, Rect::new(0, 0, width, height));
@@ -111,19 +123,28 @@ fn assert_feedback(buffer: &Buffer, body: Rect, expected: &str, style: Modifier)
     );
 }
 
+fn assert_name_cursor(cursor: &TestBackend, body: Rect, columns: u16) {
+    assert!(cursor.cursor_visible());
+    assert_eq!(
+        cursor.cursor_position(),
+        (body.x + 6 + columns, body.y).into()
+    );
+}
+
 #[test]
 fn save_profile_desktop_rows_group_the_field_feedback_and_separated_footer() {
     let mut c = editor();
-    let (initial, geometry) = draw(&c, 120, 32);
+    let (initial, geometry, cursor) = draw_with_cursor(&c, 120, 32);
     let shell = geometry.menu_layout.unwrap();
     assert_eq!(shell.outer, Rect::new(28, 10, 64, 10));
     assert_eq!(shell.body, Rect::new(30, 12, 60, 5));
     assert_eq!(shell.footer, Rect::new(30, 17, 60, 1));
+    assert_name_cursor(&cursor, shell.body, 0);
     let area = Rect::new(shell.body.x, shell.body.y, shell.body.width, 6);
     assert_eq!(
         rendered_rows(&initial, area),
         [
-            "Name: ▏",
+            "Name:",
             "",
             "Use 1–64 printable characters; no surrounding whitespace.",
             "",
@@ -132,12 +153,13 @@ fn save_profile_desktop_rows_group_the_field_feedback_and_separated_footer() {
         ]
     );
     key(&mut c, KeyCode::Enter, 120, 32);
-    let (failed, geometry) = draw(&c, 120, 32);
+    let (failed, geometry, failed_cursor) = draw_with_cursor(&c, 120, 32);
+    assert_name_cursor(&failed_cursor, shell.body, 0);
     assert_eq!(geometry.menu_layout.unwrap().outer, shell.outer);
     assert_eq!(
         rendered_rows(&failed, area),
         [
-            "Name: ▏",
+            "Name:",
             "",
             "profile name must be 1–64 printable characters without",
             "surrounding whitespace",
@@ -146,9 +168,10 @@ fn save_profile_desktop_rows_group_the_field_feedback_and_separated_footer() {
         ]
     );
     type_name(&mut c, "W");
-    let (corrected, geometry) = draw(&c, 120, 32);
+    let (corrected, geometry, corrected_cursor) = draw_with_cursor(&c, 120, 32);
+    assert_name_cursor(&corrected_cursor, shell.body, 1);
     assert_eq!(geometry.menu_layout.unwrap().outer, shell.outer);
-    assert_eq!(rendered_rows(&corrected, area)[0], "Name: W▏");
+    assert_eq!(rendered_rows(&corrected, area)[0], "Name: W");
     assert_eq!(
         &rendered_rows(&corrected, area)[1..],
         &rendered_rows(&initial, area)[1..]
@@ -364,12 +387,19 @@ fn unicode_name_editor_keeps_the_editing_end_on_one_row_after_resize() {
     let name = format!("{}尾", "界e\u{301}".repeat(20));
     type_name(&mut c, &name);
     for width in [120, 40, 32, 24, 120] {
-        let (buffer, geometry) = draw(&c, width, 24);
+        let (buffer, geometry, cursor) = draw_with_cursor(&c, width, 24);
         let body = geometry.menu_layout.as_ref().unwrap().body;
         let area = geometry.menu.unwrap();
         assert!(area.x > 0 && area.right() < width && area.bottom() < 24);
         let field = area_text(&buffer, Rect::new(body.x, body.y, body.width, 1));
-        assert!(field.starts_with("Name:") && field.ends_with("尾▏"));
+        assert!(field.starts_with("Name:") && field.ends_with('尾'));
+        assert!(cursor.cursor_visible());
+        let end = (body.x..body.right())
+            .find(|&x| buffer[(x, body.y)].symbol() == "尾")
+            .unwrap()
+            + 2;
+        assert_eq!(cursor.cursor_position(), (end, body.y).into());
+        assert!(end < body.right());
         assert_eq!(c.app.profile_name.as_deref(), Some(name.as_str()));
         assert!(area_text(&buffer, Rect::new(body.x, body.y + 1, body.width, 1)).is_empty());
         for y in area.y + 1..area.bottom() - 1 {

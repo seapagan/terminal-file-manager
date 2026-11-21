@@ -1,5 +1,5 @@
 //! Apply read-only worker completions and avoid redraws for unchanged listings.
-use super::{App, Controller, Duration, Pool, Value};
+use super::{App, Controller, Duration, NativeTerminal, Pool, Theme, Value, io, ui};
 
 pub(super) fn tick(app: &mut App) -> bool {
     let now = std::time::SystemTime::now();
@@ -63,4 +63,35 @@ fn listing_presentation(
         app.panes[pane].error.clone(),
         app.details[pane].entry.as_ref().and_then(|e| e.accessed),
     )
+}
+
+/// Geometry and cursor shape come from the same completed frame.
+pub(super) struct Renderer {
+    pub geometry: ui::Geometry,
+    shape: Option<bool>,
+}
+impl Renderer {
+    pub fn new(geometry: ui::Geometry) -> Self {
+        Self {
+            geometry,
+            shape: None,
+        }
+    }
+    pub fn draw(
+        &mut self,
+        terminal: &mut NativeTerminal,
+        app: &mut App,
+        theme: &Theme,
+    ) -> io::Result<()> {
+        ui::prepare_notifications(app, terminal.size()?.into());
+        terminal.draw(|frame| {
+            self.geometry = ui::render(frame, app, theme);
+        })?;
+        let shape = ui::editing_cursor(app, &self.geometry).map(|c| c.overwrite);
+        if self.shape != shape {
+            crate::terminal::cursor_style(terminal, shape)?;
+            self.shape = shape;
+        }
+        Ok(())
+    }
 }

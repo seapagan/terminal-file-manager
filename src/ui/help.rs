@@ -175,6 +175,19 @@ fn line(row: &Row, app: &App, theme: &Theme, key_width: usize) -> Line<'static> 
     line
 }
 
+pub(super) fn cursor(app: &App, layout: &HelpLayout) -> Option<super::text_input::Cursor> {
+    let area = layout.picker.as_ref()?.query;
+    let state = app.help_picker.as_ref()?;
+    let label = modal_label(area.width);
+    super::text_input::field_cursor(&state.query, &state.editor, label, area)
+}
+fn modal_label(width: u16) -> u16 {
+    super::modal::width(&super::modal::truncate(
+        if width >= 10 { "Search: " } else { "/ " },
+        width,
+    ))
+}
+
 #[cfg(test)]
 mod quick_copy_help_tests {
     #[test]

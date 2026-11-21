@@ -110,7 +110,7 @@ fn edit(controller: &mut Controller, key: KeyEvent) {
         }
         KeyCode::Enter if key.kind == KeyEventKind::Press => save(controller),
         _ => {
-            let mut editor = controller.app.profile_editor;
+            let mut editor = controller.app.profile_editor.clone();
             let mut text = controller.app.profile_name.as_ref().unwrap().clone();
             let result = editor.key(&mut text, key, 256);
             if text.chars().count() <= 64 {
@@ -126,7 +126,7 @@ fn edit(controller: &mut Controller, key: KeyEvent) {
 
 pub(super) fn paste(controller: &mut Controller, incoming: &str) {
     let mut text = controller.app.profile_name.as_ref().unwrap().clone();
-    let mut editor = controller.app.profile_editor;
+    let mut editor = controller.app.profile_editor.clone();
     let incoming: String = incoming.chars().filter(|c| !c.is_control()).collect();
     if editor.insert(&mut text, &incoming, 256) == crate::editor::Edit::Changed
         && text.chars().count() <= 64

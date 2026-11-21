@@ -89,7 +89,7 @@ fn profile_name_and_help_search_use_the_same_cursor_editor() {
     assert_eq!(c.app.help_picker.as_ref().unwrap().query, "XYdZ");
 }
 #[test]
-fn middle_caret_and_overwrite_mode_remain_visible_with_unicode_and_long_input() {
+fn real_cursor_tracks_unicode_without_displacing_the_value() {
     let (_root, mut c) = controller();
     key(&mut c, "Alt+b");
     event(
@@ -124,7 +124,10 @@ fn middle_caret_and_overwrite_mode_remain_visible_with_unicode_and_long_input() 
             .iter()
             .map(|cell| cell.symbol())
             .collect();
-        assert!(text.contains('▐'), "{width}");
+        assert!(!text.contains('▏') && !text.contains('▐'), "{width}");
+        assert!(t.backend().cursor_visible(), "{width}");
+        let cursor = t.backend().cursor_position();
+        assert_eq!(t.backend().buffer()[cursor].symbol(), "Z", "{width}");
     }
 }
 
@@ -147,6 +150,13 @@ fn transfer_fields_keep_independent_cursors_and_native_target_until_an_edit() {
     assert_eq!(d.text, "XYdZ");
     assert_eq!(d.incoming, "XYdZ");
     assert!(d.edited);
+    let mut t = Terminal::new(TestBackend::new(120, 32)).unwrap();
+    draw(&mut t, &c);
+    assert!(t.backend().cursor_visible());
+    assert_eq!(
+        t.backend().buffer()[t.backend().cursor_position()].symbol(),
+        "X"
+    );
 }
 
 #[test]
@@ -169,4 +179,82 @@ fn incident_acknowledgement_allows_cursor_correction_but_never_paste_approval() 
     };
     assert_eq!(typed, "ACK");
     assert!(!c.quit);
+    let mut t = Terminal::new(TestBackend::new(120, 32)).unwrap();
+    draw(&mut t, &c);
+    assert!(t.backend().cursor_visible());
+    assert_eq!(
+        t.backend().buffer()[t.backend().cursor_position()].symbol(),
+        "K"
+    );
+}
+
+#[test]
+fn moving_and_changing_cursor_shape_preserve_buffers_across_all_fields() {
+    for shortcut in ["/", "Alt+b", "Alt+n", "profile", "search"] {
+        let (_root, mut c) = controller();
+        match shortcut {
+            "profile" => {
+                c.app.profile_menu = Some(0);
+                c.app.profile_name = Some(String::new());
+            }
+            "search" => {
+                key(&mut c, "?");
+                key(&mut c, "/");
+            }
+            _ => key(&mut c, shortcut),
+        }
+        event(&mut c, Event::Paste("abc".into()));
+        key(&mut c, "Home");
+        let mut t = Terminal::new(TestBackend::new(120, 32)).unwrap();
+        draw(&mut t, &c);
+        let baseline = t.backend().buffer().clone();
+        assert!(t.backend().cursor_visible(), "{shortcut}");
+        assert_eq!(baseline[t.backend().cursor_position()].symbol(), "a");
+        key(&mut c, "Right");
+        draw(&mut t, &c);
+        assert_eq!(t.backend().buffer(), &baseline, "{shortcut}");
+        assert_eq!(baseline[t.backend().cursor_position()].symbol(), "b");
+        key(&mut c, "Insert");
+        draw(&mut t, &c);
+        assert_eq!(t.backend().buffer(), &baseline, "{shortcut}");
+        assert_eq!(baseline[t.backend().cursor_position()].symbol(), "b");
+    }
+}
+fn draw(t: &mut Terminal<TestBackend>, c: &Controller) {
+    t.draw(|f| {
+        ui::render(
+            f,
+            &c.app,
+            &terminal_file_manager::color::Theme::new(colored_text::ColorLevel::NoColor),
+        );
+    })
+    .unwrap();
+}
+
+#[test]
+fn context_help_and_non_editing_dialogs_hide_the_underlying_field_cursor() {
+    let (_root, mut c) = controller();
+    key(&mut c, "Alt+n");
+    event(&mut c, Event::Paste("abc".into()));
+    key(&mut c, "Home");
+    key(&mut c, "Right");
+    let mut t = Terminal::new(TestBackend::new(120, 32)).unwrap();
+    draw(&mut t, &c);
+    let position = t.backend().cursor_position();
+    key(&mut c, "F1");
+    assert!(
+        ui::geometry(&c.app, Rect::new(0, 0, 120, 32))
+            .context_help
+            .is_some()
+    );
+    draw(&mut t, &c);
+    assert!(!t.backend().cursor_visible());
+    key(&mut c, "Esc");
+    draw(&mut t, &c);
+    assert!(t.backend().cursor_visible());
+    assert_eq!(t.backend().cursor_position(), position);
+    c.app.operations.dialog = None;
+    c.app.operations.show_history = true;
+    draw(&mut t, &c);
+    assert!(!t.backend().cursor_visible());
 }

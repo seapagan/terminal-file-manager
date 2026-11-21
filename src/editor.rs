@@ -1,19 +1,12 @@
-//! Single-line cursor state; field owners retain text, limits and approval semantics.
+//! tui-input owns single-line editing; field owners retain validation and approval.
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use ratatui::{style::Style, text::Line};
+use tui_input::{Input, InputRequest};
+use unicode_segmentation::UnicodeSegmentation;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Editor {
-    cursor: usize,
+    input: Input,
     pub overwrite: bool,
-}
-impl Default for Editor {
-    fn default() -> Self {
-        Self {
-            cursor: usize::MAX,
-            overwrite: false,
-        }
-    }
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Edit {
@@ -22,36 +15,19 @@ pub enum Edit {
     Changed,
     Rejected,
 }
-
-/// Grapheme boundaries come from the existing renderer; retain skipped control bytes too.
-pub(crate) fn boundaries(text: &str) -> Vec<usize> {
-    let mut result = vec![0];
-    let mut offset = 0;
-    for g in Line::raw(text).styled_graphemes(Style::default()) {
-        let start = offset + text[offset..].find(g.symbol).unwrap_or(0);
-        result.extend(
-            text[offset..start]
-                .char_indices()
-                .map(|(i, c)| offset + i + c.len_utf8()),
-        );
-        offset = start + g.symbol.len();
-        result.push(offset);
-    }
-    result.extend(
-        text[offset..]
-            .char_indices()
-            .map(|(i, c)| offset + i + c.len_utf8()),
-    );
-    result
-}
-
 impl Editor {
     pub fn position(&self, text: &str) -> usize {
-        boundaries(text)
-            .into_iter()
-            .take_while(|p| *p <= self.cursor.min(text.len()))
-            .last()
-            .unwrap_or(0)
+        if self.input.value() != text {
+            return text.len();
+        }
+        text.char_indices()
+            .nth(self.input.cursor())
+            .map_or(text.len(), |(i, _)| i)
+    }
+    fn synchronize(&mut self, text: &str) {
+        if self.input.value() != text {
+            self.input = Input::new(text.to_owned());
+        }
     }
     pub fn key(&mut self, text: &mut String, key: KeyEvent, limit: usize) -> Edit {
         if key.kind == KeyEventKind::Release {
@@ -66,91 +42,75 @@ impl Editor {
         ) {
             return Edit::Ignored;
         }
-        self.cursor = self.position(text);
-        if self.move_cursor(text, key) {
+        self.synchronize(text);
+        if key.code == KeyCode::Insert && key.kind == KeyEventKind::Press {
+            self.overwrite = !self.overwrite;
             return Edit::Cursor;
         }
-        match key.code {
-            KeyCode::Backspace => self.erase(text, true),
-            KeyCode::Delete => self.erase(text, false),
-            KeyCode::Char(c) if !c.is_control() => self.insert(text, &c.to_string(), limit),
-            _ => Edit::Ignored,
+        if let KeyCode::Char(c) = key.code
+            && !c.is_control()
+        {
+            return self.insert(text, &c.to_string(), limit);
         }
-    }
-    fn move_cursor(&mut self, text: &str, key: KeyEvent) -> bool {
-        match key.code {
-            KeyCode::Left => {
-                self.cursor = boundaries(text)
-                    .into_iter()
-                    .take_while(|p| *p < self.cursor)
-                    .last()
-                    .unwrap_or(0)
-            }
-            KeyCode::Right => self.cursor = self.next(text),
-            KeyCode::Home => self.cursor = 0,
-            KeyCode::End => self.cursor = text.len(),
-            KeyCode::Insert if key.kind == KeyEventKind::Press => self.overwrite = !self.overwrite,
-            _ => return false,
-        }
-        true
-    }
-
-    fn next(&self, text: &str) -> usize {
-        boundaries(text)
-            .into_iter()
-            .find(|p| *p > self.cursor)
-            .unwrap_or(text.len())
-    }
-    fn erase(&mut self, text: &mut String, backwards: bool) -> Edit {
-        let start = if backwards {
-            boundaries(text)
-                .into_iter()
-                .take_while(|p| *p < self.cursor)
-                .last()
-                .unwrap_or(0)
-        } else {
-            self.cursor
+        let Some(request) = request(key.code) else {
+            return Edit::Ignored;
         };
-        let end = if backwards {
-            self.cursor
+        let response = self.input.handle(request);
+        if response.is_some_and(|changed| changed.value) {
+            *text = self.input.value().to_owned();
+            Edit::Changed
         } else {
-            self.next(text)
-        };
-        if start == end {
-            return Edit::Cursor;
+            Edit::Cursor
         }
-        text.replace_range(start..end, "");
-        self.cursor = start;
-        self.cursor = self.position(text);
-        Edit::Changed
     }
-    /// Reject an oversized edit atomically; callers choose sanitization and validation.
+    /// Prepare a candidate so rejected edits cannot change the field or its cursor.
     pub fn insert(&mut self, text: &mut String, incoming: &str, limit: usize) -> Edit {
-        self.cursor = self.position(text);
-        let mut end = self.cursor;
-        if self.overwrite {
-            let count = boundaries(incoming).len().saturating_sub(1);
-            end = boundaries(text)
-                .into_iter()
-                .filter(|p| *p >= self.cursor)
-                .nth(count)
-                .unwrap_or(text.len());
-        }
-        if text.len() - (end - self.cursor) + incoming.len() > limit {
-            return Edit::Rejected;
-        }
+        self.synchronize(text);
         if incoming.is_empty() {
             return Edit::Cursor;
         }
-        text.replace_range(self.cursor..end, incoming);
-        self.cursor += incoming.len();
-        // An inserted combining sequence can join the following grapheme.
-        self.cursor = boundaries(text)
-            .into_iter()
-            .find(|p| *p >= self.cursor)
-            .unwrap_or(text.len());
+        if incoming.len() > limit {
+            return Edit::Rejected;
+        }
+        let start = self.position(text);
+        let end = if self.overwrite {
+            text[start..]
+                .grapheme_indices(true)
+                .take(incoming.graphemes(true).count())
+                .last()
+                .map_or(start, |(offset, grapheme)| start + offset + grapheme.len())
+        } else {
+            start
+        };
+        if text.len() - (end - start) + incoming.len() > limit {
+            return Edit::Rejected;
+        }
+        let mut value = text.clone();
+        value.replace_range(start..end, "");
+        // Seed tui-input's bulk yank buffer instead of replaying every pasted character.
+        let mut candidate = Input::new(incoming.to_owned());
+        candidate.handle(InputRequest::DeleteLine);
+        candidate = candidate.with_value(value).with_cursor(self.input.cursor());
+        candidate.handle(InputRequest::Yank);
+        // Combining insertion can join the next grapheme; settle using library movement.
+        candidate.handle(InputRequest::GoToPrevChar);
+        candidate.handle(InputRequest::GoToNextChar);
+        *text = candidate.value().to_owned();
+        self.input = candidate;
         Edit::Changed
     }
+}
+
+fn request(code: KeyCode) -> Option<InputRequest> {
+    Some(match code {
+        KeyCode::Left => InputRequest::GoToPrevChar,
+        KeyCode::Right => InputRequest::GoToNextChar,
+        KeyCode::Home => InputRequest::GoToStart,
+        KeyCode::End => InputRequest::GoToEnd,
+        KeyCode::Backspace => InputRequest::DeletePrevChar,
+        KeyCode::Delete => InputRequest::DeleteNextChar,
+        _ => return None,
+    })
 }
 
 #[cfg(test)]
@@ -177,5 +137,73 @@ mod tests {
         assert_eq!(text, "a界");
         key(&mut e, &mut text, KeyCode::End);
         assert_eq!(e.position(&text), text.len());
+    }
+}
+
+#[cfg(test)]
+mod insertion_tests {
+    use super::*;
+    #[test]
+    fn joined_graphemes_and_oversized_paste_keep_valid_library_cursor_state() {
+        let mut editor = Editor::default();
+        let mut text = "\u{301}z".to_owned();
+        editor.key(
+            &mut text,
+            KeyEvent::new(KeyCode::Home, KeyModifiers::NONE),
+            64,
+        );
+        assert_eq!(editor.insert(&mut text, "e", 64), Edit::Changed);
+        assert_eq!(editor.position(&text), "e\u{301}".len());
+        let before = editor.position(&text);
+        assert_eq!(
+            editor.insert(&mut text, &"x".repeat(65_536), 64),
+            Edit::Rejected
+        );
+        assert_eq!(editor.position(&text), before);
+        editor.key(
+            &mut text,
+            KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
+            64,
+        );
+        assert_eq!(text, "z");
+        assert_eq!(
+            editor.insert(&mut text, &"x".repeat(65_535), 65_536),
+            Edit::Changed
+        );
+        assert_eq!(text.len(), 65_536);
+    }
+}
+
+#[cfg(test)]
+mod overwrite_tests {
+    use super::*;
+    fn key(editor: &mut Editor, text: &mut String, code: KeyCode) {
+        editor.key(text, KeyEvent::new(code, KeyModifiers::NONE), 65_536);
+    }
+    #[test]
+    fn bulk_overwrite_preserves_graphemes_controls_and_unreplaced_text() {
+        let mut editor = Editor::default();
+        let mut text = "A👩‍💻e\u{301}\r\nZ".to_owned();
+        key(&mut editor, &mut text, KeyCode::Home);
+        key(&mut editor, &mut text, KeyCode::Right);
+        key(&mut editor, &mut text, KeyCode::Insert);
+        editor.insert(&mut text, "界Q", 64);
+        assert_eq!(text, "A界Q\r\nZ");
+        editor.insert(&mut text, "\r\n", 64);
+        assert_eq!(text, "A界Q\r\nZ");
+        assert_eq!(&text[editor.position(&text)..], "Z");
+    }
+    #[test]
+    fn maximum_field_overwrite_uses_one_bounded_bulk_edit() {
+        let mut editor = Editor::default();
+        let mut text = "a".repeat(65_536);
+        key(&mut editor, &mut text, KeyCode::Home);
+        key(&mut editor, &mut text, KeyCode::Insert);
+        let incoming = "b".repeat(65_536);
+        let started = std::time::Instant::now();
+        assert_eq!(editor.insert(&mut text, &incoming, 65_536), Edit::Changed);
+        eprintln!("65,536-byte overwrite: {:?}", started.elapsed());
+        assert_eq!(text, incoming);
+        assert_eq!(editor.position(&text), text.len());
     }
 }

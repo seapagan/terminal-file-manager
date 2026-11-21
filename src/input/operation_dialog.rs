@@ -81,7 +81,7 @@ fn operation_key(
 
 fn edit_field(controller: &mut Controller, dialog: &mut OperationDialog, key: KeyEvent) {
     let index = dialog.field;
-    let mut editor = dialog.editors[index];
+    let mut editor = dialog.editors[index].clone();
     let change = editor.key(field(dialog), key, 65_536);
     dialog.editors[index] = editor;
     changed(controller, dialog, change);
@@ -318,7 +318,7 @@ fn field(dialog: &mut OperationDialog) -> &mut String {
 
 fn append(controller: &mut Controller, dialog: &mut OperationDialog, text: &str) {
     let index = dialog.field;
-    let mut editor = dialog.editors[index];
+    let mut editor = dialog.editors[index].clone();
     let change = editor.insert(field(dialog), text, 65_536);
     dialog.editors[index] = editor;
     changed(controller, dialog, change);

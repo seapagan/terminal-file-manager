@@ -12,7 +12,7 @@ use crate::{
     ui,
     workers::{Pool, Value},
 };
-use refresh::{collect, tick};
+use refresh::{Renderer, collect, tick};
 use std::{
     io::{self, IsTerminal},
     path::Path,
@@ -126,7 +126,7 @@ fn drive(
     let mut dirty = true;
     let mut watches = crate::watch::Runtime::default();
     let mut clipboard = crate::clipboard::runtime::Runtime::default();
-    let mut geometry = ui::geometry(&controller.app, terminal.size()?.into());
+    let mut renderer = Renderer::new(ui::geometry(&controller.app, terminal.size()?.into()));
     while !controller.quit {
         dirty |= controller.app.notifications.advance(started.elapsed());
         dirty |= tick(&mut controller.app);
@@ -140,18 +140,18 @@ fn drive(
         dirty |= schedule_metadata(controller, pool, &mut metadata);
         #[cfg(windows)]
         {
-            dirty |= owners.poll(&mut controller.app, &geometry);
+            dirty |= owners.poll(&mut controller.app, &renderer.geometry);
         }
         if dirty {
-            ui::prepare_notifications(&mut controller.app, terminal.size()?.into());
-            terminal.draw(|frame| {
-                geometry = ui::render(frame, &controller.app, theme);
-            })?;
+            renderer.draw(terminal, &mut controller.app, theme)?;
             dirty = false;
         }
         if crossterm::event::poll(Duration::from_millis(16))? {
-            let requests =
-                controller.handle(crossterm::event::read()?, &geometry, started.elapsed());
+            let requests = controller.handle(
+                crossterm::event::read()?,
+                &renderer.geometry,
+                started.elapsed(),
+            );
             for request in requests {
                 pool.submit(request);
             }

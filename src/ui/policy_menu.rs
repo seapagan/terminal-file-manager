@@ -25,7 +25,10 @@ pub struct PolicyLayout {
 }
 
 pub(super) fn layout(app: &App, area: Rect, controls: &[PolicyControl]) -> Option<PolicyLayout> {
-    let menu = app.policy_menu.as_ref()?;
+    let menu = app
+        .policy_menu
+        .as_ref()
+        .filter(|_| !policy_menu::preempted(app))?;
     let anchor = controls
         .iter()
         .find(|c| c.pane == menu.pane && c.action == menu.action)?

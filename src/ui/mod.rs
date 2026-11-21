@@ -31,6 +31,7 @@ pub use pattern::{PatternControl, PatternLayout};
 mod summary;
 mod text;
 pub(crate) mod text_input;
+pub(crate) use text_input::cursor as editing_cursor;
 mod view;
 use crate::{app::App, color::Theme};
 pub use layout::{Geometry, geometry};
@@ -118,6 +119,9 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     operations::render(frame, app, theme, &geometry);
     help::context::render(frame, app, theme, geometry.context_help.as_ref());
     notifications::render(frame, app, &geometry, theme);
+    if let Some(cursor) = editing_cursor(app, &geometry) {
+        frame.set_cursor_position(cursor.position);
+    }
     geometry
 }
 

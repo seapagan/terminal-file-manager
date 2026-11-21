@@ -675,10 +675,14 @@ atomic preference storage. In-progress workflow state never persists.
 
 ### Single-line input ownership
 
-The shared `editor::Editor` retains a grapheme cursor and overwrite mode while
-field owners retain strings, validation, limits and submission. Existing Ratatui
-grapheme iteration and modal fields supply segmentation and horizontal display.
-`ratatui-textarea` was assessed against these requirements; its multiline state
-and single-line restrictions would add adapters around the existing form model.
-No new dependency is required. Incident acknowledgement still requires manual
-typing and its existing explicit approval; paste cannot acknowledge an incident.
+The shared `editor::Editor` delegates cursor movement, grapheme deletion and
+text insertion to `tui-input`. Field owners retain validation, length limits,
+native operands and submission rules. The adapter rejects oversized edits
+atomically and retains each field's overwrite mode.
+
+Fields render only their text through a shared horizontal viewport. Ratatui
+positions the real terminal cursor for the topmost visible editable field;
+covered or clipped fields do not request a cursor. Supported terminals use a
+bar for insertion and a block for overwrite, restoring the user's shape on exit.
+Incident acknowledgement still requires manual typing and its existing explicit
+approval; paste cannot acknowledge an incident.

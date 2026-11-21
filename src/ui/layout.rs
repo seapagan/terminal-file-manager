@@ -120,9 +120,7 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
             )
         });
     geometry.policy_controls = super::policy::controls(app, &geometry.panes);
-    if !crate::input::policy_menu::preempted(app) {
-        geometry.policy_menu = super::policy_menu::layout(app, area, &geometry.policy_controls);
-    }
+    geometry.policy_menu = super::policy_menu::layout(app, area, &geometry.policy_controls);
     geometry.path_controls = super::path_navigation::headers(app, &geometry.panes);
     finish_geometry(app, area, &mut geometry);
     geometry

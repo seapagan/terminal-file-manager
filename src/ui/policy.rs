@@ -66,7 +66,6 @@ fn segments(pane: &Pane, width: u16, theme: &Theme) -> Vec<Line<'static>> {
         let (mut value, _) = super::text_input::edited(
             &pane.filter,
             editor,
-            true,
             width.saturating_sub(super::modal::width(&label)),
             theme,
         );

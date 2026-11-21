@@ -1,6 +1,6 @@
 //! Terminal lifecycle adapted from Labeldeck's UI guard; matched protocol cleanup.
 use crossterm::{
-    cursor::{Hide, Show},
+    cursor::{Hide, SetCursorStyle, Show},
     event::{
         DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
         KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
@@ -77,7 +77,12 @@ impl Modes {
         if modes & ALTERNATE != 0 {
             remember(
                 &mut error,
-                execute!(io::stdout(), Show, LeaveAlternateScreen),
+                execute!(
+                    io::stdout(),
+                    SetCursorStyle::DefaultUserShape,
+                    Show,
+                    LeaveAlternateScreen
+                ),
             );
         }
         if modes & RAW != 0 {
@@ -150,4 +155,17 @@ fn remember(first: &mut Option<io::Error>, result: io::Result<()>) {
     {
         *first = Some(error);
     }
+}
+
+/// Apply cursor shape without changing Ratatui's cursor position or visibility.
+pub(crate) fn cursor_style(
+    terminal: &mut NativeTerminal,
+    overwrite: Option<bool>,
+) -> io::Result<()> {
+    let style = match overwrite {
+        Some(false) => SetCursorStyle::SteadyBar,
+        Some(true) => SetCursorStyle::SteadyBlock,
+        None => SetCursorStyle::DefaultUserShape,
+    };
+    execute!(terminal.backend_mut(), style)
 }

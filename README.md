@@ -178,7 +178,8 @@ in the dialog. F2 in a transfer dialog toggles SHA-256 verification. Conflicts
 default to Skip; directories merge.
 
 Text fields support Left/Right, Home/End, Backspace and Delete at the cursor.
-Insert toggles overwrite mode; `▏` marks insertion and `▐` marks overwrite.
+Insert toggles overwrite mode. Where supported, the terminal cursor uses a bar
+for insertion and a block for overwrite.
 Pasted text goes at the cursor, and long fields scroll horizontally.
 
 When creating files or directories, enter a single name. Existing entries are

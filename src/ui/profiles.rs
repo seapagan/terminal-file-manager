@@ -115,3 +115,12 @@ fn render_rows(frame: &mut Frame, app: &App, area: Rect, start: usize, theme: &T
         .collect();
     frame.render_widget(Paragraph::new(lines), area);
 }
+
+pub(super) fn cursor(app: &App, shell: &modal::Layout<()>) -> Option<super::text_input::Cursor> {
+    super::text_input::field_cursor(
+        app.profile_name.as_ref()?,
+        &app.profile_editor,
+        modal::width("Name: "),
+        shell.body,
+    )
+}

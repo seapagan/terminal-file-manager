@@ -493,15 +493,22 @@ fn extension_selection_chords_arrive_through_native_terminal_input() {
 fn editing_keys_correct_a_filename_through_native_terminal_input() {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("editor-ready"), "owned").unwrap();
-    drive(
+    let transcript = drive(
         command(root.path(), root.path(), None),
         &[
             ("editor-ready", "\x1bn"),
-            ("Create empty file", "abx\x1b[H\x1b[C\x1b[3~c\x1b[F\x7f\r"),
+            (
+                "Create empty file",
+                "abx\x1b[H\x1b[C\x1b[3~c\x1b[F\x7f\x1b[2~\x1b[2~\r",
+            ),
             ("Create file complete", "q"),
         ],
         false,
     );
+    assert!(transcript.contains("\x1b[6 q"), "insertion cursor shape");
+    assert!(transcript.contains("\x1b[2 q"), "overwrite cursor shape");
+    assert!(transcript.contains("\x1b[0 q"), "cursor shape restored");
+    assert!(!transcript.contains('▏') && !transcript.contains('▐'));
     assert!(root.path().join("ac").is_file());
     assert!(!root.path().join("abx").exists());
 }

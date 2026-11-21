@@ -248,18 +248,31 @@ impl<T: Clone> Row<T> {
         ])
     }
 
+    /// Cursor shares the field's label and horizontal viewport geometry.
+    pub(crate) fn cursor(&self, width: u16) -> Option<(u16, bool)> {
+        if !self.focused || self.field.is_none() {
+            return None;
+        }
+        let label = self.label.as_ref().map_or(0, |label| super::width(label));
+        let available = width.saturating_sub(label);
+        if available == 0 {
+            return None;
+        }
+        let (position, overwrite) = self.editor.unwrap_or((self.text.len(), false));
+        let (_, column) = super::super::text_input::value(
+            &self.text,
+            position,
+            available,
+            &Theme::new(colored_text::ColorLevel::NoColor),
+        );
+        Some((label + column.min(available - 1), overwrite))
+    }
+
     fn field_line(&self, width: u16, theme: &Theme) -> Line<'static> {
         let label = self.label.clone().unwrap_or_default();
         let available = width.saturating_sub(super::width(&label));
-        let (position, overwrite) = self.editor.unwrap_or((self.text.len(), false));
-        let (mut line, _) = super::super::text_input::value(
-            &self.text,
-            position,
-            overwrite,
-            self.focused,
-            available,
-            theme,
-        );
+        let (position, _) = self.editor.unwrap_or((self.text.len(), false));
+        let (mut line, _) = super::super::text_input::value(&self.text, position, available, theme);
         line.spans
             .insert(0, Span::styled(label, theme.style(Role::Label)));
         line

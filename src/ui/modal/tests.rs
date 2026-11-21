@@ -259,7 +259,10 @@ fn long_escaped_field_keeps_the_editing_end_and_caret_visible() {
     let row = Row::field("Name", &value, 0usize, true).wrap(40).remove(0);
     let line = row.line(40, &Theme::new(colored_text::ColorLevel::NoColor));
     assert!(line.width() <= 40);
-    assert!(line.to_string().ends_with("end▏"));
+    assert!(line.to_string().ends_with("end"));
+    let (column, overwrite) = row.cursor(40).unwrap();
+    assert_eq!(usize::from(column), line.width());
+    assert!(column < 40 && !overwrite);
     assert!(!line.to_string().contains('\u{1b}'));
 }
 
