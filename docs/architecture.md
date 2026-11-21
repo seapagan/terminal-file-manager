@@ -663,3 +663,13 @@ the original deadline and failure process-group cleanup. Local providers report
 copied only after a successful invocation. Preflight failures never invoke a
 provider or clear the clipboard. Clipboard settings use the existing strict,
 atomic preference storage. In-progress workflow state never persists.
+
+### Single-line input ownership
+
+The shared `editor::Editor` retains a grapheme cursor and overwrite mode while
+field owners retain strings, validation, limits and submission. Existing Ratatui
+grapheme iteration and modal fields supply segmentation and horizontal display.
+`ratatui-textarea` was assessed against these requirements; its multiline state
+and single-line restrictions would add adapters around the existing form model.
+No new dependency is required. Incident acknowledgement still requires manual
+typing and its existing explicit approval; paste cannot acknowledge an incident.

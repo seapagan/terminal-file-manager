@@ -61,7 +61,20 @@ fn segments(pane: &Pane, width: u16, theme: &Theme) -> Vec<Line<'static>> {
     if pane.sort.reverse {
         segments.push(field("Reverse", "On".into(), theme));
     }
-    if !pane.filter.is_empty() {
+    if let Some(editor) = &pane.filter_editor {
+        let label = super::modal::truncate("FILTER: ", width);
+        let (mut value, _) = super::text_input::edited(
+            &pane.filter,
+            editor,
+            true,
+            width.saturating_sub(super::modal::width(&label)),
+            theme,
+        );
+        value
+            .spans
+            .insert(0, Span::styled(label, theme.style(Role::Warning)));
+        segments.insert(0, value);
+    } else if !pane.filter.is_empty() {
         let text = format!("FILTER: {}", super::clean(&pane.filter));
         segments.insert(
             0,

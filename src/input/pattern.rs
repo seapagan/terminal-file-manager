@@ -200,31 +200,18 @@ fn enter(controller: &mut Controller, layout: &crate::ui::PatternLayout) {
 
 fn edit(controller: &mut Controller, key: KeyEvent, layout: &crate::ui::PatternLayout) {
     let state = controller.app.pattern.as_mut().unwrap();
-    match key.code {
-        KeyCode::Backspace
-            if state.focus == PatternControl::Expression
-                && layout.targets().contains(&PatternControl::Expression) =>
+    if state.focus == PatternControl::Expression
+        && layout.targets().contains(&PatternControl::Expression)
+    {
+        state.edit_key(key);
+    } else if key.code == KeyCode::Char(' ') && key.kind == KeyEventKind::Press {
+        if let Some(target @ (PatternControl::Mode(_) | PatternControl::Case)) = layout
+            .targets()
+            .into_iter()
+            .find(|target| *target == state.focus)
         {
-            let mut text = state.expression().to_owned();
-            text.pop();
-            state.set_expression(text);
+            activate(controller, target, true);
         }
-        KeyCode::Char(c)
-            if state.focus == PatternControl::Expression
-                && layout.targets().contains(&PatternControl::Expression) =>
-        {
-            append(controller, &c.to_string())
-        }
-        KeyCode::Char(' ') if key.kind == KeyEventKind::Press => {
-            if let Some(target @ (PatternControl::Mode(_) | PatternControl::Case)) = layout
-                .targets()
-                .into_iter()
-                .find(|target| *target == state.focus)
-            {
-                activate(controller, target, true);
-            }
-        }
-        _ => {}
     }
 }
 

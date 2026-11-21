@@ -16,17 +16,13 @@ pub(super) fn open(controller: &mut Controller) {
 }
 
 pub(super) fn key(controller: &mut Controller, key: KeyEvent) {
-    if key.kind == KeyEventKind::Repeat
+    if controller.app.profile_name.is_none()
+        && key.kind == KeyEventKind::Repeat
         && !matches!(
             key.code,
             KeyCode::Up | KeyCode::Down | KeyCode::Home | KeyCode::End
         )
     {
-        if controller.app.profile_name.is_some()
-            && matches!(key.code, KeyCode::Char(_) | KeyCode::Backspace)
-        {
-            edit(controller, key);
-        }
         return;
     }
     if controller.app.profile_name.is_some() {
@@ -75,6 +71,7 @@ fn choose(controller: &mut Controller) {
     let count = controller.app.profile_names.len();
     if index == count + 1 {
         controller.app.profile_error = None;
+        controller.app.profile_editor = Default::default();
         controller.app.profile_name = Some(
             controller.app.panes[controller.app.active]
                 .profile
@@ -111,23 +108,32 @@ fn edit(controller: &mut Controller, key: KeyEvent) {
             controller.app.profile_name = None;
             controller.app.profile_error = None;
         }
-        KeyCode::Backspace => {
-            controller.app.profile_name.as_mut().unwrap().pop();
-            controller.app.profile_error = None;
-        }
-        KeyCode::Char(c)
-            if !key
-                .modifiers
-                .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
-        {
-            let name = controller.app.profile_name.as_mut().unwrap();
-            if name.chars().count() < 64 && !c.is_control() {
-                name.push(c);
-                controller.app.profile_error = None;
+        KeyCode::Enter => save(controller),
+        _ => {
+            let mut editor = controller.app.profile_editor;
+            let mut text = controller.app.profile_name.as_ref().unwrap().clone();
+            let result = editor.key(&mut text, key, 256);
+            if text.chars().count() <= 64 {
+                controller.app.profile_editor = editor;
+                if result == crate::editor::Edit::Changed {
+                    controller.app.profile_name = Some(text);
+                    controller.app.profile_error = None;
+                }
             }
         }
-        KeyCode::Enter => save(controller),
-        _ => {}
+    }
+}
+
+pub(super) fn paste(controller: &mut Controller, incoming: &str) {
+    let mut text = controller.app.profile_name.as_ref().unwrap().clone();
+    let mut editor = controller.app.profile_editor;
+    let incoming: String = incoming.chars().filter(|c| !c.is_control()).collect();
+    if editor.insert(&mut text, &incoming, 256) == crate::editor::Edit::Changed
+        && text.chars().count() <= 64
+    {
+        controller.app.profile_name = Some(text);
+        controller.app.profile_editor = editor;
+        controller.app.profile_error = None;
     }
 }
 

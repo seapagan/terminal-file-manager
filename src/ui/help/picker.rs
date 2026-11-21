@@ -2,7 +2,7 @@ use crate::{
     app::App,
     color::{Role, Theme},
     input::{HelpHit, HelpTarget},
-    ui::{modal, text::wrap_value},
+    ui::modal,
 };
 use ratatui::{
     Frame,
@@ -125,22 +125,17 @@ fn render_query(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
     let state = app.help_picker.as_ref().expect("visible picker");
     let label = modal::truncate(if area.width >= 10 { "Search: " } else { "/ " }, area.width);
     let label_width = modal::width(&label);
-    let available = area.width.saturating_sub(label_width + 1);
-    let text = if available == 0 {
-        String::new()
-    } else {
-        wrap_value(&crate::ui::clean(&state.query), usize::from(available))
-            .pop()
-            .unwrap_or_default()
-    };
-    let cursor = label_width + modal::width(&text);
-    frame.render_widget(
-        Paragraph::new(Line::from(vec![
-            Span::styled(label, theme.style(Role::Label)),
-            Span::styled(text, theme.style(Role::Value)),
-        ])),
-        area,
+    let (mut line, cursor) = crate::ui::text_input::edited(
+        &state.query,
+        &state.editor,
+        true,
+        area.width.saturating_sub(label_width),
+        theme,
     );
+    line.spans
+        .insert(0, Span::styled(label, theme.style(Role::Label)));
+    let cursor = label_width + cursor;
+    frame.render_widget(Paragraph::new(line), area);
     if area.width > 0 && area.height > 0 {
         frame.set_cursor_position((area.x + cursor.min(area.width - 1), area.y));
     }

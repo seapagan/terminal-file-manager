@@ -492,3 +492,20 @@ fn extension_selection_chords_arrive_through_native_terminal_input() {
         false,
     );
 }
+
+#[test]
+fn editing_keys_correct_a_filename_through_native_terminal_input() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("editor-ready"), "owned").unwrap();
+    drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("editor-ready", "\x1bn"),
+            ("File name:", "abx\x1b[H\x1b[C\x1b[3~c\x1b[F\x7f\r"),
+            ("Create file complete", "q"),
+        ],
+        false,
+    );
+    assert!(root.path().join("ac").is_file());
+    assert!(!root.path().join("abx").exists());
+}

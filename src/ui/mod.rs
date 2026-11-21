@@ -30,6 +30,7 @@ mod profiles;
 pub use pattern::{PatternControl, PatternLayout};
 mod summary;
 mod text;
+pub(crate) mod text_input;
 mod view;
 use crate::{app::App, color::Theme};
 pub use layout::{Geometry, geometry};

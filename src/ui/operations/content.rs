@@ -77,7 +77,7 @@ fn incident(app: &App, typed: &str) -> Vec<Row> {
             app.shortcut(crate::input::Action::Jobs, "F9")
         )),
         Row::plain("Enter or Esc: Stay. Type ACKNOWLEDGE manually, then press F10 to exit."),
-        Row::field("Acknowledgment", typed, 0, true),
+        Row::field("Acknowledgment", typed, 0, true).editor(&app.operations.incident_editor),
     ];
     if app.operations.active() {
         rows.push(Row::styled(
@@ -188,7 +188,8 @@ fn primary_field(dialog: &OperationDialog) -> Row {
         &value,
         0,
         dialog.field == 0,
-    );
+    )
+    .editor(&dialog.editors[0]);
     if matches!(dialog.plan.operation, Operation::Copy | Operation::Move) {
         field.label_width(6)
     } else {
@@ -302,12 +303,15 @@ fn transfer(dialog: &OperationDialog) -> Vec<Row> {
         ));
     }
     if dialog.plan.operands.len() == 1 {
-        rows.push(Row::field(
-            "Incoming name (optional)",
-            &dialog.incoming,
-            1,
-            dialog.field == 1,
-        ));
+        rows.push(
+            Row::field(
+                "Incoming name (optional)",
+                &dialog.incoming,
+                1,
+                dialog.field == 1,
+            )
+            .editor(&dialog.editors[1]),
+        );
         rows.push(Row::styled(
             "Tab switches fields; blank incoming name preserves the original.",
             Role::Label,

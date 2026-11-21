@@ -20,6 +20,7 @@ pub struct Row<T> {
     label: Option<String>,
     focused: bool,
     single_line: bool,
+    editor: Option<(usize, bool)>,
 }
 
 impl<T: Clone> Row<T> {
@@ -39,6 +40,7 @@ impl<T: Clone> Row<T> {
             label: None,
             focused: false,
             single_line: false,
+            editor: None,
         }
     }
 
@@ -64,7 +66,16 @@ impl<T: Clone> Row<T> {
             label: Some(format!("{label}: ")),
             focused,
             single_line: false,
+            editor: None,
         }
+    }
+
+    /// Use a shared cursor without transferring text or validation ownership.
+    pub fn editor(mut self, editor: &crate::editor::Editor) -> Self {
+        let position = super::super::clean(&self.text[..editor.position(&self.text)]).len();
+        self.text = super::super::clean(&self.text);
+        self.editor = Some((position, editor.overwrite));
+        self
     }
 
     /// Keep a changing summary to one measured line.
@@ -92,6 +103,7 @@ impl<T: Clone> Row<T> {
             label: None,
             focused: false,
             single_line: false,
+            editor: None,
         }
     }
 
@@ -159,6 +171,7 @@ impl<T: Clone> Row<T> {
                 label: None,
                 focused: false,
                 single_line: false,
+                editor: None,
             })
             .collect()
     }
@@ -238,33 +251,17 @@ impl<T: Clone> Row<T> {
     fn field_line(&self, width: u16, theme: &Theme) -> Line<'static> {
         let label = self.label.clone().unwrap_or_default();
         let available = width.saturating_sub(super::width(&label));
-        let caret = if self.focused && available > 0 {
-            "▏"
-        } else {
-            ""
-        };
-        let budget = available.saturating_sub(super::width(caret));
-        // Keep the editing end visible without changing the native field value.
-        let mut excess = Line::raw(&self.text)
-            .width()
-            .saturating_sub(usize::from(budget));
-        let mut start = 0;
-        let line = Line::raw(&self.text);
-        for grapheme in line.styled_graphemes(ratatui::style::Style::default()) {
-            if excess == 0 {
-                break;
-            }
-            start += grapheme.symbol.len();
-            excess = excess.saturating_sub(usize::from(super::width(grapheme.symbol)));
-        }
-        let value = &self.text[start..];
-        Line::from(vec![
-            Span::styled(label, theme.style(Role::Label)),
-            Span::styled(value.to_owned(), theme.style(Role::Value)),
-            Span::styled(
-                caret,
-                theme.style(Role::Header).add_modifier(Modifier::BOLD),
-            ),
-        ])
+        let (position, overwrite) = self.editor.unwrap_or((self.text.len(), false));
+        let (mut line, _) = super::super::text_input::value(
+            &self.text,
+            position,
+            overwrite,
+            self.focused,
+            available,
+            theme,
+        );
+        line.spans
+            .insert(0, Span::styled(label, theme.style(Role::Label)));
+        line
     }
 }

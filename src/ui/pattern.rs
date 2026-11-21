@@ -74,7 +74,8 @@ fn rows(state: &crate::app::PatternSelection, width: u16) -> Vec<Row<PatternCont
             state.expression(),
             PatternControl::Expression,
             state.focus == PatternControl::Expression,
-        ),
+        )
+        .editor(&state.editor),
         Row::plain(""),
     ];
     let controls = controls(width);

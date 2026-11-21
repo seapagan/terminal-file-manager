@@ -123,3 +123,5 @@ pub mod owner;
 pub mod operations;
 
 pub mod navigation;
+
+pub mod editor;

@@ -5,9 +5,7 @@ use crate::{
     settings::Settings,
     ui::Geometry,
 };
-use crossterm::event::{
-    Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
-};
+use crossterm::event::{Event, KeyCode, KeyEventKind, MouseButton, MouseEvent, MouseEventKind};
 use std::{path::PathBuf, time::Duration};
 
 /// Pure input controller; emitted requests are the only route to background I/O.
@@ -72,6 +70,10 @@ impl Controller {
             Event::Key(key) if key.kind != KeyEventKind::Release => self.editing_key(key, geometry),
             Event::Paste(text) if self.filter_before.is_some() => {
                 self.append_filter(&text);
+                Vec::new()
+            }
+            Event::Paste(text) if self.app.profile_name.is_some() => {
+                super::profiles::paste(self, &text);
                 Vec::new()
             }
             Event::Mouse(event) => self.mouse(event, geometry, now),
@@ -201,6 +203,7 @@ impl Controller {
     }
 
     fn begin_filter(&mut self) {
+        self.app.panes[self.app.active].filter_editor = Some(Default::default());
         self.filter_before = Some((
             self.app.active,
             self.app.panes[self.app.active].filter.clone(),
@@ -362,19 +365,22 @@ impl Controller {
                 self.filter_before = None;
                 self.app.status = "Filter applied".into();
             }
-            KeyCode::Backspace => {
-                let mut text = self.app.panes[id].filter.clone();
-                text.pop();
-                self.app.panes[id].set_filter(text);
+            _ => {
+                let pane = &mut self.app.panes[id];
+                let mut text = pane.filter.clone();
+                if pane
+                    .filter_editor
+                    .as_mut()
+                    .unwrap()
+                    .key(&mut text, key, 4096)
+                    == crate::editor::Edit::Changed
+                {
+                    pane.set_filter(text);
+                }
             }
-            KeyCode::Char(c)
-                if !key
-                    .modifiers
-                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
-            {
-                self.append_filter(&c.to_string())
-            }
-            _ => {}
+        }
+        if self.filter_before.is_none() {
+            self.app.panes[id].filter_editor = None;
         }
     }
 
@@ -382,14 +388,18 @@ impl Controller {
         let Some((id, _)) = self.filter_before.as_ref() else {
             return;
         };
-        let mut query = self.app.panes[*id].filter.clone();
-        for c in text.chars().filter(|c| !c.is_control()) {
-            if query.len() + c.len_utf8() > 4096 {
-                break;
-            }
-            query.push(c);
+        let pane = &mut self.app.panes[*id];
+        let mut query = pane.filter.clone();
+        let incoming: String = text.chars().filter(|c| !c.is_control()).collect();
+        if pane
+            .filter_editor
+            .as_mut()
+            .unwrap()
+            .insert(&mut query, &incoming, 4096)
+            == crate::editor::Edit::Changed
+        {
+            pane.set_filter(query);
         }
-        self.app.panes[*id].set_filter(query);
     }
 
     fn metadata_click(&mut self, event: MouseEvent, geometry: &Geometry) -> bool {
