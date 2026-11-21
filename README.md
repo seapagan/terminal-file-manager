@@ -105,8 +105,8 @@ resolving the error.
 | F7 | Create a directory |
 | Shift+F7 / Alt+n | Create an empty file |
 | Alt+r / Alt+a | Rename one entry / edit supported attributes |
-| F8 / Alt+t | Preview and move the selection to native Trash |
-| Shift+F8 / Alt+d | Preview permanent deletion; Enter cancels |
+| F8 / Delete / Alt+t | Preview and move the selection to native Trash |
+| Shift+F8 / Shift+Delete / Alt+d | Preview permanent deletion; Enter cancels |
 | F9 / Alt+j | Jobs, progress and results |
 | `y` | Copy names or paths to the clipboard |
 

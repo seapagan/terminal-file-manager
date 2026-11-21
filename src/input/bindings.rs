@@ -146,6 +146,7 @@ fn named_key(key: &str) -> Option<KeyCode> {
         ("tab", KeyCode::Tab),
         ("space", KeyCode::Char(' ')),
         ("insert", KeyCode::Insert),
+        ("delete", KeyCode::Delete),
         ("esc", KeyCode::Esc),
     ];
     NAMED_KEYS
@@ -218,6 +219,8 @@ const DEFAULT_BINDINGS: &[(&str, Action)] = &[
     ("Shift+F7", CreateFile),
     ("Alt+n", CreateFile),
     ("F8", Trash),
+    ("Delete", Trash),
+    ("Shift+Delete", Delete),
     ("Alt+c", Copy),
     ("Alt+x", Move),
     ("Alt+t", Trash),

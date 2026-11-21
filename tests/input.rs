@@ -129,7 +129,10 @@ fn floating_metadata_close_keys_preserve_sidebar_and_modal_focus() {
                     assert_eq!(c.app.panes[0].cursor, cursor);
                     assert!(c.app.panes[0].marks.is_empty());
                     assert!(c.app.operations.dialog.is_none());
-                    assert!(c.app.operations.outbox.is_empty());
+                    assert!(!c.app.operations.outbox.iter().any(|intent| matches!(
+                        intent,
+                        terminal_file_manager::operations::Intent::Submit { .. }
+                    )));
                 }
                 key(&mut c, close);
                 assert!(!c.app.popup, "{preference:?}: {close}");
@@ -517,4 +520,39 @@ fn filter_profile_and_view_routing_keep_precedence_and_key_kinds() {
     raw_key(&mut c, KeyCode::Enter, KeyModifiers::NONE, Press);
     assert!(c.preferences_changed);
     assert!(!c.app.panes[0].human_sizes);
+}
+
+#[test]
+fn delete_aliases_preserve_existing_operation_planning() {
+    use terminal_file_manager::{input::Action, operations::Operation};
+    for (alias, fallback, action, operation) in [
+        ("Delete", "F8", Action::Trash, Operation::Trash),
+        (
+            "Shift+Delete",
+            "Shift+F8",
+            Action::Delete,
+            Operation::Delete,
+        ),
+    ] {
+        let (_root, mut c) = controller();
+        let bindings = Bindings::new(&Default::default()).unwrap();
+        for chord in [alias, fallback] {
+            let (code, modifiers) = terminal_file_manager::input::chord(chord).unwrap();
+            assert_eq!(
+                bindings.action(KeyEvent::new(code, modifiers)),
+                Some(action)
+            );
+        }
+        key(&mut c, alias);
+        let terminal_file_manager::operations::Dialog::Operation(dialog) =
+            c.app.operations.dialog.as_ref().unwrap()
+        else {
+            panic!("operation dialog")
+        };
+        assert_eq!(dialog.plan.operation, operation);
+        assert!(!c.app.operations.outbox.iter().any(|intent| matches!(
+            intent,
+            terminal_file_manager::operations::Intent::Submit { .. }
+        )));
+    }
 }
