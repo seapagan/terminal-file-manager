@@ -31,6 +31,37 @@ fn key(c: &mut Controller, text: &str) {
     );
 }
 
+#[test]
+fn oversized_search_paste_atomically_preserves_query_cursor_and_overwrite_mode() {
+    let mut c = controller();
+    for input in ["?", "/", "a", "b", "界", "Home", "Right", "Insert"] {
+        key(&mut c, input);
+    }
+    c.app.help_picker.as_mut().unwrap().selected = 2;
+    let status = c.app.status.to_string();
+    for paste in ["é".repeat(2049), "x".repeat(4096)] {
+        let g = ui::geometry(&c.app, Rect::new(0, 0, 120, 32));
+        assert!(c.handle(Event::Paste(paste), &g, Duration::ZERO).is_empty());
+        let state = c.app.help_picker.as_ref().unwrap();
+        assert_eq!(state.query, "ab界");
+        assert_eq!(state.editor.position(&state.query), 1);
+        assert!(state.editor.overwrite);
+        assert_eq!(state.selected, 2);
+        assert_eq!(c.app.status.to_string(), status);
+    }
+    key(&mut c, "Z");
+    assert_eq!(c.app.help_picker.as_ref().unwrap().query, "aZ界");
+    key(&mut c, "Esc");
+    key(&mut c, "/");
+    let g = ui::geometry(&c.app, Rect::new(0, 0, 120, 32));
+    c.handle(Event::Paste("x".repeat(4096)), &g, Duration::ZERO);
+    let state = c.app.help_picker.as_ref().unwrap();
+    assert_eq!(state.query.len(), 4096);
+    assert_eq!(state.editor.position(&state.query), 4096);
+    key(&mut c, "y");
+    assert_eq!(c.app.help_picker.as_ref().unwrap().query.len(), 4096);
+}
+
 fn draw(c: &Controller, width: u16, height: u16) -> String {
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
     terminal
