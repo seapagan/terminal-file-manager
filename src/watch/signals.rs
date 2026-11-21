@@ -57,6 +57,7 @@ impl Hints {
     }
 }
 impl Signals {
+    #[cfg(any(test, target_os = "linux", target_os = "macos"))]
     pub fn children(&self, paths: impl IntoIterator<Item = std::path::PathBuf>) {
         let mut hints = self.hints.lock().unwrap_or_else(|e| e.into_inner());
         for path in paths {
