@@ -110,6 +110,9 @@ resolving the error.
 | F9 / Alt+j | Jobs, progress and results |
 | `y` | Copy names or paths to the clipboard |
 
+An active filter appears as **FILTER:** in the pane policy row; an empty
+filtered view shows **No matches**.
+
 Filters clear after successful navigation to another folder. Enable
 `keep_filter_on_navigation = true` in TOML or **Keep filter on navigation**
 in View Options (`V`) to retain them. Refreshes and failed navigation keep filters.

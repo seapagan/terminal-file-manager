@@ -24,7 +24,16 @@ pub(super) fn line(pane: &Pane, width: u16, theme: &Theme) -> Line<'static> {
         segments.push(field("Reverse", "On".into(), theme));
     }
     if !pane.filter.is_empty() {
-        segments.push(field("Filter", super::clean(&pane.filter), theme));
+        let text = format!("FILTER: {}", super::clean(&pane.filter));
+        segments.insert(
+            0,
+            Line::from(Span::styled(
+                super::modal::truncate(&text, width),
+                theme
+                    .style(Role::Warning)
+                    .add_modifier(ratatui::style::Modifier::BOLD),
+            )),
+        );
     }
     segments.extend([
         field("Group", format!("{:?}", pane.sort.grouping), theme),
@@ -47,4 +56,31 @@ pub(super) fn line(pane: &Pane, width: u16, theme: &Theme) -> Line<'static> {
         line.spans.extend(segment.spans);
     }
     line
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn active_filter_precedes_decorations_and_survives_narrow_monochrome() {
+        let mut app = crate::app::App::new("owned".into());
+        let pane = &mut app.panes[0];
+        pane.set_filter("a-long-expression".into());
+        for level in [
+            colored_text::ColorLevel::NoColor,
+            colored_text::ColorLevel::TrueColor,
+        ] {
+            for width in [12, 24, 80] {
+                let line = line(&pane, width, &Theme::new(level));
+                assert!(line.to_string().starts_with("FILTER:"));
+                assert!(line.width() <= usize::from(width));
+                assert!(
+                    line.spans[0]
+                        .style
+                        .add_modifier
+                        .contains(ratatui::style::Modifier::BOLD)
+                );
+            }
+        }
+    }
 }

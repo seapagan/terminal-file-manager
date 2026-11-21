@@ -160,6 +160,8 @@ fn render_empty(frame: &mut Frame, pane: &Pane, area: Rect) {
     frame.render_widget(
         Paragraph::new(if pane.pending.is_some() {
             "Loading directory…"
+        } else if !pane.filter.is_empty() {
+            "No matches — FILTER active"
         } else {
             "No visible entries"
         }),

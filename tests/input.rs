@@ -553,3 +553,29 @@ fn delete_aliases_preserve_existing_operation_planning() {
         )));
     }
 }
+
+#[test]
+fn empty_filtered_pane_explains_no_matches_without_extra_status_rows() {
+    let (_root, mut c) = controller();
+    c.app.panes[0].set_filter("missing".into());
+    let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(40, 16)).unwrap();
+    terminal
+        .draw(|frame| {
+            ui::render(
+                frame,
+                &c.app,
+                &terminal_file_manager::color::Theme::new(colored_text::ColorLevel::NoColor),
+            );
+        })
+        .unwrap();
+    let text: String = terminal
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect();
+    assert!(text.contains("FILTER: missing"));
+    assert!(text.contains("No matches"));
+    assert!(!text.contains("No visible entries"));
+}
