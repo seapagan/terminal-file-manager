@@ -55,7 +55,7 @@ fn filtered_listing_keeps_parent_row_above_empty_and_loading_feedback() {
     c.app.panes[0].set_filter("absent".into());
     assert_eq!(c.app.panes[0].entries.len(), 1);
     assert!(c.app.panes[0].visible.is_empty());
-    assert_empty_feedback(&c.app, "No visible entries");
+    assert_empty_feedback(&c.app, "No matches — FILTER active");
     c.app.request_listing(0, root.path().into());
     assert_empty_feedback(&c.app, "Loading directory…");
 }
@@ -87,7 +87,8 @@ fn assert_empty_feedback(app: &App, message: &str) {
         if height == 9 {
             assert_eq!(row(3).trim(), "0 items", "Summary must remain unobscured");
         } else {
-            assert_eq!(row(3).trim(), message, "{width}x{height}");
+            let expected: String = message.chars().take(usize::from(width - 2)).collect();
+            assert_eq!(row(3).trim(), expected, "{width}x{height}");
         }
     }
 }
