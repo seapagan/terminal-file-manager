@@ -87,10 +87,38 @@ fn assert_empty_feedback(app: &App, message: &str) {
         if height == 9 {
             assert_eq!(row(3).trim(), "0 items", "Summary must remain unobscured");
         } else {
-            let expected: String = message.chars().take(usize::from(width - 2)).collect();
+            let expected = clipped_cells(message, width - 2);
             assert_eq!(row(3).trim(), expected, "{width}x{height}");
         }
     }
+}
+
+fn clipped_cells(text: &str, cells: u16) -> String {
+    let mut used = 0;
+    ratatui::text::Line::raw(text)
+        .styled_graphemes(ratatui::style::Style::default())
+        .take_while(|grapheme| {
+            used += ui::modal::width(grapheme.symbol);
+            used <= cells
+        })
+        .map(|grapheme| grapheme.symbol)
+        .collect()
+}
+
+#[test]
+fn empty_feedback_clipping_keeps_wide_and_combining_graphemes_in_display_cells() {
+    let text = "界e\u{301}界";
+    assert_eq!(clipped_cells(text, 1), "");
+    assert_eq!(clipped_cells(text, 2), "界");
+    assert_eq!(clipped_cells(text, 3), "界e\u{301}");
+    let mut terminal = Terminal::new(TestBackend::new(3, 1)).unwrap();
+    terminal
+        .draw(|f| {
+            f.render_widget(ratatui::widgets::Paragraph::new(text), f.area());
+        })
+        .unwrap();
+    assert_eq!(terminal.backend().buffer()[(0, 0)].symbol(), "界");
+    assert_eq!(terminal.backend().buffer()[(2, 0)].symbol(), "e\u{301}");
 }
 
 fn mouse(

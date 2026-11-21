@@ -116,7 +116,7 @@ changes.** Reopen an unavailable or replaced directory after resolving the error
 ### Filters and pane options
 
 An active filter appears as **FILTER:** at the bottom of the pane. A filtered
-listing with no matches shows **No matches**.
+listing with no matches shows **No matches — FILTER active**.
 
 TFM clears the pane's filter after you enter another folder. To keep filters as
 you browse, set `keep_filter_on_navigation = true` in `config.toml` or select
