@@ -51,6 +51,9 @@ pub enum Event {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum Outcome {
     Completed,
+    /// Windows Shell completed permanent deletion under its explicit warning policy.
+    #[cfg(any(windows, test))]
+    PermanentlyDeleted,
     Skipped,
     Failed,
     Changed,
@@ -59,6 +62,16 @@ pub enum Outcome {
     OutcomeUnknown,
     /// Native OS reported permanent deletion during a recoverable Trash request.
     SafetyIncident,
+}
+
+impl Outcome {
+    pub(crate) fn successful(self) -> bool {
+        #[cfg(any(windows, test))]
+        if self == Self::PermanentlyDeleted {
+            return true;
+        }
+        self == Self::Completed
+    }
 }
 
 /// One actual recursive entry outcome; partial directories are never completed.
@@ -96,7 +109,8 @@ impl Record {
         let mut groups = Vec::<(Outcome, &str, usize)>::new();
         let mut positions = std::collections::HashMap::new();
         for entry in &self.entries {
-            if matches!(entry.outcome, Outcome::Completed | Outcome::Skipped)
+            if entry.outcome.successful()
+                || entry.outcome == Outcome::Skipped
                 || entry.detail.is_empty()
             {
                 continue;

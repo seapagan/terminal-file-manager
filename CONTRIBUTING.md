@@ -284,8 +284,9 @@ requires **Yes** in the permanent-deletion warning. Never automate these answers
 For the warning tests, set `TFM_WINDOWS_TRASH_TEST_BYTES` above the existing
 volume's Recycle Bin limit, up to 64 GiB. They create a sparse file and an owned
 hard-link recovery anchor; do not change Windows settings or fill the bin.
-The approval test expects conservative incident reporting because the native
-completion callback does not prove that a human approved permanent deletion.
+The approval test expects successful irreversible deletion with no recycle
+receipt. TFM trusts Windows to enforce the permanent-deletion warning; its
+callback does not independently prove consent. Unverified completion remains critical.
 
 The executable ConPTY approval test runs on hosted Windows or with
 `TFM_WINDOWS_TRASH_NATIVE=owned-fixtures`. It leaves one owned recoverable fixture

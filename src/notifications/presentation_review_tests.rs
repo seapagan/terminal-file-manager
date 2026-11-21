@@ -75,6 +75,48 @@ fn permissions_and_destructive_success_keep_source_scope() {
 }
 
 #[test]
+#[cfg(windows)]
+fn permanent_trash_success_is_distinct_and_never_retried() {
+    use crate::operations::Decision;
+    let (_root, mut job) = completed(Operation::Trash, 2);
+    let mut record =
+        crate::operations::execute(&job.plan, Options::default(), &true.into(), |_| {
+            Decision::Skip
+        });
+    record.entries[0].outcome = Outcome::PermanentlyDeleted;
+    record.entries[1].outcome = Outcome::Completed;
+    job.finish(record.clone(), SystemTime::UNIX_EPOCH);
+    assert_eq!(job.state, JobState::Completed);
+    assert!(!job.can_retry());
+    assert!(!job.can_reconcile());
+    assert!(!record.unresolved());
+    assert!(!record.incident());
+    assert!(record.failure_groups().is_empty());
+    assert_eq!(job.presentation().all_completed, None);
+    let notice = Presentation::job(&job);
+    assert_eq!(notice.title, "Success");
+    assert!(
+        notice.message.contains("1 entry trashed"),
+        "{}",
+        notice.message
+    );
+    assert!(
+        notice
+            .message
+            .contains("1 permanently deleted (irreversible)")
+    );
+    record.entries[1].outcome = Outcome::Failed;
+    job.finish(record.clone(), SystemTime::UNIX_EPOCH);
+    assert_eq!(job.state, JobState::Partial);
+    let retry = job.plan.retry(&record).unwrap();
+    assert_eq!(retry.operands.len(), 1);
+    assert_eq!(retry.operands[0].path, record.entries[1].source);
+    record.entries[1].outcome = Outcome::PermanentlyDeleted;
+    job.finish(record, SystemTime::UNIX_EPOCH);
+    assert!(!Presentation::job(&job).message.contains("sent to Trash"));
+}
+
+#[test]
 fn diagnostic_rewriting_preserves_error_meaning() {
     for (detail, expected) in [
         ("Is a directory (os error 21)", "Is a directory"),

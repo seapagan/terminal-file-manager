@@ -439,7 +439,19 @@ fn recycle(
         stage: Stage::Removing,
         bytes: 0,
     });
+    #[cfg(not(windows))]
     let receipt = super::trash::put(source, cancel, approval)?;
+    #[cfg(windows)]
+    let receipt = match super::trash::put(source, cancel)? {
+        Some(receipt) => receipt,
+        None => {
+            result.outcome = Outcome::PermanentlyDeleted;
+            result.created_directory = false;
+            result.detail =
+                "Permanently deleted by Windows Shell; irreversible, no recovery receipt".into();
+            return Ok(());
+        }
+    };
     result.destination = receipt.path().map(std::path::Path::to_owned);
     result.detail = format!(
         "{}; validated before move: {files} files, {directories} directories",

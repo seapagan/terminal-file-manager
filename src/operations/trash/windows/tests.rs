@@ -17,7 +17,14 @@ fn callback_refusal_preserves_known_failure_classification_only_with_retained_id
                 detail: "known pre-delete failure".into(),
             }),
         };
-        let error = finish(&entry, &observed, Ok(()), Ok(true)).unwrap_err();
+        let error = finish(
+            &entry,
+            &Parents::capture(&entry.path).unwrap(),
+            &observed,
+            Ok(()),
+            Ok(true),
+        )
+        .unwrap_err();
         assert_eq!(error.outcome, outcome);
         assert_eq!(error.detail, "known pre-delete failure");
     }
@@ -31,9 +38,15 @@ fn callback_refusal_preserves_known_failure_classification_only_with_retained_id
         }),
     };
     assert_eq!(
-        finish(&entry, &observed, Ok(()), Ok(true))
-            .unwrap_err()
-            .outcome,
+        finish(
+            &entry,
+            &Parents::capture(&entry.path).unwrap(),
+            &observed,
+            Ok(()),
+            Ok(true)
+        )
+        .unwrap_err()
+        .outcome,
         Outcome::OutcomeUnknown
     );
     assert_eq!(fs::read(path).unwrap(), b"foreign replacement");
@@ -57,7 +70,14 @@ fn a_refusal_never_masks_a_native_permanent_deletion_acknowledgement() {
             detail: "known refusal".into(),
         }),
     };
-    let error = finish(&crate::fs::inspect(&path), &observed, Ok(()), Ok(false)).unwrap_err();
+    let error = finish(
+        &crate::fs::inspect(&path),
+        &Parents::capture(&path).unwrap(),
+        &observed,
+        Ok(()),
+        Ok(false),
+    )
+    .unwrap_err();
     assert_eq!(error.outcome, Outcome::SafetyIncident);
     assert_eq!(fs::read(path).unwrap(), b"owned fixture");
 }
@@ -71,6 +91,47 @@ fn fixture() -> Option<tempfile::TempDir> {
 }
 
 #[test]
+fn completed_deletion_requires_absent_source_and_original_parents() {
+    let root = tempfile::tempdir().unwrap();
+    let parent = root.path().join("parent");
+    fs::create_dir(&parent).unwrap();
+    let path = parent.join("selected");
+    fs::write(&path, b"owned fixture").unwrap();
+    let entry = crate::fs::inspect(&path);
+    let parents = Parents::capture(&path).unwrap();
+    let observed = Observed {
+        callbacks: vec![Acknowledgement {
+            status: 0x0027_0008,
+            recycled: false,
+            metadata: Default::default(),
+            error: None,
+            parsing_name: None,
+        }],
+        refused: None,
+    };
+    assert_eq!(
+        finish(&entry, &parents, &observed, Ok(()), Ok(false))
+            .unwrap_err()
+            .outcome,
+        Outcome::SafetyIncident
+    );
+    fs::remove_file(&path).unwrap();
+    assert!(
+        finish(&entry, &parents, &observed, Ok(()), Ok(false))
+            .unwrap()
+            .is_none()
+    );
+    fs::rename(&parent, root.path().join("original-parent")).unwrap();
+    fs::create_dir(&parent).unwrap();
+    assert_eq!(
+        finish(&entry, &parents, &observed, Ok(()), Ok(false))
+            .unwrap_err()
+            .outcome,
+        Outcome::SafetyIncident
+    );
+}
+
+#[test]
 fn native_shell_restores_the_owned_recursive_tree() {
     let Some(root) = fixture() else {
         return;
@@ -78,7 +139,9 @@ fn native_shell_restores_the_owned_recursive_tree() {
     let source = root.path().join("selected");
     fs::create_dir_all(source.join("nested")).unwrap();
     fs::write(source.join("nested/file"), "native recoverable fixture").unwrap();
-    let receipt = put(&crate::fs::inspect(&source), &false.into()).unwrap();
+    let receipt = put(&crate::fs::inspect(&source), &false.into())
+        .unwrap()
+        .expect("recycling receipt required");
     assert!(!source.exists());
     assert!(receipt.path().is_none());
     restore(&receipt, &source);
@@ -98,7 +161,9 @@ fn native_shell_recycles_the_link_object_without_touching_its_target() {
     fs::write(&target, "sentinel").unwrap();
     std::os::windows::fs::symlink_file(&target, &source).unwrap();
     let entry = crate::fs::inspect(&source);
-    let receipt = put(&entry, &false.into()).unwrap();
+    let receipt = put(&entry, &false.into())
+        .unwrap()
+        .expect("recycling receipt required");
     assert!(fs::symlink_metadata(&source).is_err());
     assert_eq!(fs::read(&target).unwrap(), b"sentinel");
     restore(&receipt, &source);
@@ -113,7 +178,9 @@ fn native_shell_restores_an_ordinary_file_and_preserves_a_junction_target() {
     };
     let file = root.path().join("ordinary-雪");
     fs::write(&file, "file fixture").unwrap();
-    let receipt = put(&crate::fs::inspect(&file), &false.into()).unwrap();
+    let receipt = put(&crate::fs::inspect(&file), &false.into())
+        .unwrap()
+        .expect("recycling receipt required");
     assert!(!file.exists());
     restore(&receipt, &file);
     assert_eq!(fs::read(&file).unwrap(), b"file fixture");
@@ -130,7 +197,9 @@ fn native_shell_restores_an_ordinary_file_and_preserves_a_junction_target() {
     assert!(created.status.success());
     let entry = crate::fs::inspect(&junction);
     assert_eq!(entry.kind, EntryKind::Junction);
-    let receipt = put(&entry, &false.into()).unwrap();
+    let receipt = put(&entry, &false.into())
+        .unwrap()
+        .expect("recycling receipt required");
     assert!(fs::symlink_metadata(&junction).is_err());
     restore(&receipt, &junction);
     assert_eq!(crate::fs::inspect(&junction).kind, EntryKind::Junction);

@@ -160,6 +160,42 @@ fn jobs_app() -> App {
     app
 }
 
+#[cfg(windows)]
+#[test]
+fn jobs_render_irreversible_success_without_a_critical_incident() {
+    use crate::operations::{Decision, Options, Outcome};
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("selected");
+    std::fs::write(&source, b"owned fixture").unwrap();
+    let plan = Plan::paths(Operation::Trash, vec![source], None).unwrap();
+    let mut record =
+        crate::operations::execute(&plan, Options::default(), &true.into(), |_| Decision::Skip);
+    record.entries[0].outcome = Outcome::PermanentlyDeleted;
+    let mut app = jobs_app();
+    app.operations.history.truncate(1);
+    app.operations.history[0].plan = plan;
+    app.operations.history[0].finish(record, app.now);
+    for evidence in [false, true] {
+        app.operations.jobs_evidence = evidence;
+        let mut terminal = Terminal::new(TestBackend::new(140, 40)).unwrap();
+        terminal
+            .draw(|frame| {
+                crate::ui::render(frame, &app, &Theme::new(colored_text::ColorLevel::NoColor));
+            })
+            .unwrap();
+        let text = terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(text.contains("irreversible"), "{text}");
+        assert!(!text.contains("CRITICAL"));
+        assert!(!text.contains("sent to Trash"));
+    }
+}
+
 fn assert_jobs_regions(first: &Layout, next: &Layout) {
     assert_eq!(first.shell.outer, next.shell.outer);
     assert_eq!(first.list, next.list);

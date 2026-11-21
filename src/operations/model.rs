@@ -127,7 +127,10 @@ fn finished_state(record: &Record) -> JobState {
     if has(Outcome::CopiedSourceRetained) {
         return JobState::Partial;
     }
-    let completed = has(Outcome::Completed);
+    let completed = record
+        .entries
+        .iter()
+        .any(|entry| entry.outcome.successful());
     if has(Outcome::Failed) || has(Outcome::Changed) {
         return if completed {
             JobState::Partial
@@ -268,6 +271,11 @@ pub(crate) fn counts_summary(job: &Job) -> String {
         (Outcome::Cancelled, "cancelled"),
         (Outcome::CopiedSourceRetained, "source retained"),
         (Outcome::OutcomeUnknown, "unknown"),
+        #[cfg(any(windows, test))]
+        (
+            Outcome::PermanentlyDeleted,
+            "permanently deleted (irreversible)",
+        ),
     ] {
         let count = record
             .entries

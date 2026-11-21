@@ -135,15 +135,14 @@ fn manual_windows_trash_permanent_refusal_retains_identity_and_payload() {
 
 #[test]
 #[ignore = "manual Windows permanent-delete warning: announce first, then choose Yes; owned anchor preserves payload"]
-fn manual_windows_trash_permanent_approval_keeps_conservative_incident_reporting() {
+fn manual_windows_trash_permanent_approval_reports_irreversible_success() {
     let (root, source, before) = oversized_fixture("tfm-choose-YES.bin");
     eprintln!("Choose YES in the Windows warning for {}", source.display());
     let record = execute(&plan(&source), false);
     assert_eq!(record.entries.len(), 1);
-    // The human's test decision is known here, but Shell supplies no consent receipt.
     assert_eq!(
         record.entries[0].outcome,
-        Outcome::SafetyIncident,
+        Outcome::PermanentlyDeleted,
         "{record:?}"
     );
     assert!(record.entries[0].trash.is_none());
@@ -154,5 +153,5 @@ fn manual_windows_trash_permanent_approval_keeps_conservative_incident_reporting
     );
     assert_eq!(object(&root.path().join("recovery-anchor")), before);
     assert_payload(&root.path().join("recovery-anchor"));
-    eprintln!("NATIVE_TRASH_YES_INCIDENT: preserved anchor {before:?}");
+    eprintln!("NATIVE_TRASH_YES_IRREVERSIBLE: preserved anchor {before:?}");
 }

@@ -166,6 +166,8 @@ fn operand_status(job: &Job, result: Option<Outcome>) -> (&'static str, Role) {
     }
     match result {
         Some(Outcome::Completed) => ("Done", Role::Status),
+        #[cfg(any(windows, test))]
+        Some(Outcome::PermanentlyDeleted) => ("Deleted", Role::Status),
         Some(Outcome::Failed) => ("Failed", Role::Error),
         Some(Outcome::SafetyIncident) => ("CRITICAL", Role::Error),
         Some(Outcome::Changed) => ("Changed", Role::Warning),

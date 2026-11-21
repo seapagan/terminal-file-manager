@@ -18,17 +18,29 @@ pub(super) fn classify(
     aborted: Option<bool>,
     callbacks: &[Acknowledgement],
     retained: bool,
-) -> Result<Receipt> {
+    absent: bool,
+) -> Result<Option<Receipt>> {
+    // The configured Shell warning owns consent. Only verified completion may
+    // become irreversible success; missing/contradictory evidence stays critical.
+    if let [ack] = callbacks
+        && performed
+        && aborted == Some(false)
+        && absent
+        && !retained
+        && permanent_acknowledged(ack)
+    {
+        return Ok(None);
+    }
     if permanent_deletion(callbacks) {
         return Err(Failure { outcome: Outcome::SafetyIncident,
             detail: "CRITICAL SAFETY INCIDENT: Windows reported permanent deletion during F8 Trash; stop and report this native integration failure".into() });
     }
     if let [ack] = callbacks {
         if performed && aborted == Some(false) && recycle_acknowledged(ack) && !retained {
-            return Ok(Receipt::Windows {
+            return Ok(Some(Receipt::Windows {
                 parsing_name: ack.parsing_name.clone(),
                 metadata: ack.metadata.clone(),
-            });
+            }));
         }
         if let Some(failure) = retained_refusal(ack, retained) {
             return Err(failure);
@@ -85,9 +97,16 @@ fn recycle_acknowledged(ack: &Acknowledgement) -> bool {
     ack.status >= 0 && ack.recycled && !control
 }
 
+fn permanent_acknowledged(ack: &Acknowledgement) -> bool {
+    matches!(ack.status, 0 | 0x0027_0008)
+        && !ack.recycled
+        && ack.parsing_name.is_none()
+        && ack.error.is_none()
+}
+
 fn permanent_deletion(callbacks: &[Acknowledgement]) -> bool {
     // COPYENGINE_S_DONT_PROCESS_CHILDREN also completes an atomic native delete.
-    // Neither status proves that a human approved the Shell's permanent-delete warning.
+    // These statuses without a receipt require verified completion above.
     callbacks
         .iter()
         .any(|ack| matches!(ack.status, 0 | 0x0027_0008) && !ack.recycled)
@@ -119,13 +138,13 @@ mod tests {
                     Outcome::OutcomeUnknown
                 };
                 assert_eq!(
-                    classify(true, aborted, &[ignored.clone()], true)
+                    classify(true, aborted, &[ignored.clone()], true, false)
                         .unwrap_err()
                         .outcome,
                     expected
                 );
                 assert_eq!(
-                    classify(true, aborted, &[ignored.clone()], false)
+                    classify(true, aborted, &[ignored.clone()], false, false)
                         .unwrap_err()
                         .outcome,
                     Outcome::OutcomeUnknown
@@ -136,23 +155,37 @@ mod tests {
 
     #[test]
     fn callback_not_optional_properties_proves_recycling() {
-        let receipt = classify(true, Some(false), &[ack(true, true)], false).unwrap();
+        let receipt = classify(true, Some(false), &[ack(true, true)], false, false).unwrap();
         assert!(matches!(
             receipt,
-            Receipt::Windows {
+            Some(Receipt::Windows {
                 parsing_name: None,
                 ..
-            }
+            })
         ));
-        assert!(receipt.path().is_none());
+        assert!(receipt.unwrap().path().is_none());
     }
 
     #[test]
-    fn permanent_deletion_is_critical_even_with_abort_or_rpc_failure() {
+    fn verified_completed_permanent_deletion_is_successful_without_a_receipt() {
+        for status in [0, 0x0027_0008] {
+            let mut deleted = ack(true, false);
+            deleted.status = status;
+            deleted.error = None;
+            assert!(
+                classify(true, Some(false), &[deleted], false, true)
+                    .unwrap()
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
+    fn unverified_permanent_deletion_is_critical_even_with_abort_or_rpc_failure() {
         for performed in [true, false] {
             for aborted in [Some(false), Some(true), None] {
                 assert_eq!(
-                    classify(performed, aborted, &[ack(true, false)], false)
+                    classify(performed, aborted, &[ack(true, false)], false, false)
                         .unwrap_err()
                         .outcome,
                     Outcome::SafetyIncident
@@ -162,14 +195,14 @@ mod tests {
     }
 
     #[test]
-    fn completed_nonzero_deletion_without_a_receipt_is_critical() {
+    fn unverified_nonzero_deletion_without_a_receipt_is_critical() {
         let mut deleted = ack(true, false);
         deleted.status = 0x0027_0008;
         for retained in [true, false] {
             for performed in [true, false] {
                 for aborted in [Some(false), Some(true), None] {
                     assert_eq!(
-                        classify(performed, aborted, &[deleted.clone()], retained)
+                        classify(performed, aborted, &[deleted.clone()], retained, false)
                             .unwrap_err()
                             .outcome,
                         Outcome::SafetyIncident
@@ -180,19 +213,62 @@ mod tests {
     }
 
     #[test]
+    fn permanent_success_requires_uncontradicted_terminal_evidence() {
+        let mut deleted = ack(true, false);
+        deleted.error = None;
+        for status in [0, 0x0027_0008] {
+            deleted.status = status;
+            for (performed, aborted, retained, absent) in [
+                (false, Some(false), false, true),
+                (true, Some(true), false, true),
+                (true, None, false, true),
+                (true, Some(false), true, true),
+                (true, Some(false), false, false),
+            ] {
+                assert_eq!(
+                    classify(performed, aborted, &[deleted.clone()], retained, absent)
+                        .unwrap_err()
+                        .outcome,
+                    Outcome::SafetyIncident
+                );
+            }
+            assert_eq!(
+                classify(
+                    true,
+                    Some(false),
+                    &[deleted.clone(), deleted.clone()],
+                    false,
+                    true
+                )
+                .unwrap_err()
+                .outcome,
+                Outcome::SafetyIncident
+            );
+            let mut contradictory = deleted.clone();
+            contradictory.parsing_name = Some(vec![1]);
+            assert_eq!(
+                classify(true, Some(false), &[contradictory], false, true)
+                    .unwrap_err()
+                    .outcome,
+                Outcome::SafetyIncident
+            );
+        }
+    }
+
+    #[test]
     fn native_user_cancellation_requires_the_original_source_identity() {
         let mut cancelled = ack(false, false);
         cancelled.status = 0x8027_0000_u32 as i32;
         for performed in [true, false] {
             for aborted in [Some(false), Some(true), None] {
                 assert_eq!(
-                    classify(performed, aborted, &[cancelled.clone()], true)
+                    classify(performed, aborted, &[cancelled.clone()], true, false)
                         .unwrap_err()
                         .outcome,
                     Outcome::Cancelled
                 );
                 assert_eq!(
-                    classify(performed, aborted, &[cancelled.clone()], false)
+                    classify(performed, aborted, &[cancelled.clone()], false, false)
                         .unwrap_err()
                         .outcome,
                     Outcome::OutcomeUnknown
@@ -209,7 +285,7 @@ mod tests {
             for performed in [true, false] {
                 for aborted in [Some(false), Some(true), None] {
                     assert_eq!(
-                        classify(performed, aborted, &[cancelled.clone()], retained)
+                        classify(performed, aborted, &[cancelled.clone()], retained, false)
                             .unwrap_err()
                             .outcome,
                         Outcome::OutcomeUnknown
@@ -230,20 +306,20 @@ mod tests {
             (true, Some(false), vec![ack(false, false)]),
         ] {
             assert_eq!(
-                classify(performed, aborted, &callbacks, false)
+                classify(performed, aborted, &callbacks, false, false)
                     .unwrap_err()
                     .outcome,
                 Outcome::OutcomeUnknown
             );
         }
         assert_eq!(
-            classify(true, Some(false), &[ack(true, true)], true)
+            classify(true, Some(false), &[ack(true, true)], true, false)
                 .unwrap_err()
                 .outcome,
             Outcome::OutcomeUnknown
         );
         assert_eq!(
-            classify(true, Some(false), &[ack(false, false)], true)
+            classify(true, Some(false), &[ack(false, false)], true, false)
                 .unwrap_err()
                 .outcome,
             Outcome::Failed
