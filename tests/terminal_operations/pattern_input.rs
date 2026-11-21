@@ -5,19 +5,36 @@ use super::*;
 fn pattern_selection_alt_b_paste_mark_and_cancel_work_in_native_terminal() {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("pattern-ready.txt"), "preserved").unwrap();
-    let transcript = drive(
-        command(root.path(), root.path(), None),
-        &[
-            ("pattern-ready.txt", "\x1bb"),
-            ("Pattern selection", "\x1b[200~*\x1b[201~"),
-            ("Matches: 1 / 1 selectable", "\r\r"),
-            ("[*]", "\x1bb"),
-            ("Pattern selection", "\x1bk\x1b[200~missing\x1b[201~\x1b"),
-            ("Pattern selection cancelled", "q"),
-        ],
-        true,
-    );
+    let mut session =
+        terminal_driver::Session::open(command(root.path(), root.path(), None)).unwrap();
+    let mut output = Vec::new();
+    let deadline = mark_after_fresh_readiness(&mut session, &mut output);
+    use std::io::Write;
+    session
+        .writer
+        .as_mut()
+        .unwrap()
+        .write_all(b"\x1bb")
+        .unwrap();
+    session
+        .drive(
+            &[
+                ("Pattern selection", "\x1bk\x1b[200~missing\x1b[201~\x1b"),
+                ("Pattern selection cancelled", "q"),
+            ],
+            deadline,
+            &mut output,
+            true,
+        )
+        .unwrap();
+    let transcript = String::from_utf8_lossy(&output);
     assert!(transcript.contains("[*]"));
+    assert!(transcript.contains("\x1b[?2004l"));
+    for (enabled, restored) in [("\x1b[?1006h", "\x1b[?1006l"), ("\x1b[>1u", "\x1b[<1u")] {
+        if transcript.contains(enabled) {
+            assert!(transcript.contains(restored));
+        }
+    }
     assert_eq!(
         fs::read_to_string(root.path().join("pattern-ready.txt")).unwrap(),
         "preserved"
@@ -82,4 +99,32 @@ fn pattern_overlong_native_input_requires_correction_before_apply() {
         fs::read(root.path().join("overlong-ready.txt")).unwrap(),
         b"preserved"
     );
+}
+
+fn mark_after_fresh_readiness(
+    session: &mut terminal_driver::Session,
+    output: &mut Vec<u8>,
+) -> std::time::Instant {
+    use std::time::{Duration, Instant};
+    let deadline = Instant::now() + Duration::from_secs(20);
+    let mut script = terminal_driver::Script::default();
+    let steps = [
+        ("pattern-ready.txt", "\x1bb"),
+        ("Pattern selection", "\x1b[200~*\x1b[201~"),
+        ("Matches: 1 / 1 selectable", "\r\r"),
+    ];
+    while !output.windows(3).any(|window| window == b"[*]") {
+        assert!(
+            Instant::now() < deadline,
+            "pattern mark timed out: {output:?}"
+        );
+        session
+            .read_step(Duration::from_millis(20), &mut script, &steps, output, true)
+            .unwrap();
+        // Registration refresh can reject apply; retry only on newly rendered readiness.
+        if script.step == steps.len() {
+            script.step -= 1;
+        }
+    }
+    deadline
 }
