@@ -123,8 +123,7 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, layout: &Picke
 
 fn render_query(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
     let state = app.help_picker.as_ref().expect("visible picker");
-    let label = modal::truncate(if area.width >= 10 { "Search: " } else { "/ " }, area.width);
-    let label_width = modal::width(&label);
+    let (label, label_width) = query_label(area.width);
     let (mut line, _) = crate::ui::text_input::edited(
         &state.query,
         &state.editor,
@@ -134,6 +133,12 @@ fn render_query(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
     line.spans
         .insert(0, Span::styled(label, theme.style(Role::Label)));
     frame.render_widget(Paragraph::new(line), area);
+}
+
+pub(super) fn query_label(width: u16) -> (String, u16) {
+    let label = modal::truncate(if width >= 10 { "Search: " } else { "/ " }, width);
+    let cells = modal::width(&label);
+    (label, cells)
 }
 
 fn render_hits(frame: &mut Frame, app: &App, theme: &Theme, layout: &PickerLayout) {

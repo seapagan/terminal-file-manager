@@ -151,7 +151,7 @@ fn narrow_results_keep_complete_nonoverlapping_regions_and_selected_rows_visible
 fn long_unicode_queries_keep_the_label_cursor_and_query_style_outside_results() {
     for width in [12, 20, 40, 80] {
         let bounds = Rect::new(0, 0, width, 24);
-        let c = controller(&"界e\u{301}".repeat(100));
+        let mut c = controller(&"界e\u{301}".repeat(100));
         let p = ui::geometry(&c.app, bounds).help.unwrap().picker.unwrap();
         let mut terminal = Terminal::new(TestBackend::new(width, 24)).unwrap();
         terminal
@@ -174,6 +174,28 @@ fn long_unicode_queries_keep_the_label_cursor_and_query_style_outside_results() 
                     .contains(ratatui::style::Modifier::REVERSED)
             );
         }
+        let state = c.app.help_picker.as_mut().unwrap();
+        state.editor.key(
+            &mut state.query,
+            KeyEvent::new(crossterm::event::KeyCode::Home, KeyModifiers::NONE),
+            4096,
+        );
+        terminal
+            .draw(|f| {
+                ui::render(f, &c.app, &Theme::new(ColorLevel::NoColor));
+            })
+            .unwrap();
+        let cursor = terminal.get_cursor_position().unwrap();
+        let label = if p.query.width >= 10 {
+            "Search: "
+        } else {
+            "/ "
+        };
+        assert_eq!(
+            cursor.x,
+            p.query.x + ratatui::text::Line::raw(label).width() as u16
+        );
+        assert_eq!(terminal.backend().buffer()[cursor].symbol(), "界");
     }
 }
 
