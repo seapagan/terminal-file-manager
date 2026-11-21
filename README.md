@@ -110,6 +110,9 @@ resolving the error.
 | F9 / Alt+j | Jobs, progress and results |
 | `y` | Copy names or paths to the clipboard |
 
+View Options (`V`) includes a Single/Dual pane choice for the running session.
+The `two_panes` setting continues to control the startup default.
+
 ## Working with files
 
 Operations use visible marks, or the highlighted entry when no visible marks

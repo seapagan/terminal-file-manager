@@ -278,3 +278,28 @@ fn hidden_menu_labels_follow_the_existing_toggle_and_preference() {
         key(&mut controller, "Space");
     }
 }
+
+#[test]
+fn view_menu_switches_live_layout_without_changing_startup_default() {
+    let mut c = Controller::new(
+        App::new(".".into()),
+        Bindings::new(&Default::default()).unwrap(),
+        Settings::default(),
+    );
+    let default = c.preferences.two_panes;
+    let paths = [c.app.panes[0].path.clone(), c.app.panes[1].path.clone()];
+    key(&mut c, "V");
+    for _ in 0..15 {
+        key(&mut c, "Down");
+    }
+    key(&mut c, "Enter");
+    assert!(c.app.dual);
+    assert_eq!(c.preferences.two_panes, default);
+    assert!(!c.preferences_changed);
+    assert_eq!(
+        [c.app.panes[0].path.clone(), c.app.panes[1].path.clone()],
+        paths
+    );
+    key(&mut c, "Enter");
+    assert!(!c.app.dual);
+}

@@ -24,6 +24,7 @@ pub(crate) const OPTIONS: &[(&str, Action)] = &[
     ("Owner display", Action::OwnerDisplay),
     #[cfg(not(windows))]
     ("Owner/group display", Action::OwnerDisplay),
+    ("Pane layout", Action::TogglePanes),
 ];
 
 pub(super) fn key(controller: &mut Controller, key: KeyEvent, geometry: &Geometry) {
@@ -128,6 +129,7 @@ pub(crate) fn rows(app: &App, preferred: MetadataPresentation) -> Vec<(String, S
         check(app.sidebar),
         format!("{preferred:?}"),
         format!("{:?}", pane.owner_display),
+        if app.dual { "Dual" } else { "Single" }.into(),
     ];
     OPTIONS
         .iter()
