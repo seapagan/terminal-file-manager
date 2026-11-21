@@ -1,4 +1,6 @@
 //! Mouse menus use policy geometry while keyboard policy shortcuts keep cycling.
+#[path = "policy_choices/direct.rs"]
+mod direct;
 #[path = "policy_choices/priority.rs"]
 mod priority;
 use crossterm::event::{Event, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};

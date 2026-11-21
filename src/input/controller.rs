@@ -260,8 +260,11 @@ impl Controller {
             }
             _ => {}
         }
-        pane.profile_modified = pane.profile.is_some();
-        pane.resort();
+        self.app.policy_changed();
+        self.capture_policy(action);
+    }
+
+    pub(super) fn capture_policy(&mut self, action: Action) {
         self.preferences.capture(&self.app, action);
         self.preferences_changed = true;
     }

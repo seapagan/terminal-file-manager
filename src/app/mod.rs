@@ -7,6 +7,7 @@ mod notifications;
 mod pane;
 pub use metadata::MetadataFormat;
 mod pattern;
+mod policy;
 mod refresh;
 mod selection;
 mod status;

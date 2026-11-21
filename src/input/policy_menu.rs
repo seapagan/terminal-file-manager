@@ -1,4 +1,4 @@
-//! Choice menus commit through the existing policy actions; keyboard cycling stays direct.
+//! Choice menus apply one policy value; keyboard shortcuts keep cycling.
 use super::{Action, Controller};
 use crate::{app::App, ui::Geometry};
 use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind};
@@ -164,10 +164,7 @@ fn commit(c: &mut Controller, g: &Geometry) {
         return;
     }
     c.app.active = menu.pane;
-    for _ in 0..choices(menu.action).len() {
-        if current(&c.app, menu.pane, menu.action) == menu.selected {
-            break;
-        }
-        c.dispatch(menu.action, g);
+    if c.app.select_policy(menu.action, menu.selected) {
+        c.capture_policy(menu.action);
     }
 }
