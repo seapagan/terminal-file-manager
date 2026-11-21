@@ -17,6 +17,7 @@ mod tests;
 pub enum HelpTopic {
     FullPath,
     Pattern,
+    Policy(crate::input::Action),
     View(ViewHelpTopic),
     Operation(Operation),
     Conflict,
@@ -72,7 +73,10 @@ impl HelpTopic {
                 ViewHelpTopic::Profiles
             }))
         } else {
-            None
+            app.policy_menu
+                .as_ref()
+                .filter(|_| !crate::input::policy_menu::preempted(app))
+                .map(|menu| Self::Policy(menu.action))
         }
     }
 
@@ -106,6 +110,7 @@ impl HelpTopic {
             Self::View(view) => view.title(),
             Self::Operation(operation) => operation_title(operation),
             Self::Pattern => "Pattern Help",
+            Self::Policy(action) => super::policy_text::title(action),
             Self::Conflict => "Conflict Help",
             Self::Jobs => "Jobs Help",
             Self::Metadata => "Metadata Help",

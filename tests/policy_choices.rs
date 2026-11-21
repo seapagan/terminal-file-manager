@@ -5,6 +5,8 @@ mod compact;
 mod dimensions;
 #[path = "policy_choices/direct.rs"]
 mod direct;
+#[path = "policy_choices/help.rs"]
+mod help;
 #[path = "policy_choices/priority.rs"]
 mod priority;
 use crossterm::event::{Event, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};

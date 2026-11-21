@@ -33,7 +33,7 @@ fn all_policy_popups_render_only_choice_rows_between_the_borders() {
         assert_eq!(layout.shell.outer.bottom(), anchor.y);
         assert_eq!(layout.shell.body.y, layout.shell.outer.y + 1);
         assert_eq!(layout.shell.body.bottom(), layout.shell.outer.bottom() - 1);
-        assert_plain_borders(terminal.backend().buffer(), layout.shell.outer);
+        assert_choice_borders(terminal.backend().buffer(), &layout.shell);
         assert_choice_rows(terminal.backend().buffer(), layout.shell.body, last);
         click(
             &mut c,
@@ -97,12 +97,15 @@ fn assert_choice_rows(buffer: &ratatui::buffer::Buffer, body: Rect, last: &str) 
     assert!(row.contains(last), "{row}");
 }
 
-fn assert_plain_borders(buffer: &ratatui::buffer::Buffer, outer: Rect) {
+fn assert_choice_borders(buffer: &ratatui::buffer::Buffer, shell: &ui::modal::Layout<()>) {
+    let outer = shell.outer;
     for (y, left, right) in [(outer.y, "┌", "┐"), (outer.bottom() - 1, "└", "┘")] {
         assert_eq!(buffer[(outer.x, y)].symbol(), left);
         assert_eq!(buffer[(outer.right() - 1, y)].symbol(), right);
         for x in outer.x + 1..outer.right() - 1 {
-            assert_eq!(buffer[(x, y)].symbol(), "─", "({x}, {y})");
+            if !shell.help.is_some_and(|help| help.contains((x, y).into())) {
+                assert_eq!(buffer[(x, y)].symbol(), "─", "({x}, {y})");
+            }
         }
     }
 }

@@ -38,6 +38,10 @@ fn operation_dialog_preempts_an_open_policy_menu_and_receives_cancel() {
     open_sort(&mut c, bounds);
     c.app.operations.dialog = Some(Dialog::Exit { save: false });
     assert_operation_visible(&c, "Active jobs — safe exit");
+    assert_eq!(
+        terminal_file_manager::input::HelpTopic::current(&c.app),
+        Some(terminal_file_manager::input::HelpTopic::Exit)
+    );
     key(&mut c, "Esc", bounds);
     assert!(c.app.operations.dialog.is_none());
     assert!(c.app.policy_menu.is_none());

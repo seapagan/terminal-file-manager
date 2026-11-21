@@ -41,6 +41,7 @@ pub(super) fn text(topic: HelpTopic, app: &App) -> Vec<HelpParagraph> {
         HelpTopic::View(view) => view_text(view),
         HelpTopic::Metadata => return metadata(app),
         HelpTopic::Pattern => (Action::PatternSelection, PATTERN),
+        HelpTopic::Policy(action) => (action, super::policy_text::text(action)),
         HelpTopic::Conflict => (Action::Jobs, CONFLICT),
         HelpTopic::Jobs => (Action::Jobs, JOBS),
         HelpTopic::Exit => (Action::Quit, EXIT),

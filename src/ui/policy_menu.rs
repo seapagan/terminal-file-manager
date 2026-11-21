@@ -52,7 +52,7 @@ pub(super) fn layout(app: &App, area: Rect, controls: &[PolicyControl]) -> Optio
     };
     let spec = super::modal::Spec {
         title: "",
-        help: false,
+        help: true,
         content_width: usize::from(content_width),
         pinned_rows: 0,
         footer_rows: 0,

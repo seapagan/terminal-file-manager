@@ -28,6 +28,13 @@ fn constrained_choice_geometry_stays_inside_offset_terminal_bounds() {
         let layout = layout(&app, bounds, &controls).unwrap();
         assert_eq!(layout.shell.outer.width, width.min(17));
         assert_eq!(layout.shell.outer.intersection(bounds), layout.shell.outer);
+        if let Some(help) = layout.shell.help {
+            assert!(width >= 5);
+            assert_eq!(help.intersection(layout.shell.outer), help);
+            assert_eq!(help.right(), layout.shell.outer.right() - 1);
+        } else {
+            assert!(width < 5);
+        }
         assert_eq!(layout.start + usize::from(layout.shell.body.height), 9);
     }
 }

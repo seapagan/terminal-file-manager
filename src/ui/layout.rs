@@ -128,6 +128,11 @@ pub fn geometry(app: &App, area: Rect) -> Geometry {
 
 fn finish_geometry(app: &App, area: Rect, geometry: &mut Geometry) {
     let bounds = super::overlay_bounds(app, area);
+    geometry.context_control = geometry
+        .policy_menu
+        .as_ref()
+        .and_then(|layout| layout.shell.help)
+        .or(geometry.context_control);
     scroll_limits(app, geometry, bounds);
     geometry.notification_history = super::notifications::history(app, bounds);
     geometry.status_segments = super::status::controls(app, geometry.status);

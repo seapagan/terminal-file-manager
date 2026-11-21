@@ -120,7 +120,9 @@ in View Options (`V`) to retain them. Refreshes and failed navigation keep filte
 
 Click **Sort**, **Group**, **Hidden** or **Ignore** in a pane's policy row to
 choose a value. Menus open above the control; use arrows and Enter, click a
-choice, or press Esc to cancel. Keyboard policy shortcuts continue cycling.
+choice, or press Esc to cancel. Press F1 or click `[?]` for an explanation of
+each option; Esc returns from Help to the same highlighted choice. Keyboard
+policy shortcuts continue cycling.
 
 View Options (`V`) includes a Single/Dual pane choice for the running session.
 The `two_panes` setting continues to control the startup default.
