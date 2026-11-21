@@ -16,18 +16,18 @@ fn pattern_selection_alt_b_paste_mark_and_cancel_work_in_native_terminal() {
         .unwrap()
         .write_all(b"\x1bb")
         .unwrap();
-    session
-        .drive(
-            &[
-                ("Pattern selection", "\x1bk\x1b[200~missing\x1b[201~\x1b"),
-                ("Pattern selection cancelled", "q"),
-            ],
-            deadline,
-            &mut output,
-            true,
-        )
-        .unwrap();
+    let result = session.drive(
+        &[
+            ("Pattern selection", "\x1bk\x1b[200~missing\x1b[201~"),
+            ("missing", "\x1b"),
+            ("Pattern selection cancelled", "q"),
+        ],
+        deadline,
+        &mut output,
+        false,
+    );
     let transcript = String::from_utf8_lossy(&output);
+    assert!(result.is_ok(), "{result:?}; transcript: {transcript:?}");
     assert!(transcript.contains("[*]"));
     assert!(transcript.contains("\x1b[?2004l"));
     for (enabled, restored) in [("\x1b[?1006h", "\x1b[?1006l"), ("\x1b[>1u", "\x1b[<1u")] {
