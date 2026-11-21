@@ -1,4 +1,6 @@
 //! View dialogs share measured title controls and retain their own input state.
+#[path = "views/select.rs"]
+mod select;
 use colored_text::ColorLevel;
 use crossterm::event::{Event, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::{Terminal, backend::TestBackend, buffer::Buffer, layout::Rect, style::Modifier};
@@ -216,9 +218,7 @@ fn short_menus_use_available_height_and_keep_last_selection_clickable() {
         let bounds = Rect::new(0, 0, 80, 10);
         key_at(&mut c, "End", bounds);
         if open == "V" {
-            for _ in 0..32 {
-                key_at(&mut c, "Down", bounds);
-            }
+            select::option(&mut c, "Keep filter on navigation");
         }
         let (buffer, g) = draw(&c, bounds, ColorLevel::NoColor);
         let shell = g.menu_layout.unwrap();
