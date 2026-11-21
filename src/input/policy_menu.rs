@@ -62,6 +62,9 @@ pub(super) fn open_at(
 }
 
 pub(super) fn open(c: &mut Controller, control: &crate::ui::PolicyControl) {
+    if preempted(&c.app) {
+        return;
+    }
     c.app.active = control.pane;
     c.app.sidebar = c.app.panes[control.pane].sidebar;
     c.app.policy_menu = Some(PolicyMenu {
@@ -73,6 +76,10 @@ pub(super) fn open(c: &mut Controller, control: &crate::ui::PolicyControl) {
 }
 
 pub(super) fn handle(c: &mut Controller, event: &Event, g: &Geometry) -> bool {
+    if preempted(&c.app) {
+        c.app.policy_menu = None;
+        return false;
+    }
     if c.app.policy_menu.is_none() {
         return false;
     }
@@ -89,6 +96,13 @@ pub(super) fn handle(c: &mut Controller, event: &Event, g: &Geometry) -> bool {
         commit(c, g);
     }
     true
+}
+
+pub(crate) fn preempted(app: &App) -> bool {
+    app.operations.dialog.is_some()
+        || !app.operations.conflicts.is_empty()
+        || app.operations.waiting_exit.is_some()
+        || app.operations.show_history
 }
 
 fn key_input(c: &mut Controller, key: crossterm::event::KeyEvent, g: &Geometry) -> bool {

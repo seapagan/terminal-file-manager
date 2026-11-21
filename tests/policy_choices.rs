@@ -1,4 +1,6 @@
 //! Mouse menus use policy geometry while keyboard policy shortcuts keep cycling.
+#[path = "policy_choices/priority.rs"]
+mod priority;
 use crossterm::event::{Event, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::{Terminal, backend::TestBackend, layout::Rect};
 use terminal_file_manager::{
