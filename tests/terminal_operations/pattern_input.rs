@@ -20,7 +20,8 @@ fn pattern_selection_alt_b_paste_mark_and_cancel_work_in_native_terminal() {
         &[
             ("Pattern selection", "\x1bk\x1b[200~missing\x1b[201~"),
             ("missing", "\x1b"),
-            ("Pattern selection cancelled", "q"),
+            // ConPTY may reuse unchanged cells earlier in the status phrase.
+            ("cancelled", "q"),
         ],
         deadline,
         &mut output,
