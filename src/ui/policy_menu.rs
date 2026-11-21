@@ -1,4 +1,6 @@
 //! Upward-anchored choice menus reuse the measured modal shell.
+#[cfg(test)]
+mod tests;
 use crate::{
     app::App,
     color::{Role, Theme},
@@ -34,7 +36,8 @@ pub(super) fn layout(app: &App, area: Rect, controls: &[PolicyControl]) -> Optio
         .find(|c| c.pane == menu.pane && c.action == menu.action)?
         .area;
     let choices = policy_menu::choices(menu.action);
-    let width = 24.min(area.width);
+    let content_width = choice_width(choices);
+    let width = content_width.saturating_add(4).min(area.width);
     let available = anchor.y.saturating_sub(area.y);
     let height = (choices.len() as u16 + 2).min(if available >= 3 {
         available
@@ -50,7 +53,7 @@ pub(super) fn layout(app: &App, area: Rect, controls: &[PolicyControl]) -> Optio
     let spec = super::modal::Spec {
         title: "",
         help: false,
-        content_width: 20,
+        content_width: usize::from(content_width),
         pinned_rows: 0,
         footer_rows: 0,
         actions: &[],
@@ -90,11 +93,23 @@ pub(super) fn render(frame: &mut Frame, app: &App, layout: &PolicyLayout, theme:
                 Role::Value
             });
             Line::from(Span::styled(
-                format!("{} {label}", if index == active { "[x]" } else { "[ ]" }),
+                choice_text(label, index == active),
                 style.add_modifier(Modifier::BOLD),
             ))
         })
         .collect();
     super::modal::render_measured(frame, &layout.shell, "", theme, Role::Header);
     frame.render_widget(Paragraph::new(rows), layout.shell.body);
+}
+
+fn choice_text(label: &str, active: bool) -> String {
+    format!("{} {label}", if active { "[x]" } else { "[ ]" })
+}
+
+fn choice_width(choices: &[&str]) -> u16 {
+    choices
+        .iter()
+        .map(|label| super::modal::width(&choice_text(label, false)))
+        .max()
+        .unwrap_or_default()
 }

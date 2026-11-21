@@ -1,6 +1,6 @@
 use super::*;
 
-fn open(c: &mut Controller, action: Action, bounds: Rect) -> Rect {
+pub(super) fn open(c: &mut Controller, action: Action, bounds: Rect) -> Rect {
     let g = ui::geometry(&c.app, bounds);
     let control = g
         .policy_controls
