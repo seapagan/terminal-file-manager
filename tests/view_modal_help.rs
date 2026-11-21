@@ -217,9 +217,8 @@ fn short_menus_use_available_height_and_keep_last_selection_clickable() {
         c.app.profile_names = (0..20).map(|i| format!("Profile {i:02}")).collect();
         let bounds = Rect::new(0, 0, 80, 10);
         key_at(&mut c, "End", bounds);
-        if open == "V" {
-            select::option(&mut c, "Keep filter on navigation");
-        }
+        let selected =
+            (open == "V").then(|| select::option(&mut c, "Keep filter on navigation", bounds));
         let (buffer, g) = draw(&c, bounds, ColorLevel::NoColor);
         let shell = g.menu_layout.unwrap();
         assert_eq!(shell.outer.height, 8);
@@ -228,7 +227,8 @@ fn short_menus_use_available_height_and_keep_last_selection_clickable() {
         } else {
             "Save active as…"
         }));
-        let row = Rect::new(shell.body.x, shell.body.bottom() - 1, 1, 1);
+        let row =
+            selected.unwrap_or_else(|| Rect::new(shell.body.x, shell.body.bottom() - 1, 1, 1));
         click(&mut c, row, bounds);
         if open == "V" {
             assert!(c.preferences_changed);
@@ -243,9 +243,10 @@ fn short_menus_use_available_height_and_keep_last_selection_clickable() {
 fn mouse_help_and_close_keep_view_changes_and_do_not_change_another_row() {
     let mut c = controller_with_menu("V");
     let bounds = Rect::new(0, 0, 80, 24);
+    let row = select::option(&mut c, "Human sizes", bounds);
     let g = ui::geometry(&c.app, bounds);
     let shell = g.menu_layout.unwrap();
-    click(&mut c, shell.body, bounds);
+    click(&mut c, row, bounds);
     assert!(!c.app.panes[0].human_sizes);
     let changed = toml::to_string(&c.preferences).unwrap();
     click(&mut c, shell.help.unwrap(), bounds);

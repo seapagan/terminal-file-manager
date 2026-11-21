@@ -2,8 +2,15 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{Terminal, backend::TestBackend, layout::Rect, style::Modifier};
 use terminal_file_manager::{color::Theme, input::Controller, ui};
 
-pub fn option(c: &mut Controller, label: &str) -> Rect {
-    let bounds = Rect::new(0, 0, 120, 24);
+pub fn option(c: &mut Controller, label: &str, bounds: Rect) -> Rect {
+    let g = ui::geometry(&c.app, bounds);
+    while c.app.view_menu.is_some_and(|selected| selected > 0) {
+        c.handle(
+            Event::Key(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE)),
+            &g,
+            Default::default(),
+        );
+    }
     let mut terminal = Terminal::new(TestBackend::new(bounds.width, bounds.height)).unwrap();
     loop {
         let mut g = ui::geometry(&c.app, bounds);

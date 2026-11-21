@@ -20,6 +20,10 @@ fn key(controller: &mut Controller, text: &str) {
     );
 }
 
+fn select_option(c: &mut Controller, label: &str) -> ratatui::layout::Rect {
+    select::option(c, label, ratatui::layout::Rect::new(0, 0, 120, 24))
+}
+
 #[test]
 fn view_menu_changes_active_formatting_and_preserves_last_explicit_defaults() {
     let mut controller = Controller::new(
@@ -28,11 +32,12 @@ fn view_menu_changes_active_formatting_and_preserves_last_explicit_defaults() {
         Settings::default(),
     );
     key(&mut controller, "V");
+    select_option(&mut controller, "Human sizes");
     key(&mut controller, "Space");
     assert!(!controller.app.panes[0].human_sizes);
     assert!(controller.app.panes[1].human_sizes);
     assert!(!controller.preferences.human_sizes);
-    select::option(&mut controller, "Fuzzy timestamps");
+    select_option(&mut controller, "Fuzzy timestamps");
     key(&mut controller, "Enter");
     assert!(controller.app.panes[0].fuzzy_timestamps);
     key(&mut controller, "Esc");
@@ -140,7 +145,7 @@ fn view_menu_mouse_uses_drawn_geometry_and_column_settings_round_trip() {
         Settings::default(),
     );
     key(&mut controller, "V");
-    let row = select::option(&mut controller, "Size column");
+    let row = select_option(&mut controller, "Size column");
     let geometry = ui::geometry(&controller.app, ratatui::layout::Rect::new(0, 0, 120, 24));
     controller.handle(
         Event::Mouse(MouseEvent {
@@ -251,7 +256,7 @@ fn hidden_menu_labels_follow_the_existing_toggle_and_preference() {
         Settings::default(),
     );
     key(&mut controller, "V");
-    select::option(&mut controller, "Hidden");
+    select_option(&mut controller, "Hidden");
     let mut terminal = Terminal::new(TestBackend::new(120, 24)).unwrap();
     for (shown, expected) in [(false, "Hide"), (true, "Show"), (false, "Hide")] {
         terminal
@@ -289,7 +294,7 @@ fn view_menu_switches_live_layout_without_changing_startup_default() {
     let default = c.preferences.two_panes;
     let paths = [c.app.panes[0].path.clone(), c.app.panes[1].path.clone()];
     key(&mut c, "V");
-    select::option(&mut c, "Pane layout");
+    select_option(&mut c, "Pane layout");
     key(&mut c, "Enter");
     assert!(c.app.dual);
     assert_eq!(c.preferences.two_panes, default);
@@ -312,7 +317,7 @@ fn retain_filter_menu_choice_round_trips_and_applies_to_navigation() {
     );
     assert!(c.app.keep_filter_on_navigation);
     key(&mut c, "V");
-    select::option(&mut c, "Keep filter on navigation");
+    select_option(&mut c, "Keep filter on navigation");
     key(&mut c, "Enter");
     assert!(!c.app.keep_filter_on_navigation);
     assert!(c.preferences_changed);
