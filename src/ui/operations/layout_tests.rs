@@ -175,6 +175,11 @@ fn jobs_render_irreversible_success_without_a_critical_incident() {
     app.operations.history.truncate(1);
     app.operations.history[0].plan = plan;
     app.operations.history[0].finish(record, app.now);
+    let outcome = super::jobs::details(&app)
+        .into_iter()
+        .find(|row| row.text.starts_with("Permanently deleted"))
+        .unwrap();
+    assert!(matches!(outcome.role, crate::color::Role::Warning));
     for evidence in [false, true] {
         app.operations.jobs_evidence = evidence;
         let mut terminal = Terminal::new(TestBackend::new(140, 40)).unwrap();

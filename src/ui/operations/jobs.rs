@@ -216,7 +216,7 @@ fn result(
         Outcome::Changed | Outcome::OutcomeUnknown | Outcome::CopiedSourceRetained => Role::Warning,
         Outcome::Completed => Role::Status,
         #[cfg(any(windows, test))]
-        Outcome::PermanentlyDeleted => Role::Status,
+        Outcome::PermanentlyDeleted => Role::Warning,
         _ => Role::Value,
     };
     let source = root

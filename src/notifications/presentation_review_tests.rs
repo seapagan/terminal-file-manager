@@ -75,6 +75,45 @@ fn permissions_and_destructive_success_keep_source_scope() {
 }
 
 #[test]
+fn trash_summary_counts_recycled_permanent_and_mixed_outcomes() {
+    use crate::operations::Decision;
+    let (_root, mut job) = completed(Operation::Trash, 2);
+    let record = crate::operations::execute(&job.plan, Options::default(), &true.into(), |_| {
+        Decision::Skip
+    });
+    for (outcomes, expected) in [
+        (
+            vec![Outcome::Completed],
+            "Job 1: 1 entry trashed (native top-level acknowledgements)",
+        ),
+        (
+            vec![Outcome::PermanentlyDeleted],
+            "Job 1: 1 permanently deleted (irreversible)",
+        ),
+        (
+            vec![Outcome::Completed, Outcome::Completed],
+            "Job 1: 2 entries trashed (native top-level acknowledgements)",
+        ),
+        (
+            vec![Outcome::PermanentlyDeleted, Outcome::PermanentlyDeleted],
+            "Job 1: 2 permanently deleted (irreversible)",
+        ),
+        (
+            vec![Outcome::Completed, Outcome::PermanentlyDeleted],
+            "Job 1: 1 entry trashed (native top-level acknowledgements); 1 permanently deleted (irreversible)",
+        ),
+    ] {
+        let mut record = record.clone();
+        record.entries.truncate(outcomes.len());
+        for (entry, outcome) in record.entries.iter_mut().zip(outcomes) {
+            entry.outcome = outcome;
+        }
+        job.finish(record, SystemTime::UNIX_EPOCH);
+        assert_eq!(crate::operations::summary(&job), expected);
+    }
+}
+
+#[test]
 fn permanent_trash_success_is_distinct_and_never_retried() {
     use crate::operations::Decision;
     let (_root, mut job) = completed(Operation::Trash, 2);
