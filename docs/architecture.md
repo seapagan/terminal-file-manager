@@ -183,8 +183,17 @@ names and identities, including directories. Its shared modal edits wildcard
 or regex expressions independently of the fuzzy listing filter. Matching uses
 native filename bytes rather than display text. Rendering caches preview counts;
 Apply independently revalidates the captured directory and complete visible
-identity set before changing any marks. Mark and Unmark affect matching entries;
-Replace changes only the captured visible working set and preserves excluded marks.
+identity set before changing any marks. Mark and Unmark affect matching visible
+entries and preserve excluded marks. Replace clears all marks in the active
+pane, including hidden and filtered-out marks, then marks visible matches. Zero
+matches leaves that pane with no marks. The other pane keeps its marks. The
+Replace preview reports the total marks it will clear.
+
+The extension-selection actions (`Alt+e` and `Alt+Shift+e`) use
+`Pane::mark_extension` to replace all active-pane marks with matching visible
+files. They validate the highlighted file's extension before clearing marks;
+a missing or unusable extension leaves all marks unchanged. Both actions leave
+the other pane's marks untouched.
 
 An edit exceeding 4,096 bytes is rejected atomically and blocks all Apply routes
 until deliberate correction or cancellation. Rendering, focus, mouse targets and
