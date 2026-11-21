@@ -379,16 +379,23 @@ mod notification_tests {
     }
 
     #[test]
-    fn pattern_count_excludes_filtered_marks_and_preserves_them() {
+    fn pattern_count_stays_visible_while_replace_clears_filtered_marks() {
         let (_root, mut c) = controller();
         c.app.panes[0].select_all();
         c.app.panes[0].set_filter(".txt".into());
-        apply(&mut c, "*", PatternOperation::Replace);
-        assert_eq!(c.app.status.to_string(), "2 visible entries marked");
-        assert_eq!(c.app.panes[0].marks.len(), 3);
-        apply(&mut c, "*", PatternOperation::Unmark);
-        assert_eq!(c.app.status.to_string(), "0 visible entries marked");
-        assert_eq!(c.app.panes[0].marks.len(), 1);
+        for (operation, total, visible) in [
+            (PatternOperation::Unmark, 1, 0),
+            (PatternOperation::Mark, 3, 2),
+            (PatternOperation::Replace, 2, 2),
+            (PatternOperation::Unmark, 0, 0),
+        ] {
+            apply(&mut c, "*", operation);
+            assert_eq!(
+                c.app.status.to_string(),
+                format!("{visible} visible entries marked")
+            );
+            assert_eq!(c.app.panes[0].marks.len(), total);
+        }
     }
 
     #[test]
