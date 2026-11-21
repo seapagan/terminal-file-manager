@@ -388,7 +388,7 @@ impl Controller {
                 self.cancel();
                 return true;
             }
-            if let Some(format) = &mut self.app.metadata_formats[usize::from(self.app.popup)] {
+            if let Some(format) = &mut self.app.metadata_formats[self.app.active] {
                 format.toggle(control.action);
             }
             return true;

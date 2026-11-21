@@ -187,7 +187,8 @@ or **Octal** for four permission digits (`0775`).
 
 On Windows, **Symbolic** shows `RHSA` (read-only, hidden, system, archive),
 with `-` for unset attributes. **Native hex** shows the full Windows bitmask.
-Click an attribute value in a metadata view to toggle that view's format.
+Click metadata attributes, owner or time values to change their format.
+The popup and sidebar share these choices for each pane during the session.
 
 Windows owners appear as `DOMAIN\user`; **Numeric** shows the SID. Names load
 in the background. If a name cannot be resolved, TFM keeps the SID. Ownership
