@@ -56,6 +56,9 @@ impl Controller {
         geometry: &Geometry,
         now: Duration,
     ) -> Vec<Request> {
+        if super::policy_menu::handle(self, &event, geometry) {
+            return Vec::new();
+        }
         if super::pattern::handle(self, &event, geometry) {
             return Vec::new();
         }

@@ -15,6 +15,14 @@ impl Controller {
         if let Some(requests) = super::path_navigation::header(self, event, geometry) {
             return requests;
         }
+        if let Some(control) = geometry
+            .policy_controls
+            .iter()
+            .find(|c| c.area.contains((event.column, event.row).into()))
+        {
+            super::policy_menu::open(self, control);
+            return Vec::new();
+        }
         self.app.active = id;
         self.app.sidebar = self.app.panes[id].sidebar;
         let area = geometry.panes[id].expect("hit pane");

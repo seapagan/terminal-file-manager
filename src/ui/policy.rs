@@ -13,6 +13,44 @@ fn field(label: &str, value: String, theme: &Theme) -> Line<'static> {
 }
 
 pub(super) fn line(pane: &Pane, width: u16, theme: &Theme) -> Line<'static> {
+    layout(pane, width, theme).0
+}
+
+fn layout(
+    pane: &Pane,
+    width: u16,
+    theme: &Theme,
+) -> (Line<'static>, Vec<(u16, u16, crate::input::Action)>) {
+    let segments = segments(pane, width, theme);
+    let mut line = Line::default();
+    let mut controls = Vec::new();
+    for segment in segments {
+        let gap = if line.spans.is_empty() { 0 } else { 3 };
+        if line.width() + gap + segment.width() > usize::from(width) {
+            continue;
+        }
+        if gap > 0 {
+            line.spans.push(Span::raw(" │ "));
+        }
+        let action = segment
+            .spans
+            .first()
+            .and_then(|span| match span.content.as_ref() {
+                "Sort: " => Some(crate::input::Action::Sort),
+                "Group: " => Some(crate::input::Action::Group),
+                "Hidden: " => Some(crate::input::Action::Hidden),
+                "Ignore: " => Some(crate::input::Action::Ignore),
+                _ => None,
+            });
+        if let Some(action) = action {
+            controls.push((line.width() as u16, segment.width() as u16, action));
+        }
+        line.spans.extend(segment.spans);
+    }
+    (line, controls)
+}
+
+fn segments(pane: &Pane, width: u16, theme: &Theme) -> Vec<Line<'static>> {
     let mut segments = vec![
         Line::from(Span::styled(
             super::clean(&pane.profile_label()),
@@ -44,18 +82,7 @@ pub(super) fn line(pane: &Pane, width: u16, theme: &Theme) -> Line<'static> {
         ),
         field("Ignore", format!("{:?}", pane.ignore), theme),
     ]);
-    let mut line = Line::default();
-    for segment in segments {
-        let gap = if line.spans.is_empty() { 0 } else { 3 };
-        if line.width() + gap + segment.width() > usize::from(width) {
-            continue;
-        }
-        if gap > 0 {
-            line.spans.push(Span::raw(" │ "));
-        }
-        line.spans.extend(segment.spans);
-    }
-    line
+    segments
 }
 
 #[cfg(test)]
@@ -83,4 +110,39 @@ mod tests {
             }
         }
     }
+}
+
+/// Hit regions come from the same whole segments and width decisions as drawing.
+pub(super) fn controls(
+    app: &crate::app::App,
+    panes: &[Option<ratatui::layout::Rect>; 2],
+) -> Vec<super::PolicyControl> {
+    let theme = Theme::new(colored_text::ColorLevel::NoColor);
+    let theme = &theme;
+    panes
+        .iter()
+        .enumerate()
+        .flat_map(|(pane, area)| {
+            let state = &app.panes[pane];
+            area.filter(|area| {
+                area.height >= 3 && state.error.is_none() && state.warnings.is_empty()
+            })
+            .into_iter()
+            .flat_map(move |area| {
+                layout(state, area.width.saturating_sub(2), &theme)
+                    .1
+                    .into_iter()
+                    .map(move |(x, width, action)| super::PolicyControl {
+                        pane,
+                        action,
+                        area: ratatui::layout::Rect::new(
+                            area.x + 1 + x,
+                            area.bottom() - 2,
+                            width,
+                            1,
+                        ),
+                    })
+            })
+        })
+        .collect()
 }

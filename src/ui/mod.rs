@@ -24,6 +24,8 @@ pub use path_navigation::PathControl;
 pub use path_picker::PathLayout;
 mod pattern;
 mod policy;
+mod policy_menu;
+pub use policy_menu::{PolicyControl, PolicyLayout};
 mod profiles;
 pub use pattern::{PatternControl, PatternLayout};
 mod summary;
@@ -112,6 +114,9 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
         } else {
             profiles::render(frame, app, shell, theme);
         }
+    }
+    if let Some(layout) = &geometry.policy_menu {
+        policy_menu::render(frame, app, layout, theme);
     }
     if let Some(lines) = diagnostics {
         diagnostics::render(frame, app, theme, &mut geometry, lines);

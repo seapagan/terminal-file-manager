@@ -117,6 +117,10 @@ Filters clear after successful navigation to another folder. Enable
 `keep_filter_on_navigation = true` in TOML or **Keep filter on navigation**
 in View Options (`V`) to retain them. Refreshes and failed navigation keep filters.
 
+Click **Sort**, **Group**, **Hidden** or **Ignore** in a pane's policy row to
+choose a value. Menus open above the control; use arrows and Enter, click a
+choice, or press Esc to cancel. Keyboard policy shortcuts continue cycling.
+
 View Options (`V`) includes a Single/Dual pane choice for the running session.
 The `two_panes` setting continues to control the startup default.
 
