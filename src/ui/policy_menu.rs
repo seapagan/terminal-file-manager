@@ -48,7 +48,7 @@ pub(super) fn layout(app: &App, area: Rect, controls: &[PolicyControl]) -> Optio
         area.y
     };
     let spec = super::modal::Spec {
-        title: "Choose — Esc cancels",
+        title: "",
         help: false,
         content_width: 20,
         pinned_rows: 0,
@@ -56,6 +56,7 @@ pub(super) fn layout(app: &App, area: Rect, controls: &[PolicyControl]) -> Optio
         actions: &[],
     };
     let mut shell = super::modal::Layout::viewport(&spec, Rect::new(x, y, width, height));
+    shell.close = None;
     // Choice rows sit directly inside the border, without form padding.
     shell.body.y = y.saturating_add(u16::from(height > 0));
     shell.body.height = height.saturating_sub(2);
@@ -94,12 +95,6 @@ pub(super) fn render(frame: &mut Frame, app: &App, layout: &PolicyLayout, theme:
             ))
         })
         .collect();
-    super::modal::render_measured(
-        frame,
-        &layout.shell,
-        "Choose — Esc cancels",
-        theme,
-        Role::Header,
-    );
+    super::modal::render_measured(frame, &layout.shell, "", theme, Role::Header);
     frame.render_widget(Paragraph::new(rows), layout.shell.body);
 }

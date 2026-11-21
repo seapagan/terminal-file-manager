@@ -33,6 +33,7 @@ fn all_policy_popups_render_only_choice_rows_between_the_borders() {
         assert_eq!(layout.shell.outer.bottom(), anchor.y);
         assert_eq!(layout.shell.body.y, layout.shell.outer.y + 1);
         assert_eq!(layout.shell.body.bottom(), layout.shell.outer.bottom() - 1);
+        assert_plain_borders(terminal.backend().buffer(), layout.shell.outer);
         assert_choice_rows(terminal.backend().buffer(), layout.shell.body, last);
         click(
             &mut c,
@@ -94,4 +95,38 @@ fn assert_choice_rows(buffer: &ratatui::buffer::Buffer, body: Rect, last: &str) 
         .map(|x| buffer[(x, body.bottom() - 1)].symbol())
         .collect();
     assert!(row.contains(last), "{row}");
+}
+
+fn assert_plain_borders(buffer: &ratatui::buffer::Buffer, outer: Rect) {
+    for (y, left, right) in [(outer.y, "┌", "┐"), (outer.bottom() - 1, "└", "┘")] {
+        assert_eq!(buffer[(outer.x, y)].symbol(), left);
+        assert_eq!(buffer[(outer.right() - 1, y)].symbol(), right);
+        for x in outer.x + 1..outer.right() - 1 {
+            assert_eq!(buffer[(x, y)].symbol(), "─", "({x}, {y})");
+        }
+    }
+}
+
+#[test]
+fn headerless_choices_keep_keyboard_highlighting_and_outside_dismissal() {
+    let bounds = Rect::new(0, 0, 120, 30);
+    for action in [Action::Sort, Action::Group, Action::Hidden, Action::Ignore] {
+        let mut c = controller();
+        open(&mut c, action, bounds);
+        key(&mut c, "Down", bounds);
+        let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
+        let mut g = ui::geometry(&c.app, bounds);
+        terminal
+            .draw(|f| g = ui::render(f, &c.app, &Theme::new(colored_text::ColorLevel::NoColor)))
+            .unwrap();
+        let body = g.policy_menu.unwrap().shell.body;
+        assert!(
+            terminal.backend().buffer()[(body.x, body.y + 1)]
+                .modifier
+                .contains(ratatui::style::Modifier::REVERSED)
+        );
+        click(&mut c, 0, 0, bounds);
+        assert!(c.app.policy_menu.is_none());
+        assert!(!c.preferences_changed);
+    }
 }
