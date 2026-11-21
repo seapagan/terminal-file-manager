@@ -215,6 +215,8 @@ fn result(
         Outcome::SafetyIncident | Outcome::Failed => Role::Error,
         Outcome::Changed | Outcome::OutcomeUnknown | Outcome::CopiedSourceRetained => Role::Warning,
         Outcome::Completed => Role::Status,
+        #[cfg(any(windows, test))]
+        Outcome::PermanentlyDeleted => Role::Warning,
         _ => Role::Value,
     };
     let source = root
@@ -320,6 +322,8 @@ pub(super) fn state_role(state: JobState) -> Role {
 pub(super) fn outcome(outcome: Outcome) -> &'static str {
     match outcome {
         Outcome::Completed => "Completed",
+        #[cfg(any(windows, test))]
+        Outcome::PermanentlyDeleted => "Permanently deleted (irreversible; no recovery receipt)",
         Outcome::Skipped => "Skipped",
         Outcome::Failed => "Failed",
         Outcome::Changed => "Changed since approval",

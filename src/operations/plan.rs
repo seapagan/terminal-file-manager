@@ -167,7 +167,7 @@ impl Plan {
             record
                 .entries
                 .iter()
-                .filter(|entry| entry.outcome == super::Outcome::Completed)
+                .filter(|entry| entry.outcome.successful())
                 .map(|entry| entry.source.clone()),
         );
         retry
@@ -184,7 +184,7 @@ impl Plan {
             if record
                 .entries
                 .iter()
-                .any(|entry| entry.outcome == super::Outcome::Completed)
+                .any(|entry| entry.outcome.successful())
             {
                 return Err(invalid("No incomplete creation to retry"));
             }
@@ -193,7 +193,7 @@ impl Plan {
         let completed: HashSet<_> = record
             .entries
             .iter()
-            .filter(|entry| entry.outcome == super::Outcome::Completed)
+            .filter(|entry| entry.outcome.successful())
             .map(|entry| &entry.source)
             .collect();
         if !self

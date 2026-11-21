@@ -127,7 +127,10 @@ fn finished_state(record: &Record) -> JobState {
     if has(Outcome::CopiedSourceRetained) {
         return JobState::Partial;
     }
-    let completed = has(Outcome::Completed);
+    let completed = record
+        .entries
+        .iter()
+        .any(|entry| entry.outcome.successful());
     if has(Outcome::Failed) || has(Outcome::Changed) {
         return if completed {
             JobState::Partial
@@ -260,7 +263,10 @@ pub(crate) fn counts_summary(job: &Job) -> String {
         );
     }
     let completed = completed(job, record);
-    let mut summary = format!("Job {}: {completed}", job.id);
+    let mut parts = Vec::new();
+    if !completed.is_empty() {
+        parts.push(completed);
+    }
     for (outcome, label) in [
         (Outcome::Skipped, "skipped"),
         (Outcome::Failed, "failed"),
@@ -268,6 +274,11 @@ pub(crate) fn counts_summary(job: &Job) -> String {
         (Outcome::Cancelled, "cancelled"),
         (Outcome::CopiedSourceRetained, "source retained"),
         (Outcome::OutcomeUnknown, "unknown"),
+        #[cfg(any(windows, test))]
+        (
+            Outcome::PermanentlyDeleted,
+            "permanently deleted (irreversible)",
+        ),
     ] {
         let count = record
             .entries
@@ -275,10 +286,10 @@ pub(crate) fn counts_summary(job: &Job) -> String {
             .filter(|entry| entry.outcome == outcome)
             .count();
         if count > 0 {
-            summary.push_str(&format!("; {count} {label}"));
+            parts.push(format!("{count} {label}"));
         }
     }
-    summary
+    format!("Job {}: {}", job.id, parts.join("; "))
 }
 
 fn completed(job: &Job, record: &Record) -> String {
@@ -340,6 +351,15 @@ fn trash_completed(record: &Record) -> String {
         .iter()
         .filter(|entry| entry.outcome == Outcome::Completed)
         .count();
+    #[cfg(any(windows, test))]
+    if count == 0
+        && record
+            .entries
+            .iter()
+            .any(|entry| entry.outcome == Outcome::PermanentlyDeleted)
+    {
+        return String::new();
+    }
     format!(
         "{} trashed (native top-level acknowledgements)",
         noun(count, "entry", "entries")

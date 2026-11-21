@@ -134,9 +134,12 @@ When creating files or directories, enter a single name. Existing entries are
 not overwritten.
 
 Review Trash and permanent-deletion previews before confirming. **Enter cancels
-permanent deletion.** TFM does not use permanent deletion as a Trash fallback.
-If the OS reports irreversible deletion during a Trash request, review the
-critical incident in Jobs; acknowledgement cannot restore the data.
+permanent deletion.** TFM requires explicit approval for permanent deletion.
+On Windows, TFM skips the ordinary Recycle Bin confirmation after its own
+approval. Windows still warns before permanently deleting an item it cannot
+recycle: **No keeps the item; Yes permits permanent deletion.**
+Jobs distinguishes completed Windows permanent deletion as irreversible, with
+no recovery receipt. Unverified or contradictory deletion results remain critical or unknown.
 
 In Jobs, `c` requests cancellation, `r` retries incomplete work and `x` reconciles
 an unknown outcome. **Unknown outcomes block retries and normal safe exit until

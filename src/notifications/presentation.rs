@@ -53,6 +53,17 @@ fn success_title(operation: Operation) -> String {
 }
 
 fn success(job: &Job, name: String) -> String {
+    #[cfg(any(windows, test))]
+    if job.plan.operation == Operation::Trash
+        && job.record.as_ref().is_some_and(|record| {
+            record
+                .entries
+                .iter()
+                .any(|entry| entry.outcome == Outcome::PermanentlyDeleted)
+        })
+    {
+        return job.presentation().counts.clone();
+    }
     let ending = match job.plan.operation {
         Operation::Trash => "sent to Trash",
         Operation::Delete => "permanently deleted",
@@ -120,7 +131,7 @@ fn failure(job: &Job, name: &str) -> String {
         record
             .entries
             .iter()
-            .find(|entry| !matches!(entry.outcome, Outcome::Completed | Outcome::Skipped))
+            .find(|entry| !entry.outcome.successful() && entry.outcome != Outcome::Skipped)
     });
     let detail = failed.map_or("Inspect Jobs for the result.", |entry| {
         entry.detail.as_str()

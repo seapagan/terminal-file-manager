@@ -18,10 +18,10 @@ use windows::Win32::{
         CoTaskMemFree, CoUninitialize,
     },
     UI::Shell::{
-        FOF_NO_CONNECTED_ELEMENTS, FOF_NOERRORUI, FOF_SILENT, FOF_WANTNUKEWARNING,
-        FOFX_ADDUNDORECORD, FOFX_EARLYFAILURE, FOFX_RECYCLEONDELETE, FileOperation, IFileOperation,
-        IFileOperationProgressSink, IShellItem, SHCreateItemFromParsingName,
-        SIGDN_DESKTOPABSOLUTEPARSING,
+        FOF_NO_CONNECTED_ELEMENTS, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT,
+        FOF_WANTNUKEWARNING, FOFX_ADDUNDORECORD, FOFX_EARLYFAILURE, FOFX_RECYCLEONDELETE,
+        FileOperation, IFileOperation, IFileOperationProgressSink, IShellItem,
+        SHCreateItemFromParsingName, SIGDN_DESKTOPABSOLUTEPARSING,
     },
 };
 use windows_core::{HRESULT, PCWSTR, Ref};
@@ -37,7 +37,8 @@ struct Observed {
     refused: Option<Failure>,
 }
 
-pub(super) fn put(entry: &Entry, cancel: &AtomicBool) -> Result<Receipt> {
+// None means verified permanent deletion, never a recycled-item receipt.
+pub(in crate::operations) fn put(entry: &Entry, cancel: &AtomicBool) -> Result<Option<Receipt>> {
     std::thread::scope(|scope| scope.spawn(|| recycle_sta(entry, cancel)).join()).unwrap_or_else(
         |_| {
             Err(Failure {
@@ -84,7 +85,7 @@ impl Drop for Apartment {
     unsafe_code,
     reason = "Approved native Trash boundary: synchronous Shell calls confined to one owned STA"
 )]
-fn recycle_sta(entry: &Entry, cancel: &AtomicBool) -> Result<Receipt> {
+fn recycle_sta(entry: &Entry, cancel: &AtomicBool) -> Result<Option<Receipt>> {
     let _apartment = Apartment::initialize()?;
     let (parents, item) = preflight(entry)?;
     let observed = Rc::new(RefCell::new(Observed::default()));
@@ -99,11 +100,12 @@ fn recycle_sta(entry: &Entry, cancel: &AtomicBool) -> Result<Receipt> {
     // object or borrowed pointer crosses the scoped thread boundary.
     // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     unsafe {
-        // SILENT hides progress only; no auto-Yes flag is set. WANTNUKEWARNING
-        // is a warning, not proof that Windows can never delete permanently.
+        // TFM already obtained Trash approval. WANTNUKEWARNING overrides the
+        // ordinary confirmation suppression when Windows would delete permanently.
         let operation = configured(
             FOFX_RECYCLEONDELETE
                 | FOFX_ADDUNDORECORD
+                | FOF_NOCONFIRMATION
                 | FOF_WANTNUKEWARNING
                 | FOF_NO_CONNECTED_ELEMENTS
                 | FOF_SILENT
@@ -120,6 +122,7 @@ fn recycle_sta(entry: &Entry, cancel: &AtomicBool) -> Result<Receipt> {
         let aborted = operation.GetAnyOperationsAborted();
         finish(
             entry,
+            &parents,
             &observed.borrow(),
             performed,
             aborted.map(|value| value.as_bool()),
@@ -144,7 +147,7 @@ fn preflight(entry: &Entry) -> Result<(Parents, IShellItem)> {
 )]
 fn configured(flags: windows::Win32::UI::Shell::FILEOPERATION_FLAGS) -> io::Result<IFileOperation> {
     // SAFETY: caller holds a live Apartment on this STA; the returned owned
-    // interface is dropped before apartment teardown. Flags never auto-answer Yes.
+    // interface is dropped before apartment teardown. The caller selects the flags.
     // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     unsafe {
         let operation: IFileOperation =
@@ -159,10 +162,11 @@ fn configured(flags: windows::Win32::UI::Shell::FILEOPERATION_FLAGS) -> io::Resu
 
 fn finish(
     entry: &Entry,
+    parents: &Parents,
     observed: &Observed,
     performed: windows_core::Result<()>,
     aborted: windows_core::Result<bool>,
-) -> Result<Receipt> {
+) -> Result<Option<Receipt>> {
     let retained = safety::revalidate(entry, true).is_ok();
     if observed.callbacks.is_empty()
         && retained
@@ -178,6 +182,10 @@ fn finish(
         aborted.as_ref().ok().copied(),
         &observed.callbacks,
         retained,
+        observed.refused.is_none()
+            && parents.validate().is_ok()
+            && std::fs::symlink_metadata(&entry.path)
+                .is_err_and(|error| error.kind() == io::ErrorKind::NotFound),
     )
     .map_err(|mut error| {
         for native in [performed.err(), aborted.err()].into_iter().flatten() {

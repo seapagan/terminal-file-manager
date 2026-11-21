@@ -4,10 +4,13 @@ mod acknowledgement;
 mod macos;
 #[cfg(windows)]
 mod windows;
+#[cfg(not(windows))]
 use crate::fs::Entry;
 #[cfg(target_os = "linux")]
 use std::io;
 use std::path::PathBuf;
+#[cfg(windows)]
+pub(super) use windows::put;
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "linux")]
@@ -61,6 +64,7 @@ impl Receipt {
     }
 }
 
+#[cfg(not(windows))]
 pub(super) fn put(
     entry: &Entry,
     cancel: &std::sync::atomic::AtomicBool,
@@ -77,10 +81,6 @@ pub(super) fn put(
     #[cfg(target_os = "macos")]
     {
         macos::put(entry, cancel)
-    }
-    #[cfg(windows)]
-    {
-        windows::put(entry, cancel)
     }
 }
 

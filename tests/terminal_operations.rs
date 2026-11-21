@@ -1,5 +1,8 @@
 //! Local mutations through the executable and native PTY/ConPTY.
 mod terminal_driver;
+#[cfg(windows)]
+#[path = "terminal_operations/windows_trash.rs"]
+mod windows_trash;
 use portable_pty::CommandBuilder;
 use std::{fs, path::Path};
 use terminal_driver::drive;
