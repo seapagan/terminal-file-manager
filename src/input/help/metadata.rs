@@ -109,7 +109,7 @@ define_commands! {
         HelpSection::Selection,
         "Clear visible marks",
     ),
-    (Action::PathCopy, HelpSection::Selection, "Copy names or paths to OS clipboard"),
+    (Action::PathCopy, HelpSection::Selection, "Copy selected names or paths to the clipboard"),
     (
         Action::PatternSelection,
         HelpSection::Selection,

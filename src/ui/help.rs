@@ -119,12 +119,7 @@ fn command_rows(
     let target = HelpTarget::Action(entry.action);
     let keys = super::text::wrap_value(&entry.keys, keys_width);
     let text_width = width.saturating_sub(keys_width + 1);
-    let mut text = super::text::wrap_value(entry.description, text_width);
-    if entry.action == crate::input::Action::PathCopy {
-        for detail in crate::path_copy::HELP {
-            text.extend(super::text::wrap_value(detail, text_width));
-        }
-    }
+    let text = super::text::wrap_value(entry.description, text_width);
     for index in 0..keys.len().max(text.len()) {
         rows.push(Row {
             keys: keys.get(index).cloned().unwrap_or_default(),
@@ -178,4 +173,25 @@ fn line(row: &Row, app: &App, theme: &Theme, key_width: usize) -> Line<'static> 
         line = line.style(theme.style(Role::Cursor));
     }
     line
+}
+
+#[cfg(test)]
+mod quick_copy_help_tests {
+    #[test]
+    fn copy_path_command_is_one_concise_row() {
+        let entry = crate::input::Bindings::new(&Default::default())
+            .unwrap()
+            .help_entries()
+            .into_iter()
+            .find(|e| e.action == crate::input::Action::PathCopy)
+            .unwrap();
+        let mut rows = Vec::new();
+        super::command_rows(&mut rows, &entry, 100, 12);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].keys, "y");
+        assert_eq!(
+            rows[0].text,
+            "Copy selected names or paths to the clipboard"
+        );
+    }
 }
