@@ -263,7 +263,7 @@ fn pattern_selection_alt_b_paste_mark_and_cancel_work_in_native_terminal() {
             ("Matches: 1 / 1 selectable", "\r\r"),
             ("[*]", "\x1bb"),
             ("Pattern selection", "\x1bk\x1b[200~missing\x1b[201~\x1b"),
-            ("cancelled", "q"),
+            ("selection cancelle", "q"),
         ],
         true,
     );
@@ -287,7 +287,7 @@ fn pattern_alt_controls_and_literal_letters_cross_the_native_terminal_parser() {
             ("Pattern selection", "\x1bx"),
             ("Regex searches", "\x1b"),
             ("cancelled", "\x1bb"),
-            ("Pattern selection", "\x1b[200~*\x1b[201~"),
+            ("Pattern selection", "\x1bw\x1b[200~*\x1b[201~"),
             ("Matches: 1 / 1 selectable", "\x1bs\x1bw\x1bu"),
             ("0 visible entries", "q"),
         ],
@@ -400,7 +400,7 @@ fn view_dialog_help_and_profile_editing_cross_the_native_terminal_parser() {
             "V",
             "Human sizes",
             "View Options Help",
-            "Space/Enter changes",
+            "Keep filter on navigation",
         ),
         (
             "\x1bv",
@@ -415,7 +415,8 @@ fn view_dialog_help_and_profile_editing_cross_the_native_terminal_parser() {
                 ("view-help-sentinel", open),
                 (title, "?"),
                 (help, "\x1b"),
-                // Observe the restored menu before the next independent key.
+                // Observe a restored body row: the taller menu hint can remain
+                // outside the Help overlay and need no repaint on close.
                 (restored, "\x03"),
             ],
             false,
@@ -452,7 +453,7 @@ fn notification_history_opens_from_the_native_keyboard_and_restores_the_browser(
         command(root.path(), root.path(), None),
         &[
             ("notification-ready", "\x1bn"),
-            ("File name:", "notification-ready\r"),
+            ("Create empty file", "notification-ready\r"),
             ("Create file failed", "\x1bh"),
             ("Notifications", "\x1b"),
             ("notification-ready", "q"),
