@@ -35,6 +35,7 @@ macro_rules! define_commands {
 
 // Row position is display priority; bindings remain in the effective keymap.
 define_commands! {
+    (Action::KeepFilter, HelpSection::Views, "Keep filters across directory navigation"),
     (Action::Up, HelpSection::Navigation, "Move cursor up"),
     (Action::Down, HelpSection::Navigation, "Move cursor down"),
     (

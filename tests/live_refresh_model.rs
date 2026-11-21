@@ -297,3 +297,34 @@ fn refilter_uses_nearest_visible_index_and_empty_results_clear_the_cursor() {
     assert_eq!(pane.scroll, 0);
     assert!(pane.eligible().is_empty());
 }
+
+#[test]
+fn navigation_clears_only_the_changed_panes_filter_after_success() {
+    let root = tempfile::tempdir().unwrap();
+    let other = tempfile::tempdir().unwrap();
+    let mut app = loaded(root.path());
+    app.panes[0].set_filter("old".into());
+    app.panes[1].set_filter("other-pane".into());
+    let refresh = app.request_refresh(0).unwrap();
+    app.complete_listing(0, refresh.generation, Ok(snapshot(root.path())));
+    assert_eq!(app.panes[0].filter, "old");
+    let failed = app.request_listing(0, other.path().into());
+    app.complete_listing(0, failed.generation, Err("denied".into()));
+    assert_eq!(app.panes[0].filter, "old");
+    let request = app.request_listing(0, other.path().into());
+    app.complete_listing(0, request.generation, Ok(snapshot(other.path())));
+    assert!(app.panes[0].filter.is_empty());
+    assert_eq!(app.panes[1].filter, "other-pane");
+}
+
+#[test]
+fn configured_retention_keeps_filter_after_successful_navigation() {
+    let root = tempfile::tempdir().unwrap();
+    let other = tempfile::tempdir().unwrap();
+    let mut app = loaded(root.path());
+    app.keep_filter_on_navigation = true;
+    app.panes[0].set_filter("kept".into());
+    let request = app.request_listing(0, other.path().into());
+    app.complete_listing(0, request.generation, Ok(snapshot(other.path())));
+    assert_eq!(app.panes[0].filter, "kept");
+}

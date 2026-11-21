@@ -30,6 +30,7 @@ impl Controller {
     /// Own the authoritative app and validated keymap.
     pub fn new(mut app: App, bindings: Bindings, preferences: Settings) -> Self {
         preferences.apply_notifications(&mut app);
+        app.keep_filter_on_navigation = preferences.keep_filter_on_navigation;
         app.help_rows = bindings.help_entries();
         app.metadata_presentation = preferences.metadata_presentation;
         app.profile_names = preferences.profiles.keys().cloned().collect();
@@ -140,6 +141,11 @@ impl Controller {
             SplitLeft => super::divider::adjust(self, self.app.split_percent.saturating_sub(5)),
             SplitRight => super::divider::adjust(self, self.app.split_percent.saturating_add(5)),
             ViewProfiles => super::profiles::open(self),
+            KeepFilter => {
+                self.app.keep_filter_on_navigation = !self.app.keep_filter_on_navigation;
+                self.preferences.keep_filter_on_navigation = self.app.keep_filter_on_navigation;
+                self.preferences_changed = true;
+            }
             Quit | SaveQuit => self.exit(action),
             ViewOptions => {
                 self.app.view_menu = if self.app.view_menu.is_some() {
@@ -176,13 +182,13 @@ impl Controller {
             Cancel => self.cancel(),
             // These actions are handled or normalized before pane dispatch.
             Diagnostics | DiagnosticsUp | DiagnosticsDown | SplitLeft | SplitRight
-            | ViewProfiles | Quit | SaveQuit | ViewOptions | HumanSizes | FuzzyTimestamps
-            | Permissions | ColumnSize | ColumnModified | ColumnAttributes | ColumnOwner
-            | OwnerDisplay | MetadataPresentation | TogglePanes | Maximise | FocusPane
-            | ToggleSidebar | Metadata | Help | Info | Viewer | Editor | Path | FullPath
-            | Zoxide | OppositeZoxide | ExitDirectory | Copy | Move | Mkdir | CreateFile
-            | Trash | Delete | Rename | Attributes | Jobs | Notifications | DismissToast
-            | DismissToasts | CopyQuick | MoveQuick | PathCopy => {}
+            | ViewProfiles | Quit | SaveQuit | ViewOptions | KeepFilter | HumanSizes
+            | FuzzyTimestamps | Permissions | ColumnSize | ColumnModified | ColumnAttributes
+            | ColumnOwner | OwnerDisplay | MetadataPresentation | TogglePanes | Maximise
+            | FocusPane | ToggleSidebar | Metadata | Help | Info | Viewer | Editor | Path
+            | FullPath | Zoxide | OppositeZoxide | ExitDirectory | Copy | Move | Mkdir
+            | CreateFile | Trash | Delete | Rename | Attributes | Jobs | Notifications
+            | DismissToast | DismissToasts | CopyQuick | MoveQuick | PathCopy => {}
         }
         Vec::new()
     }

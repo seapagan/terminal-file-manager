@@ -24,6 +24,7 @@ pub enum MetadataPresentation {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Settings {
+    pub keep_filter_on_navigation: bool,
     pub pattern_mode: crate::app::PatternMode,
     pub pattern_case_sensitive: bool,
     pub clipboard: crate::path_copy::Preferences,
@@ -55,6 +56,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            keep_filter_on_navigation: false,
             pattern_mode: crate::app::PatternMode::Wildcard,
             pattern_case_sensitive: true,
             clipboard: Default::default(),
@@ -142,6 +144,7 @@ impl Settings {
     /// Apply startup/view preferences without replacing native locations.
     pub fn apply(&self, app: &mut App) {
         self.apply_notifications(app);
+        app.keep_filter_on_navigation = self.keep_filter_on_navigation;
         app.sidebar = self.sidebar;
         app.dual = self.two_panes;
         app.split_percent = self.split_percent;

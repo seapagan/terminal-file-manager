@@ -51,6 +51,7 @@ pub struct Detail {
 
 /// Both panes remain alive when hidden or temporarily collapsed by width.
 pub struct App {
+    pub keep_filter_on_navigation: bool,
     pub relative_path_base: PathBuf,
     pub footer_workflow: Option<crate::path_copy::Workflow>,
     pub path_picker: Option<crate::navigation::PathPicker>,
@@ -92,6 +93,7 @@ impl App {
     /// Every invocation starts single-pane, with two independent original locations.
     pub fn new(path: PathBuf) -> Self {
         Self {
+            keep_filter_on_navigation: false,
             relative_path_base: path.clone(),
             footer_workflow: None,
             path_picker: None,
@@ -333,6 +335,9 @@ impl App {
         if attempted.is_some() || state.context == 0 {
             state.context += 1;
             state.entry_identity = snapshot.entry_identity.clone();
+        }
+        if state.path != snapshot.path && !self.keep_filter_on_navigation {
+            state.filter.clear();
         }
         state.install(snapshot);
         self.close_stale_path_picker(pane);

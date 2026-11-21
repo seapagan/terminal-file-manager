@@ -61,6 +61,7 @@ pub enum Action {
     Metadata,
     Info,
     ViewOptions,
+    KeepFilter,
     ViewProfiles,
     HumanSizes,
     FuzzyTimestamps,

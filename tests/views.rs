@@ -303,3 +303,26 @@ fn view_menu_switches_live_layout_without_changing_startup_default() {
     key(&mut c, "Enter");
     assert!(!c.app.dual);
 }
+
+#[test]
+fn retain_filter_menu_choice_round_trips_and_applies_to_navigation() {
+    let settings = Settings::parse("keep_filter_on_navigation = true").unwrap();
+    let mut c = Controller::new(
+        App::new(".".into()),
+        Bindings::new(&Default::default()).unwrap(),
+        settings,
+    );
+    assert!(c.app.keep_filter_on_navigation);
+    key(&mut c, "V");
+    for _ in 0..16 {
+        key(&mut c, "Down");
+    }
+    key(&mut c, "Enter");
+    assert!(!c.app.keep_filter_on_navigation);
+    assert!(c.preferences_changed);
+    assert!(
+        !Settings::parse(&toml::to_string(&c.preferences).unwrap())
+            .unwrap()
+            .keep_filter_on_navigation
+    );
+}

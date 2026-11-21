@@ -25,6 +25,7 @@ pub(crate) const OPTIONS: &[(&str, Action)] = &[
     #[cfg(not(windows))]
     ("Owner/group display", Action::OwnerDisplay),
     ("Pane layout", Action::TogglePanes),
+    ("Keep filter on navigation", Action::KeepFilter),
 ];
 
 pub(super) fn key(controller: &mut Controller, key: KeyEvent, geometry: &Geometry) {
@@ -130,6 +131,7 @@ pub(crate) fn rows(app: &App, preferred: MetadataPresentation) -> Vec<(String, S
         format!("{preferred:?}"),
         format!("{:?}", pane.owner_display),
         if app.dual { "Dual" } else { "Single" }.into(),
+        check(app.keep_filter_on_navigation),
     ];
     OPTIONS
         .iter()
