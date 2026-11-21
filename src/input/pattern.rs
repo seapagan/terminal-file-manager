@@ -10,7 +10,12 @@ use crossterm::event::{
 
 pub(super) fn open(controller: &mut Controller) {
     let pane = controller.app.active;
-    controller.app.pattern = Some(PatternSelection::new(&controller.app.panes[pane], pane));
+    let mut state = PatternSelection::new(&controller.app.panes[pane], pane);
+    state.set_mode(controller.pattern_preferences.0);
+    if state.case_sensitive != controller.pattern_preferences.1 {
+        state.toggle_case();
+    }
+    controller.app.pattern = Some(state);
     controller.last_click = None;
     controller.dragging_divider = false;
 }
@@ -254,6 +259,7 @@ fn activate(controller: &mut Controller, target: PatternControl, move_focus: boo
             }
         }
     }
+    controller.pattern_preferences = (state.mode, state.case_sensitive);
     controller.app.pattern = Some(state);
 }
 

@@ -21,7 +21,8 @@ struct CachedPreview {
 }
 
 /// Filename matching syntax, independent of the listing's fuzzy filter.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum PatternMode {
     /// Globset whole-filename wildcards.
     Wildcard,

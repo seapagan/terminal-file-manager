@@ -126,7 +126,10 @@ attribute. Windows permissions still determine access.
 
 Alt+b selects by wildcard or regex, for example `*.rs`. Wildcards match whole
 filenames; regex matches substrings. **Replace can clear visible marks even when
-nothing matches.** Review the preview before applying a pattern.
+nothing matches.** Review the preview before applying a pattern. Matching mode
+and case sensitivity carry over between opens during the session; expressions
+start empty. Set `pattern_mode = "wildcard"` (or `"regex"`) and
+`pattern_case_sensitive = true` in TOML to choose startup defaults.
 
 With two panes, copy and move target the other pane: one entry starts at once,
 while multiple entries ask for confirmation. With one pane, choose a destination

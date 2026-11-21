@@ -19,6 +19,7 @@ pub struct Controller {
     pub save_session: bool,
     pub preferences_changed: bool,
     pub preferences: Settings,
+    pub(super) pattern_preferences: (crate::app::PatternMode, bool),
     pub(super) bindings: Bindings,
     pub(super) filter_before: Option<(usize, String)>,
     pub(super) last_click: Option<(usize, PathBuf, Duration)>,
@@ -33,6 +34,7 @@ impl Controller {
         app.metadata_presentation = preferences.metadata_presentation;
         app.profile_names = preferences.profiles.keys().cloned().collect();
         Self {
+            pattern_preferences: (preferences.pattern_mode, preferences.pattern_case_sensitive),
             path_copy_request: None,
             path_base_request: None,
             app,

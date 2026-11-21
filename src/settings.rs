@@ -24,6 +24,8 @@ pub enum MetadataPresentation {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Settings {
+    pub pattern_mode: crate::app::PatternMode,
+    pub pattern_case_sensitive: bool,
     pub clipboard: crate::path_copy::Preferences,
     pub path_hover: Option<String>,
     pub inactive_pane_border: Option<String>,
@@ -53,6 +55,8 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            pattern_mode: crate::app::PatternMode::Wildcard,
+            pattern_case_sensitive: true,
             clipboard: Default::default(),
             path_hover: None,
             inactive_pane_border: None,
