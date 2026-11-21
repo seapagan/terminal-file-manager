@@ -189,6 +189,10 @@ formats. Alt+v offers **Compact**, **Detailed** and **Minimal** profiles, or you
 can save a named view. Profiles apply to the active pane unless you choose
 **Apply to both**.
 
+Use `Alt+o` for the floating metadata popup when Windows Terminal captures
+`Alt+Enter`. Both shortcuts invoke the configurable `metadata` action,
+independently of the F2 sidebar/popup preference.
+
 Metadata views show the highlighted entry's details. Press `c` within one to
 count directory contents and size; press it again to refresh the count.
 

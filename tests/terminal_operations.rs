@@ -464,3 +464,18 @@ fn notification_history_opens_from_the_native_keyboard_and_restores_the_browser(
         b"preserved"
     );
 }
+
+#[test]
+fn alternate_metadata_popup_opens_through_native_terminal_input() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("metadata-ready"), "preserved").unwrap();
+    drive(
+        command(root.path(), root.path(), None),
+        &[("metadata-ready", "\x1bo"), ("Metadata", "q")],
+        false,
+    );
+    assert_eq!(
+        fs::read(root.path().join("metadata-ready")).unwrap(),
+        b"preserved"
+    );
+}

@@ -194,6 +194,7 @@ const DEFAULT_BINDINGS: &[(&str, Action)] = &[
     ("Ctrl+Right", SplitRight),
     ("Alt+i", ToggleSidebar),
     ("Alt+Enter", Metadata),
+    ("Alt+o", Metadata),
     ("F2", Info),
     ("V", ViewOptions),
     ("Alt+v", ViewProfiles),

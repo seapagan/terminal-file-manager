@@ -226,7 +226,7 @@ define_commands! {
     (
         Action::Metadata,
         HelpSection::Views,
-        "Show or hide file information",
+        "Open or close the floating metadata popup",
     ),
     (
         Action::ToggleSidebar,

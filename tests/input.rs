@@ -579,3 +579,27 @@ fn empty_filtered_pane_explains_no_matches_without_extra_status_rows() {
     assert!(text.contains("No matches"));
     assert!(!text.contains("No visible entries"));
 }
+
+#[test]
+fn alternate_metadata_binding_opens_popup_despite_sidebar_preference() {
+    let (_root, mut c) = controller();
+    c.preferences.metadata_presentation =
+        terminal_file_manager::settings::MetadataPresentation::Sidebar;
+    key(&mut c, "Alt+o");
+    assert!(c.app.popup);
+    assert!(!c.app.sidebar);
+    key(&mut c, "Alt+o");
+    assert!(!c.app.popup);
+    key(&mut c, "Alt+Enter");
+    assert!(c.app.popup);
+    let bindings = Bindings::new(&std::collections::BTreeMap::from([(
+        "Alt+u".into(),
+        terminal_file_manager::input::Action::Metadata,
+    )]))
+    .unwrap();
+    let (code, modifiers) = terminal_file_manager::input::chord("Alt+u").unwrap();
+    assert_eq!(
+        bindings.action(KeyEvent::new(code, modifiers)),
+        Some(terminal_file_manager::input::Action::Metadata)
+    );
+}
