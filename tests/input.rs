@@ -129,10 +129,7 @@ fn floating_metadata_close_keys_preserve_sidebar_and_modal_focus() {
                     assert_eq!(c.app.panes[0].cursor, cursor);
                     assert!(c.app.panes[0].marks.is_empty());
                     assert!(c.app.operations.dialog.is_none());
-                    assert!(!c.app.operations.outbox.iter().any(|intent| matches!(
-                        intent,
-                        terminal_file_manager::operations::Intent::Submit { .. }
-                    )));
+                    assert!(c.app.operations.outbox.is_empty());
                 }
                 key(&mut c, close);
                 assert!(!c.app.popup, "{preference:?}: {close}");
