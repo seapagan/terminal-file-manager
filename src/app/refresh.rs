@@ -1,9 +1,16 @@
 //! Refresh seeds and unchanged-result checks preserve the current working set.
-use super::Pane;
+use super::{App, Pane};
 use crate::fs::Snapshot;
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 impl Pane {
+    pub(super) fn clear_navigation_filter(&mut self, path: &std::path::Path, keep: bool) {
+        if self.path != path && !keep {
+            self.filter.clear();
+        }
+    }
+
     pub(crate) fn cached_snapshot(&self) -> Snapshot {
         let mut ordered = vec![None; self.entries.len()];
         for entry in &self.entries {
@@ -52,5 +59,40 @@ impl Pane {
             entry.accessed = accessed[&entry.path];
         }
         self.directory = fresh.directory.map(|entry| *entry);
+    }
+}
+
+impl App {
+    pub(super) fn apply_listing(
+        &mut self,
+        pane: usize,
+        attempted: Option<PathBuf>,
+        snapshot: Snapshot,
+    ) -> bool {
+        let state = &mut self.panes[pane];
+        let previous = if attempted.is_none() && state.error.is_none() && snapshot.errors.is_empty()
+        {
+            state.current().cloned()
+        } else {
+            None
+        };
+        if attempted.is_none() && state.error.is_none() && state.unchanged_listing(&snapshot) {
+            state.update_access_times(snapshot);
+            self.reconcile_listing_details(pane, previous);
+            return true;
+        }
+        state.error = snapshot.directory.is_none().then(|| {
+            "Directory identity unavailable; reopen the directory before using this context".into()
+        });
+        if attempted.is_some() || state.context == 0 {
+            state.context += 1;
+            state.entry_identity = snapshot.entry_identity.clone();
+        }
+        state.clear_navigation_filter(&snapshot.path, self.keep_filter_on_navigation);
+        state.listing_installs += 1;
+        state.install(snapshot);
+        self.close_stale_path_picker(pane);
+        self.reconcile_listing_details(pane, previous);
+        true
     }
 }

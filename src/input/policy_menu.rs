@@ -45,6 +45,22 @@ pub(crate) fn current(app: &App, pane: usize, action: Action) -> usize {
         .unwrap_or(0)
 }
 
+pub(super) fn open_at(
+    c: &mut Controller,
+    event: crossterm::event::MouseEvent,
+    geometry: &Geometry,
+) -> bool {
+    let Some(control) = geometry
+        .policy_controls
+        .iter()
+        .find(|control| control.area.contains((event.column, event.row).into()))
+    else {
+        return false;
+    };
+    open(c, control);
+    true
+}
+
 pub(super) fn open(c: &mut Controller, control: &crate::ui::PolicyControl) {
     c.app.active = control.pane;
     c.app.sidebar = c.app.panes[control.pane].sidebar;

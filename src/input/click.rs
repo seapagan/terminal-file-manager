@@ -15,12 +15,7 @@ impl Controller {
         if let Some(requests) = super::path_navigation::header(self, event, geometry) {
             return requests;
         }
-        if let Some(control) = geometry
-            .policy_controls
-            .iter()
-            .find(|c| c.area.contains((event.column, event.row).into()))
-        {
-            super::policy_menu::open(self, control);
+        if super::policy_menu::open_at(self, event, geometry) {
             return Vec::new();
         }
         self.app.active = id;

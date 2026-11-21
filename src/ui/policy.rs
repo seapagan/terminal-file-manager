@@ -98,33 +98,6 @@ fn segments(pane: &Pane, width: u16, theme: &Theme) -> Vec<Line<'static>> {
     segments
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn active_filter_precedes_decorations_and_survives_narrow_monochrome() {
-        let mut app = crate::app::App::new("owned".into());
-        let pane = &mut app.panes[0];
-        pane.set_filter("a-long-expression".into());
-        for level in [
-            colored_text::ColorLevel::NoColor,
-            colored_text::ColorLevel::TrueColor,
-        ] {
-            for width in [12, 24, 80] {
-                let line = line(&pane, width, &Theme::new(level));
-                assert!(line.to_string().starts_with("FILTER:"));
-                assert!(line.width() <= usize::from(width));
-                assert!(
-                    line.spans[0]
-                        .style
-                        .add_modifier
-                        .contains(ratatui::style::Modifier::BOLD)
-                );
-            }
-        }
-    }
-}
-
 /// Hit regions come from the same whole segments and width decisions as drawing.
 pub(super) fn controls(
     app: &crate::app::App,
@@ -142,7 +115,7 @@ pub(super) fn controls(
             })
             .into_iter()
             .flat_map(move |area| {
-                layout(state, area.width.saturating_sub(2), &theme)
+                layout(state, area.width.saturating_sub(2), theme)
                     .1
                     .into_iter()
                     .map(move |(x, width, action)| super::PolicyControl {
@@ -158,4 +131,31 @@ pub(super) fn controls(
             })
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn active_filter_precedes_decorations_and_survives_narrow_monochrome() {
+        let mut app = crate::app::App::new("owned".into());
+        let pane = &mut app.panes[0];
+        pane.set_filter("a-long-expression".into());
+        for level in [
+            colored_text::ColorLevel::NoColor,
+            colored_text::ColorLevel::TrueColor,
+        ] {
+            for width in [12, 24, 80] {
+                let line = line(pane, width, &Theme::new(level));
+                assert!(line.to_string().starts_with("FILTER:"));
+                assert!(line.width() <= usize::from(width));
+                assert!(
+                    line.spans[0]
+                        .style
+                        .add_modifier
+                        .contains(ratatui::style::Modifier::BOLD)
+                );
+            }
+        }
+    }
 }

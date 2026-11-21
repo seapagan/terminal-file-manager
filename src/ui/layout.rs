@@ -195,13 +195,17 @@ fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
             area.width,
             super::status::rows(app, area),
         ),
-        footer: Rect::new(
-            area.x,
-            area.bottom().saturating_sub(1),
-            area.width,
-            u16::from(area.height >= 1),
-        ),
+        footer: footer_area(area),
     }
+}
+
+fn footer_area(area: Rect) -> Rect {
+    Rect::new(
+        area.x,
+        area.bottom().saturating_sub(1),
+        area.width,
+        u16::from(area.height >= 1),
+    )
 }
 
 fn menu_layout(app: &App, area: Rect) -> Option<super::modal::Layout<()>> {

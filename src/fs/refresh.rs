@@ -111,13 +111,17 @@ mod tests {
         let old = seed(root.path());
         let missing = root.path().join("unknown");
         assert!(
-            refresh_metadata(old.clone(), &[missing.clone()], &AtomicBool::new(false))
-                .unwrap()
-                .is_none()
+            refresh_metadata(
+                old.clone(),
+                std::slice::from_ref(&missing),
+                &AtomicBool::new(false)
+            )
+            .unwrap()
+            .is_none()
         );
         fs::write(&missing, "new").unwrap();
         assert!(
-            refresh_metadata(old, &[path.clone()], &AtomicBool::new(false))
+            refresh_metadata(old, std::slice::from_ref(&path), &AtomicBool::new(false))
                 .unwrap()
                 .is_none()
         );

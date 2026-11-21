@@ -130,7 +130,19 @@ impl Settings {
             return Err("toast_expiry_seconds must be between 1 and 60".into());
         }
         settings.validate_colours()?;
-        if settings.compound_extensions.iter().any(|s| {
+        settings.validate_compound_extensions()?;
+        for name in settings.profiles.keys() {
+            validate_profile_name(name)?;
+        }
+        for (name, view) in crate::view::profiles() {
+            settings.profiles.entry(name).or_insert(view);
+        }
+        Bindings::new(&settings.bindings)?;
+        Ok(settings)
+    }
+
+    fn validate_compound_extensions(&self) -> Result<(), String> {
+        if self.compound_extensions.iter().any(|s| {
             !s.starts_with('.')
                 || s.len() < 2
                 || s.ends_with('.')
@@ -141,14 +153,7 @@ impl Settings {
                     .into(),
             );
         }
-        for name in settings.profiles.keys() {
-            validate_profile_name(name)?;
-        }
-        for (name, view) in crate::view::profiles() {
-            settings.profiles.entry(name).or_insert(view);
-        }
-        Bindings::new(&settings.bindings)?;
-        Ok(settings)
+        Ok(())
     }
 
     fn validate_colours(&self) -> Result<(), String> {

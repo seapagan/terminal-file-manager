@@ -158,7 +158,6 @@ impl Pane {
     }
 
     pub(super) fn install(&mut self, snapshot: Snapshot) {
-        self.listing_installs += 1;
         let previous_index = self.cursor_index().unwrap_or(0);
         let continuous = self.accepts_refresh(&snapshot);
         #[cfg(windows)]

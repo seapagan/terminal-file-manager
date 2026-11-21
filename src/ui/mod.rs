@@ -109,6 +109,19 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     if let Some(layout) = &geometry.help {
         help::render(frame, app, theme, layout);
     }
+    render_menus(frame, app, &geometry, theme);
+    if let Some(lines) = diagnostics {
+        diagnostics::render(frame, app, theme, &mut geometry, lines);
+    }
+    path_picker::render(frame, app, theme, geometry.path_picker.as_ref());
+    pattern::render(frame, app, theme, geometry.pattern.as_ref());
+    operations::render(frame, app, theme, &geometry);
+    help::context::render(frame, app, theme, geometry.context_help.as_ref());
+    notifications::render(frame, app, &geometry, theme);
+    geometry
+}
+
+fn render_menus(frame: &mut Frame, app: &App, geometry: &Geometry, theme: &Theme) {
     if let Some(shell) = &geometry.menu_layout {
         if app.view_menu.is_some() {
             view::render(frame, app, shell, theme);
@@ -119,15 +132,6 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     if let Some(layout) = &geometry.policy_menu {
         policy_menu::render(frame, app, layout, theme);
     }
-    if let Some(lines) = diagnostics {
-        diagnostics::render(frame, app, theme, &mut geometry, lines);
-    }
-    path_picker::render(frame, app, theme, geometry.path_picker.as_ref());
-    pattern::render(frame, app, theme, geometry.pattern.as_ref());
-    operations::render(frame, app, theme, &geometry);
-    help::context::render(frame, app, theme, geometry.context_help.as_ref());
-    notifications::render(frame, app, &geometry, theme);
-    geometry
 }
 
 pub(super) fn centered(area: Rect, width: u16, height: u16) -> Rect {

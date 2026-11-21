@@ -329,31 +329,7 @@ impl App {
             self.invalidate_listing_details(pane);
             return true;
         }
-        let previous = if attempted.is_none() && state.error.is_none() && snapshot.errors.is_empty()
-        {
-            state.current().cloned()
-        } else {
-            None
-        };
-        if attempted.is_none() && state.error.is_none() && state.unchanged_listing(&snapshot) {
-            state.update_access_times(snapshot);
-            self.reconcile_listing_details(pane, previous);
-            return true;
-        }
-        state.error = snapshot.directory.is_none().then(|| {
-            "Directory identity unavailable; reopen the directory before using this context".into()
-        });
-        if attempted.is_some() || state.context == 0 {
-            state.context += 1;
-            state.entry_identity = snapshot.entry_identity.clone();
-        }
-        if state.path != snapshot.path && !self.keep_filter_on_navigation {
-            state.filter.clear();
-        }
-        state.install(snapshot);
-        self.close_stale_path_picker(pane);
-        self.reconcile_listing_details(pane, previous);
-        true
+        self.apply_listing(pane, attempted, snapshot)
     }
 
     fn reconcile_listing_details(&mut self, pane: usize, previous: Option<Entry>) {

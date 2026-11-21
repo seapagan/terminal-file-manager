@@ -204,14 +204,14 @@ fn edit(controller: &mut Controller, key: KeyEvent, layout: &crate::ui::PatternL
         && layout.targets().contains(&PatternControl::Expression)
     {
         state.edit_key(key);
-    } else if key.code == KeyCode::Char(' ') && key.kind == KeyEventKind::Press {
-        if let Some(target @ (PatternControl::Mode(_) | PatternControl::Case)) = layout
+    } else if key.code == KeyCode::Char(' ')
+        && key.kind == KeyEventKind::Press
+        && let Some(target @ (PatternControl::Mode(_) | PatternControl::Case)) = layout
             .targets()
             .into_iter()
             .find(|target| *target == state.focus)
-        {
-            activate(controller, target, true);
-        }
+    {
+        activate(controller, target, true);
     }
 }
 

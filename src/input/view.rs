@@ -67,6 +67,16 @@ pub(super) fn mouse(controller: &mut Controller, event: MouseEvent, geometry: &G
 }
 
 pub(super) fn formatting(controller: &mut Controller, action: Action) {
+    if action == Action::KeepFilter {
+        controller.app.keep_filter_on_navigation = !controller.app.keep_filter_on_navigation;
+        controller.preferences.keep_filter_on_navigation = controller.app.keep_filter_on_navigation;
+        controller.preferences_changed = true;
+        return;
+    }
+    format_display(controller, action);
+}
+
+fn format_display(controller: &mut Controller, action: Action) {
     let pane = &mut controller.app.panes[controller.app.active];
     match action {
         Action::MetadataPresentation => {

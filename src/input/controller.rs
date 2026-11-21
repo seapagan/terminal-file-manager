@@ -66,6 +66,10 @@ impl Controller {
         if super::operations::handle(self, &event, geometry) {
             return Vec::new();
         }
+        self.event(event, geometry, now)
+    }
+
+    fn event(&mut self, event: Event, geometry: &Geometry, now: Duration) -> Vec<Request> {
         match event {
             Event::Key(key) if key.kind != KeyEventKind::Release => self.editing_key(key, geometry),
             Event::Paste(text) if self.filter_before.is_some() => {
@@ -146,11 +150,6 @@ impl Controller {
             SplitLeft => super::divider::adjust(self, self.app.split_percent.saturating_sub(5)),
             SplitRight => super::divider::adjust(self, self.app.split_percent.saturating_add(5)),
             ViewProfiles => super::profiles::open(self),
-            KeepFilter => {
-                self.app.keep_filter_on_navigation = !self.app.keep_filter_on_navigation;
-                self.preferences.keep_filter_on_navigation = self.app.keep_filter_on_navigation;
-                self.preferences_changed = true;
-            }
             Quit | SaveQuit => self.exit(action),
             ViewOptions => {
                 self.app.view_menu = if self.app.view_menu.is_some() {
@@ -161,10 +160,9 @@ impl Controller {
                 self.app.popup = false;
                 self.app.close_help();
             }
-            HumanSizes | FuzzyTimestamps | Permissions | ColumnSize | ColumnModified
-            | ColumnAttributes | ColumnOwner | OwnerDisplay | MetadataPresentation => {
-                super::view::formatting(self, action)
-            }
+            KeepFilter | HumanSizes | FuzzyTimestamps | Permissions | ColumnSize
+            | ColumnModified | ColumnAttributes | ColumnOwner | OwnerDisplay
+            | MetadataPresentation => super::view::formatting(self, action),
             TogglePanes | Maximise | FocusPane | ToggleSidebar | Metadata | Help | FullPath => {
                 self.layout(action, geometry)
             }
@@ -179,11 +177,9 @@ impl Controller {
             Up | Down | Home | End | PageUp | PageDown => self.movement(action, geometry),
             ExtendUp | ExtendDown => self.extend_selection(action, geometry),
             Enter | Parent | Back | Forward | Refresh => return self.navigate(action),
-            Mark | MarkNext | SelectAll | ClearVisible => self.selection(action, geometry),
-            MarkExtension | MarkFinalExtension => self.app.panes[self.app.active].mark_extension(
-                &self.preferences.compound_extensions,
-                action == MarkFinalExtension,
-            ),
+            Mark | MarkNext | SelectAll | ClearVisible | MarkExtension | MarkFinalExtension => {
+                self.selection(action, geometry)
+            }
             Hidden | Ignore | Sort | Reverse | Group => self.policy(action),
             Filter => self.begin_filter(),
             PatternSelection => super::pattern::open(self),
@@ -233,6 +229,10 @@ impl Controller {
                 pane.move_cursor(1, height);
             }
             Action::SelectAll => pane.select_all(),
+            Action::MarkExtension | Action::MarkFinalExtension => pane.mark_extension(
+                &self.preferences.compound_extensions,
+                action == Action::MarkFinalExtension,
+            ),
             Action::ClearVisible => pane.clear_visible(),
             _ => {}
         }
