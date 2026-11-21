@@ -88,11 +88,11 @@ const FULL_PATH: &[&str] = &[
 ];
 
 const PATTERN: &[&str] = &[
-    "Change marks on entries shown in this pane. Hidden and filtered-out entries keep their marks. After applying, the status area shows how many visible entries are marked; this does not add a notification.",
+    "Match entries shown in this pane. Mark and Unmark keep hidden and filtered-out marks. Replace clears all marks in this pane before marking visible matches, including when nothing matches. The other pane keeps its marks. After applying, the status area shows how many visible entries are marked; this does not add a notification.",
     "Wildcards match the whole filename: * matches a sequence; ? matches one byte. Regex searches names; ^ and $ anchor the match. Case sensitive applies to both modes.",
     "You can type ? in Pattern. While typing, use `Alt+w` for Wildcard, `Alt+x` for Regex and `Alt+s` for Case sensitive. These shortcuts keep the cursor in Pattern.",
     "Outside Pattern, use `w`, `x` and `s` for those settings. Press `Tab` / `Shift+Tab` or click to choose a field or action. `Space` activates the focused control.",
-    "`m` Mark adds matching entries, `u` Unmark removes them, and `r` Replace replaces the visible marks with matches. While typing, use `Alt+m` / `Alt+u` / `Alt+r`.",
+    "`m` Mark adds matching entries, `u` Unmark removes them, and `r` Replace clears all pane marks and marks the visible matches. While typing, use `Alt+m` / `Alt+u` / `Alt+r`.",
     "`Enter` in Pattern moves to an available action; press `Enter` again to apply it. Correct invalid or overlong expressions before applying. Close Help to return to the form; `Esc` then cancels it without changing marks.",
 ];
 const TRANSFER: &[&str] = &[

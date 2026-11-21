@@ -1,4 +1,4 @@
-//! Pattern marking is bounded by the native identities visible when opened.
+//! Pattern matches use the native identities visible when opened.
 use super::{Pane, pane::same_object};
 use crate::fs::Identity;
 use std::{cell::RefCell, collections::HashMap, path::PathBuf};
@@ -37,7 +37,7 @@ pub enum PatternOperation {
     Mark,
     /// Remove matching visible marks.
     Unmark,
-    /// Replace only marks in the captured visible working set.
+    /// Clear all pane marks, then mark matching visible identities.
     Replace,
 }
 
@@ -56,6 +56,7 @@ pub enum PatternControl {
 pub struct PatternPreview {
     pub matches: usize,
     pub visible: usize,
+    /// All marks in this pane, including excluded entries cleared by Replace.
     pub marked: usize,
 }
 
@@ -247,11 +248,7 @@ impl PatternSelection {
                 .filter(|e| matcher.is_match(e.name.as_encoded_bytes()))
                 .count(),
             visible: self.scope.len(),
-            marked: self
-                .scope
-                .keys()
-                .filter(|path| pane.marks.contains_key(*path))
-                .count(),
+            marked: pane.marks.len(),
         })
     }
 
@@ -277,7 +274,7 @@ impl PatternSelection {
         cache.as_ref().unwrap().result.clone()
     }
 
-    /// Revalidate immediately, then apply only this explicit visible-mark change.
+    /// Revalidate before changing marks; Replace clears all pane marks first.
     ///
     /// # Errors
     /// Invalid expressions and changed/unavailable listings leave marks untouched.
@@ -292,14 +289,13 @@ impl PatternSelection {
         let mut preview = PatternPreview {
             matches: 0,
             visible: self.scope.len(),
-            marked: self
-                .scope
-                .keys()
-                .filter(|path| pane.marks.contains_key(*path))
-                .count(),
+            marked: pane.marks.len(),
         };
         pane.reset_range();
         pane.selection_revision = pane.selection_revision.wrapping_add(1);
+        if operation == PatternOperation::Replace {
+            pane.marks.clear();
+        }
         for i in &pane.visible {
             let entry = &pane.entries[*i];
             if self.scope.contains_key(&entry.path) {
@@ -326,9 +322,6 @@ impl PatternSelection {
                 marks
                     .entry(entry.path.clone())
                     .or_insert_with(|| identity.clone());
-            }
-            PatternOperation::Replace => {
-                marks.remove(&entry.path);
             }
             PatternOperation::Unmark if matched => {
                 marks.remove(&entry.path);

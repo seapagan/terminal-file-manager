@@ -23,7 +23,7 @@ fn extension<'a>(entry: &'a Entry, compounds: &'a [String], final_only: bool) ->
 }
 
 impl Pane {
-    /// Replace visible marks with the highlighted file's exact or final extension class.
+    /// Replace all pane marks with visible files matching the highlighted extension.
     pub fn mark_extension(&mut self, compounds: &[String], final_only: bool) {
         if self.error.is_some() || self.pending.is_some() {
             return;
@@ -41,7 +41,9 @@ impl Pane {
             .filter(|entry| extension(entry, compounds, final_only) == Some(reference))
             .map(|entry| (entry.path.clone(), entry.identity.clone().unwrap()))
             .collect();
-        self.clear_visible();
+        self.reset_range();
+        self.selection_revision = self.selection_revision.wrapping_add(1);
+        self.marks.clear();
         self.marks.extend(selected);
     }
 }

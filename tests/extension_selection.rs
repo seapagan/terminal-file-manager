@@ -1,4 +1,4 @@
-//! Extension marking uses native names and only replaces the visible working set.
+//! Extension matching replaces pane marks with matching visible native files.
 use crossterm::event::{Event, KeyEvent};
 use std::{path::Path, time::Duration};
 use terminal_file_manager::{
@@ -12,7 +12,9 @@ use terminal_file_manager::{
 fn loaded(path: &Path) -> Controller {
     let mut app = App::new(path.into());
     let snapshot = fs::list(path, &fs::IgnoreContext::isolated(), &Default::default()).unwrap();
-    app.complete_listing(0, 1, Ok(snapshot));
+    for pane in 0..2 {
+        app.complete_listing(pane, 1, Ok(snapshot.clone()));
+    }
     Controller::new(
         app,
         Bindings::new(&Default::default()).unwrap(),
@@ -73,26 +75,74 @@ fn exact_and_final_extension_actions_distinguish_configured_compounds() {
 }
 
 #[test]
-fn filtered_and_hidden_marks_survive_and_invalid_cursors_do_not_expand_scope() {
+fn replacement_clears_hidden_and_filtered_marks_only_in_the_active_pane() {
     let root = tempfile::tempdir().unwrap();
-    for name in ["a.rs", "b.rs", "other.log", ".hidden.rs"] {
+    for name in ["a.rs", "b.rs", "other.log", "no-extension"] {
         std::fs::write(root.path().join(name), "owned").unwrap();
     }
-    let mut c = loaded(root.path());
-    c.app.panes[0].show_hidden = true;
-    c.app.panes[0].refilter();
-    c.app.panes[0].select_all();
-    c.app.panes[0].show_hidden = false;
-    c.app.panes[0].set_filter(".rs".into());
-    c.app.panes[0].cursor = Some(root.path().join("a.rs"));
-    key(&mut c, "Alt+e");
-    assert_eq!(marks(&c), [".hidden.rs", "a.rs", "b.rs", "other.log"]);
-    c.app.panes[0].cursor = Some(root.path().join("absent.rs"));
-    key(&mut c, "Alt+e");
-    assert_eq!(marks(&c).len(), 4);
-    c.app.panes[0].cursor = root.path().parent().map(Path::to_owned);
-    key(&mut c, "Alt+Shift+e");
-    assert_eq!(marks(&c).len(), 4);
+    hidden_file(&root.path().join(".hidden.rs"));
+    for active in 0..2 {
+        for shortcut in ["Alt+e", "Alt+Shift+e"] {
+            let mut c = loaded(root.path());
+            for pane in &mut c.app.panes {
+                pane.show_hidden = true;
+                pane.refilter();
+                pane.select_all();
+            }
+            let other = c.app.panes[1 - active].marks.clone();
+            c.app.active = active;
+            let pane = &mut c.app.panes[active];
+            pane.show_hidden = false;
+            pane.set_filter(".rs".into());
+            pane.cursor = Some(root.path().join("a.rs"));
+            key(&mut c, shortcut);
+            let pane = &c.app.panes[active];
+            assert_eq!(pane.marks.len(), 2);
+            for name in ["a.rs", "b.rs"] {
+                assert!(pane.marks.contains_key(&root.path().join(name)));
+            }
+            assert_eq!(c.app.panes[1 - active].marks, other);
+        }
+    }
+}
+
+#[test]
+fn unusable_extensions_and_invalid_cursors_preserve_all_marks() {
+    let root = tempfile::tempdir().unwrap();
+    for name in ["a.rs", "other.log", "no-extension"] {
+        std::fs::write(root.path().join(name), "owned").unwrap();
+    }
+    hidden_file(&root.path().join(".hidden.rs"));
+    for shortcut in ["Alt+e", "Alt+Shift+e"] {
+        let mut c = loaded(root.path());
+        c.app.panes[0].show_hidden = true;
+        c.app.panes[0].refilter();
+        c.app.panes[0].select_all();
+        c.app.panes[0].show_hidden = false;
+        c.app.panes[0].set_filter("no-extension".into());
+        let before = c.app.panes[0].marks.clone();
+        for target in [
+            Some(root.path().join("no-extension")),
+            Some(root.path().join("absent.rs")),
+            root.path().parent().map(Path::to_owned),
+            None,
+        ] {
+            c.app.panes[0].cursor = target;
+            key(&mut c, shortcut);
+            assert_eq!(c.app.panes[0].marks, before);
+        }
+    }
+}
+
+fn hidden_file(path: &Path) {
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        options.attributes(2);
+    }
+    options.open(path).unwrap();
 }
 
 #[test]

@@ -100,7 +100,7 @@ fn assert_decision_context(
     assert!(text.contains("Matches: 2 / 3 selectable"));
     let compact: String = text.chars().filter(|c| !c.is_whitespace()).collect();
     assert!(
-        compact.contains(&format!("Replace:{marked}visiblemarks->2matches")),
+        compact.contains(&format!("Replace:{marked}totalmarks->2matches")),
         "{text:?}"
     );
 }

@@ -110,13 +110,13 @@ define_commands! {
         HelpSection::Selection,
         "Clear visible marks",
     ),
-    (Action::MarkExtension, HelpSection::Selection, "Mark visible files with the highlighted extension class"),
-    (Action::MarkFinalExtension, HelpSection::Selection, "Mark visible files with the highlighted final extension"),
+    (Action::MarkExtension, HelpSection::Selection, "Replace pane marks with visible files matching the highlighted extension class"),
+    (Action::MarkFinalExtension, HelpSection::Selection, "Replace pane marks with visible files matching the highlighted final extension"),
     (Action::PathCopy, HelpSection::Selection, "Copy selected names or paths to the clipboard"),
     (
         Action::PatternSelection,
         HelpSection::Selection,
-        "Mark, unmark or replace visible marks (wildcard or regex)",
+        "Mark or unmark visible matches, or replace pane marks (wildcard or regex)",
     ),
     (
         Action::Copy,

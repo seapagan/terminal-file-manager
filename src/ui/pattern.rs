@@ -296,10 +296,7 @@ fn summary_rows(preview: Result<&crate::app::PatternPreview, &str>) -> Vec<Row<P
         Ok(p) => vec![
             Row::plain(format!("Matches: {} / {} selectable", p.matches, p.visible)),
             Row::styled(
-                format!(
-                    "Replace: {} visible marks -> {} matches",
-                    p.marked, p.matches
-                ),
+                format!("Replace: {} total marks -> {} matches", p.marked, p.matches),
                 Role::Warning,
             ),
             Row::plain("Tab selects; Enter activates. Esc cancels."),
