@@ -37,7 +37,7 @@ fn paragraph(text: &str, bindings: &[&str]) -> HelpParagraph {
 
 pub(super) fn text(topic: HelpTopic, app: &App) -> Vec<HelpParagraph> {
     let (action, lines) = match topic {
-        HelpTopic::FullPath => (Action::FullPath, FULL_PATH),
+        HelpTopic::FullPath | HelpTopic::PathCopy => path_text(topic),
         HelpTopic::View(view) => view_text(view),
         HelpTopic::Metadata => return metadata(app),
         HelpTopic::Pattern => (Action::PatternSelection, PATTERN),
@@ -49,6 +49,14 @@ pub(super) fn text(topic: HelpTopic, app: &App) -> Vec<HelpParagraph> {
         HelpTopic::Operation(operation) => operation_text(operation),
     };
     action_paragraphs(app, action, lines)
+}
+
+fn path_text(topic: HelpTopic) -> (Action, &'static [&'static str]) {
+    if topic == HelpTopic::FullPath {
+        (Action::FullPath, FULL_PATH)
+    } else {
+        (Action::PathCopy, crate::path_copy::HELP)
+    }
 }
 
 fn action_paragraphs(app: &App, action: Action, lines: &[&str]) -> Vec<HelpParagraph> {

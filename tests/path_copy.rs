@@ -9,6 +9,9 @@ use terminal_file_manager::{
     ui,
 };
 
+#[path = "path_copy/context_help.rs"]
+mod context_help;
+
 fn controller(root: &Path) -> Controller {
     let mut app = App::new(root.into());
     for pane in 0..2 {

@@ -22,7 +22,9 @@ fn editing(c: &Controller) -> bool {
         || app.help
         || app.popup
         || app.diagnostics
-        || app.context_help.is_some()
+        || app.context_help.as_ref().is_some_and(|help| {
+            help.topic != super::HelpTopic::PathCopy || app.footer_workflow.is_none()
+        })
         || app.pattern.is_some()
         || app.path_picker.is_some()
         || app.profile_menu.is_some()
@@ -40,6 +42,14 @@ impl Controller {
         });
         if stale {
             self.app.footer_workflow = None;
+            if self
+                .app
+                .context_help
+                .as_ref()
+                .is_some_and(|help| help.topic == super::HelpTopic::PathCopy)
+            {
+                self.app.context_help = None;
+            }
         }
         stale
     }
@@ -72,6 +82,9 @@ pub(super) fn handle(c: &mut Controller, event: &Event, g: &Geometry) -> bool {
     }
     if c.reconcile_footer() {
         return false;
+    }
+    if super::help::context_handle(c, event, g) {
+        return true;
     }
     if matches!(event, Event::Resize(..)) {
         return false;
