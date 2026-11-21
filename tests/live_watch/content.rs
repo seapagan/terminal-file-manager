@@ -10,11 +10,15 @@ fn known_child_writes_update_metadata_without_repeated_directory_scans() {
     let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
     let mut watch = Runtime::default();
     let started = Instant::now();
-    std::fs::write(root.path().join("registered"), "owned").unwrap();
-    converge(&mut app, &mut pool, &mut watch, started, "registered");
-    let before = app.panes[0].generation;
-    let metrics = pool.listing_metrics();
+    // READY schedules a full catch-up only after each native watch is registered.
+    until(&mut app, &mut pool, &mut watch, started, |app| {
+        app.panes.iter().all(|p| p.generation > 1)
+    });
+    assert_eq!(pool.listing_metrics().full_scans, 2);
+    assert!(app.notifications.history.is_empty());
     for size in 10..15 {
+        let before = app.panes.each_ref().map(|pane| pane.generation);
+        let metrics = pool.listing_metrics();
         std::fs::write(&file, "x".repeat(size)).unwrap();
         until(&mut app, &mut pool, &mut watch, started, |app| {
             app.panes.iter().all(|p| {
@@ -23,18 +27,29 @@ fn known_child_writes_update_metadata_without_repeated_directory_scans() {
                     .any(|e| e.path == file && e.size == Some(size as u64))
             })
         });
+        // A periodic sweep is required at 30 seconds; this measures native hints before it.
+        assert!(started.elapsed() < Duration::from_secs(30));
+        let after = pool.listing_metrics();
+        let completed: u64 = app
+            .panes
+            .iter()
+            .zip(before)
+            .map(|(pane, generation)| pane.generation - generation)
+            .sum();
+        assert!(
+            completed >= 2,
+            "both panes must complete the {size}-byte update"
+        );
+        assert_eq!(
+            after.full_scans, metrics.full_scans,
+            "known-child {size}-byte update unnecessarily enumerated the directory"
+        );
+        assert_eq!(
+            (after.metadata_refreshes - metrics.metadata_refreshes) as u64,
+            completed,
+            "every completed listing must use targeted metadata refresh"
+        );
     }
-    eprintln!(
-        "Five same-child writes: {} listing requests/pane",
-        app.panes[0].generation - before
-    );
-    let after = pool.listing_metrics();
-    eprintln!(
-        "N5 executed work: full scans {}, metadata refreshes {}",
-        after.full_scans - metrics.full_scans,
-        after.metadata_refreshes - metrics.metadata_refreshes
-    );
-    assert!(after.metadata_refreshes > metrics.metadata_refreshes);
-    assert!(after.full_scans - metrics.full_scans < 10);
+    assert!(app.notifications.history.is_empty());
     assert_manual_listing_matches(&app, root.path());
 }
