@@ -20,12 +20,18 @@ pub(crate) fn value(
         ""
     };
     let budget = width.saturating_sub(super::modal::width(caret));
-    let mut start = 0;
-    for end in crate::editor::boundaries(&text[..position]) {
-        if super::modal::width(&text[end..position]) <= budget {
-            start = end;
+    let mut start = position;
+    let mut used = 0;
+    for pair in crate::editor::boundaries(&text[..position])
+        .windows(2)
+        .rev()
+    {
+        let cells = super::modal::width(&text[pair[0]..pair[1]]);
+        if used + cells > budget {
             break;
         }
+        used += cells;
+        start = pair[0];
     }
     let before = &text[start..position];
     let cursor = super::modal::width(before);
@@ -60,4 +66,30 @@ pub(crate) fn edited(
         width,
         theme,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn long_field_viewports_keep_the_caret_bounded() {
+        let theme = Theme::new(colored_text::ColorLevel::NoColor);
+        for size in [8192, 65_536] {
+            check_viewport(size, &theme);
+        }
+    }
+    fn check_viewport(size: usize, theme: &Theme) {
+        let text = "x".repeat(size);
+        let started = std::time::Instant::now();
+        for position in [0, 1, size / 2, text.len()] {
+            let (line, cursor) = value(&text, position, false, true, 20, theme);
+            assert!(line.width() <= 20);
+            assert!(cursor < 20);
+            assert!(line.to_string().contains('▏'));
+        }
+        eprintln!(
+            "{size}-byte field viewport samples: {:?}",
+            started.elapsed()
+        );
+    }
 }
