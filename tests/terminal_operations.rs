@@ -396,12 +396,7 @@ fn view_dialog_help_and_profile_editing_cross_the_native_terminal_parser() {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("view-help-sentinel"), b"preserved").unwrap();
     for (open, title, help, restored) in [
-        (
-            "V",
-            "Human sizes",
-            "View Options Help",
-            "Keep filter on navigation",
-        ),
+        ("V", "Human sizes", "View Options Help", "Attributes"),
         (
             "\x1bv",
             "View profiles",
@@ -415,8 +410,8 @@ fn view_dialog_help_and_profile_editing_cross_the_native_terminal_parser() {
                 ("view-help-sentinel", open),
                 (title, "?"),
                 (help, "\x1b"),
-                // Observe a restored body row: the taller menu hint can remain
-                // outside the Help overlay and need no repaint on close.
+                // Observe a repainted body-label prefix left of transient toasts.
+                // The taller menu hint may remain outside the Help overlay.
                 (restored, "\x03"),
             ],
             false,
