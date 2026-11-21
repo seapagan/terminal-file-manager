@@ -263,7 +263,7 @@ fn pattern_selection_alt_b_paste_mark_and_cancel_work_in_native_terminal() {
             ("Matches: 1 / 1 selectable", "\r\r"),
             ("[*]", "\x1bb"),
             ("Pattern selection", "\x1bk\x1b[200~missing\x1b[201~\x1b"),
-            ("selection cancelle", "q"),
+            ("Pattern selection cancelled", "q"),
         ],
         true,
     );
@@ -286,7 +286,7 @@ fn pattern_alt_controls_and_literal_letters_cross_the_native_terminal_parser() {
             ("[*]", "\x1bb"),
             ("Pattern selection", "\x1bx"),
             ("Regex searches", "\x1b"),
-            ("cancelled", "\x1bb"),
+            ("Pattern selection cancelled", "\x1bb"),
             ("Pattern selection", "\x1bw\x1b[200~*\x1b[201~"),
             ("Matches: 1 / 1 selectable", "\x1bs\x1bw\x1bu"),
             ("0 visible entries", "q"),
@@ -381,7 +381,7 @@ fn help_synonyms_choose_document_and_context_in_a_native_terminal() {
             ("Pattern selection", "\t?"),
             ("Pattern Help", "\x1b"),
             ("Esc cancels.", "\x1b"),
-            ("cancelled", "q"),
+            ("Pattern selection cancelled", "q"),
         ],
         false,
     );
@@ -396,7 +396,7 @@ fn view_dialog_help_and_profile_editing_cross_the_native_terminal_parser() {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("view-help-sentinel"), b"preserved").unwrap();
     for (open, title, help, restored) in [
-        ("V", "Human sizes", "View Options Help", "Attributes"),
+        ("V", "Human sizes", "View Options Help", "Attributes column"),
         (
             "\x1bv",
             "View profiles",
@@ -410,8 +410,8 @@ fn view_dialog_help_and_profile_editing_cross_the_native_terminal_parser() {
                 ("view-help-sentinel", open),
                 (title, "?"),
                 (help, "\x1b"),
-                // Observe a repainted body-label prefix left of transient toasts.
-                // The taller menu hint may remain outside the Help overlay.
+                // Observe a repainted body row. The taller menu hint can stay
+                // outside the Help overlay without fresh writes on close.
                 (restored, "\x03"),
             ],
             false,

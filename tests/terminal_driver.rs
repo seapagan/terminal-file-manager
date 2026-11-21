@@ -1,4 +1,6 @@
 //! Native driver adapted from Labeldeck 8c0fdea tests/common/terminal.rs (MIT, Grant Ramsay).
+#[path = "terminal_driver/screen.rs"]
+mod screen;
 use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system};
 use std::{
     io::{self, Read, Write},
@@ -202,6 +204,7 @@ fn read_output(mut reader: Box<dyn Read + Send>, sender: mpsc::Sender<io::Result
 #[derive(Default)]
 pub struct Script {
     pending: Vec<u8>,
+    screen: screen::Screen,
     query: [Vec<u8>; 3],
     pub step: usize,
     ansi: u8,
@@ -235,6 +238,7 @@ impl Script {
         writer: &mut dyn Write,
     ) -> io::Result<()> {
         append_visible(&mut self.pending, &mut self.ansi, chunk);
+        self.screen.observe(chunk)?;
         if self.pending.len() > 1_048_576 {
             return Err(io::Error::other("terminal marker buffer exceeded 1 MiB"));
         }
@@ -254,16 +258,16 @@ impl Script {
             }
             buffer.drain(..buffer.len().saturating_sub(query.len() - 1));
         }
-        if let Some((marker, keys)) = steps.get(self.step)
-            && contains(
-                &self.pending,
-                &marker
-                    .bytes()
-                    .filter(|b| !b.is_ascii_whitespace())
-                    .collect::<Vec<_>>(),
-            )
-        {
+        if let Some((marker, keys)) = steps.get(self.step) {
+            let marker: Vec<_> = marker
+                .bytes()
+                .filter(|b| !b.is_ascii_whitespace())
+                .collect();
+            if !contains(&self.pending, &marker) && !self.screen.contains_fresh(&marker) {
+                return writer.flush();
+            }
             self.pending.clear();
+            self.screen.clear_fresh();
             writer.write_all(keys.as_bytes())?;
             self.step += 1;
         }
