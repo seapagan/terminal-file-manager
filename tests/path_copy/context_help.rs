@@ -117,3 +117,75 @@ fn detailed_help_opens_with_f1_and_question_only_in_the_active_workflow() {
         assert!(prose.contains(expected), "{expected}");
     }
 }
+
+fn mouse(c: &mut Controller, x: u16, y: u16) {
+    use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+    let g = ui::geometry(&c.app, Rect::new(0, 0, 120, 24));
+    assert!(
+        c.handle(
+            Event::Mouse(MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: x,
+                row: y,
+                modifiers: KeyModifiers::NONE,
+            }),
+            &g,
+            Default::default()
+        )
+        .is_empty()
+    );
+}
+
+#[test]
+fn title_close_hits_only_its_cells_and_preserves_both_copy_stages() {
+    let root = tempfile::tempdir().unwrap();
+    for keys in ["y", "yc"] {
+        for offset in 0..3 {
+            let mut c = controller(root.path());
+            sequence(&mut c, keys);
+            let before = workflow_state(&c);
+            let base = c.app.relative_path_base.clone();
+            send(&mut c, KeyCode::F(1));
+            let shell = ui::geometry(&c.app, Rect::new(0, 0, 120, 24))
+                .context_help
+                .unwrap()
+                .shell;
+            let close = shell.close.unwrap();
+            for (x, y) in [
+                (close.x - 1, close.y),
+                (close.right(), close.y),
+                (close.x, close.y + 1),
+            ] {
+                mouse(&mut c, x, y);
+                assert!(c.app.context_help.is_some());
+            }
+            mouse(&mut c, close.x + offset, close.y);
+            assert!(c.app.context_help.is_none());
+            assert_eq!(workflow_state(&c), before);
+            assert_eq!(c.app.relative_path_base, base);
+            assert!(c.path_copy_request.is_none() && c.path_base_request.is_none());
+            send(&mut c, KeyCode::Esc);
+            assert!(c.app.footer_workflow.is_none());
+        }
+    }
+}
+
+#[test]
+fn mouse_close_does_not_consume_copy_input_history() {
+    let root = tempfile::tempdir().unwrap();
+    let mut c = controller(root.path());
+    sequence(&mut c, "yc");
+    for _ in 2..terminal_file_manager::workflow::MAX_INPUTS - 1 {
+        send(&mut c, KeyCode::Up);
+    }
+    send(&mut c, KeyCode::F(1));
+    let close = ui::geometry(&c.app, Rect::new(0, 0, 120, 24))
+        .context_help
+        .unwrap()
+        .shell
+        .close
+        .unwrap();
+    mouse(&mut c, close.x + 1, close.y);
+    send(&mut c, KeyCode::Char('r'));
+    assert_eq!(c.path_copy_request.take().unwrap().prepare().unwrap(), ".");
+}

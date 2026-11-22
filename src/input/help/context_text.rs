@@ -76,6 +76,12 @@ fn path_text(topic: HelpTopic) -> (Action, &'static [&'static str]) {
 
 fn action_paragraphs(app: &App, action: Action, lines: &[&str]) -> Vec<HelpParagraph> {
     let mut text: Vec<_> = lines.iter().map(|line| paragraph(line, &[])).collect();
+    if action == Action::PathCopy {
+        text.push(paragraph(
+            "Save pane locations and the relative-path base on exit: `{}`.",
+            &[bound(app, Action::SaveQuit)],
+        ));
+    }
     if let Some(entry) = app.help_entry(action) {
         text.push(paragraph("Open from the file list: `{}`.", &[&entry.keys]));
     }

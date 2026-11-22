@@ -79,6 +79,45 @@ fn actual_shortcuts_are_styled_and_survive_configured_unicode_and_backticks() {
         assert!(!b[(x, y)].modifier.contains(Modifier::BOLD));
     }
 }
+
+#[test]
+fn copy_path_help_styles_fixed_keys_and_the_effective_opening_binding() {
+    let mut c = controller(&std::collections::BTreeMap::from([
+        ("y".into(), Action::Up),
+        ("Alt+y".into(), Action::PathCopy),
+    ]));
+    c.app.context_help.as_mut().unwrap().topic = HelpTopic::PathCopy;
+    for level in [ColorLevel::NoColor, ColorLevel::TrueColor] {
+        let theme = Theme::new(level);
+        let (b, body) = draw(&c.app, Rect::new(0, 0, 100, 180), level);
+        for key in [
+            "F1",
+            "?",
+            "Esc",
+            "m Marked",
+            "h Highlighted",
+            "c Current",
+            "n Name",
+            "r Relative",
+            "f Full",
+            "Enter",
+            "Backspace",
+            "Shift+s",
+            "Ctrl+c",
+            "F5",
+            "F6",
+            "Alt+y",
+        ] {
+            let (x, y) = find(&b, body, key);
+            assert_eq!(
+                b[(x, y)].fg,
+                theme.style(Role::Key).fg.unwrap_or_default(),
+                "{key}"
+            );
+            assert!(b[(x, y)].modifier.contains(Modifier::BOLD), "{key}");
+        }
+    }
+}
 #[test]
 fn destructive_and_pattern_help_keep_their_case_sensitive_safety_instructions() {
     let cases = [
@@ -133,5 +172,75 @@ fn assert_safety_text(topic: HelpTopic, needles: [&str; 3]) {
         .join(" ");
     for needle in needles {
         assert!(text.contains(needle), "{needle}: {text}");
+    }
+}
+
+fn topics() -> Vec<HelpTopic> {
+    use terminal_file_manager::input::ViewHelpTopic;
+    let mut topics = vec![
+        HelpTopic::FullPath,
+        HelpTopic::PathCopy,
+        HelpTopic::Pattern,
+        HelpTopic::Conflict,
+        HelpTopic::Jobs,
+        HelpTopic::Metadata,
+        HelpTopic::Exit,
+        HelpTopic::Incident,
+    ];
+    topics.extend(
+        [
+            ViewHelpTopic::Options,
+            ViewHelpTopic::Profiles,
+            ViewHelpTopic::SaveProfile,
+        ]
+        .map(HelpTopic::View),
+    );
+    topics.extend(
+        [Action::Sort, Action::Group, Action::Hidden, Action::Ignore].map(HelpTopic::Policy),
+    );
+    topics.extend(
+        [
+            Operation::Copy,
+            Operation::Move,
+            Operation::Mkdir,
+            Operation::CreateFile,
+            Operation::Rename,
+            Operation::Trash,
+            Operation::Delete,
+            Operation::Permissions(0o600),
+            Operation::ReadOnly(true),
+        ]
+        .map(HelpTopic::Operation),
+    );
+    topics
+}
+
+#[test]
+fn title_close_and_shortcut_styles_work_for_each_contextual_topic() {
+    use crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    for topic in topics() {
+        let mut c = controller(&Default::default());
+        c.app.context_help.as_mut().unwrap().topic = topic;
+        let (buffer, body) = draw(&c.app, Rect::new(0, 0, 100, 180), ColorLevel::TrueColor);
+        let (x, y) = find(&buffer, body, "Esc");
+        assert!(
+            buffer[(x, y)].modifier.contains(Modifier::BOLD),
+            "{topic:?}"
+        );
+        let g = ui::geometry(&c.app, Rect::new(0, 0, 100, 30));
+        let close = g.context_help.as_ref().unwrap().shell.close.unwrap();
+        c.handle(
+            Event::Mouse(MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: close.x + 1,
+                row: close.y,
+                modifiers: KeyModifiers::NONE,
+            }),
+            &g,
+            Default::default(),
+        );
+        assert!(c.app.context_help.is_none(), "{topic:?}");
+        assert!(c.app.operations.dialog.is_some(), "{topic:?}");
+        assert!(c.app.operations.outbox.is_empty());
     }
 }

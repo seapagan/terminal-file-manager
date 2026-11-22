@@ -231,7 +231,7 @@ fn overlay(c: &mut Controller, event: &Event, geometry: &Geometry) {
         return;
     }
     if matches!(event, Event::Key(key) if key.kind == KeyEventKind::Press && key.code == KeyCode::Esc)
-        || matches!(event, Event::Mouse(mouse) if mouse.kind == MouseEventKind::Down(MouseButton::Left) && geometry.context_help.as_ref().is_some_and(|layout| layout.shell.hit(mouse.column, mouse.row).is_some()))
+        || matches!(event, Event::Mouse(mouse) if mouse.kind == MouseEventKind::Down(MouseButton::Left) && geometry.context_help.as_ref().is_some_and(|layout| (layout.shell.hit(mouse.column, mouse.row).is_some() || layout.shell.close.is_some_and(|area| area.contains((mouse.column, mouse.row).into())))))
     {
         c.app.context_help = None;
         return;
