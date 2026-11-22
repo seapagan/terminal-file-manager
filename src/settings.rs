@@ -25,7 +25,9 @@ pub enum MetadataPresentation {
 #[serde(default, deny_unknown_fields)]
 pub struct Settings {
     pub keep_filter_on_navigation: bool,
-    pub compound_extensions: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compound_extensions: Option<Vec<String>>,
+    pub compound_extensions_extend: Vec<String>,
     pub pattern_mode: crate::app::PatternMode,
     pub pattern_case_sensitive: bool,
     pub clipboard: crate::path_copy::Preferences,
@@ -58,17 +60,8 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             keep_filter_on_navigation: false,
-            compound_extensions: [
-                ".tar.gz",
-                ".tar.xz",
-                ".tar.bz2",
-                ".tar.zst",
-                ".tar.lz",
-                ".tar.lzma",
-                ".tar.Z",
-            ]
-            .map(str::to_owned)
-            .to_vec(),
+            compound_extensions: None,
+            compound_extensions_extend: Vec::new(),
             pattern_mode: crate::app::PatternMode::Wildcard,
             pattern_case_sensitive: true,
             clipboard: Default::default(),
@@ -141,17 +134,49 @@ impl Settings {
         Ok(settings)
     }
 
+    /// Resolve defaults or an explicit replacement, then append unique additions.
+    pub fn effective_compound_extensions(&self) -> Vec<String> {
+        let defaults = [
+            ".tar.gz",
+            ".tar.xz",
+            ".tar.bz2",
+            ".tar.zst",
+            ".tar.lz",
+            ".tar.lzma",
+            ".tar.Z",
+        ]
+        .map(str::to_owned);
+        let base = self.compound_extensions.as_deref().unwrap_or(&defaults);
+        let mut effective = Vec::new();
+        for suffix in base.iter().chain(&self.compound_extensions_extend) {
+            if !effective.contains(suffix) {
+                effective.push(suffix.clone());
+            }
+        }
+        effective
+    }
+
     fn validate_compound_extensions(&self) -> Result<(), String> {
-        if self.compound_extensions.iter().any(|s| {
-            !s.starts_with('.')
-                || s.len() < 2
-                || s.ends_with('.')
-                || s.chars().any(|c| c.is_control() || matches!(c, '/' | '\\'))
-        }) {
-            return Err(
-                "compound_extensions must contain dotted filename suffixes without path separators"
-                    .into(),
-            );
+        for (name, suffixes) in [
+            (
+                "compound_extensions",
+                self.compound_extensions.as_deref().unwrap_or_default(),
+            ),
+            (
+                "compound_extensions_extend",
+                self.compound_extensions_extend.as_slice(),
+            ),
+        ] {
+            if suffixes.iter().any(|s| {
+                !s.starts_with('.')
+                    || s.len() < 2
+                    || s.ends_with('.')
+                    || s.chars().any(|c| c.is_control() || matches!(c, '/' | '\\'))
+            }) {
+                return Err(format!(
+                    "{name} must contain dotted filename suffixes without path separators"
+                ));
+            }
         }
         Ok(())
     }

@@ -176,12 +176,31 @@ attribute. Windows permissions still determine access.
 Use `Alt+e` to select visible files with the same extension as the highlighted
 file. Configured compound extensions such as `.tar.gz` stay distinct from `.gz`.
 Use `Alt+Shift+e` to match the final extension, including both `.gz` and `.tar.gz`
-files. Set `compound_extensions` in `config.toml` to choose which compound
-extensions TFM recognises. The defaults are:
+files. By default, TFM recognises seven compound extensions: `.tar.gz`,
+`.tar.xz`, `.tar.bz2`, `.tar.zst`, `.tar.lz`, `.tar.lzma` and `.tar.Z`.
+
+To add extensions while keeping these defaults, set this in `config.toml`:
 
 ```toml
-compound_extensions = [".tar.gz", ".tar.xz", ".tar.bz2", ".tar.zst", ".tar.lz", ".tar.lzma", ".tar.Z"]
+compound_extensions_extend = [".tar.br", ".user.js"]
 ```
+
+To replace the defaults, use `compound_extensions`:
+
+```toml
+compound_extensions = [".tar.gz", ".tar.xz"]
+```
+
+You can combine both settings. This recognises only the four listed extensions:
+
+```toml
+compound_extensions = [".tar.gz", ".tar.xz"]
+compound_extensions_extend = [".tar.br", ".user.js"]
+```
+
+An empty replacement (`compound_extensions = []`) disables the defaults; any
+additions still apply. An empty additive list has no effect. Matching is case
+sensitive. Duplicate extensions count once, keeping their first occurrence.
 
 Both shortcuts clear all marks in the active pane, including marks on hidden
 and filtered-out entries, then mark visible matches. The other pane keeps its
