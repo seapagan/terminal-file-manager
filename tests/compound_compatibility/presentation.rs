@@ -116,7 +116,7 @@ fn responsive_action_groups_remain_centered_clickable_and_separate_from_the_body
         "compound_extensions_extend = ['.tar.gz', '.user.js']",
     ] {
         let c = controller(settings, "0.1.0");
-        for width in [32, 40, 60, 80, 120] {
+        for width in [28, 32, 40, 60, 80, 120] {
             let (_, g) = draw(&c, width, 30);
             let layout = g.compound_extension_review.unwrap();
             assert_eq!(layout.shell.actions.len(), 2, "width {width}");

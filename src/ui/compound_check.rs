@@ -238,11 +238,24 @@ pub(super) fn layout(app: &App, area: Rect) -> Option<CheckLayout> {
     };
     let measured = spec.measure(area, |width| rows(review, width).len());
     let footer_rows = super::text::wrap_words(HINT, usize::from(measured.body.width)).len() as u16;
-    let mut shell = modal::Spec {
+    let spec = modal::Spec {
         footer_rows,
         ..spec
+    };
+    let mut shell = spec.measure(area, |width| rows(review, width).len());
+    if shell.actions.len() < actions.len() {
+        let expanded = modal::Layout::viewport(
+            &spec,
+            Rect {
+                x: area.x,
+                width: area.width,
+                ..shell.outer
+            },
+        );
+        if expanded.actions.len() == actions.len() {
+            shell = expanded;
+        }
     }
-    .measure(area, |width| rows(review, width).len());
     if shell.body.height == 0 || shell.body.width == 0 {
         for region in &mut shell.actions {
             region.action.enabled &= region.action.intent == CheckIntent::Keep;
