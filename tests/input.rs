@@ -159,7 +159,7 @@ fn help_lists_effective_bindings_and_centres_the_action_table() {
         .collect::<Vec<_>>();
     let pane_row = rows
         .iter()
-        .find(|row| row.contains("Toggle one/two panes"))
+        .find(|row| row.contains("Switch between one and two panes"))
         .unwrap();
     assert!(pane_row.contains("F12"));
     assert!(!pane_row.contains("Ctrl+P"));

@@ -41,7 +41,7 @@ define_commands! {
     (
         Action::Enter,
         HelpSection::Navigation,
-        "Open a directory or focused ..; files are not launched",
+        "Open a directory or ..; files stay unopened",
     ),
     (Action::Parent, HelpSection::Navigation, "Parent directory"),
     (
@@ -63,7 +63,7 @@ define_commands! {
     (Action::PageUp, HelpSection::Navigation, "Previous page"),
     (Action::Home, HelpSection::Navigation, "First row (.. when available)"),
     (Action::End, HelpSection::Navigation, "Last entry"),
-    (Action::FullPath, HelpSection::Navigation, "Open full path picker"),
+    (Action::FullPath, HelpSection::Navigation, "Choose a parent directory from the full path"),
     (
         Action::Path,
         HelpSection::Navigation,
@@ -177,7 +177,7 @@ define_commands! {
     (
         Action::TogglePanes,
         HelpSection::Panes,
-        "Toggle one/two panes",
+        "Switch between one and two panes",
     ),
     (
         Action::Maximise,
@@ -202,7 +202,7 @@ define_commands! {
     (
         Action::Hidden,
         HelpSection::Views,
-        "Toggle hidden entries (h beside the type indicator)",
+        "Show or hide hidden entries",
     ),
     (Action::Sort, HelpSection::Views, "Cycle sort order"),
     (
@@ -213,12 +213,12 @@ define_commands! {
     (
         Action::Group,
         HelpSection::Views,
-        "Cycle directory grouping First/Last/Mixed",
+        "Cycle directory grouping: First, Last, Mixed",
     ),
     (
         Action::Ignore,
         HelpSection::Views,
-        "Cycle Git-ignore Dim/Hide/Off",
+        "Cycle Git-ignore display: Dim, Hide, Off",
     ),
     (Action::SortMenu, HelpSection::Views, "Choose sort order from a popup"),
     (Action::GroupMenu, HelpSection::Views, "Choose directory grouping from a popup"),
@@ -227,17 +227,17 @@ define_commands! {
     (
         Action::Info,
         HelpSection::Views,
-        "Show file information in your chosen view",
+        "Show file information",
     ),
     (
         Action::Metadata,
         HelpSection::Views,
-        "Open or close the floating metadata popup",
+        "Open or close file information popup",
     ),
     (
         Action::ToggleSidebar,
         HelpSection::Views,
-        "Show file information sidebar (wide single pane)",
+        "Show file information sidebar in a wide single pane",
     ),
     (
         Action::Count,
@@ -301,9 +301,9 @@ define_commands! {
         HelpSection::Views,
         "File editor (not available yet)",
     ),
-    (Action::DismissToast, HelpSection::Jobs, "Dismiss oldest visible toast; available in all interfaces"),
-    (Action::DismissToasts, HelpSection::Jobs, "Dismiss all active toasts; keep notification history and Jobs evidence"),
-    (Action::Notifications, HelpSection::Jobs, "Read noteworthy events and file-operation results; Enter opens linked Jobs evidence"),
+    (Action::DismissToast, HelpSection::Jobs, "Dismiss the oldest visible notification"),
+    (Action::DismissToasts, HelpSection::Jobs, "Dismiss active notifications; keep history and Jobs evidence"),
+    (Action::Notifications, HelpSection::Jobs, "Read notification history; Enter opens linked Jobs evidence"),
     (Action::Help, HelpSection::Application, "Help"),
     (
         Action::Cancel,
@@ -313,12 +313,12 @@ define_commands! {
     (
         Action::Quit,
         HelpSection::Application,
-        "Quit without saving pane locations",
+        "Quit without saving the navigation session",
     ),
     (
         Action::SaveQuit,
         HelpSection::Application,
-        "Save pane locations and quit",
+        "Save the navigation session and quit",
     ),
     (
         Action::Diagnostics,

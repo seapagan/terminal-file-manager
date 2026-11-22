@@ -85,6 +85,8 @@ fn copy_path_help_styles_fixed_keys_and_the_effective_opening_binding() {
     let mut c = controller(&std::collections::BTreeMap::from([
         ("y".into(), Action::Up),
         ("Alt+y".into(), Action::PathCopy),
+        ("Shift+q".into(), Action::Up),
+        ("Alt+q".into(), Action::SaveQuit),
     ]));
     c.app.context_help.as_mut().unwrap().topic = HelpTopic::PathCopy;
     for level in [ColorLevel::NoColor, ColorLevel::TrueColor] {
@@ -107,6 +109,7 @@ fn copy_path_help_styles_fixed_keys_and_the_effective_opening_binding() {
             "F5",
             "F6",
             "Alt+y",
+            "Alt+q",
         ] {
             let (x, y) = find(&b, body, key);
             assert_eq!(
@@ -156,6 +159,30 @@ fn destructive_and_pattern_help_keep_their_case_sensitive_safety_instructions() 
     ];
     for (topic, needles) in cases {
         assert_safety_text(topic, needles);
+    }
+}
+
+#[test]
+fn copy_help_keeps_clipboard_limits_compatibility_and_failure_guarantees() {
+    for needles in [
+        [
+            "Clipboard commands time out after three seconds.",
+            "Text limit: 16 MiB.",
+            "74,991 UTF-8 bytes.",
+        ],
+        ["wl-copy on Wayland", "xclip/xsel on X11", "pbcopy on macOS"],
+        [
+            "native Windows clipboard",
+            "clipboard.osc52_fallback = true",
+            "GNU screen and dumb/unknown terminals are unsupported.",
+        ],
+        [
+            "tmux needs set-clipboard on and outer terminal support",
+            "The terminal may refuse the text",
+            "Non-Unicode paths or paths containing control characters fail without changing the clipboard.",
+        ],
+    ] {
+        assert_safety_text(HelpTopic::PathCopy, needles);
     }
 }
 

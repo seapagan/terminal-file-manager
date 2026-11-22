@@ -7,18 +7,18 @@ pub use request::{BaseRequest, CopyRequest, ValidatedBase};
 mod paths;
 /// Detailed Help opens with `F1` or `?` during Copy Path, including at narrow widths.
 pub const HELP: &[&str] = &[
-    "Press `F1` or `?` during Copy Path to open this Help. `Esc` closes Help and returns to the same choice; press `Esc` again to cancel Copy Path.",
-    "Choose `m` Marked, `h` Highlighted or `c` Current folder, then `n` Name, `r` Relative or `f` Full path. Example: `y h f` copies the highlighted path with the default binding.",
-    "`Enter` accepts the highlighted choice: visible marks first, then the real highlighted entry, then current directory. Full path starts selected. The synthetic .. row is never Highlighted; Current folder still means this directory.",
-    "Copy Path starts with From: choose a direct letter shortcut or press `Enter` for the highlighted default. `Backspace` returns to the previous stage; `Esc` cancels. Click a displayed choice to activate it. Arrow keys and `Tab` stay inside the workflow without changing the choice; there is no timeout.",
-    "From also offers `s` Set base and `Shift+s` Other base. They capture the active or opposite pane directory, confirm the change and exit without copying. Other base requires a valid directory in logical two-pane mode. Relative copies immediately from Format using the selected session base; incomparable roots are disabled.",
-    "The startup base is the first explicit CLI directory, or the process working directory when no directory is supplied. Saved navigation sessions restore their captured base; older sessions use the first pane. Save and quit or --save-session saves it; ordinary quit does not. It is not a configuration preference.",
-    "Relative copying checks that the selected base is an accessible directory. If it was deleted, became unreadable or is no longer a directory, copying fails without changing the clipboard or base. Use Set base or Other base to choose another directory. Name and Full path remain available.",
-    "Copy Path waits for a valid directory listing before activation. Base changes are confirmed after validation; wait for confirmation before copying relative paths.",
-    "The workflow consumes `Ctrl+c`, `F5` and `F6` while open. `Backspace` at From cancels. More than 1,024 recorded inputs cancels with an error; restart the workflow to continue.",
-    "Only visible marks in the active pane are copied, in displayed order, one per LF-delimited line. Directories copy their own path, without traversal. Text is literal and unquoted. Non-Unicode or control-containing paths are rejected without changing the clipboard.",
-    "Local providers: wl-copy on Wayland, xclip/xsel on X11, pbcopy on macOS and native Windows clipboard. Commands have a three-second deadline. Clipboard text is limited to 16 MiB.",
-    "SSH sends OSC 52 to the terminal-side clipboard. Local OSC 52 fallback requires clipboard.osc52_fallback = true. Sent does not mean accepted; the terminal may refuse it. Limit: 74,991 UTF-8 bytes. Zellij uses standard framing; tmux needs set-clipboard on and outer terminal support. GNU screen and dumb/unknown terminals are unsupported.",
+    "Press `F1` or `?` during Copy Path for Help. `Esc` or [×] closes Help; press `Esc` again to cancel Copy Path.",
+    "Choose `m` Marked, `h` Highlighted or `c` Current folder, then `n` Name, `r` Relative or `f` Full path. With the default binding, `y h f` copies the highlighted path.",
+    "`Enter` accepts the highlighted choice. From defaults to visible marks, then a real highlighted entry, then the current folder. Format defaults to Full path. The .. row is navigation only; Current folder means the directory you are browsing.",
+    "Press a choice's letter or click it to continue. `Backspace` returns to From, or cancels if you are there. `Esc` cancels at either stage. Arrow keys and `Tab` leave the choice unchanged. There is no timeout.",
+    "From also offers `s` Set base and `Shift+s` Other base. Choose one to use the active or other pane's directory as the relative-path base. Wait for confirmation; this exits without copying. Other base requires a valid directory in two-pane mode. Relative copies from this session base; paths on incomparable roots are disabled.",
+    "The initial base is the first directory argument, or the working directory if none is given. Restoring a session restores its base; older sessions use the first pane. Save and quit or --save-session saves the base; ordinary quit does not. The base belongs to the navigation session, not configuration.",
+    "Relative requires an accessible directory as its base. If the base was deleted, became unreadable or is no longer a directory, copying fails and leaves the clipboard and base unchanged. Choose Set base or Other base to replace it. Name and Full path remain available.",
+    "Wait for a valid directory listing before starting Copy Path. After setting a base, wait for confirmation before copying relative paths.",
+    "Copy Path consumes `Ctrl+c`, `F5` and `F6` while open. More than 1,024 recorded inputs cancels the workflow with an error; start it again to continue.",
+    "Copy Path uses visible marks from the active pane in display order, one path per line (LF). Directories copy their own path without listing their contents. Text is literal and unquoted. Non-Unicode paths or paths containing control characters fail without changing the clipboard.",
+    "Local clipboard support: wl-copy on Wayland, xclip/xsel on X11, pbcopy on macOS and the native Windows clipboard. Clipboard commands time out after three seconds. Text limit: 16 MiB.",
+    "Over SSH, Copy Path sends OSC 52 to the terminal-side clipboard. For local OSC 52 fallback, set clipboard.osc52_fallback = true. The terminal may refuse the text even after tfm sends it. Limit: 74,991 UTF-8 bytes. Zellij uses standard framing; tmux needs set-clipboard on and outer terminal support. GNU screen and dumb/unknown terminals are unsupported.",
 ];
 use crate::{
     app::App,

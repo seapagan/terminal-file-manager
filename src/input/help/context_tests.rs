@@ -16,7 +16,7 @@ fn view_topics_keep_distinct_titles_prose_and_opening_hints() {
         (
             HelpTopic::View(ViewHelpTopic::Options),
             "View Options Help",
-            "Change how you see",
+            "Change the active pane's display settings.",
             crate::input::Action::ViewOptions,
         ),
         (
