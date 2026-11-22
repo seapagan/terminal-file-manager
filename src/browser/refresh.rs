@@ -4,7 +4,7 @@ use super::{App, Controller, Duration, NativeTerminal, Pool, Theme, Value, io, u
 #[cfg(test)]
 mod tests;
 
-pub(super) fn tick(app: &mut App) -> bool {
+pub(super) fn tick(app: &mut App, width: u16) -> bool {
     let now = std::time::SystemTime::now();
     let elapsed = now.duration_since(app.now).unwrap_or(Duration::MAX);
     if elapsed < Duration::from_secs(1) {
@@ -19,7 +19,7 @@ pub(super) fn tick(app: &mut App) -> bool {
         || app.notifications.open
         || app.operations.active()
         || app.panes.iter().any(|pane| pane.fuzzy_timestamps)
-        || ((app.popup || app.sidebar) && app.metadata_format(true).fuzzy_timestamps)
+        || ((app.popup || app.sidebar_visible(width)) && app.metadata_format(true).fuzzy_timestamps)
 }
 
 pub(super) fn collect(controller: &mut Controller, pool: &mut Pool) -> bool {

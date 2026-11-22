@@ -178,3 +178,34 @@ fn user_navigation_overrides_creation_focus_even_after_returning_to_original_row
         assert_eq!(controller.app.panes[0].cursor, cursor);
     }
 }
+
+#[test]
+fn hidden_sidebar_does_not_request_metadata_clock_redraw() {
+    for (width, dual, popup, expected) in [
+        (99, false, false, false),
+        (100, false, false, true),
+        (120, true, false, false),
+        (80, false, true, true),
+    ] {
+        let mut app = App::new("owned".into());
+        app.sidebar = true;
+        app.dual = dual;
+        app.popup = popup;
+        app.metadata_formats[0] = Some(app.metadata_format(true));
+        app.metadata_formats[0].as_mut().unwrap().fuzzy_timestamps = true;
+        let geometry = ui::geometry(&app, ratatui::layout::Rect::new(0, 0, width, 24));
+        assert_eq!(geometry.sidebar.is_some(), !dual && width >= 100);
+        app.now = std::time::SystemTime::UNIX_EPOCH;
+        assert_eq!(
+            tick(&mut app, width),
+            expected,
+            "width={width}, dual={dual}, popup={popup}"
+        );
+        app.panes[0].fuzzy_timestamps = true;
+        app.now = std::time::SystemTime::UNIX_EPOCH;
+        assert!(
+            tick(&mut app, width),
+            "listing timestamps still need updates"
+        );
+    }
+}

@@ -129,7 +129,7 @@ fn drive(
     let mut renderer = Renderer::new(ui::geometry(&controller.app, terminal.size()?.into()));
     while !controller.quit {
         dirty |= controller.app.notifications.advance(started.elapsed());
-        dirty |= tick(&mut controller.app);
+        dirty |= tick(&mut controller.app, renderer.geometry.footer.width);
         dirty |= ui::animate_preview(&mut controller.app, started.elapsed());
         dirty |= collect(controller, pool);
         dirty |= operations::collect(controller, jobs, pool);
@@ -422,7 +422,7 @@ mod tests {
             .unwrap()
             .toggle(Action::FuzzyTimestamps);
         c.app.now = std::time::SystemTime::UNIX_EPOCH;
-        assert!(tick(&mut c.app));
+        assert!(tick(&mut c.app, g.footer.width));
         assert!(c.app.panes.iter().all(|p| !p.fuzzy_timestamps));
         assert!(!c.preferences.fuzzy_timestamps && !c.preferences_changed);
     }
@@ -439,7 +439,7 @@ mod tests {
             .toggle(Action::FuzzyTimestamps);
         c.dispatch(Action::Metadata, &g);
         c.app.now = std::time::SystemTime::UNIX_EPOCH;
-        assert!(!tick(&mut c.app));
+        assert!(!tick(&mut c.app, g.footer.width));
     }
 
     pub(super) fn hold_first_count(
