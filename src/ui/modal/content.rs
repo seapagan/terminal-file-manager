@@ -133,6 +133,7 @@ impl<T: Clone> Row<T> {
                 .as_ref()
                 .map_or(0, |label| Line::raw(label).width())
             + Line::raw(super::super::clean(&self.text)).width()
+            + usize::from(self.editor.is_some())
             + self
                 .trailing
                 .as_ref()
