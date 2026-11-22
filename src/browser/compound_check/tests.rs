@@ -117,7 +117,10 @@ fn approved_replacement_and_cleanup_survive_store_reload_without_materializing_d
     let mut store = Some(Store::load(path.clone()).unwrap());
     let mut c = controller(store.as_ref().unwrap().settings.clone());
     c.check_compound_extensions("0.1.0").unwrap();
-    for code in [KeyCode::Char('d'), KeyCode::Char('r'), KeyCode::Enter] {
+    for (index, code) in [KeyCode::Char('d'), KeyCode::Char('r')]
+        .into_iter()
+        .enumerate()
+    {
         let g = crate::ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 120, 40));
         c.handle(
             Event::Key(KeyEvent::new(code, KeyModifiers::NONE)),
@@ -125,6 +128,11 @@ fn approved_replacement_and_cleanup_survive_store_reload_without_materializing_d
             std::time::Duration::ZERO,
         );
         persist(&mut c, &mut store).unwrap();
+        if index == 0 {
+            let pending = Store::load(path.clone()).unwrap().settings;
+            assert!(pending.compound_extensions_checked_version.is_none());
+            assert_eq!(pending.compound_extensions, Some(vec![]));
+        }
     }
     assert!(!c.quit);
     let saved = Store::load(path).unwrap().settings;

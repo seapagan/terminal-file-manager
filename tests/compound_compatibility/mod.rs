@@ -37,16 +37,7 @@ fn key(c: &mut Controller, code: KeyCode) {
 }
 
 fn draw(c: &Controller, width: u16, height: u16) -> (String, ui::Geometry) {
-    let mut t = Terminal::new(TestBackend::new(width, height)).unwrap();
-    let mut geometry = None;
-    t.draw(|frame| {
-        geometry = Some(ui::render(
-            frame,
-            &c.app,
-            &Theme::new(colored_text::ColorLevel::NoColor),
-        ))
-    })
-    .unwrap();
+    let (t, geometry) = canvas(c, width, height, colored_text::ColorLevel::NoColor);
     let buffer = t.backend().buffer();
     let text = (0..height)
         .map(|y| {
@@ -56,5 +47,18 @@ fn draw(c: &Controller, width: u16, height: u16) -> (String, ui::Geometry) {
         })
         .collect::<Vec<_>>()
         .join("\n");
-    (text, geometry.unwrap())
+    (text, geometry)
+}
+
+fn canvas(
+    c: &Controller,
+    width: u16,
+    height: u16,
+    level: colored_text::ColorLevel,
+) -> (Terminal<TestBackend>, ui::Geometry) {
+    let mut t = Terminal::new(TestBackend::new(width, height)).unwrap();
+    let mut geometry = None;
+    t.draw(|frame| geometry = Some(ui::render(frame, &c.app, &Theme::new(level))))
+        .unwrap();
+    (t, geometry.unwrap())
 }

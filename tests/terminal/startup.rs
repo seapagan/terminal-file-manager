@@ -94,7 +94,8 @@ fn startup_compound_review_saves_choices_and_stays_suppressed() {
     drive(
         command,
         &[
-            ("Compound extension compatibility", "dr\r"),
+            ("Compound extension compatibility", "d"),
+            ("Review custom extensions", "r"),
             ("review-ready", "q"),
         ],
         true,

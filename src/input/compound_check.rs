@@ -1,7 +1,7 @@
 //! Startup review captures input until choices are committed or declined.
 use super::Controller;
 use crate::{
-    settings::compound_check::Review,
+    settings::compound_check::{Review, Stage},
     ui::{CheckIntent, Geometry, modal::actions::Group},
 };
 use crossterm::event::{
@@ -20,9 +20,7 @@ impl Controller {
             return Ok(());
         }
         self.app.compound_extension_review = Review::new(&self.preferences, running);
-        if let Some(review) = &mut self.app.compound_extension_review {
-            review.selected = crate::ui::compound_check::actions(review).len() - 2;
-        } else {
+        if self.app.compound_extension_review.is_none() {
             self.preferences.compound_extensions_checked_version = Some(running.into());
             self.completed_compound_check();
         }
@@ -34,9 +32,9 @@ impl Controller {
         self.compound_check_save_pending = true;
     }
 
-    fn finish_compound_check(&mut self, apply: bool) {
+    fn finish_compound_check(&mut self, remove: bool) {
         if let Some(review) = self.app.compound_extension_review.take() {
-            review.complete(&mut self.preferences, apply);
+            review.complete(&mut self.preferences, remove);
             self.completed_compound_check();
         }
     }
@@ -67,12 +65,15 @@ pub(super) fn handle(c: &mut Controller, event: &Event, geometry: &Geometry) -> 
 
 fn activate(c: &mut Controller, intent: CheckIntent) {
     let review = c.app.compound_extension_review.as_mut().unwrap();
-    match intent {
-        CheckIntent::Keep => review.use_defaults = false,
-        CheckIntent::Defaults => review.use_defaults = true,
-        CheckIntent::Remove => review.remove_redundant = !review.remove_redundant,
-        CheckIntent::Continue => c.finish_compound_check(true),
-        CheckIntent::Dismiss => c.finish_compound_check(false),
+    let complete = match (review.stage, intent) {
+        (Stage::Replacement, CheckIntent::Keep | CheckIntent::Defaults | CheckIntent::Dismiss) => {
+            !review.choose_replacement(intent == CheckIntent::Defaults)
+        }
+        (Stage::Additions, CheckIntent::Keep | CheckIntent::Remove | CheckIntent::Dismiss) => true,
+        _ => false,
+    };
+    if complete {
+        c.finish_compound_check(intent == CheckIntent::Remove);
     }
 }
 
@@ -92,6 +93,9 @@ fn key_input(c: &mut Controller, key: KeyEvent, g: &Geometry) -> Option<CheckInt
     }
     let layout = g.compound_extension_review.as_ref()?;
     let review = c.app.compound_extension_review.as_mut().unwrap();
+    if layout.stage != review.stage {
+        return None;
+    }
     if scroll_key(review, layout, key.code) {
         return None;
     }
@@ -157,6 +161,9 @@ fn mouse_input(
     let layout = g.compound_extension_review.as_ref()?;
     let point = (mouse.column, mouse.row).into();
     let review = c.app.compound_extension_review.as_mut().unwrap();
+    if layout.stage != review.stage {
+        return None;
+    }
     match mouse.kind {
         MouseEventKind::Down(MouseButton::Left)
             if layout.shell.close.is_some_and(|r| r.contains(point)) =>

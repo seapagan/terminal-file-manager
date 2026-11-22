@@ -134,9 +134,10 @@ edge when resize is returned first. Native PTY/ConPTY tests exercise resize,
 quit and error/unwind cleanup. `settings` loads before terminal setup and saves
 changed preferences after teardown through an owned same-directory stage.
 Interactive startup also runs a SemVer-gated compound-extension check. The shared
-modal shows replacement differences and safe additive cleanup; only explicit
-choices change either list. Completion records the running version and saves
-immediately through the same atomic store, including checks with no popup.
+modal first resolves replacement differences, then offers additive cleanup only
+for entries already supplied by the chosen base. Each dialog has a safe Keep
+default; only explicit choices change either list. Completion records the running
+version and saves immediately through the same atomic store, including checks with no popup.
 Linked config files fail explicitly. `session` owns a separate strict version-1
 navigation schema: current native locations, relative-path base and layout.
 Unix byte arrays

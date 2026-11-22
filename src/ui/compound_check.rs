@@ -1,159 +1,258 @@
-//! Startup compatibility uses the shared measured, scrollable modal.
+//! Consecutive startup dialogs share measured content, actions and hit testing.
 use super::modal::{self, actions::Action};
 use crate::{
     app::App,
     color::{Role, Theme},
-    settings::compound_check::{Review, difference},
+    settings::compound_check::{Review, Stage, difference},
 };
 use crossterm::event::KeyCode;
-use ratatui::{Frame, layout::Rect, text::Line, widgets::Paragraph};
+use ratatui::{Frame, layout::Rect, widgets::Paragraph};
 
-const TITLE: &str = "Compound extension compatibility";
-const HINT: &str = "Tab/Left/Right: actions; Space/Enter: choose; Up/Down/PgUp/PgDn: scroll";
+const HINT: &str = "Tab/←→: choose  Enter: select  Esc: keep";
+const PREFERRED_WIDTH: u16 = 56;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CheckIntent {
     Keep,
     Defaults,
     Remove,
-    Continue,
     Dismiss,
 }
 
 #[derive(Clone, Debug)]
 pub struct CheckLayout {
     pub shell: modal::Layout<CheckIntent>,
+    pub stage: Stage,
     pub scroll: usize,
     pub limit: usize,
 }
 
+fn title(stage: Stage) -> &'static str {
+    match stage {
+        Stage::Replacement => "Compound extension compatibility",
+        Stage::Additions => "Review custom extensions",
+    }
+}
+
 pub(crate) fn actions(review: &Review) -> Vec<Action<CheckIntent>> {
-    let mut actions = Vec::new();
-    if review.replacement_differs() {
-        actions.push(choice(
-            "Keep my configuration",
-            CheckIntent::Keep,
-            'k',
-            !review.use_defaults,
-        ));
-        actions.push(choice(
-            "Use current defaults",
-            CheckIntent::Defaults,
-            'd',
-            review.use_defaults,
-        ));
-    }
-    if !review.default_additions().is_empty() {
-        let mut remove = choice(
-            "Remove redundant entries",
-            CheckIntent::Remove,
-            'r',
-            review.remove_redundant,
-        );
-        remove.enabled = !review.removable().is_empty();
-        actions.push(remove);
-    }
-    let mut done = Action::custom("Continue", CheckIntent::Continue, KeyCode::Enter);
-    done.enter = true;
-    actions.push(done);
-    let mut dismiss = Action::custom("Esc Keep both lists", CheckIntent::Dismiss, KeyCode::Esc);
-    dismiss.enter = true;
-    actions.push(dismiss);
-    actions
+    let choices = match review.stage {
+        Stage::Replacement => [
+            ("Keep my configuration", CheckIntent::Keep, 'k'),
+            ("Use current defaults", CheckIntent::Defaults, 'd'),
+        ],
+        Stage::Additions => [
+            ("Keep additions", CheckIntent::Keep, 'k'),
+            ("Remove duplicates", CheckIntent::Remove, 'r'),
+        ],
+    };
+    choices
+        .into_iter()
+        .map(|(label, intent, key)| {
+            let mut action = Action::custom(label, intent, KeyCode::Char(key));
+            action.enter = true;
+            action
+        })
+        .collect()
 }
 
-fn choice(label: &str, intent: CheckIntent, key: char, chosen: bool) -> Action<CheckIntent> {
-    let state = if chosen { "On" } else { "Off" };
-    let mut action = Action::custom(
-        format!("{key} {label}: {state}"),
-        intent,
-        KeyCode::Char(key),
+fn prose(rows: &mut Vec<modal::Row<()>>, text: &str, role: Role, width: u16) {
+    rows.extend(
+        super::text::wrap_words(text, usize::from(width))
+            .into_iter()
+            .map(|text| modal::Row::styled(text, role)),
     );
-    action.state = Some((state, Role::Value));
-    action.enter = true;
-    action
 }
 
-fn list(values: &[String]) -> String {
-    format!("{values:?}")
-}
-
-fn rows(review: &Review) -> Vec<modal::Row<()>> {
-    let mut rows = vec![modal::Row::plain(format!(
-        "Review compound extensions for TFM {}. Continue saves your choices; Esc keeps both lists.",
-        review.version
-    ))];
-    if review.replacement_differs() {
-        let configured = review.configured.as_ref().unwrap();
-        rows.extend([
-            modal::Row::styled("Your configured extensions:", Role::Label),
-            modal::Row::plain(list(configured)),
-            modal::Row::styled("Current TFM defaults:", Role::Label),
-            modal::Row::plain(list(&review.defaults)),
-            modal::Row::styled("Differences:", Role::Label),
-            modal::Row::key_value(
-                "Only in your configuration",
-                list(&difference(configured, &review.defaults)),
-            ),
-            modal::Row::key_value(
-                "Only in current defaults",
-                list(&difference(&review.defaults, configured)),
-            ),
-        ]);
+fn group(
+    rows: &mut Vec<modal::Row<()>>,
+    label: &str,
+    values: &[String],
+    marker: &str,
+    role: Role,
+    width: u16,
+) {
+    prose(rows, label, Role::SectionHeader, width);
+    if values.is_empty() {
+        prose(rows, "  No compound extensions", Role::Muted, width);
+    } else {
+        rows.extend(value_rows(values, marker, role, width));
     }
-    if !review.default_additions().is_empty() {
-        let removable = review.removable();
-        rows.extend([
-            modal::Row::styled("Additive entries now in TFM defaults:", Role::Label),
-            modal::Row::plain(list(&review.default_additions())),
-            modal::Row::key_value("Safe to remove with your current choice", list(&removable)),
-            modal::Row::key_value(
-                "Retain to preserve your chosen replacement",
-                list(&difference(&review.default_additions(), &removable)),
-            ),
-            modal::Row::plain(
-                "Removal keeps unrelated custom entries. Leave removal Off to keep all additions.",
-            ),
-        ]);
+}
+
+fn value_rows(values: &[String], marker: &str, role: Role, width: u16) -> Vec<modal::Row<()>> {
+    let indent = " ".repeat(usize::from(width.min(2)));
+    let available = width.saturating_sub(2);
+    let mut rows = Vec::new();
+    let mut row = String::new();
+    for value in values {
+        let token = format!("{marker}{}", super::clean(value));
+        let gap = if row.is_empty() { "" } else { "   " };
+        if modal::width(&row)
+            .saturating_add(modal::width(gap))
+            .saturating_add(modal::width(&token))
+            > available
+        {
+            if !row.is_empty() {
+                rows.push(modal::Row::styled(format!("{indent}{row}"), role));
+                row.clear();
+            }
+            if modal::width(&token) > available {
+                rows.extend(
+                    super::text::wrap_value(&token, usize::from(available))
+                        .into_iter()
+                        .map(|part| modal::Row::styled(format!("{indent}{part}"), role)),
+                );
+                continue;
+            }
+        }
+        if !row.is_empty() {
+            row.push_str("   ");
+        }
+        row.push_str(&token);
+    }
+    if !row.is_empty() {
+        rows.push(modal::Row::styled(format!("{indent}{row}"), role));
     }
     rows
 }
 
-fn lines(review: &Review, width: u16, theme: &Theme) -> Vec<Line<'static>> {
-    rows(review)
-        .into_iter()
-        .flat_map(|row| row.wrap(width))
-        .map(|row| row.line(width, theme))
-        .collect()
+fn replacement_rows(review: &Review, width: u16) -> Vec<modal::Row<()>> {
+    let configured = review.configured.as_ref().unwrap();
+    let mut rows = Vec::new();
+    group(
+        &mut rows,
+        &format!("Your configured extensions ({})", configured.len()),
+        configured,
+        "",
+        Role::Value,
+        width,
+    );
+    rows.push(modal::Row::plain(""));
+    group(
+        &mut rows,
+        &format!("Current TFM defaults ({})", review.defaults.len()),
+        &review.defaults,
+        "",
+        Role::Value,
+        width,
+    );
+    for (label, values, marker, role) in [
+        (
+            "Additional extensions in TFM's defaults",
+            difference(&review.defaults, configured),
+            "+ ",
+            Role::Marked,
+        ),
+        (
+            "Extensions removed by using defaults",
+            difference(configured, &review.defaults),
+            "- ",
+            Role::Warning,
+        ),
+    ] {
+        if !values.is_empty() {
+            rows.push(modal::Row::plain(""));
+            group(&mut rows, label, &values, marker, role, width);
+        }
+    }
+    rows.push(modal::Row::plain(""));
+    prose(
+        &mut rows,
+        "Which list would you like to use?",
+        Role::Label,
+        width,
+    );
+    rows
+}
+
+fn addition_rows(review: &Review, width: u16) -> Vec<modal::Row<()>> {
+    let mut rows = Vec::new();
+    prose(
+        &mut rows,
+        "These additions already occur in your chosen base list.",
+        Role::Value,
+        width,
+    );
+    rows.push(modal::Row::plain(""));
+    group(
+        &mut rows,
+        &format!("Your added extensions ({})", review.additions.len()),
+        &review.additions,
+        "",
+        Role::Value,
+        width,
+    );
+    rows.push(modal::Row::plain(""));
+    let removable = review.removable();
+    group(
+        &mut rows,
+        "Already included",
+        &removable,
+        "✓ ",
+        Role::Marked,
+        width,
+    );
+    let custom = difference(&review.additions, &removable);
+    if !custom.is_empty() {
+        group(
+            &mut rows,
+            "Custom additions to keep",
+            &custom,
+            "",
+            Role::Value,
+            width,
+        );
+    }
+    rows.push(modal::Row::plain(""));
+    prose(
+        &mut rows,
+        "Removal keeps the same recognised compound extensions.",
+        Role::Value,
+        width,
+    );
+    rows
+}
+
+fn rows(review: &Review, width: u16) -> Vec<modal::Row<()>> {
+    match review.stage {
+        Stage::Replacement => replacement_rows(review, width),
+        Stage::Additions => addition_rows(review, width),
+    }
 }
 
 pub(super) fn layout(app: &App, area: Rect) -> Option<CheckLayout> {
     let review = app.compound_extension_review.as_ref()?;
     let actions = actions(review);
-    let mut shell = modal::Spec {
-        title: TITLE,
+    let content_width = rows(review, PREFERRED_WIDTH)
+        .iter()
+        .map(modal::Row::width)
+        .max()
+        .unwrap_or(0);
+    let spec = modal::Spec {
+        title: title(review.stage),
         help: false,
-        content_width: 88,
+        content_width,
         pinned_rows: 0,
-        footer_rows: 2,
+        footer_rows: 0,
         actions: &actions,
+    };
+    let measured = spec.measure(area, |width| rows(review, width).len());
+    let footer_rows = super::text::wrap_words(HINT, usize::from(measured.body.width)).len() as u16;
+    let mut shell = modal::Spec {
+        footer_rows,
+        ..spec
     }
-    .measure(area, |width| {
-        rows(review).into_iter().flat_map(|r| r.wrap(width)).count()
-    });
+    .measure(area, |width| rows(review, width).len());
     if shell.body.height == 0 || shell.body.width == 0 {
         for region in &mut shell.actions {
-            region.action.enabled &= region.action.intent == CheckIntent::Dismiss;
+            region.action.enabled &= region.action.intent == CheckIntent::Keep;
         }
     }
-    let count = rows(review)
-        .into_iter()
-        .flat_map(|r| r.wrap(shell.body.width))
-        .count();
-    let limit = shell.scroll_limit(count);
+    let limit = shell.scroll_limit(rows(review, shell.body.width).len());
     Some(CheckLayout {
-        shell,
+        stage: review.stage,
         scroll: review.scroll.min(limit),
+        shell,
         limit,
     })
 }
@@ -163,11 +262,18 @@ pub(super) fn render(frame: &mut Frame, app: &App, geometry: &super::Geometry, t
         return;
     };
     let review = app.compound_extension_review.as_ref().unwrap();
-    modal::render_measured(frame, &layout.shell, TITLE, theme, Role::Header);
-    let lines: Vec<_> = lines(review, layout.shell.body.width, theme)
+    modal::render_measured(
+        frame,
+        &layout.shell,
+        title(review.stage),
+        theme,
+        Role::Header,
+    );
+    let lines: Vec<_> = rows(review, layout.shell.body.width)
         .into_iter()
         .skip(layout.scroll)
         .take(usize::from(layout.shell.body.height))
+        .map(|row| row.line(layout.shell.body.width, theme))
         .collect();
     frame.render_widget(Paragraph::new(lines), layout.shell.body);
     frame.render_widget(
@@ -180,7 +286,7 @@ pub(super) fn render(frame: &mut Frame, app: &App, geometry: &super::Geometry, t
     if layout.limit > 0 {
         frame.render_widget(
             Paragraph::new(format!(
-                "{} / {} (scroll for all values)",
+                "{} / {} · ↑↓ / PgUp / PgDn",
                 layout.scroll + 1,
                 layout.limit + 1
             ))

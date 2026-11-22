@@ -2,6 +2,13 @@
 use super::Settings;
 use semver::Version;
 
+/// Only one startup dialog is active at a time.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Stage {
+    Replacement,
+    Additions,
+}
+
 /// A startup review owns the exact lists shown to the user.
 #[derive(Clone, Debug)]
 pub struct Review {
@@ -9,8 +16,7 @@ pub struct Review {
     pub configured: Option<Vec<String>>,
     pub defaults: Vec<String>,
     pub additions: Vec<String>,
-    pub use_defaults: bool,
-    pub remove_redundant: bool,
+    pub stage: Stage,
     pub selected: usize,
     pub scroll: usize,
 }
@@ -36,17 +42,19 @@ impl Settings {
 impl Review {
     /// Return a popup only when suffix membership needs a user decision.
     pub fn new(settings: &Settings, version: &str) -> Option<Self> {
-        let review = Self {
+        let mut review = Self {
             version: version.into(),
             configured: settings.compound_extensions.clone(),
             defaults: Settings::default().effective_compound_extensions(),
             additions: settings.compound_extensions_extend.clone(),
-            use_defaults: false,
-            remove_redundant: false,
+            stage: Stage::Replacement,
             selected: 0,
             scroll: 0,
         };
-        (review.replacement_differs() || !review.default_additions().is_empty()).then_some(review)
+        if !review.replacement_differs() {
+            review.stage = Stage::Additions;
+        }
+        (review.stage == Stage::Replacement || !review.removable().is_empty()).then_some(review)
     }
 
     pub fn replacement_differs(&self) -> bool {
@@ -56,39 +64,36 @@ impl Review {
         })
     }
 
-    /// Entries shared with shipped defaults may still be needed by an explicit replacement.
-    pub fn default_additions(&self) -> Vec<String> {
+    /// Removing these entries leaves the chosen base's effective suffixes unchanged.
+    pub fn removable(&self) -> Vec<String> {
+        let base = self.configured.as_ref().unwrap_or(&self.defaults);
         self.additions
             .iter()
-            .filter(|suffix| self.defaults.contains(suffix))
+            .filter(|suffix| base.contains(suffix))
             .cloned()
             .collect()
     }
 
-    /// Removing these entries leaves the selected base's effective suffixes unchanged.
-    pub fn removable(&self) -> Vec<String> {
-        let base = if self.use_defaults {
-            &self.defaults
-        } else {
-            self.configured.as_ref().unwrap_or(&self.defaults)
-        };
-        self.default_additions()
-            .into_iter()
-            .filter(|suffix| base.contains(suffix))
-            .collect()
+    /// Resolve the replacement first, then recalculate whether cleanup is relevant.
+    pub fn choose_replacement(&mut self, use_defaults: bool) -> bool {
+        if use_defaults {
+            self.configured = None;
+        }
+        self.stage = Stage::Additions;
+        self.selected = 0;
+        self.scroll = 0;
+        !self.removable().is_empty()
     }
 
-    /// Dismissal declines both changes, even after editing the tentative choices.
-    pub fn complete(self, settings: &mut Settings, apply: bool) {
-        if apply && self.remove_redundant {
+    /// Save approved replacement choices and optionally the identified safe cleanup.
+    pub fn complete(self, settings: &mut Settings, remove: bool) {
+        if remove && self.stage == Stage::Additions {
             let removable = self.removable();
             settings
                 .compound_extensions_extend
                 .retain(|s| !removable.contains(s));
         }
-        if apply && self.use_defaults {
-            settings.compound_extensions = None;
-        }
+        settings.compound_extensions = self.configured;
         settings.compound_extensions_checked_version = Some(self.version);
     }
 }

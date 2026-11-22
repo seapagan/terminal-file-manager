@@ -203,22 +203,26 @@ additions still apply. An empty additive list has no effect. Matching is case
 sensitive. Duplicate extensions count once, keeping their first occurrence.
 
 On the first interactive start of each newer TFM version, TFM checks these
-settings against its shipped defaults. If your replacement differs, the popup
-shows your complete list, the current defaults and the extensions unique to
-each. Choose **Keep my configuration** or **Use current defaults**. Choosing
-defaults removes the replacement setting.
+settings against its shipped defaults. If your replacement differs, the first
+dialog shows your complete list, the current defaults and their differences.
+Choose **Keep my configuration** or **Use current defaults**. Choosing defaults
+removes the replacement setting.
 
-The same popup shows additive entries now included in the defaults. You can
-turn **Remove redundant entries** on to remove the listed safe entries, while
-keeping unrelated custom extensions. Entries excluded by your chosen replacement
-stay in the additive list. The popup updates the cleanup list when you change
-your replacement choice.
+TFM then checks your additions against the chosen base list. If it finds
+duplicates, a second dialog shows those entries and the custom additions to
+keep. Choose **Keep additions** or **Remove duplicates**. Entries excluded by a
+retained replacement stay in the additive list.
 
-Use Tab or Left/Right to focus an action and Space or Enter to choose it.
-Use Up/Down or Page Up/Page Down to scroll long lists. **Continue** saves your
-choices; Esc or the close control keeps both original lists. Either completes
-the check. TFM saves the configuration immediately, even when no popup or other
-preference change is needed, and maintains this marker:
+Each dialog starts with its Keep action focused. Use Tab or Left/Right to
+choose an action and Space or Enter to select it. An action advances to the
+next applicable dialog, with no extra confirmation step. Use Up/Down or
+Page Up/Page Down to scroll long lists. Esc or the close control keeps the
+current dialog's configuration; choices you approved in an earlier dialog
+remain in effect.
+
+TFM saves the configuration when the sequence completes, including declined
+changes. It also saves a completed check when no dialog or other preference
+change is needed, and maintains this marker:
 
 ```toml
 compound_extensions_checked_version = "0.1.0"
