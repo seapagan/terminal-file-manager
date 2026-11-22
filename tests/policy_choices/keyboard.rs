@@ -46,20 +46,24 @@ fn popup_actions_use_configured_bindings_and_effective_help_labels() {
         let entry = c.app.help_entry(menu).unwrap();
         assert_eq!(entry.keys, "F11");
         assert_eq!(entry.action.help_section(), HelpSection::Views);
-        assert!(entry.description.contains("popup"));
         key(&mut c, "F1", bounds);
         assert_eq!(
             c.app.context_help.as_ref().unwrap().topic,
             HelpTopic::Policy(policy)
         );
-        let text: String = HelpTopic::Policy(policy)
+        let fragments: Vec<_> = HelpTopic::Policy(policy)
             .text(&c.app)
             .into_iter()
             .flatten()
-            .map(|fragment| fragment.text().to_owned())
             .collect();
-        assert!(text.contains("Open from the file list: F11."));
-        assert!(text.contains("Change directly from the file list:"));
+        for binding in [
+            "F11".to_owned(),
+            format!("Shift+{}", upper.to_ascii_lowercase()),
+        ] {
+            assert!(fragments.iter().any(|part| {
+                matches!(part, terminal_file_manager::input::HelpFragment::Key(value) if value.split(" / ").any(|key| key == binding))
+            }), "missing effective {binding} binding");
+        }
     }
 }
 

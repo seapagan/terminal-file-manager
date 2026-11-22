@@ -26,7 +26,11 @@ fn assert_operation_visible(c: &Controller, title: &str) -> ui::Geometry {
         .map(|c| c.symbol())
         .collect();
     assert!(text.contains(title), "{text}");
-    assert!(!text.contains("Choose — Esc cancels"), "{text}");
+    assert!(
+        !text.contains("[ ] Unsorted"),
+        "policy choices leaked: {text}"
+    );
+    assert!(!geometry.operation_controls.is_empty());
     assert!(geometry.policy_menu.is_none());
     geometry
 }

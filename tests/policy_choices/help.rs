@@ -57,7 +57,8 @@ fn shared_help_button_fits_the_dynamic_border_and_help_title_is_rendered() {
         assert_eq!(help.width, 3);
         let (_, rows) = drawn(&c, bounds);
         assert!(rows[usize::from(help.y)].contains("[?]"));
-        assert!(!rows.iter().any(|row| row.contains("Choose")));
+        assert!(rows[usize::from(shell.body.y)].contains("["));
+        assert_eq!(shell.body.y, shell.outer.y + 1);
         click(&mut c, help.x + 1, help.y, bounds);
         let (g, rows) = drawn(&c, bounds);
         assert!(g.context_help.is_some());
@@ -92,38 +93,65 @@ fn narrow_scrolled_policy_menu_returns_from_help_without_committing() {
 }
 
 #[test]
-fn contextual_help_explains_every_option_and_the_key_policy_distinctions() {
+fn contextual_help_identifies_every_option_and_navigation_key() {
+    use terminal_file_manager::input::HelpFragment;
     let c = controller();
-    for (action, options, distinction) in [
+    for (action, options, concepts) in [
         (
             Action::Sort,
             "Natural Name Extension Size Modified Created Kind Version Unsorted",
-            "filesystem's directory-listing order",
+            &["file2", "file10", "directory-listing"][..],
         ),
-        (Action::Group, "First Last Mixed", "enterable directories"),
-        (Action::Hidden, "Hide Show", "hidden entries"),
-        (Action::Ignore, "Dim Hide Off", "normal name styling"),
+        (
+            Action::Group,
+            "First Last Mixed",
+            &["directories", "group"][..],
+        ),
+        (
+            Action::Hidden,
+            "Hide Show",
+            &["hidden", "Unix", "Windows"][..],
+        ),
+        (
+            Action::Ignore,
+            "Dim Hide Off",
+            &["Git-ignored", "marks", "filter"][..],
+        ),
     ] {
-        let text = HelpTopic::Policy(action)
+        let fragments: Vec<_> = HelpTopic::Policy(action)
             .text(&c.app)
             .into_iter()
             .flatten()
-            .map(|fragment| fragment.text().to_owned())
-            .collect::<String>();
-        for option in options.split_whitespace() {
+            .collect();
+        assert_help_content(&fragments, options, concepts);
+        for key in ["Up", "Down", "Home", "End", "Enter", "Esc", "F1"] {
             assert!(
-                text.contains(&format!("‘{option}’")),
-                "{action:?}: {option}"
+                fragments
+                    .iter()
+                    .any(|part| { matches!(part, HelpFragment::Key(value) if value == key) }),
+                "{action:?}: {key}"
             );
         }
-        assert!(text.contains(distinction));
-        assert!(text.contains("Esc") && text.contains("highlighted choice"));
-        if action == Action::Sort {
-            assert!(text.contains("file2 comes before file10"));
-        }
-        if action == Action::Ignore {
-            assert!(text.contains("subdued names") && text.contains("excludes them"));
-        }
+    }
+}
+
+fn assert_help_content(
+    fragments: &[terminal_file_manager::input::HelpFragment],
+    options: &str,
+    concepts: &[&str],
+) {
+    use terminal_file_manager::input::HelpFragment;
+    for option in options.split_whitespace() {
+        assert!(
+            fragments.iter().any(|part| {
+                matches!(part, HelpFragment::Label(label) if label == &format!("‘{option}’"))
+            }),
+            "missing {option} label"
+        );
+    }
+    let text: String = fragments.iter().map(HelpFragment::text).collect();
+    for concept in concepts {
+        assert!(text.contains(concept), "missing {concept}");
     }
 }
 

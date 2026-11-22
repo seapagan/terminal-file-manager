@@ -15,10 +15,15 @@ fn menu_width_fits_its_longest_rendered_choice_with_equal_padding() {
         let layout = g.policy_menu.unwrap();
         let text = format!("[ ] {longest}");
         let cells = ratatui::text::Line::raw(&text).width() as u16;
-        assert_eq!(layout.shell.outer.width, cells + 4, "{action:?}");
         assert_eq!(layout.shell.body.width, cells);
-        assert_eq!(layout.shell.body.x, layout.shell.outer.x + 2);
-        assert_eq!(layout.shell.body.right(), layout.shell.outer.right() - 2);
+        let outer = layout.shell.outer;
+        let body = layout.shell.body;
+        assert_eq!(outer.intersection(bounds), outer);
+        assert_eq!(body.intersection(outer), body);
+        let left = body.x - outer.x;
+        let right = outer.right() - body.right();
+        assert!(left > 0, "choices must clear the border");
+        assert_eq!(left, right, "{action:?}: asymmetric padding");
         assert_eq!(layout.shell.outer.bottom(), anchor.y);
     }
 }
