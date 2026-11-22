@@ -202,6 +202,32 @@ An empty replacement (`compound_extensions = []`) disables the defaults; any
 additions still apply. An empty additive list has no effect. Matching is case
 sensitive. Duplicate extensions count once, keeping their first occurrence.
 
+On the first interactive start of each newer TFM version, TFM checks these
+settings against its shipped defaults. If your replacement differs, the popup
+shows your complete list, the current defaults and the extensions unique to
+each. Choose **Keep my configuration** or **Use current defaults**. Choosing
+defaults removes the replacement setting.
+
+The same popup shows additive entries now included in the defaults. You can
+turn **Remove redundant entries** on to remove the listed safe entries, while
+keeping unrelated custom extensions. Entries excluded by your chosen replacement
+stay in the additive list. The popup updates the cleanup list when you change
+your replacement choice.
+
+Use Tab or Left/Right to focus an action and Space or Enter to choose it.
+Use Up/Down or Page Up/Page Down to scroll long lists. **Continue** saves your
+choices; Esc or the close control keeps both original lists. Either completes
+the check. TFM saves the configuration immediately, even when no popup or other
+preference change is needed, and maintains this marker:
+
+```toml
+compound_extensions_checked_version = "0.1.0"
+```
+
+TFM compares semantic versions, including prereleases. Equal or newer markers
+skip the check and retain their recorded value. An invalid marker produces a
+configuration error.
+
 Both shortcuts clear all marks in the active pane, including marks on hidden
 and filtered-out entries, then mark visible matches. The other pane keeps its
 marks. If the highlighted entry has no usable extension, both shortcuts leave
@@ -323,7 +349,9 @@ and Jobs last for the current run.
 
 ## Configuration
 
-You can use TFM without a configuration file. TFM saves preference changes in
+You can start TFM without a configuration file. On interactive startup, TFM
+creates or updates it to record completed compound-extension checks and saves
+your preference changes in
 `tfm/config.toml` under your platform's configuration directory:
 
 | Platform | Configuration directory |

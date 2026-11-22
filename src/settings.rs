@@ -1,4 +1,5 @@
-//! Optional TOML preferences; no eager writes or navigation persistence.
+//! Validated TOML preferences and atomic persistence.
+pub mod compound_check;
 use crate::{
     app::{App, IgnoreMode},
     input::{Action, Bindings},
@@ -28,6 +29,8 @@ pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compound_extensions: Option<Vec<String>>,
     pub compound_extensions_extend: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compound_extensions_checked_version: Option<String>,
     pub pattern_mode: crate::app::PatternMode,
     pub pattern_case_sensitive: bool,
     pub clipboard: crate::path_copy::Preferences,
@@ -62,6 +65,7 @@ impl Default for Settings {
             keep_filter_on_navigation: false,
             compound_extensions: None,
             compound_extensions_extend: Vec::new(),
+            compound_extensions_checked_version: None,
             pattern_mode: crate::app::PatternMode::Wildcard,
             pattern_case_sensitive: true,
             clipboard: Default::default(),
@@ -178,7 +182,8 @@ impl Settings {
                 ));
             }
         }
-        Ok(())
+        self.compound_check_due(env!("CARGO_PKG_VERSION"))
+            .map(|_| ())
     }
 
     fn validate_colours(&self) -> Result<(), String> {

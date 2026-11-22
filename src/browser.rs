@@ -1,5 +1,6 @@
 //! Runtime orchestration: terminal events and bounded worker results meet here.
 mod clipboard;
+mod compound_check;
 mod operations;
 mod refresh;
 use crate::{
@@ -54,6 +55,8 @@ pub fn run_startup(options: &crate::startup::Startup) -> Result<(), String> {
 fn browse(app: App, settings: Settings, store: &mut Option<Store>) -> Result<(), String> {
     let bindings = Bindings::new(&settings.bindings)?;
     let mut controller = Controller::new(app, bindings, settings.clone());
+    controller.check_compound_extensions(env!("CARGO_PKG_VERSION"))?;
+    compound_check::persist(&mut controller, store)?;
     let mut theme = Theme::for_stdout();
     theme
         .set_path_hover(settings.path_hover.as_deref())
@@ -63,9 +66,6 @@ fn browse(app: App, settings: Settings, store: &mut Option<Store>) -> Result<(),
         .map_err(|e| e.to_string())?;
     let mut pool = Pool::new(IgnoreContext::default()).map_err(|e| e.to_string())?;
     let mut jobs = crate::operations::Queue::new().map_err(|error| error.to_string())?;
-    #[cfg(windows)]
-    let mut owners =
-        crate::owner::windows::runtime::Runtime::new().map_err(|error| error.to_string())?;
     for pane in 0..2 {
         pool.submit(Request {
             pane,
@@ -74,25 +74,31 @@ fn browse(app: App, settings: Settings, store: &mut Option<Store>) -> Result<(),
             kind: RequestKind::Listing,
         });
     }
-    terminal::with_terminal(settings.mouse, |terminal| {
+    run_terminal(&mut controller, &mut pool, &mut jobs, &theme, store)?;
+    save_state(controller, store)
+}
+
+fn run_terminal(
+    controller: &mut Controller,
+    pool: &mut Pool,
+    jobs: &mut crate::operations::Queue,
+    theme: &Theme,
+    store: &mut Option<Store>,
+) -> Result<(), String> {
+    #[cfg(windows)]
+    let mut owners =
+        crate::owner::windows::runtime::Runtime::new().map_err(|error| error.to_string())?;
+    terminal::with_terminal(controller.preferences.mouse, |terminal| {
         #[cfg(windows)]
         {
-            drive(
-                terminal,
-                &mut controller,
-                &mut pool,
-                &mut jobs,
-                &theme,
-                &mut owners,
-            )
+            drive(terminal, controller, pool, jobs, theme, store, &mut owners)
         }
         #[cfg(not(windows))]
         {
-            drive(terminal, &mut controller, &mut pool, &mut jobs, &theme)
+            drive(terminal, controller, pool, jobs, theme, store)
         }
     })
-    .map_err(|e| e.to_string())?;
-    save_state(controller, store)
+    .map_err(|e| e.to_string())
 }
 
 fn save_state(controller: Controller, store: &mut Option<Store>) -> Result<(), String> {
@@ -119,6 +125,7 @@ fn drive(
     pool: &mut Pool,
     jobs: &mut crate::operations::Queue,
     theme: &Theme,
+    store: &mut Option<Store>,
     #[cfg(windows)] owners: &mut crate::owner::windows::runtime::Runtime,
 ) -> io::Result<()> {
     let started = Instant::now();
@@ -147,14 +154,14 @@ fn drive(
             dirty = false;
         }
         if crossterm::event::poll(Duration::from_millis(16))? {
-            let requests = controller.handle(
+            for request in controller.handle(
                 crossterm::event::read()?,
                 &renderer.geometry,
                 started.elapsed(),
-            );
-            for request in requests {
+            ) {
                 pool.submit(request);
             }
+            compound_check::persist(controller, store).map_err(io::Error::other)?;
             operations::submit(controller, jobs);
             clipboard::submit(controller, &mut clipboard);
             dirty = true;

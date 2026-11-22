@@ -144,3 +144,24 @@ fn saving_a_missing_config_keeps_the_replacement_omitted() {
     assert!(reloaded.compound_extensions_extend.is_empty());
     assert_eq!(reloaded.effective_compound_extensions(), DEFAULTS);
 }
+
+#[test]
+fn checked_versions_accept_semver_and_diagnose_invalid_markers() {
+    for version in [
+        "0.1.0",
+        "0.1.0-pre",
+        "0.1.0-beta0",
+        "0.1.0-beta.1",
+        "0.1.0-rc.2",
+    ] {
+        let text = format!("compound_extensions_checked_version = '{version}'");
+        assert!(Settings::parse(&text).is_ok(), "{version}");
+    }
+    for version in ["", "0.1", "v0.1.0", "0.1.0-01", "nonsense"] {
+        let error = Settings::parse(&format!(
+            "compound_extensions_checked_version = '{version}'"
+        ))
+        .unwrap_err();
+        assert!(error.contains("compound_extensions_checked_version"));
+    }
+}

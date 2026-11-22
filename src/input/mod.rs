@@ -1,6 +1,7 @@
 //! One action vocabulary for keyboard and mouse dispatch.
 mod bindings;
 mod click;
+mod compound_check;
 mod controller;
 mod diagnostics;
 mod divider;

@@ -27,7 +27,8 @@ by `colored_text`; plain and coloured output retain the same diagnostic text.
 The M1 browser retains two independent pane models, with configurable one/two-pane
 startup, bounded divider adjustment and temporary active-pane maximisation.
 Cursor, scroll, marks, filter and back/forward history are session-only;
-preferences persist lazily.
+preferences persist after explicit changes, with completed startup compatibility
+checks saved immediately.
 
 `app` owns pure transitions and request generations; `input` maps keyboard and
 mouse to the same application actions. `ui` renders cached data through Ratatui,
@@ -132,6 +133,10 @@ use-dev-tty input source: its default Mio path can lose a keyboard readiness
 edge when resize is returned first. Native PTY/ConPTY tests exercise resize,
 quit and error/unwind cleanup. `settings` loads before terminal setup and saves
 changed preferences after teardown through an owned same-directory stage.
+Interactive startup also runs a SemVer-gated compound-extension check. The shared
+modal shows replacement differences and safe additive cleanup; only explicit
+choices change either list. Completion records the running version and saves
+immediately through the same atomic store, including checks with no popup.
 Linked config files fail explicitly. `session` owns a separate strict version-1
 navigation schema: current native locations, relative-path base and layout.
 Unix byte arrays
@@ -140,8 +145,8 @@ after teardown through the same owned atomic staging; normal quit never replaces
 session bytes. Restore is opt-in and validates both paths without fallback.
 
 The M1 browsing workers do not mutate selected files; completed M2 operations
-use the separate planner and executor below. Only deliberate preference/session
-actions write TFM's own configuration data. Unimplemented viewer/editor and
+use the separate planner and executor below. Deliberate preference/session
+actions and completed startup compatibility checks write TFM's own configuration data. Unimplemented viewer/editor and
 direct-path/zoxide actions explain their later scope instead of falling back to
 a subprocess.
 

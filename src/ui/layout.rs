@@ -4,6 +4,7 @@ use ratatui::layout::Rect;
 /// File panes, optional metadata and stable bottom controls.
 #[derive(Clone, Debug)]
 pub struct Geometry {
+    pub compound_extension_review: Option<super::CheckLayout>,
     pub policy_controls: Vec<super::PolicyControl>,
     pub policy_menu: Option<super::PolicyLayout>,
     pub workflow: Option<super::workflow::Layout>,
@@ -164,6 +165,7 @@ fn initial_geometry(app: &App, area: Rect, height: u16) -> Geometry {
     let pattern = super::pattern::layout(app, bounds);
     let menu_layout = menu_layout(app, bounds);
     Geometry {
+        compound_extension_review: super::compound_check::layout(app, bounds),
         policy_controls: Vec::new(),
         policy_menu: None,
         workflow: None,
