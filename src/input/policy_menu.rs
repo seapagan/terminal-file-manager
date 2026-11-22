@@ -181,7 +181,7 @@ fn commit(c: &mut Controller, g: &Geometry) {
     let menu = c.app.policy_menu.take().unwrap();
     if g.policy_menu
         .as_ref()
-        .is_none_or(|layout| layout.shell.body.height == 0)
+        .is_none_or(|layout| layout.shell.body.height == 0 || layout.shell.body.width == 0)
     {
         return;
     }

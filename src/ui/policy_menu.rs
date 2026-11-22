@@ -36,18 +36,20 @@ pub(super) fn layout(
         .policy_menu
         .as_ref()
         .filter(|_| !policy_menu::preempted(app))?;
-    let anchor = controls
-        .iter()
-        .find(|c| c.pane == menu.pane && c.action == menu.action)?
-        .area;
-    let choices = policy_menu::choices(menu.action);
     let owner = panes
         .get(menu.pane)
         .copied()
         .flatten()
         .unwrap_or(area)
         .intersection(area);
-    let outer = popup_bounds(area, owner, anchor, choices);
+    let anchor = controls
+        .iter()
+        .find(|c| c.pane == menu.pane && c.action == menu.action)
+        .map_or_else(
+            || Rect::new(owner.x, owner.bottom().saturating_sub(2).max(owner.y), 0, 0),
+            |c| c.area,
+        );
+    let outer = popup_bounds(owner, anchor, policy_menu::choices(menu.action));
     let spec = super::modal::Spec {
         title: "",
         help: true,
@@ -77,13 +79,13 @@ pub(super) fn layout(
     Some(PolicyLayout { shell, start })
 }
 
-fn popup_bounds(area: Rect, owner: Rect, anchor: Rect, choices: &[&str]) -> Rect {
+fn popup_bounds(owner: Rect, anchor: Rect, choices: &[&str]) -> Rect {
     let width = choice_width(choices).saturating_add(4).min(owner.width);
-    let available = anchor.y.saturating_sub(area.y);
+    let available = anchor.y.saturating_sub(owner.y);
     let height = (choices.len() as u16 + 2).min(if available >= 3 {
         available
     } else {
-        area.height
+        owner.height
     });
     let x = anchor
         .x
@@ -92,7 +94,7 @@ fn popup_bounds(area: Rect, owner: Rect, anchor: Rect, choices: &[&str]) -> Rect
     let y = if available >= 3 {
         anchor.y.saturating_sub(height)
     } else {
-        area.y
+        owner.y
     };
     Rect::new(x, y, width, height)
 }

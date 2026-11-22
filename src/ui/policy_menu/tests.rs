@@ -67,3 +67,29 @@ fn choice_popups_clamp_to_each_owning_pane_even_when_content_is_wider() {
         }
     }
 }
+
+#[test]
+fn missing_controls_anchor_inside_each_offset_pane_even_at_constrained_heights() {
+    let mut app = App::new("owned".into());
+    for pane in 0..2 {
+        app.policy_menu = Some(PolicyMenu {
+            pane,
+            action: Action::Sort,
+            selected: 8,
+        });
+        for width in [1, 8, 24, 40] {
+            for height in [1, 3, 9] {
+                let bounds = Rect::new(3, 5, width * 2, height);
+                let panes = [
+                    Some(Rect::new(3, 5, width, height)),
+                    Some(Rect::new(3 + width, 5, width, height)),
+                ];
+                let owner = panes[pane].unwrap();
+                let popup = layout(&app, bounds, &[], &panes).unwrap();
+                assert_eq!(popup.shell.outer.intersection(owner), popup.shell.outer);
+                assert_eq!(popup.shell.outer.width, width.min(17));
+                assert_eq!(popup.shell.outer.x, owner.x);
+            }
+        }
+    }
+}

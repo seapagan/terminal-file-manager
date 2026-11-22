@@ -9,6 +9,8 @@ mod direct;
 mod help;
 #[path = "policy_choices/keyboard.rs"]
 mod keyboard;
+#[path = "policy_choices/keyboard_geometry.rs"]
+mod keyboard_geometry;
 #[path = "policy_choices/keyboard_safety.rs"]
 mod keyboard_safety;
 #[path = "policy_choices/priority.rs"]

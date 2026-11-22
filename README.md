@@ -127,10 +127,12 @@ navigation keep the filter.
 Press `S`, `G`, `H` or `I` to open **Sort**, **Group**, **Hidden** or **Ignore**
 choices for the active pane, or click the corresponding control at the bottom
 of a pane. The menu highlights the current setting and opens above the control.
+If the control is hidden at a narrow width, the keyboard shortcut still opens
+the menu near the bottom of the active pane.
 Use Up/Down and Enter, or click a choice; Esc closes the menu without applying
 it. Press F1 or click `[?]` to read about each option. Esc closes Help and returns
-to the same highlighted choice. Lowercase `s`, `g`, `h` and `i` keep their direct cycle or
-toggle behavior. Configure the popup shortcuts with the `sort-menu`,
+to the same highlighted choice. Lowercase `s`, `g`, `h` and `i` keep their direct
+cycle or toggle behavior. Configure the popup shortcuts with the `sort-menu`,
 `group-menu`, `hidden-menu` and `ignore-menu` actions in `[bindings]`.
 
 View Options (Shift+v) also lets you switch between one and two panes for the
