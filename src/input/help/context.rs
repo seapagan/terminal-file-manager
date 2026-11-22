@@ -180,11 +180,11 @@ fn opens_with_key(c: &Controller, key: KeyEvent, topic: HelpTopic) -> bool {
     if key.kind != KeyEventKind::Press {
         return false;
     }
-    if topic == HelpTopic::PathCopy {
-        return question_key(key);
-    }
     if key.code == KeyCode::F(1) && key.modifiers.is_empty() {
         return true;
+    }
+    if topic == HelpTopic::PathCopy {
+        return question_key(key);
     }
     question_key(key)
         && c.bindings.action(key) == Some(crate::input::Action::Help)

@@ -239,7 +239,7 @@ another base or use Name or Full path.
 On Linux, clipboard copying needs `wl-copy` (Wayland) or `xclip`/`xsel` (X11).
 TFM running over SSH copies through OSC 52, which requires terminal support.
 **A `Sent` message means TFM sent the request; your terminal may still reject it.**
-Press `?` during Copy Path for clipboard setup, compatibility and limits.
+Press `F1` or `?` during Copy Path for clipboard setup, compatibility and limits.
 Press `Esc` to return to the same choice, then `Esc` again to cancel.
 
 ## Views and metadata

@@ -10,22 +10,49 @@ fn workflow_state(c: &Controller) -> (usize, &'static str, bool) {
     )
 }
 
+fn assert_help_rendered(c: &Controller) {
+    let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 24)).unwrap();
+    terminal
+        .draw(|frame| {
+            ui::render(
+                frame,
+                &c.app,
+                &terminal_file_manager::color::Theme::new(colored_text::ColorLevel::NoColor),
+            );
+        })
+        .unwrap();
+    let text: String = terminal
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect();
+    assert!(text.contains("Copy Path Help"));
+}
+
 #[test]
-fn question_help_preserves_both_copy_stages_and_escape_cancels_one_layer() {
+fn both_help_keys_preserve_copy_stages_and_escape_cancels_one_layer() {
     let root = tempfile::tempdir().unwrap();
     std::fs::write(root.path().join("file"), "owned").unwrap();
-    for keys in ["y", "yh"] {
+    for (keys, help) in [
+        ("y", KeyCode::Char('?')),
+        ("yh", KeyCode::Char('?')),
+        ("y", KeyCode::F(1)),
+        ("yh", KeyCode::F(1)),
+    ] {
         let mut c = controller(root.path());
         c.app.panes[0].cursor = Some(root.path().join("file"));
         sequence(&mut c, keys);
         let before = workflow_state(&c);
         let base = c.app.relative_path_base.clone();
-        send(&mut c, KeyCode::Char('?'));
+        send(&mut c, help);
         assert_eq!(
             c.app.context_help.as_ref().unwrap().topic,
             HelpTopic::PathCopy
         );
         assert!(!c.reconcile_footer());
+        assert_help_rendered(&c);
         for code in [KeyCode::Enter, KeyCode::Char('s'), KeyCode::F(5)] {
             send(&mut c, code);
         }
@@ -46,20 +73,22 @@ fn question_help_preserves_both_copy_stages_and_escape_cancels_one_layer() {
 #[test]
 fn help_round_trip_does_not_consume_workflow_history_or_change_relative_copy() {
     let root = tempfile::tempdir().unwrap();
-    let mut c = controller(root.path());
-    sequence(&mut c, "yc");
-    for _ in 2..terminal_file_manager::workflow::MAX_INPUTS - 1 {
-        send(&mut c, KeyCode::Up);
+    for help in [KeyCode::Char('?'), KeyCode::F(1)] {
+        let mut c = controller(root.path());
+        sequence(&mut c, "yc");
+        for _ in 2..terminal_file_manager::workflow::MAX_INPUTS - 1 {
+            send(&mut c, KeyCode::Up);
+        }
+        send(&mut c, help);
+        send(&mut c, KeyCode::Esc);
+        send(&mut c, KeyCode::Char('r'));
+        assert_eq!(c.path_copy_request.take().unwrap().prepare().unwrap(), ".");
+        assert_eq!(c.app.relative_path_base, root.path());
     }
-    send(&mut c, KeyCode::Char('?'));
-    send(&mut c, KeyCode::Esc);
-    send(&mut c, KeyCode::Char('r'));
-    assert_eq!(c.path_copy_request.take().unwrap().prepare().unwrap(), ".");
-    assert_eq!(c.app.relative_path_base, root.path());
 }
 
 #[test]
-fn detailed_help_is_only_opened_by_question_in_the_active_workflow() {
+fn detailed_help_opens_with_f1_and_question_only_in_the_active_workflow() {
     let root = tempfile::tempdir().unwrap();
     let mut c = controller(root.path());
     send(&mut c, KeyCode::Char('?'));
@@ -67,7 +96,12 @@ fn detailed_help_is_only_opened_by_question_in_the_active_workflow() {
     send(&mut c, KeyCode::Esc);
     sequence(&mut c, "y");
     send(&mut c, KeyCode::F(1));
-    assert!(!c.app.help && c.app.context_help.is_none());
+    assert!(!c.app.help);
+    assert_eq!(
+        c.app.context_help.as_ref().unwrap().topic,
+        HelpTopic::PathCopy
+    );
+    send(&mut c, KeyCode::Esc);
     send(&mut c, KeyCode::Char('?'));
     let text = HelpTopic::PathCopy.text(&c.app);
     let prose = format!("{text:?}");

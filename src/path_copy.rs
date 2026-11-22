@@ -5,9 +5,9 @@ mod request;
 use directory::Directory;
 pub use request::{BaseRequest, CopyRequest, ValidatedBase};
 mod paths;
-/// Detailed Help opens with `?` during Copy Path, including at narrow widths.
+/// Detailed Help opens with `F1` or `?` during Copy Path, including at narrow widths.
 pub const HELP: &[&str] = &[
-    "Press ? during Copy Path to open this Help. Esc closes Help and returns to the same choice; press Esc again to cancel Copy Path.",
+    "Press F1 or ? during Copy Path to open this Help. Esc closes Help and returns to the same choice; press Esc again to cancel Copy Path.",
     "Choose m Marked, h Highlighted or c Current folder, then n Name, r Relative or f Full path. Example: y h f copies the highlighted path with the default binding.",
     "Enter accepts the highlighted choice: visible marks first, then the real highlighted entry, then current directory. Full path starts selected. The synthetic .. row is never Highlighted; Current folder still means this directory.",
     "Copy Path starts with From: choose a direct letter shortcut or press Enter for the highlighted default. Backspace returns to the previous stage; Esc cancels. Click a displayed choice to activate it. Arrow and Tab keys stay inside the workflow without changing the choice; there is no timeout.",
