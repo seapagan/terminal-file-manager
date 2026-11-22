@@ -195,6 +195,10 @@ impl<C, O> Flow<C, O> {
     pub fn context(&self) -> Option<&C> {
         self.context.as_ref()
     }
+    /// Accepted choices, excluding the current stage's uncommitted highlight.
+    pub fn resolved(&self) -> &[Resolved] {
+        &self.choices
+    }
     pub fn highlighted(&self) -> Option<&Choice> {
         self.stage()
             .selected

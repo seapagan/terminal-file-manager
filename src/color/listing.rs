@@ -4,6 +4,15 @@ use crate::fs::Entry;
 use ratatui::style::Style;
 
 impl Theme {
+    /// Dim a complete listing row, retaining colours and VTE faint compatibility.
+    pub(crate) fn dim_listing_style(&self, style: Style) -> Style {
+        self.faint_style(
+            style
+                .remove_modifier(ratatui::style::Modifier::BOLD)
+                .add_modifier(ratatui::style::Modifier::DIM),
+            None,
+        )
+    }
     /// System filenames use the shared red accent; type indicators keep their style.
     pub fn name_style(&self, entry: &Entry) -> Style {
         let style = self.entry_style(entry);

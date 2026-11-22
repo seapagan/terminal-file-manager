@@ -1,4 +1,5 @@
 use super::clean;
+mod focus;
 use crate::{
     app::{App, IgnoreMode, Pane},
     color::{Role, Theme},
@@ -18,6 +19,7 @@ pub(super) fn render(
     id: usize,
     geometry: &super::Geometry,
     theme: &Theme,
+    preserve: Option<&dyn Fn(&Entry) -> bool>,
 ) {
     let pane = &app.panes[id];
     let area = geometry.panes[id].expect("visible pane");
@@ -54,6 +56,7 @@ pub(super) fn render(
         ..inner
     };
     render_rows(frame, pane, rows_area, theme, id == app.active, app.now);
+    focus::dim(frame, pane, rows_area, theme, preserve);
     render_summary(frame, summary, inner);
     render_status(frame, pane, inner, theme);
 }

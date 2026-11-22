@@ -4,12 +4,15 @@ mod directory;
 mod request;
 use directory::Directory;
 pub use request::{BaseRequest, CopyRequest, ValidatedBase};
+mod focus;
 mod paths;
+pub(crate) use focus::listing_focus;
 /// Detailed Help opens with `F1` or `?` during Copy Path, including at narrow widths.
 pub const HELP: &[&str] = &[
     "Press `F1` or `?` during Copy Path for Help. `Esc` or ‘[×]’ closes Help; press `Esc` again to cancel Copy Path.",
     "Choose `m` ‘Marked’, `h` ‘Highlighted’ or `c` ‘Current folder’, then `n` ‘Name’, `r` ‘Relative’ or `f` ‘Full path’. With the default binding, `y h f` copies the highlighted path.",
     "`Enter` accepts the highlighted choice. ‘From’ defaults to visible marks, then a real highlighted entry, then the current folder. ‘Format’ defaults to ‘Full path’. The .. row is navigation only; ‘Current folder’ means the directory you are browsing.",
+    "In ‘From’, marked and highlighted entries keep their normal appearance. After choosing ‘Marked’ or ‘Highlighted’, only that source stays bright. Other entries in both panes dim until you finish or cancel; entry errors stay visible.",
     "Press a choice's letter or click it to continue. `Backspace` returns to ‘From’, or cancels if you are there. `Esc` cancels at either stage. Arrow keys and `Tab` leave the choice unchanged. There is no timeout.",
     "‘From’ also offers `s` ‘Set base’ and `Shift+s` ‘Other base’. Choose one to use the active or other pane's directory as the relative-path base. Wait for confirmation; this exits without copying. ‘Other base’ requires a valid directory in two-pane mode. ‘Relative’ copies from this session base; paths on incomparable roots are disabled.",
     "The initial base is the first directory argument, or the working directory if none is given. Restoring a session restores its base; older sessions use the first pane. Save and quit or --save-session saves the base; ordinary quit does not. The base belongs to the navigation session, not configuration.",

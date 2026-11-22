@@ -91,9 +91,21 @@ pub fn prepare_notifications(app: &mut App, area: Rect) {
 /// Draw a frame using the same geometry used by mouse hit testing.
 pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     let mut geometry = geometry(app, frame.area());
+    let focus = crate::path_copy::listing_focus(app);
     for (id, area) in geometry.panes.iter().enumerate() {
         if area.is_some() {
-            listing::render(frame, app, id, &geometry, theme);
+            let preserve =
+                |entry: &crate::fs::Entry| focus.as_ref().is_none_or(|focus| focus(id, entry));
+            listing::render(
+                frame,
+                app,
+                id,
+                &geometry,
+                theme,
+                focus
+                    .as_ref()
+                    .map(|_| &preserve as &dyn Fn(&crate::fs::Entry) -> bool),
+            );
         }
     }
     let diagnostics = app
