@@ -57,6 +57,11 @@ fn policy_click_cannot_open_a_menu_over_an_operation_dialog() {
     open_sort(&mut c, bounds);
     assert!(c.app.policy_menu.is_none());
     assert!(c.app.operations.dialog.is_some());
+    for shortcut in ["S", "G", "H", "I"] {
+        key(&mut c, shortcut, bounds);
+        assert!(c.app.policy_menu.is_none());
+        assert!(c.app.operations.dialog.is_some());
+    }
 }
 
 fn conflict(c: &mut Controller, root: &std::path::Path) -> mpsc::Receiver<Decision> {
@@ -84,14 +89,22 @@ fn conflict(c: &mut Controller, root: &std::path::Path) -> mpsc::Receiver<Decisi
 #[test]
 fn asynchronous_conflict_preempts_policy_keyboard_and_mouse_input() {
     let bounds = Rect::new(0, 0, 120, 30);
-    for mouse in [false, true] {
+    for activation in ["mouse", "s", "S"] {
         let root = tempfile::tempdir().unwrap();
         let mut c = controller();
         open_sort(&mut c, bounds);
         key(&mut c, "End", bounds);
         let response = conflict(&mut c, root.path());
+        for shortcut in ["G", "H", "I"] {
+            key(&mut c, shortcut, bounds);
+            assert!(c.app.policy_menu.is_none());
+            assert!(matches!(
+                response.try_recv(),
+                Err(mpsc::TryRecvError::Empty)
+            ));
+        }
         let g = assert_operation_visible(&c, "File already exists");
-        if mouse {
+        if activation == "mouse" {
             let skip = g
                 .operation_controls
                 .iter()
@@ -101,7 +114,7 @@ fn asynchronous_conflict_preempts_policy_keyboard_and_mouse_input() {
                 .unwrap();
             click(&mut c, skip.area.x, skip.area.y, bounds);
         } else {
-            key(&mut c, "s", bounds);
+            key(&mut c, activation, bounds);
         }
         assert!(matches!(response.try_recv().unwrap(), Decision::Skip));
         assert!(c.app.policy_menu.is_none());

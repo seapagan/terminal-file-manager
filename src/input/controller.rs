@@ -1,7 +1,7 @@
 use super::{Action, Bindings};
 use crate::{
     app::{App, IgnoreMode, Request},
-    listing::{Grouping, Sort},
+    listing::Grouping,
     settings::Settings,
     ui::Geometry,
 };
@@ -135,7 +135,10 @@ impl Controller {
             self.app.status = reason.into();
             return Vec::new();
         }
-        if super::path_copy::action(self, action) || self.application_action(action, geometry) {
+        if super::policy_menu::action(self, action)
+            || super::path_copy::action(self, action)
+            || self.application_action(action, geometry)
+        {
             return Vec::new();
         }
         self.pane_action(action, geometry)
@@ -193,7 +196,8 @@ impl Controller {
             | FocusPane | ToggleSidebar | Metadata | Help | Info | Viewer | Editor | Path
             | FullPath | Zoxide | OppositeZoxide | ExitDirectory | Copy | Move | Mkdir
             | CreateFile | Trash | Delete | Rename | Attributes | Jobs | Notifications
-            | DismissToast | DismissToasts | CopyQuick | MoveQuick | PathCopy => {}
+            | DismissToast | DismissToasts | CopyQuick | MoveQuick | PathCopy | SortMenu
+            | GroupMenu | HiddenMenu | IgnoreMenu => {}
         }
         Vec::new()
     }
@@ -249,7 +253,7 @@ impl Controller {
                     IgnoreMode::Off => IgnoreMode::Dim,
                 }
             }
-            Action::Sort => pane.sort.sort = next_sort(pane.sort.sort),
+            Action::Sort => pane.sort.sort = super::policy_menu::next_sort(pane.sort.sort),
             Action::Reverse => pane.sort.reverse = !pane.sort.reverse,
             Action::Group => {
                 pane.sort.grouping = match pane.sort.grouping {
@@ -501,20 +505,6 @@ impl Controller {
 
 pub(super) fn page_height(geometry: &Geometry, pane: usize) -> usize {
     geometry.listing_rows[pane].max(1)
-}
-
-fn next_sort(sort: Sort) -> Sort {
-    match sort {
-        Sort::Natural => Sort::Name,
-        Sort::Name => Sort::Extension,
-        Sort::Extension => Sort::Size,
-        Sort::Size => Sort::Modified,
-        Sort::Modified => Sort::Created,
-        Sort::Created => Sort::Kind,
-        Sort::Kind => Sort::Version,
-        Sort::Version => Sort::Unsorted,
-        Sort::Unsorted => Sort::Natural,
-    }
 }
 
 fn unavailable(action: Action) -> Option<&'static str> {

@@ -220,6 +220,10 @@ define_commands! {
         HelpSection::Views,
         "Cycle Git-ignore Dim/Hide/Off",
     ),
+    (Action::SortMenu, HelpSection::Views, "Choose sort order from a popup"),
+    (Action::GroupMenu, HelpSection::Views, "Choose directory grouping from a popup"),
+    (Action::HiddenMenu, HelpSection::Views, "Choose hidden-entry visibility from a popup"),
+    (Action::IgnoreMenu, HelpSection::Views, "Choose Git-ignore display from a popup"),
     (
         Action::Info,
         HelpSection::Views,

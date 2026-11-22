@@ -74,6 +74,7 @@ letter shortcuts as `Shift+` plus the lowercase letter.
 | `h` | Show or hide hidden entries |
 | `i` | Cycle Git-ignore display: dim, hide, off |
 | `s` / `v` / `g` | Cycle sort order / reverse order / directory grouping |
+| `S` / `G` / `H` / `I` | Open Sort / Group / Hidden / Ignore choices |
 | `r` | Refresh the directory |
 | Shift+v / Alt+v | View options / view profiles |
 
@@ -123,12 +124,14 @@ you browse, set `keep_filter_on_navigation = true` in `config.toml` or select
 **Keep filter on navigation** in View Options (Shift+v). Refreshes and failed
 navigation keep the filter.
 
-Click **Sort**, **Group**, **Hidden** or **Ignore** at the bottom of a pane to
-choose a setting. The menu opens above the control. Use Up/Down and Enter, or
-click a choice; Esc closes the menu without applying it. Press F1 or click
-`[?]` to read about each option. Esc closes Help and returns to the same
-highlighted choice. The keyboard shortcuts for these settings cycle through
-their values.
+Press `S`, `G`, `H` or `I` to open **Sort**, **Group**, **Hidden** or **Ignore**
+choices for the active pane, or click the corresponding control at the bottom
+of a pane. The menu highlights the current setting and opens above the control.
+Use Up/Down and Enter, or click a choice; Esc closes the menu without applying
+it. Press F1 or click `[?]` to read about each option. Esc closes Help and returns
+to the same highlighted choice. Lowercase `s`, `g`, `h` and `i` keep their direct cycle or
+toggle behavior. Configure the popup shortcuts with the `sort-menu`,
+`group-menu`, `hidden-menu` and `ignore-menu` actions in `[bindings]`.
 
 View Options (Shift+v) also lets you switch between one and two panes for the
 current session. The `two_panes` setting controls the startup layout.

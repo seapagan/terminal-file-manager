@@ -1,6 +1,6 @@
-//! Choice menus apply one policy value; keyboard shortcuts keep cycling.
+//! Mouse controls and configurable actions open the same single-choice policy menus.
 use super::{Action, Controller};
-use crate::{app::App, ui::Geometry};
+use crate::{app::App, listing::Sort, ui::Geometry};
 use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind};
 
 #[derive(Clone, Debug)]
@@ -57,20 +57,42 @@ pub(super) fn open_at(
     else {
         return false;
     };
-    open(c, control);
+    open(c, control.pane, control.action);
     true
 }
 
-pub(super) fn open(c: &mut Controller, control: &crate::ui::PolicyControl) {
+pub(super) fn action(c: &mut Controller, action: Action) -> bool {
+    let policy = match action {
+        Action::SortMenu => Action::Sort,
+        Action::GroupMenu => Action::Group,
+        Action::HiddenMenu => Action::Hidden,
+        Action::IgnoreMenu => Action::Ignore,
+        _ => return false,
+    };
+    open(c, c.app.active, policy);
+    true
+}
+
+pub(crate) fn opening_action(action: Action) -> Action {
+    match action {
+        Action::Sort => Action::SortMenu,
+        Action::Group => Action::GroupMenu,
+        Action::Hidden => Action::HiddenMenu,
+        Action::Ignore => Action::IgnoreMenu,
+        _ => action,
+    }
+}
+
+fn open(c: &mut Controller, pane: usize, action: Action) {
     if preempted(&c.app) {
         return;
     }
-    c.app.active = control.pane;
-    c.app.sidebar = c.app.panes[control.pane].sidebar;
+    c.app.active = pane;
+    c.app.sidebar = c.app.panes[pane].sidebar;
     c.app.policy_menu = Some(PolicyMenu {
-        pane: control.pane,
-        action: control.action,
-        selected: current(&c.app, control.pane, control.action),
+        pane,
+        action,
+        selected: current(&c.app, pane, action),
     });
     c.last_click = None;
 }
@@ -166,5 +188,19 @@ fn commit(c: &mut Controller, g: &Geometry) {
     c.app.active = menu.pane;
     if c.app.select_policy(menu.action, menu.selected) {
         c.capture_policy(menu.action);
+    }
+}
+
+pub(super) fn next_sort(sort: Sort) -> Sort {
+    match sort {
+        Sort::Natural => Sort::Name,
+        Sort::Name => Sort::Extension,
+        Sort::Extension => Sort::Size,
+        Sort::Size => Sort::Modified,
+        Sort::Modified => Sort::Created,
+        Sort::Created => Sort::Kind,
+        Sort::Kind => Sort::Version,
+        Sort::Version => Sort::Unsorted,
+        Sort::Unsorted => Sort::Natural,
     }
 }

@@ -41,7 +41,7 @@ pub(super) fn text(topic: HelpTopic, app: &App) -> Vec<HelpParagraph> {
         HelpTopic::View(view) => view_text(view),
         HelpTopic::Metadata => return metadata(app),
         HelpTopic::Pattern => (Action::PatternSelection, PATTERN),
-        HelpTopic::Policy(action) => (action, super::policy_text::text(action)),
+        HelpTopic::Policy(action) => return policy(app, action),
         HelpTopic::Conflict => (Action::Jobs, CONFLICT),
         HelpTopic::Jobs => (Action::Jobs, JOBS),
         HelpTopic::Exit => (Action::Quit, EXIT),
@@ -49,6 +49,21 @@ pub(super) fn text(topic: HelpTopic, app: &App) -> Vec<HelpParagraph> {
         HelpTopic::Operation(operation) => operation_text(operation),
     };
     action_paragraphs(app, action, lines)
+}
+
+fn policy(app: &App, action: Action) -> Vec<HelpParagraph> {
+    let mut text = action_paragraphs(
+        app,
+        crate::input::policy_menu::opening_action(action),
+        super::policy_text::text(action),
+    );
+    if let Some(entry) = app.help_entry(action) {
+        text.push(paragraph(
+            "Change directly from the file list: `{}`.",
+            &[&entry.keys],
+        ));
+    }
+    text
 }
 
 fn path_text(topic: HelpTopic) -> (Action, &'static [&'static str]) {

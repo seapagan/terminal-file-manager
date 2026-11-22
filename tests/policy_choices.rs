@@ -1,4 +1,4 @@
-//! Mouse menus use policy geometry while keyboard policy shortcuts keep cycling.
+//! Policy menus share mouse and keyboard activation; lowercase keys keep cycling.
 #[path = "policy_choices/compact.rs"]
 mod compact;
 #[path = "policy_choices/dimensions.rs"]
@@ -7,6 +7,10 @@ mod dimensions;
 mod direct;
 #[path = "policy_choices/help.rs"]
 mod help;
+#[path = "policy_choices/keyboard.rs"]
+mod keyboard;
+#[path = "policy_choices/keyboard_safety.rs"]
+mod keyboard_safety;
 #[path = "policy_choices/priority.rs"]
 mod priority;
 use crossterm::event::{Event, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
