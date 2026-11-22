@@ -7,7 +7,9 @@ fn git(root: &Path, args: &[&str]) {
         .env("GIT_CONFIG_SYSTEM", root.join("no-system-config"))
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .output()
-        .unwrap();
+        .unwrap_or_else(|error| {
+            panic!("Git integration test requires an executable Git on PATH; git {args:?}: {error}")
+        });
     assert!(
         output.status.success(),
         "{args:?}: {}",

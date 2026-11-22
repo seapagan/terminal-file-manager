@@ -76,6 +76,16 @@ fn until(
     started: Instant,
     done: impl Fn(&App) -> bool,
 ) -> [Vec<Duration>; 2] {
+    until_with_clock(app, pool, watch, || started.elapsed(), done)
+}
+
+fn until_with_clock(
+    app: &mut App,
+    pool: &mut Pool,
+    watch: &mut Runtime,
+    mut clock: impl FnMut() -> Duration,
+    done: impl Fn(&App) -> bool,
+) -> [Vec<Duration>; 2] {
     let mut generations = [app.panes[0].generation, app.panes[1].generation];
     let mut starts: [Vec<Duration>; 2] = Default::default();
     // Windows runs the same filesystem/safety cases after deliberate refresh;
@@ -89,7 +99,7 @@ fn until(
     let deadline = Instant::now() + Duration::from_secs(5);
     let (mut active, mut queued) = (0, 0);
     loop {
-        let now = started.elapsed();
+        let now = clock();
         watch.poll(app, pool, now);
         for pane in 0..2 {
             if app.panes[pane].generation != generations[pane] {
