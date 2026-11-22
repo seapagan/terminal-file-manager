@@ -1,6 +1,3 @@
-#[cfg(test)]
-#[path = "../../tests/policy_choices/revision.rs"]
-mod tests;
 use super::{App, IgnoreMode};
 use crate::{
     input::Action,
@@ -62,3 +59,6 @@ fn select<T: Copy + PartialEq>(current: &mut T, choices: &[T], selected: usize) 
     *current = *value;
     true
 }
+
+#[cfg(test)]
+mod tests;

@@ -200,9 +200,7 @@ mod overwrite_tests {
         key(&mut editor, &mut text, KeyCode::Home);
         key(&mut editor, &mut text, KeyCode::Insert);
         let incoming = "b".repeat(65_536);
-        let started = std::time::Instant::now();
         assert_eq!(editor.insert(&mut text, &incoming, 65_536), Edit::Changed);
-        eprintln!("65,536-byte overwrite: {:?}", started.elapsed());
         assert_eq!(text, incoming);
         assert_eq!(editor.position(&text), text.len());
     }
