@@ -9,7 +9,7 @@ use crossterm::event::KeyCode;
 use ratatui::{Frame, layout::Rect, widgets::Paragraph};
 
 const HINT: &str = "Tab/←→: choose  Enter: select  Esc: keep";
-const PREFERRED_WIDTH: u16 = 56;
+const PREFERRED_WIDTH: u16 = 52;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CheckIntent {
@@ -141,7 +141,7 @@ fn replacement_rows(review: &Review, width: u16) -> Vec<modal::Row<()>> {
             "Additional extensions in TFM's defaults",
             difference(&review.defaults, configured),
             "+ ",
-            Role::Marked,
+            Role::Addition,
         ),
         (
             "Extensions removed by using defaults",
@@ -169,7 +169,7 @@ fn addition_rows(review: &Review, width: u16) -> Vec<modal::Row<()>> {
     let mut rows = Vec::new();
     prose(
         &mut rows,
-        "These additions already occur in your chosen base list.",
+        "Some added extensions occur in your chosen base.",
         Role::Value,
         width,
     );
@@ -189,7 +189,7 @@ fn addition_rows(review: &Review, width: u16) -> Vec<modal::Row<()>> {
         "Already included",
         &removable,
         "✓ ",
-        Role::Marked,
+        Role::Addition,
         width,
     );
     let custom = difference(&review.additions, &removable);
@@ -206,7 +206,7 @@ fn addition_rows(review: &Review, width: u16) -> Vec<modal::Row<()>> {
     rows.push(modal::Row::plain(""));
     prose(
         &mut rows,
-        "Removal keeps the same recognised compound extensions.",
+        "Removal preserves recognised compound extensions.",
         Role::Value,
         width,
     );

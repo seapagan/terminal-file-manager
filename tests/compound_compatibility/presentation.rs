@@ -69,19 +69,27 @@ fn removal_and_addition_differences_use_semantic_colors_and_monochrome_markers()
     use terminal_file_manager::color::Role;
     for level in [
         colored_text::ColorLevel::NoColor,
+        colored_text::ColorLevel::Ansi16,
+        colored_text::ColorLevel::Ansi256,
         colored_text::ColorLevel::TrueColor,
     ] {
         let c = controller("compound_extensions = ['.tar.gz', '.custom.js']", "0.1.0");
         let (t, g) = canvas(&c, 120, 40, level);
         let buffer = t.backend().buffer();
         let theme = Theme::new(level);
-        for (marker, role) in [("+ .tar.xz", Role::Marked), ("- .custom.js", Role::Warning)] {
+        for (marker, role) in [("+ .tar.xz", Role::Status), ("- .custom.js", Role::Warning)] {
             let point = find(buffer, marker);
             assert_eq!(
                 buffer[point].fg,
                 theme.style(role).fg.unwrap_or(ratatui::style::Color::Reset)
             );
         }
+        assert_green_highlight(&c, "+ .tar.xz", level);
+        let additions = controller(
+            "compound_extensions_extend = ['.tar.gz', '.user.js']",
+            "0.1.0",
+        );
+        assert_green_highlight(&additions, "✓ .tar.gz", level);
         let actions = &g.compound_extension_review.unwrap().shell.actions;
         assert_eq!(actions[0].action.intent, CheckIntent::Keep);
         assert_ne!(
@@ -286,4 +294,44 @@ fn body_values(buffer: &ratatui::buffer::Buffer, body: Rect) -> String {
         text.push_str(row.strip_prefix("  ").unwrap_or(row));
     }
     text
+}
+
+#[test]
+fn sequential_dialogs_have_proportionate_dimensions() {
+    let mut c = controller(
+        "compound_extensions = ['.tar.gz', '.tar.xz', '.tar.Z']\ncompound_extensions_extend = ['.tar.gz', '.user.js']",
+        "0.1.0",
+    );
+    let (_, first) = draw(&c, 120, 40);
+    let first = first.compound_extension_review.unwrap().shell.outer;
+    key(&mut c, KeyCode::Enter);
+    let (_, second) = draw(&c, 120, 40);
+    let second = second.compound_extension_review.unwrap();
+    assert!(
+        second.shell.outer.width <= first.width,
+        "{first:?} vs {:?}",
+        second.shell.outer
+    );
+    assert!(first.width - second.shell.outer.width <= 4);
+    assert!(second.shell.outer.height <= first.height);
+    assert_eq!(second.limit, 0);
+}
+
+fn assert_green_highlight(c: &Controller, marker: &str, level: colored_text::ColorLevel) {
+    use terminal_file_manager::color::Role;
+    let (t, _) = canvas(c, 120, 40, level);
+    let buffer = t.backend().buffer();
+    let cell = &buffer[find(buffer, marker)];
+    let theme = Theme::new(level);
+    assert_eq!(
+        cell.fg,
+        theme
+            .style(Role::Status)
+            .fg
+            .unwrap_or(ratatui::style::Color::Reset)
+    );
+    assert!(cell.modifier.contains(ratatui::style::Modifier::BOLD));
+    if level != colored_text::ColorLevel::NoColor {
+        assert_ne!(cell.fg, theme.style(Role::Marked).fg.unwrap());
+    }
 }
