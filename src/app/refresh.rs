@@ -77,7 +77,9 @@ impl App {
             None
         };
         if attempted.is_none() && state.error.is_none() && state.unchanged_listing(&snapshot) {
+            let creation = state.take_creation(true);
             state.update_access_times(snapshot);
+            state.restore_creation(creation);
             self.reconcile_listing_details(pane, previous);
             return true;
         }

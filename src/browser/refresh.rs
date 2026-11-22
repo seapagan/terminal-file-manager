@@ -57,18 +57,26 @@ pub(super) fn collect(controller: &mut Controller, pool: &mut Pool) -> bool {
     changed
 }
 
-fn listing_presentation(
-    app: &App,
-    pane: usize,
-) -> Option<(u64, Option<String>, Option<std::time::SystemTime>, bool)> {
+#[derive(Debug, PartialEq)]
+struct ListingPresentation {
+    installs: u64,
+    error: Option<String>,
+    accessed: Option<std::time::SystemTime>,
+    pattern_listing: bool,
+    cursor: Option<std::path::PathBuf>,
+}
+
+fn listing_presentation(app: &App, pane: usize) -> Option<ListingPresentation> {
     let state = app.panes.get(pane)?;
     let detail = app.details.get(pane)?;
-    Some((
-        state.listing_installs,
-        state.error.clone(),
-        detail.entry.as_ref().and_then(|e| e.accessed),
-        app.pattern.as_ref().is_some_and(|state| state.pane == pane) && state.listing,
-    ))
+    Some(ListingPresentation {
+        installs: state.listing_installs,
+        error: state.error.clone(),
+        accessed: detail.entry.as_ref().and_then(|e| e.accessed),
+        pattern_listing: app.pattern.as_ref().is_some_and(|state| state.pane == pane)
+            && state.listing,
+        cursor: state.cursor.clone(),
+    })
 }
 
 /// Geometry and cursor shape come from the same completed frame.

@@ -83,12 +83,98 @@ fn unchanged_refresh_without_pattern_selection_does_not_request_redraw() {
     let root = tempfile::tempdir().unwrap();
     let mut controller = crate::browser::tests::counting_controller(root.path());
     let mut pool = Pool::new(crate::fs::IgnoreContext::isolated()).unwrap();
+    unchanged_without_redraw(&mut controller, &mut pool);
+}
+
+fn creation_before_completion(root: &std::path::Path) -> (Controller, std::path::PathBuf) {
+    let mut controller = crate::browser::tests::counting_controller(root);
+    let created = root.join("created");
+    controller.app.panes[0].track_creation(7, created.clone());
+    std::fs::write(&created, "new").unwrap();
+    let request = controller.app.request_reconciliation(0).unwrap();
+    let snapshot = crate::fs::list(
+        root,
+        &crate::fs::IgnoreContext::isolated(),
+        &std::sync::atomic::AtomicBool::new(false),
+    )
+    .unwrap();
+    controller
+        .app
+        .complete_listing(0, request.generation, Ok(snapshot));
+    assert_ne!(controller.app.panes[0].cursor.as_ref(), Some(&created));
+    (controller, created)
+}
+
+fn unchanged_without_redraw(controller: &mut Controller, pool: &mut Pool) {
+    let installs = controller.app.panes[0].listing_installs;
     pool.submit(controller.app.request_reconciliation(0).unwrap());
     let deadline = std::time::Instant::now() + Duration::from_secs(10);
     while pool.active_count() != 0 {
-        assert!(!collect(&mut controller, &mut pool));
+        assert!(!collect(controller, pool));
         assert!(std::time::Instant::now() < deadline, "listing timed out");
         std::thread::yield_now();
     }
+    assert_eq!(controller.app.panes[0].listing_installs, installs);
     assert!(!controller.app.panes[0].listing);
+}
+
+#[test]
+fn unchanged_refresh_focuses_creation_and_redraws_before_an_unrelated_change() {
+    let root = tempfile::tempdir().unwrap();
+    let (mut controller, created) = creation_before_completion(root.path());
+    controller.app.panes[0].finish_creation(7, true);
+    let installs = controller.app.panes[0].listing_installs;
+    let mut pool = Pool::new(crate::fs::IgnoreContext::isolated()).unwrap();
+    pool.submit(controller.app.request_reconciliation(0).unwrap());
+    crate::browser::tests::collect_until_idle(&mut controller, &mut pool);
+    assert_eq!(controller.app.panes[0].cursor.as_ref(), Some(&created));
+    assert_eq!(controller.app.panes[0].listing_installs, installs);
+    unchanged_without_redraw(&mut controller, &mut pool);
+
+    controller.app.panes[0].move_cursor(-isize::MAX, 20);
+    let cursor = controller.app.panes[0].cursor.clone();
+    assert_ne!(cursor.as_ref(), Some(&created));
+    std::fs::write(root.path().join("unrelated"), "change").unwrap();
+    pool.submit(controller.app.request_reconciliation(0).unwrap());
+    crate::browser::tests::collect_until_idle(&mut controller, &mut pool);
+    assert_eq!(controller.app.panes[0].cursor, cursor);
+}
+
+#[test]
+fn unchanged_refresh_before_creation_completion_keeps_focus_pending() {
+    let root = tempfile::tempdir().unwrap();
+    let (mut controller, created) = creation_before_completion(root.path());
+    let cursor = controller.app.panes[0].cursor.clone();
+    let mut pool = Pool::new(crate::fs::IgnoreContext::isolated()).unwrap();
+    unchanged_without_redraw(&mut controller, &mut pool);
+    assert_eq!(controller.app.panes[0].cursor, cursor);
+    controller.app.panes[0].finish_creation(7, true);
+    pool.submit(controller.app.request_reconciliation(0).unwrap());
+    crate::browser::tests::collect_until_idle(&mut controller, &mut pool);
+    assert_eq!(controller.app.panes[0].cursor.as_ref(), Some(&created));
+}
+
+#[test]
+fn user_navigation_overrides_creation_focus_even_after_returning_to_original_row() {
+    for before_completion in [true, false] {
+        let root = tempfile::tempdir().unwrap();
+        let (mut controller, created) = creation_before_completion(root.path());
+        if !before_completion {
+            controller.app.panes[0].finish_creation(7, true);
+        }
+        let cursor = controller.app.panes[0].cursor.clone();
+        controller.app.panes[0].move_cursor(1, 20);
+        controller.app.panes[0].move_cursor(-1, 20);
+        assert_eq!(controller.app.panes[0].cursor, cursor);
+        assert_ne!(cursor.as_ref(), Some(&created));
+        if before_completion {
+            controller.app.panes[0].finish_creation(7, true);
+        }
+        let mut pool = Pool::new(crate::fs::IgnoreContext::isolated()).unwrap();
+        unchanged_without_redraw(&mut controller, &mut pool);
+        std::fs::write(root.path().join("unrelated"), "change").unwrap();
+        pool.submit(controller.app.request_reconciliation(0).unwrap());
+        crate::browser::tests::collect_until_idle(&mut controller, &mut pool);
+        assert_eq!(controller.app.panes[0].cursor, cursor);
+    }
 }
