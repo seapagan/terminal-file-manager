@@ -1,4 +1,4 @@
-//! Word wrapping is local to Help; long tokens reuse display-cell wrapping.
+//! Main and contextual Help share word wrapping and lossless grapheme splitting.
 use crate::{
     color::{Role, Theme},
     input::{HelpFragment, HelpParagraph},
@@ -36,7 +36,7 @@ pub(super) fn lines(
     rows
 }
 
-fn wrap(line: Line<'static>, width: usize) -> Vec<Line<'static>> {
+pub(super) fn wrap(line: Line<'static>, width: usize) -> Vec<Line<'static>> {
     let mut rows = vec![Line::default()];
     if width == 0 {
         return rows;
@@ -63,7 +63,7 @@ fn append_word(rows: &mut Vec<Line<'static>>, word: &mut Line<'static>, width: u
         rows.push(Line::default());
     }
     if word.width() > width {
-        let mut parts = crate::ui::text::wrap_line(word, width).into_iter();
+        let mut parts = split_word(word, width).into_iter();
         *rows.last_mut().expect("row") = parts.next().expect("wrapped word");
         rows.extend(parts);
     } else {
@@ -73,6 +73,24 @@ fn append_word(rows: &mut Vec<Line<'static>>, word: &mut Line<'static>, width: u
         }
         row.spans.extend(word.spans);
     }
+}
+
+fn split_word(word: Line<'static>, width: usize) -> Vec<Line<'static>> {
+    let mut rows = vec![Line::default()];
+    let mut used = 0;
+    for grapheme in word.styled_graphemes(Style::default()) {
+        let cells = Span::raw(grapheme.symbol).width();
+        if used > 0 && used + cells > width {
+            rows.push(Line::default());
+            used = 0;
+        }
+        // Keep indivisible graphemes in the document even if the viewport cannot show them.
+        rows.last_mut()
+            .expect("row")
+            .push_span(Span::styled(grapheme.symbol.to_owned(), grapheme.style));
+        used += cells;
+    }
+    rows
 }
 
 #[cfg(test)]
@@ -112,7 +130,7 @@ mod tests {
         );
         assert_eq!(
             strings(&wrap(Line::raw("界e\u{301}"), 1)),
-            ["�", "e\u{301}"]
+            ["界", "e\u{301}"]
         );
     }
 }

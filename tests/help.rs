@@ -1,4 +1,6 @@
 //! Categorised Help remains one document behind a temporary jump picker.
+#[path = "help/wrapping.rs"]
+mod wrapping;
 use colored_text::ColorLevel;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{Terminal, backend::TestBackend, layout::Rect};

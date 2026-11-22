@@ -89,10 +89,10 @@ fn document(app: &App, width: usize, keys_width: usize) -> (Vec<Row>, Vec<(HelpT
             });
         }
         anchors.push((target, rows.len() as u16));
-        for text in super::text::wrap_value(section.title(), width) {
+        for text in prose::wrap(Line::raw(section.title()), width) {
             rows.push(Row {
                 keys: String::new(),
-                text,
+                text: text.to_string(),
                 heading: true,
                 target,
             });
@@ -119,11 +119,11 @@ fn command_rows(
     let target = HelpTarget::Action(entry.action);
     let keys = super::text::wrap_value(&entry.keys, keys_width);
     let text_width = width.saturating_sub(keys_width + 1);
-    let text = super::text::wrap_value(entry.description, text_width);
+    let text = prose::wrap(Line::raw(entry.description), text_width);
     for index in 0..keys.len().max(text.len()) {
         rows.push(Row {
             keys: keys.get(index).cloned().unwrap_or_default(),
-            text: text.get(index).cloned().unwrap_or_default(),
+            text: text.get(index).map(ToString::to_string).unwrap_or_default(),
             heading: false,
             target,
         });
@@ -184,6 +184,26 @@ pub(super) fn cursor(app: &App, layout: &HelpLayout) -> Option<super::text_input
 
 #[cfg(test)]
 mod quick_copy_help_tests {
+    #[test]
+    fn one_cell_descriptions_keep_indivisible_graphemes_in_the_document() {
+        let text = "界e\u{301}🙂";
+        let entry = crate::input::HelpEntry {
+            action: crate::input::Action::Copy,
+            keys: String::new(),
+            description: text,
+        };
+        let mut rows = Vec::new();
+        super::command_rows(&mut rows, &entry, 2, 0);
+        assert_eq!(
+            rows.iter().map(|row| row.text.as_str()).collect::<Vec<_>>(),
+            ["界", "e\u{301}", "🙂"]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.text.as_str()).collect::<String>(),
+            text
+        );
+    }
+
     #[test]
     fn copy_path_command_is_one_concise_row() {
         let entry = crate::input::Bindings::new(&Default::default())
