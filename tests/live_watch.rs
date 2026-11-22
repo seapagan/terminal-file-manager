@@ -42,6 +42,10 @@ fn assert_manual_listing_matches(app: &App, path: &Path) {
     for pane in &app.panes {
         let actual: BTreeMap<_, _> = pane.entries.iter().map(|e| (&e.path, e.size)).collect();
         assert_eq!(actual, expected);
+        assert_eq!(
+            pane.directory.as_ref().and_then(|e| e.modified),
+            manual.directory.as_ref().and_then(|e| e.modified)
+        );
     }
 }
 
@@ -72,6 +76,16 @@ fn until(
     started: Instant,
     done: impl Fn(&App) -> bool,
 ) -> [Vec<Duration>; 2] {
+    until_with_clock(app, pool, watch, || started.elapsed(), done)
+}
+
+fn until_with_clock(
+    app: &mut App,
+    pool: &mut Pool,
+    watch: &mut Runtime,
+    mut clock: impl FnMut() -> Duration,
+    done: impl Fn(&App) -> bool,
+) -> [Vec<Duration>; 2] {
     let mut generations = [app.panes[0].generation, app.panes[1].generation];
     let mut starts: [Vec<Duration>; 2] = Default::default();
     // Windows runs the same filesystem/safety cases after deliberate refresh;
@@ -85,7 +99,7 @@ fn until(
     let deadline = Instant::now() + Duration::from_secs(5);
     let (mut active, mut queued) = (0, 0);
     loop {
-        let now = started.elapsed();
+        let now = clock();
         watch.poll(app, pool, now);
         for pane in 0..2 {
             if app.panes[pane].generation != generations[pane] {
@@ -476,3 +490,11 @@ fn native_external_create_refreshes_both_panes_without_input_including_registrat
     converge(&mut app, &mut pool, &mut watch, started, "external-create");
     assert!(!app.dual);
 }
+
+#[cfg(target_os = "linux")]
+#[path = "live_watch/content.rs"]
+mod content;
+
+#[cfg(not(windows))]
+#[path = "live_watch/git.rs"]
+mod git;

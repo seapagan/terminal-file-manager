@@ -1,4 +1,4 @@
-//! Each open metadata surface owns temporary formatting and retains cached data.
+//! Metadata surfaces share retained pane-local formatting without changing saved views.
 use colored_text::ColorLevel;
 use crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::{Terminal, backend::TestBackend, layout::Rect};
@@ -115,6 +115,7 @@ fn both_panes_and_surfaces_toggle_locally_without_saving_or_changing_profiles() 
                 settings: c.preferences.clone(),
             };
             store.save().unwrap();
+            let saved = std::fs::read_to_string(&store.path).unwrap();
             for a in [
                 Action::Permissions,
                 Action::FuzzyTimestamps,
@@ -126,7 +127,7 @@ fn both_panes_and_surfaces_toggle_locally_without_saving_or_changing_profiles() 
             assert_eq!(c.app.panes.each_ref().map(|p| p.profile_label()), badges);
             assert_eq!(toml::to_string(&c.preferences).unwrap(), before);
             assert!(!c.preferences_changed);
-            assert_eq!(std::fs::read_to_string(&store.path).unwrap(), before);
+            assert_eq!(std::fs::read_to_string(&store.path).unwrap(), saved);
             let rendered = text(&c);
             assert!(
                 rendered.contains("4754")
@@ -134,11 +135,11 @@ fn both_panes_and_surfaces_toggle_locally_without_saving_or_changing_profiles() 
                     && rendered.contains("12:34")
             );
             assert!(c.app.request_metadata(id).is_none());
-            reopen_defaults(&mut c, floating);
+            reopen_retains_choices(&mut c, floating);
         }
     }
 }
-fn reopen_defaults(c: &mut Controller, floating: bool) {
+fn reopen_retains_choices(c: &mut Controller, floating: bool) {
     action(
         c,
         if floating {
@@ -156,13 +157,13 @@ fn reopen_defaults(c: &mut Controller, floating: bool) {
         },
     );
     let format = c.app.metadata_format(floating);
-    assert_eq!(format.permissions, PermissionDisplay::Symbolic);
-    assert!(!format.fuzzy_timestamps);
-    assert_eq!(format.owner_display, OwnerDisplay::Names);
+    assert_eq!(format.permissions, PermissionDisplay::Octal);
+    assert!(format.fuzzy_timestamps);
+    assert_eq!(format.owner_display, OwnerDisplay::Numeric);
 }
 
 #[test]
-fn popup_and_sidebar_invocations_are_independent_and_entry_changes_retain_choices() {
+fn popup_and_sidebar_share_choices_across_entry_changes() {
     let (_root, mut c) = loaded();
     action(&mut c, Action::ToggleSidebar);
     click_value(&mut c, Action::Permissions);
@@ -187,7 +188,7 @@ fn popup_and_sidebar_invocations_are_independent_and_entry_changes_retain_choice
     action(&mut c, Action::Metadata);
     assert_eq!(
         c.app.metadata_format(true).permissions,
-        PermissionDisplay::Symbolic
+        PermissionDisplay::Octal
     );
     click_value(&mut c, Action::OwnerDisplay);
     action(&mut c, Action::Cancel);
@@ -197,16 +198,16 @@ fn popup_and_sidebar_invocations_are_independent_and_entry_changes_retain_choice
     );
     assert_eq!(
         c.app.metadata_format(false).owner_display,
-        OwnerDisplay::Names
+        OwnerDisplay::Numeric
     );
     action(&mut c, Action::Metadata);
     assert_eq!(
         c.app.metadata_format(true).owner_display,
-        OwnerDisplay::Names
+        OwnerDisplay::Numeric
     );
 }
 #[test]
-fn focus_and_layout_hiding_restart_metadata_from_the_new_pane_defaults() {
+fn focus_and_layout_hiding_retain_choices_independently_for_each_pane() {
     let (_root, mut c) = loaded();
     c.app.panes[1].permissions = PermissionDisplay::Octal;
     c.app.panes[1].fuzzy_timestamps = true;
@@ -215,11 +216,11 @@ fn focus_and_layout_hiding_restart_metadata_from_the_new_pane_defaults() {
     click_value(&mut c, Action::Permissions);
     let g = ui::geometry(&c.app, Rect::new(0, 0, 180, 40));
     c.handle(Event::Resize(40, 12), &g, Duration::ZERO);
-    assert!(c.app.metadata_formats[0].is_none());
+    assert!(c.app.metadata_formats[0].is_some());
     c.handle(Event::Resize(180, 40), &g, Duration::ZERO);
     assert_eq!(
         c.app.metadata_format(false).permissions,
-        PermissionDisplay::Symbolic
+        PermissionDisplay::Octal
     );
     action(&mut c, Action::TogglePanes);
     action(&mut c, Action::Metadata);
@@ -229,7 +230,7 @@ fn focus_and_layout_hiding_restart_metadata_from_the_new_pane_defaults() {
     assert_eq!(format.permissions, PermissionDisplay::Octal);
     assert!(format.fuzzy_timestamps);
     assert_eq!(format.owner_display, OwnerDisplay::Numeric);
-    assert!(c.app.metadata_formats[0].is_none());
+    assert!(c.app.metadata_formats[0].is_some());
     action(&mut c, Action::FocusPane);
     assert_eq!(
         c.app.metadata_format(true).permissions,

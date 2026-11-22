@@ -18,8 +18,8 @@ fn setting_shortcuts_preserve_expression_caret_and_subsequent_typing_and_paste()
         expected.push_str("w.txt");
         assert_eq!(c.app.pattern.as_ref().unwrap().expression(), expected);
         for level in [ColorLevel::NoColor, ColorLevel::TrueColor] {
-            let (buffer, layout) = frame(&c, 100, 24, level);
-            assert!(text_at(&buffer, layout.fields[0].0).contains(&format!("{expected}▏")));
+            let (_, layout, cursor) = frame_with_cursor(&c, 100, 24, level);
+            assert_editor_cursor(&cursor, layout.fields[0].0, &expected);
         }
     }
     assert!(c.app.panes[0].marks.is_empty());

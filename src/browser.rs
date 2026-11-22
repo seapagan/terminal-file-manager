@@ -1,6 +1,7 @@
 //! Runtime orchestration: terminal events and bounded worker results meet here.
 mod clipboard;
 mod operations;
+mod refresh;
 use crate::{
     app::{App, Request, RequestKind},
     color::Theme,
@@ -11,6 +12,7 @@ use crate::{
     ui,
     workers::{Pool, Value},
 };
+use refresh::{Renderer, collect, tick};
 use std::{
     io::{self, IsTerminal},
     path::Path,
@@ -124,10 +126,10 @@ fn drive(
     let mut dirty = true;
     let mut watches = crate::watch::Runtime::default();
     let mut clipboard = crate::clipboard::runtime::Runtime::default();
-    let mut geometry = ui::geometry(&controller.app, terminal.size()?.into());
+    let mut renderer = Renderer::new(ui::geometry(&controller.app, terminal.size()?.into()));
     while !controller.quit {
         dirty |= controller.app.notifications.advance(started.elapsed());
-        dirty |= tick(&mut controller.app);
+        dirty |= tick(&mut controller.app, renderer.geometry.footer.width);
         dirty |= ui::animate_preview(&mut controller.app, started.elapsed());
         dirty |= collect(controller, pool);
         dirty |= operations::collect(controller, jobs, pool);
@@ -138,18 +140,18 @@ fn drive(
         dirty |= schedule_metadata(controller, pool, &mut metadata);
         #[cfg(windows)]
         {
-            dirty |= owners.poll(&mut controller.app, &geometry);
+            dirty |= owners.poll(&mut controller.app, &renderer.geometry);
         }
         if dirty {
-            ui::prepare_notifications(&mut controller.app, terminal.size()?.into());
-            terminal.draw(|frame| {
-                geometry = ui::render(frame, &controller.app, theme);
-            })?;
+            renderer.draw(terminal, &mut controller.app, theme)?;
             dirty = false;
         }
         if crossterm::event::poll(Duration::from_millis(16))? {
-            let requests =
-                controller.handle(crossterm::event::read()?, &geometry, started.elapsed());
+            let requests = controller.handle(
+                crossterm::event::read()?,
+                &renderer.geometry,
+                started.elapsed(),
+            );
             for request in requests {
                 pool.submit(request);
             }
@@ -167,58 +169,6 @@ fn submit_refreshes(app: &mut App, pool: &mut Pool) {
             pool.submit(request);
         }
     }
-}
-
-fn tick(app: &mut App) -> bool {
-    let now = std::time::SystemTime::now();
-    let elapsed = now.duration_since(app.now).unwrap_or(Duration::MAX);
-    if elapsed < Duration::from_secs(1) {
-        return false;
-    }
-    app.now = now;
-    let help_expired = app.help_landing.is_some_and(|(_, until)| now >= until);
-    if help_expired {
-        app.help_landing = None;
-    }
-    help_expired
-        || app.notifications.open
-        || app.operations.active()
-        || app.panes.iter().any(|pane| pane.fuzzy_timestamps)
-        || app
-            .metadata_formats
-            .iter()
-            .flatten()
-            .any(|format| format.fuzzy_timestamps)
-}
-
-fn collect(controller: &mut Controller, pool: &mut Pool) -> bool {
-    let mut changed = false;
-    for _ in 0..6 {
-        let Some(completion) = pool.next(Duration::ZERO) else {
-            break;
-        };
-        let request = completion.request;
-        changed = true;
-        match completion.value {
-            Value::Listing(result) => {
-                controller
-                    .app
-                    .complete_listing(request.pane, request.generation, result);
-            }
-            Value::Metadata(entry, canonical) => {
-                controller
-                    .app
-                    .complete_metadata(&request, *entry, canonical);
-            }
-            Value::Totals(result) => {
-                controller.app.complete_totals(&request, result);
-            }
-            Value::Failed(error) => {
-                controller.app.complete_failure(&request, error);
-            }
-        }
-    }
-    changed
 }
 
 fn schedule_metadata(
@@ -467,14 +417,29 @@ mod tests {
         let mut c = counting_controller(root.path());
         let g = ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 120, 24));
         c.dispatch(Action::Metadata, &g);
-        c.app.metadata_formats[1]
+        c.app.metadata_formats[c.app.active]
             .as_mut()
             .unwrap()
             .toggle(Action::FuzzyTimestamps);
         c.app.now = std::time::SystemTime::UNIX_EPOCH;
-        assert!(tick(&mut c.app));
+        assert!(tick(&mut c.app, g.footer.width));
         assert!(c.app.panes.iter().all(|p| !p.fuzzy_timestamps));
         assert!(!c.preferences.fuzzy_timestamps && !c.preferences_changed);
+    }
+
+    #[test]
+    fn closed_metadata_formats_do_not_request_clock_redraw() {
+        let root = tempfile::tempdir().unwrap();
+        let mut c = counting_controller(root.path());
+        let g = ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 120, 24));
+        c.dispatch(Action::Metadata, &g);
+        c.app.metadata_formats[c.app.active]
+            .as_mut()
+            .unwrap()
+            .toggle(Action::FuzzyTimestamps);
+        c.dispatch(Action::Metadata, &g);
+        c.app.now = std::time::SystemTime::UNIX_EPOCH;
+        assert!(!tick(&mut c.app, g.footer.width));
     }
 
     pub(super) fn hold_first_count(

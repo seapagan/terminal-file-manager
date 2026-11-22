@@ -15,6 +15,7 @@ fn scroll_cues_are_interior_and_all_geometry_stays_centred_after_resize() {
     plan.operands = vec![plan.operands[0].clone(); 50];
     let mut app = App::new(root.path().into());
     app.operations.dialog = Some(Dialog::Operation(Box::new(OperationDialog {
+        editors: Default::default(),
         plan,
         pane: 0,
         base: root.path().into(),
@@ -240,6 +241,7 @@ fn pending_preview(operation: Operation) -> (tempfile::TempDir, App) {
     std::fs::write(&path, b"kept").unwrap();
     let mut app = App::new(root.path().into());
     app.operations.dialog = Some(Dialog::Operation(Box::new(OperationDialog {
+        editors: Default::default(),
         plan: Plan::paths(operation, vec![path], None).unwrap(),
         pane: 0,
         base: root.path().into(),

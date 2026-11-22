@@ -169,3 +169,25 @@ pub(crate) fn animate_preview(app: &mut App, elapsed: std::time::Duration) -> bo
     app.operations.preview_frame = frame;
     changed
 }
+
+pub(super) fn cursor(g: &super::Geometry) -> Option<super::text_input::Cursor> {
+    let layout = g.operation_layout.as_ref()?;
+    [
+        (&layout.header, layout.shell.pinned),
+        (&layout.rows, layout.body),
+    ]
+    .into_iter()
+    .find_map(|(rows, area)| {
+        rows.iter()
+            .take(usize::from(area.height))
+            .enumerate()
+            .find_map(|(row, field)| {
+                field
+                    .cursor(area.width)
+                    .map(|(column, overwrite)| super::text_input::Cursor {
+                        position: (area.x + column, area.y + row as u16).into(),
+                        overwrite,
+                    })
+            })
+    })
+}

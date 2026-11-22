@@ -1,4 +1,4 @@
-//! Metadata values share listing styles while keeping formatting local to each open view.
+//! Metadata values share listing styles while sharing formatting per pane.
 use colored_text::ColorLevel;
 use crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::{Terminal, backend::TestBackend, buffer::Buffer, layout::Rect};
@@ -96,3 +96,35 @@ mod attributes;
 mod owner;
 #[path = "metadata_controls/timestamps.rs"]
 mod timestamps;
+
+#[test]
+fn popup_and_sidebar_share_active_pane_format_across_lifetimes() {
+    let (_root, mut c) = loaded();
+    c.app.popup = true;
+    let buffer = draw(&c.app, 120, 32, ColorLevel::NoColor);
+    let g = ui::geometry(&c.app, buffer.area);
+    let (x, y) = visible_value(&buffer, &g, "-rwsr-xr--");
+    click(&mut c, x, y, &g);
+    assert_eq!(
+        c.app.metadata_format(false).permissions,
+        PermissionDisplay::Octal
+    );
+    c.app.popup = false;
+    let g = ui::geometry(&c.app, buffer.area);
+    c.handle(Event::Resize(120, 32), &g, Default::default());
+    assert_eq!(
+        c.app.metadata_format(false).permissions,
+        PermissionDisplay::Octal
+    );
+    c.app.active = 1;
+    assert_eq!(
+        c.app.metadata_format(true).permissions,
+        PermissionDisplay::Symbolic
+    );
+    c.app.active = 0;
+    assert_eq!(
+        c.app.metadata_format(true).permissions,
+        PermissionDisplay::Octal
+    );
+    assert_eq!(c.app.panes[0].permissions, PermissionDisplay::Symbolic);
+}

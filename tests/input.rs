@@ -94,22 +94,6 @@ fn alt_p_and_both_tab_encodings_share_the_two_pane_focus_action() {
 }
 
 #[test]
-fn preferred_metadata_presentation_keeps_both_direct_shortcuts() {
-    let (_root, mut controller) = controller();
-    controller.preferences =
-        terminal_file_manager::settings::Settings::parse("metadata_presentation = 'sidebar'")
-            .unwrap();
-    key(&mut controller, "F2");
-    assert!(controller.app.sidebar);
-    assert!(!controller.app.popup);
-    key(&mut controller, "Alt+Enter");
-    assert!(controller.app.popup);
-    key(&mut controller, "Esc");
-    key(&mut controller, "Alt+i");
-    assert!(!controller.app.sidebar);
-}
-
-#[test]
 fn floating_metadata_close_keys_preserve_sidebar_and_modal_focus() {
     use terminal_file_manager::settings::MetadataPresentation;
     for preference in [MetadataPresentation::Sidebar, MetadataPresentation::Popup] {
@@ -175,7 +159,7 @@ fn help_lists_effective_bindings_and_centres_the_action_table() {
         .collect::<Vec<_>>();
     let pane_row = rows
         .iter()
-        .find(|row| row.contains("Toggle one/two panes"))
+        .find(|row| row.contains("Switch between one and two panes"))
         .unwrap();
     assert!(pane_row.contains("F12"));
     assert!(!pane_row.contains("Ctrl+P"));
@@ -518,3 +502,6 @@ fn filter_profile_and_view_routing_keep_precedence_and_key_kinds() {
     assert!(c.preferences_changed);
     assert!(!c.app.panes[0].human_sizes);
 }
+
+#[path = "input/combined.rs"]
+mod combined;

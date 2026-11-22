@@ -2,7 +2,7 @@ use super::*;
 
 #[cfg(windows)]
 #[test]
-fn native_windows_attribute_click_toggles_only_the_open_metadata_view() {
+fn native_windows_attribute_click_toggles_shared_metadata_format() {
     for floating in [false, true] {
         let (_root, mut c) = loaded();
         let path = c.app.details[0].path.as_ref().unwrap();
@@ -66,7 +66,7 @@ fn metadata_attributes_keep_symbolic_and_octal_character_styles_at_every_depth()
 }
 
 #[test]
-fn attribute_value_click_changes_only_the_open_metadata_view() {
+fn attribute_value_click_changes_shared_metadata_format() {
     for floating in [false, true] {
         let (_root, mut c) = loaded();
         c.app.popup = floating;
@@ -168,7 +168,7 @@ fn wrapped_scrolled_values_match_click_regions_and_exclude_padding_and_overlays(
                 c.app.metadata_format(floating).permissions,
                 PermissionDisplay::Octal
             );
-            c.app.metadata_formats[usize::from(floating)] = None;
+            c.app.metadata_formats[c.app.active] = None;
         }
         if width == 24 {
             assert!(geometry.metadata_controls.len() > 1);

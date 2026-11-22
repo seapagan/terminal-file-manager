@@ -119,7 +119,7 @@ fn direct_start_link_replacement_or_removal_cannot_restore_focus() {
 
 #[test]
 fn direct_start_link_obeys_visibility_and_missing_identity() {
-    for exclusion in ["hidden", "absent", "identity", "filter"] {
+    for exclusion in ["hidden", "absent", "identity", "filter", "cleared-filter"] {
         let (root, _target) = fixture();
         let alias = root.path().join("link");
         let mut app = loaded(&alias);
@@ -148,10 +148,18 @@ fn direct_start_link_obeys_visibility_and_missing_identity() {
                     .unwrap()
                     .identity = None
             }
-            _ => app.panes[0].set_filter("aaa".into()),
+            _ => {
+                app.keep_filter_on_navigation = exclusion == "filter";
+                app.panes[0].set_filter("aaa".into());
+            }
         }
         assert!(app.complete_listing(0, request.generation, Ok(listing)));
-        assert_eq!(app.panes[0].cursor, Some(root.path().join("aaa")));
+        let expected = if exclusion == "cleared-filter" {
+            "link"
+        } else {
+            "aaa"
+        };
+        assert_eq!(app.panes[0].cursor, Some(root.path().join(expected)));
     }
 }
 

@@ -33,7 +33,7 @@ Usage: tfm [OPTIONS] [DIRECTORY [OTHER_DIRECTORY]]
 
 Options:
   -2  --two-panes        Start with two panes
-      --save-session     Save locations, relative base and layout; exit
+      --save-session     Save pane locations, relative base and layout; exit
       --restore-session  Restore saved navigation session; no directory arguments
   -h  --help             Print help and exit
   -V  --version          Print version and exit
@@ -108,8 +108,9 @@ fn help() -> String {
             let text = &captures[0];
             let styled = match text {
                 "Usage:" | "Options:" => text.cyan().bold(),
-                "DIRECTORY" | "OTHER_DIRECTORY" | "?" | "F1" => text.cyan(),
-                _ => text.green(),
+                "DIRECTORY" | "OTHER_DIRECTORY" => text.cyan(),
+                "?" | "F1" => return input::HelpFragment::Key(text.into()).stdout(),
+                _ => return input::HelpFragment::Reference(text.into()).stdout(),
             };
             styled.render(RenderTarget::Stdout)
         })
@@ -123,3 +124,5 @@ pub mod owner;
 pub mod operations;
 
 pub mod navigation;
+
+pub mod editor;

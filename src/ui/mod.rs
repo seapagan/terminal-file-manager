@@ -24,10 +24,14 @@ pub use path_navigation::PathControl;
 pub use path_picker::PathLayout;
 mod pattern;
 mod policy;
+mod policy_menu;
+pub use policy_menu::{PolicyControl, PolicyLayout};
 mod profiles;
 pub use pattern::{PatternControl, PatternLayout};
 mod summary;
 mod text;
+pub(crate) mod text_input;
+pub(crate) use text_input::cursor as editing_cursor;
 mod view;
 use crate::{app::App, color::Theme};
 pub use layout::{Geometry, geometry};
@@ -87,9 +91,21 @@ pub fn prepare_notifications(app: &mut App, area: Rect) {
 /// Draw a frame using the same geometry used by mouse hit testing.
 pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     let mut geometry = geometry(app, frame.area());
+    let focus = crate::path_copy::listing_focus(app);
     for (id, area) in geometry.panes.iter().enumerate() {
         if area.is_some() {
-            listing::render(frame, app, id, &geometry, theme);
+            let preserve =
+                |entry: &crate::fs::Entry| focus.as_ref().is_none_or(|focus| focus(id, entry));
+            listing::render(
+                frame,
+                app,
+                id,
+                &geometry,
+                theme,
+                focus
+                    .as_ref()
+                    .map(|_| &preserve as &dyn Fn(&crate::fs::Entry) -> bool),
+            );
         }
     }
     let diagnostics = app
@@ -99,6 +115,9 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
         metadata::render(frame, app, area, theme, false);
     }
     status::render(frame, &geometry.status_segments, theme);
+    if focus.is_some() {
+        listing::mute_browser_surfaces(frame, &geometry, theme);
+    }
     footer::render_geometry(frame, &geometry, theme);
     if app.popup {
         metadata::render(frame, app, overlay_bounds(app, frame.area()), theme, true);
@@ -106,13 +125,7 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     if let Some(layout) = &geometry.help {
         help::render(frame, app, theme, layout);
     }
-    if let Some(shell) = &geometry.menu_layout {
-        if app.view_menu.is_some() {
-            view::render(frame, app, shell, theme);
-        } else {
-            profiles::render(frame, app, shell, theme);
-        }
-    }
+    render_menus(frame, app, &geometry, theme);
     if let Some(lines) = diagnostics {
         diagnostics::render(frame, app, theme, &mut geometry, lines);
     }
@@ -121,7 +134,23 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     operations::render(frame, app, theme, &geometry);
     help::context::render(frame, app, theme, geometry.context_help.as_ref());
     notifications::render(frame, app, &geometry, theme);
+    if let Some(cursor) = editing_cursor(app, &geometry) {
+        frame.set_cursor_position(cursor.position);
+    }
     geometry
+}
+
+fn render_menus(frame: &mut Frame, app: &App, geometry: &Geometry, theme: &Theme) {
+    if let Some(shell) = &geometry.menu_layout {
+        if app.view_menu.is_some() {
+            view::render(frame, app, shell, theme);
+        } else {
+            profiles::render(frame, app, shell, theme);
+        }
+    }
+    if let Some(layout) = &geometry.policy_menu {
+        policy_menu::render(frame, app, layout, theme);
+    }
 }
 
 pub(super) fn centered(area: Rect, width: u16, height: u16) -> Rect {

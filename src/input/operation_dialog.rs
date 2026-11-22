@@ -19,7 +19,7 @@ pub(super) fn handle(
         }
         Dialog::Operation(mut dialog) => {
             let keep = match event {
-                Event::Key(key) if key.kind == KeyEventKind::Press => {
+                Event::Key(key) if key.kind != KeyEventKind::Release => {
                     operation_key(controller, &mut dialog, *key, geometry)
                 }
                 Event::Paste(text) => {
@@ -39,6 +39,12 @@ fn operation_key(
     key: KeyEvent,
     geometry: &crate::ui::Geometry,
 ) -> bool {
+    if key.kind == KeyEventKind::Repeat {
+        if !matches!(dialog.plan.operation, Operation::Delete | Operation::Trash) {
+            edit_field(controller, dialog, key);
+        }
+        return true;
+    }
     if matches!(key.code, KeyCode::Esc) {
         cancel_preview(controller, dialog);
         return false;
@@ -59,28 +65,28 @@ fn operation_key(
             dialog.field = 1 - dialog.field;
             true
         }
-        KeyCode::Backspace => {
-            field(dialog).pop();
-            dialog.error = None;
-            dialog.edited |= dialog.field == 0;
-            true
-        }
         KeyCode::Char('a') if key.modifiers == KeyModifiers::CONTROL => {
             field(dialog).clear();
+            let overwrite = dialog.editors[dialog.field].overwrite;
+            dialog.editors[dialog.field] = Default::default();
+            dialog.editors[dialog.field].overwrite = overwrite;
             dialog.error = None;
             dialog.edited |= dialog.field == 0;
             true
         }
-        KeyCode::Char(character)
-            if !key
-                .modifiers
-                .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
-        {
-            append(controller, dialog, &character.to_string());
+        _ => {
+            edit_field(controller, dialog, key);
             true
         }
-        _ => true,
     }
+}
+
+fn edit_field(controller: &mut Controller, dialog: &mut OperationDialog, key: KeyEvent) {
+    let index = dialog.field;
+    let mut editor = dialog.editors[index].clone();
+    let change = editor.key(field(dialog), key, 65_536);
+    dialog.editors[index] = editor;
+    changed(controller, dialog, change);
 }
 
 fn destructive(
@@ -313,11 +319,22 @@ fn field(dialog: &mut OperationDialog) -> &mut String {
 }
 
 fn append(controller: &mut Controller, dialog: &mut OperationDialog, text: &str) {
-    if field(dialog).len().saturating_add(text.len()) > 65_536 {
-        controller.app.status = "Input too long; paste was not added".into();
-        return;
+    let index = dialog.field;
+    let mut editor = dialog.editors[index].clone();
+    let change = editor.insert(field(dialog), text, 65_536);
+    dialog.editors[index] = editor;
+    changed(controller, dialog, change);
+}
+
+fn changed(controller: &mut Controller, dialog: &mut OperationDialog, change: crate::editor::Edit) {
+    match change {
+        crate::editor::Edit::Rejected => {
+            controller.app.status = "Input too long; paste was not added".into()
+        }
+        crate::editor::Edit::Changed => {
+            dialog.error = None;
+            dialog.edited |= dialog.field == 0;
+        }
+        _ => {}
     }
-    dialog.error = None;
-    field(dialog).push_str(text);
-    dialog.edited |= dialog.field == 0;
 }

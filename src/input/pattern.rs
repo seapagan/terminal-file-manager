@@ -10,7 +10,12 @@ use crossterm::event::{
 
 pub(super) fn open(controller: &mut Controller) {
     let pane = controller.app.active;
-    controller.app.pattern = Some(PatternSelection::new(&controller.app.panes[pane], pane));
+    let mut state = PatternSelection::new(&controller.app.panes[pane], pane);
+    state.set_mode(controller.pattern_preferences.0);
+    if state.case_sensitive != controller.pattern_preferences.1 {
+        state.toggle_case();
+    }
+    controller.app.pattern = Some(state);
     controller.last_click = None;
     controller.dragging_divider = false;
 }
@@ -195,31 +200,18 @@ fn enter(controller: &mut Controller, layout: &crate::ui::PatternLayout) {
 
 fn edit(controller: &mut Controller, key: KeyEvent, layout: &crate::ui::PatternLayout) {
     let state = controller.app.pattern.as_mut().unwrap();
-    match key.code {
-        KeyCode::Backspace
-            if state.focus == PatternControl::Expression
-                && layout.targets().contains(&PatternControl::Expression) =>
-        {
-            let mut text = state.expression().to_owned();
-            text.pop();
-            state.set_expression(text);
-        }
-        KeyCode::Char(c)
-            if state.focus == PatternControl::Expression
-                && layout.targets().contains(&PatternControl::Expression) =>
-        {
-            append(controller, &c.to_string())
-        }
-        KeyCode::Char(' ') if key.kind == KeyEventKind::Press => {
-            if let Some(target @ (PatternControl::Mode(_) | PatternControl::Case)) = layout
-                .targets()
-                .into_iter()
-                .find(|target| *target == state.focus)
-            {
-                activate(controller, target, true);
-            }
-        }
-        _ => {}
+    if state.focus == PatternControl::Expression
+        && layout.targets().contains(&PatternControl::Expression)
+    {
+        state.edit_key(key);
+    } else if key.code == KeyCode::Char(' ')
+        && key.kind == KeyEventKind::Press
+        && let Some(target @ (PatternControl::Mode(_) | PatternControl::Case)) = layout
+            .targets()
+            .into_iter()
+            .find(|target| *target == state.focus)
+    {
+        activate(controller, target, true);
     }
 }
 
@@ -254,6 +246,7 @@ fn activate(controller: &mut Controller, target: PatternControl, move_focus: boo
             }
         }
     }
+    controller.pattern_preferences = (state.mode, state.case_sensitive);
     controller.app.pattern = Some(state);
 }
 
@@ -386,16 +379,23 @@ mod notification_tests {
     }
 
     #[test]
-    fn pattern_count_excludes_filtered_marks_and_preserves_them() {
+    fn pattern_count_stays_visible_while_replace_clears_filtered_marks() {
         let (_root, mut c) = controller();
         c.app.panes[0].select_all();
         c.app.panes[0].set_filter(".txt".into());
-        apply(&mut c, "*", PatternOperation::Replace);
-        assert_eq!(c.app.status.to_string(), "2 visible entries marked");
-        assert_eq!(c.app.panes[0].marks.len(), 3);
-        apply(&mut c, "*", PatternOperation::Unmark);
-        assert_eq!(c.app.status.to_string(), "0 visible entries marked");
-        assert_eq!(c.app.panes[0].marks.len(), 1);
+        for (operation, total, visible) in [
+            (PatternOperation::Unmark, 1, 0),
+            (PatternOperation::Mark, 3, 2),
+            (PatternOperation::Replace, 2, 2),
+            (PatternOperation::Unmark, 0, 0),
+        ] {
+            apply(&mut c, "*", operation);
+            assert_eq!(
+                c.app.status.to_string(),
+                format!("{visible} visible entries marked")
+            );
+            assert_eq!(c.app.panes[0].marks.len(), total);
+        }
     }
 
     #[test]

@@ -1,13 +1,11 @@
 use super::{Action, Bindings};
 use crate::{
     app::{App, IgnoreMode, Request},
-    listing::{Grouping, Sort},
+    listing::Grouping,
     settings::Settings,
     ui::Geometry,
 };
-use crossterm::event::{
-    Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
-};
+use crossterm::event::{Event, KeyCode, KeyEventKind, MouseButton, MouseEvent, MouseEventKind};
 use std::{path::PathBuf, time::Duration};
 
 /// Pure input controller; emitted requests are the only route to background I/O.
@@ -19,6 +17,7 @@ pub struct Controller {
     pub save_session: bool,
     pub preferences_changed: bool,
     pub preferences: Settings,
+    pub(super) pattern_preferences: (crate::app::PatternMode, bool),
     pub(super) bindings: Bindings,
     pub(super) filter_before: Option<(usize, String)>,
     pub(super) last_click: Option<(usize, PathBuf, Duration)>,
@@ -29,10 +28,12 @@ impl Controller {
     /// Own the authoritative app and validated keymap.
     pub fn new(mut app: App, bindings: Bindings, preferences: Settings) -> Self {
         preferences.apply_notifications(&mut app);
+        app.keep_filter_on_navigation = preferences.keep_filter_on_navigation;
         app.help_rows = bindings.help_entries();
         app.metadata_presentation = preferences.metadata_presentation;
         app.profile_names = preferences.profiles.keys().cloned().collect();
         Self {
+            pattern_preferences: (preferences.pattern_mode, preferences.pattern_case_sensitive),
             path_copy_request: None,
             path_base_request: None,
             app,
@@ -53,6 +54,9 @@ impl Controller {
         geometry: &Geometry,
         now: Duration,
     ) -> Vec<Request> {
+        if super::policy_menu::handle(self, &event, geometry) {
+            return Vec::new();
+        }
         if super::pattern::handle(self, &event, geometry) {
             return Vec::new();
         }
@@ -62,10 +66,18 @@ impl Controller {
         if super::operations::handle(self, &event, geometry) {
             return Vec::new();
         }
+        self.event(event, geometry, now)
+    }
+
+    fn event(&mut self, event: Event, geometry: &Geometry, now: Duration) -> Vec<Request> {
         match event {
             Event::Key(key) if key.kind != KeyEventKind::Release => self.editing_key(key, geometry),
             Event::Paste(text) if self.filter_before.is_some() => {
                 self.append_filter(&text);
+                Vec::new()
+            }
+            Event::Paste(text) if self.app.profile_name.is_some() => {
+                super::profiles::paste(self, &text);
                 Vec::new()
             }
             Event::Mouse(event) => self.mouse(event, geometry, now),
@@ -123,7 +135,10 @@ impl Controller {
             self.app.status = reason.into();
             return Vec::new();
         }
-        if super::path_copy::action(self, action) || self.application_action(action, geometry) {
+        if super::policy_menu::action(self, action)
+            || super::path_copy::action(self, action)
+            || self.application_action(action, geometry)
+        {
             return Vec::new();
         }
         self.pane_action(action, geometry)
@@ -148,10 +163,9 @@ impl Controller {
                 self.app.popup = false;
                 self.app.close_help();
             }
-            HumanSizes | FuzzyTimestamps | Permissions | ColumnSize | ColumnModified
-            | ColumnAttributes | ColumnOwner | OwnerDisplay | MetadataPresentation => {
-                super::view::formatting(self, action)
-            }
+            KeepFilter | HumanSizes | FuzzyTimestamps | Permissions | ColumnSize
+            | ColumnModified | ColumnAttributes | ColumnOwner | OwnerDisplay
+            | MetadataPresentation => super::view::formatting(self, action),
             TogglePanes | Maximise | FocusPane | ToggleSidebar | Metadata | Help | FullPath => {
                 self.layout(action, geometry)
             }
@@ -166,7 +180,9 @@ impl Controller {
             Up | Down | Home | End | PageUp | PageDown => self.movement(action, geometry),
             ExtendUp | ExtendDown => self.extend_selection(action, geometry),
             Enter | Parent | Back | Forward | Refresh => return self.navigate(action),
-            Mark | MarkNext | SelectAll | ClearVisible => self.selection(action, geometry),
+            Mark | MarkNext | SelectAll | ClearVisible | MarkExtension | MarkFinalExtension => {
+                self.selection(action, geometry)
+            }
             Hidden | Ignore | Sort | Reverse | Group => self.policy(action),
             Filter => self.begin_filter(),
             PatternSelection => super::pattern::open(self),
@@ -174,18 +190,20 @@ impl Controller {
             Cancel => self.cancel(),
             // These actions are handled or normalized before pane dispatch.
             Diagnostics | DiagnosticsUp | DiagnosticsDown | SplitLeft | SplitRight
-            | ViewProfiles | Quit | SaveQuit | ViewOptions | HumanSizes | FuzzyTimestamps
-            | Permissions | ColumnSize | ColumnModified | ColumnAttributes | ColumnOwner
-            | OwnerDisplay | MetadataPresentation | TogglePanes | Maximise | FocusPane
-            | ToggleSidebar | Metadata | Help | Info | Viewer | Editor | Path | FullPath
-            | Zoxide | OppositeZoxide | ExitDirectory | Copy | Move | Mkdir | CreateFile
-            | Trash | Delete | Rename | Attributes | Jobs | Notifications | DismissToast
-            | DismissToasts | CopyQuick | MoveQuick | PathCopy => {}
+            | ViewProfiles | Quit | SaveQuit | ViewOptions | KeepFilter | HumanSizes
+            | FuzzyTimestamps | Permissions | ColumnSize | ColumnModified | ColumnAttributes
+            | ColumnOwner | OwnerDisplay | MetadataPresentation | TogglePanes | Maximise
+            | FocusPane | ToggleSidebar | Metadata | Help | Info | Viewer | Editor | Path
+            | FullPath | Zoxide | OppositeZoxide | ExitDirectory | Copy | Move | Mkdir
+            | CreateFile | Trash | Delete | Rename | Attributes | Jobs | Notifications
+            | DismissToast | DismissToasts | CopyQuick | MoveQuick | PathCopy | SortMenu
+            | GroupMenu | HiddenMenu | IgnoreMenu => {}
         }
         Vec::new()
     }
 
     fn begin_filter(&mut self) {
+        self.app.panes[self.app.active].filter_editor = Some(Default::default());
         self.filter_before = Some((
             self.app.active,
             self.app.panes[self.app.active].filter.clone(),
@@ -215,6 +233,10 @@ impl Controller {
                 pane.move_cursor(1, height);
             }
             Action::SelectAll => pane.select_all(),
+            Action::MarkExtension | Action::MarkFinalExtension => pane.mark_extension(
+                &self.preferences.compound_extensions,
+                action == Action::MarkFinalExtension,
+            ),
             Action::ClearVisible => pane.clear_visible(),
             _ => {}
         }
@@ -231,7 +253,7 @@ impl Controller {
                     IgnoreMode::Off => IgnoreMode::Dim,
                 }
             }
-            Action::Sort => pane.sort.sort = next_sort(pane.sort.sort),
+            Action::Sort => pane.sort.sort = super::policy_menu::next_sort(pane.sort.sort),
             Action::Reverse => pane.sort.reverse = !pane.sort.reverse,
             Action::Group => {
                 pane.sort.grouping = match pane.sort.grouping {
@@ -242,8 +264,11 @@ impl Controller {
             }
             _ => {}
         }
-        pane.profile_modified = pane.profile.is_some();
-        pane.resort();
+        self.app.policy_changed();
+        self.capture_policy(action);
+    }
+
+    pub(super) fn capture_policy(&mut self, action: Action) {
         self.preferences.capture(&self.app, action);
         self.preferences_changed = true;
     }
@@ -347,19 +372,22 @@ impl Controller {
                 self.filter_before = None;
                 self.app.status = "Filter applied".into();
             }
-            KeyCode::Backspace => {
-                let mut text = self.app.panes[id].filter.clone();
-                text.pop();
-                self.app.panes[id].set_filter(text);
+            _ => {
+                let pane = &mut self.app.panes[id];
+                let mut text = pane.filter.clone();
+                if pane
+                    .filter_editor
+                    .as_mut()
+                    .unwrap()
+                    .key(&mut text, key, 4096)
+                    == crate::editor::Edit::Changed
+                {
+                    pane.set_filter(text);
+                }
             }
-            KeyCode::Char(c)
-                if !key
-                    .modifiers
-                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
-            {
-                self.append_filter(&c.to_string())
-            }
-            _ => {}
+        }
+        if self.filter_before.is_none() {
+            self.app.panes[id].filter_editor = None;
         }
     }
 
@@ -367,14 +395,18 @@ impl Controller {
         let Some((id, _)) = self.filter_before.as_ref() else {
             return;
         };
-        let mut query = self.app.panes[*id].filter.clone();
-        for c in text.chars().filter(|c| !c.is_control()) {
-            if query.len() + c.len_utf8() > 4096 {
-                break;
-            }
-            query.push(c);
+        let pane = &mut self.app.panes[*id];
+        let mut query = pane.filter.clone();
+        let incoming: String = text.chars().filter(|c| !c.is_control()).collect();
+        if pane
+            .filter_editor
+            .as_mut()
+            .unwrap()
+            .insert(&mut query, &incoming, 4096)
+            == crate::editor::Edit::Changed
+        {
+            pane.set_filter(query);
         }
-        self.app.panes[*id].set_filter(query);
     }
 
     fn metadata_click(&mut self, event: MouseEvent, geometry: &Geometry) -> bool {
@@ -388,7 +420,7 @@ impl Controller {
                 self.cancel();
                 return true;
             }
-            if let Some(format) = &mut self.app.metadata_formats[usize::from(self.app.popup)] {
+            if let Some(format) = &mut self.app.metadata_formats[self.app.active] {
                 format.toggle(control.action);
             }
             return true;
@@ -473,20 +505,6 @@ impl Controller {
 
 pub(super) fn page_height(geometry: &Geometry, pane: usize) -> usize {
     geometry.listing_rows[pane].max(1)
-}
-
-fn next_sort(sort: Sort) -> Sort {
-    match sort {
-        Sort::Natural => Sort::Name,
-        Sort::Name => Sort::Extension,
-        Sort::Extension => Sort::Size,
-        Sort::Size => Sort::Modified,
-        Sort::Modified => Sort::Created,
-        Sort::Created => Sort::Kind,
-        Sort::Kind => Sort::Version,
-        Sort::Version => Sort::Unsorted,
-        Sort::Unsorted => Sort::Natural,
-    }
 }
 
 fn unavailable(action: Action) -> Option<&'static str> {

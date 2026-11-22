@@ -11,6 +11,7 @@ use terminal_file_manager::{
 fn mkdir() -> App {
     let mut app = App::new("/controlled".into());
     app.operations.dialog = Some(Dialog::Operation(Box::new(OperationDialog {
+        editors: Default::default(),
         plan: Plan::mkdir("/controlled".into()),
         pane: 0,
         base: "/controlled".into(),

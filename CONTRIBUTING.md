@@ -82,6 +82,7 @@ Clippy and `llvm-tools-preview`, plus
 3.10+, Ruff, mypy and Lizard 1.24.3 for static support-code checks and source
 complexity analysis. Install and verify required tools before running the
 corresponding tasks; missing prerequisites must not be treated as passing.
+Native Git integration tests also require a Git executable on PATH.
 
 On Windows, Linux and macOS, [uv-managed Python](https://docs.astral.sh/uv/guides/install-python/)
 is an alternative when your system interpreter is missing or unsuitable. To

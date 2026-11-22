@@ -360,7 +360,7 @@ fn popup_layout(
         .measure(bounds, |width| {
             measured_rows = rows(fields, width, theme);
             if let Some(entry) = detail.entry.as_ref().filter(|_| detail.stale.is_none()) {
-                let row = super::modal::entry_row::<()>(entry, std::path::Path::new(&entry.name));
+                let row = filename_row(entry);
                 let row = row.wrap(width).remove(0).line(width, theme);
                 measured_rows.insert(0, (row, None, 0));
             }
@@ -368,6 +368,27 @@ fn popup_layout(
         })
     };
     (shell, measured_rows)
+}
+
+fn filename_row(entry: &crate::fs::Entry) -> super::modal::Row<()> {
+    super::modal::Row::<()>::file(
+        format!(
+            "{}{}",
+            entry.name.to_string_lossy(),
+            if entry.kind == crate::fs::EntryKind::Directory
+                || (entry.kind == crate::fs::EntryKind::Junction && entry.enterable)
+            {
+                "/"
+            } else {
+                ""
+            }
+        ),
+        if entry.kind == crate::fs::EntryKind::File {
+            super::modal::file_size(entry.size)
+        } else {
+            "—".into()
+        },
+    )
 }
 
 fn value_controls(rows: &[Row], inner: Rect, scroll: u16, offset: u16) -> Vec<MetadataControl> {

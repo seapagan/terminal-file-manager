@@ -35,12 +35,13 @@ macro_rules! define_commands {
 
 // Row position is display priority; bindings remain in the effective keymap.
 define_commands! {
+    (Action::KeepFilter, HelpSection::Views, "Keep filters across directory navigation"),
     (Action::Up, HelpSection::Navigation, "Move cursor up"),
     (Action::Down, HelpSection::Navigation, "Move cursor down"),
     (
         Action::Enter,
         HelpSection::Navigation,
-        "Open a directory or focused ..; files are not launched",
+        "Open a directory or ..; files stay unopened",
     ),
     (Action::Parent, HelpSection::Navigation, "Parent directory"),
     (
@@ -62,7 +63,7 @@ define_commands! {
     (Action::PageUp, HelpSection::Navigation, "Previous page"),
     (Action::Home, HelpSection::Navigation, "First row (.. when available)"),
     (Action::End, HelpSection::Navigation, "Last entry"),
-    (Action::FullPath, HelpSection::Navigation, "Open full path picker"),
+    (Action::FullPath, HelpSection::Navigation, "Choose a parent directory from the full path"),
     (
         Action::Path,
         HelpSection::Navigation,
@@ -109,11 +110,13 @@ define_commands! {
         HelpSection::Selection,
         "Clear visible marks",
     ),
-    (Action::PathCopy, HelpSection::Selection, "Copy names or paths to OS clipboard"),
+    (Action::MarkExtension, HelpSection::Selection, "Replace pane marks with visible files matching the highlighted extension class"),
+    (Action::MarkFinalExtension, HelpSection::Selection, "Replace pane marks with visible files matching the highlighted final extension"),
+    (Action::PathCopy, HelpSection::Selection, "Copy selected names or paths to the clipboard"),
     (
         Action::PatternSelection,
         HelpSection::Selection,
-        "Mark, unmark or replace visible marks (wildcard or regex)",
+        "Mark or unmark visible matches, or replace pane marks (wildcard or regex)",
     ),
     (
         Action::Copy,
@@ -174,7 +177,7 @@ define_commands! {
     (
         Action::TogglePanes,
         HelpSection::Panes,
-        "Toggle one/two panes",
+        "Switch between one and two panes",
     ),
     (
         Action::Maximise,
@@ -199,7 +202,7 @@ define_commands! {
     (
         Action::Hidden,
         HelpSection::Views,
-        "Toggle hidden entries (h beside the type indicator)",
+        "Show or hide hidden entries",
     ),
     (Action::Sort, HelpSection::Views, "Cycle sort order"),
     (
@@ -210,34 +213,38 @@ define_commands! {
     (
         Action::Group,
         HelpSection::Views,
-        "Cycle directory grouping First/Last/Mixed",
+        "Cycle directory grouping: ‘First’, ‘Last’, ‘Mixed’",
     ),
     (
         Action::Ignore,
         HelpSection::Views,
-        "Cycle Git-ignore Dim/Hide/Off",
+        "Cycle Git-ignore display: ‘Dim’, ‘Hide’, ‘Off’",
     ),
+    (Action::SortMenu, HelpSection::Views, "Choose sort order from a popup"),
+    (Action::GroupMenu, HelpSection::Views, "Choose directory grouping from a popup"),
+    (Action::HiddenMenu, HelpSection::Views, "Choose hidden-entry visibility from a popup"),
+    (Action::IgnoreMenu, HelpSection::Views, "Choose Git-ignore display from a popup"),
     (
         Action::Info,
         HelpSection::Views,
-        "Show file information in your chosen view",
+        "Show file information",
     ),
     (
         Action::Metadata,
         HelpSection::Views,
-        "Show or hide file information",
+        "Open or close file information popup",
     ),
     (
         Action::ToggleSidebar,
         HelpSection::Views,
-        "Show file information sidebar (wide single pane)",
+        "Show file information sidebar in a wide single pane",
     ),
     (
         Action::Count,
         HelpSection::Views,
         "Count folder contents; cancel to stop",
     ),
-    (Action::ViewOptions, HelpSection::Views, "View options"),
+    (Action::ViewOptions, HelpSection::Views, "Open ‘View Options’"),
     (
         Action::ViewProfiles,
         HelpSection::Views,
@@ -294,9 +301,9 @@ define_commands! {
         HelpSection::Views,
         "File editor (not available yet)",
     ),
-    (Action::DismissToast, HelpSection::Jobs, "Dismiss oldest visible toast; available in all interfaces"),
-    (Action::DismissToasts, HelpSection::Jobs, "Dismiss all active toasts; keep notification history and Jobs evidence"),
-    (Action::Notifications, HelpSection::Jobs, "Read noteworthy events and file-operation results; Enter opens linked Jobs evidence"),
+    (Action::DismissToast, HelpSection::Jobs, "Dismiss the oldest visible notification"),
+    (Action::DismissToasts, HelpSection::Jobs, "Dismiss active notifications; keep history and ‘Jobs’ evidence"),
+    (Action::Notifications, HelpSection::Jobs, "Read notification history; Enter opens linked ‘Jobs’ evidence"),
     (Action::Help, HelpSection::Application, "Help"),
     (
         Action::Cancel,
@@ -306,12 +313,12 @@ define_commands! {
     (
         Action::Quit,
         HelpSection::Application,
-        "Quit without saving pane locations",
+        "Quit without saving the navigation session",
     ),
     (
         Action::SaveQuit,
         HelpSection::Application,
-        "Save pane locations and quit",
+        "Save the navigation session and quit",
     ),
     (
         Action::Diagnostics,

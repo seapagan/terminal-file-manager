@@ -2,6 +2,8 @@ use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 mod recovery;
 #[cfg(test)]
 mod registration_tests;
+#[cfg(test)]
+mod targeted_tests;
 use super::signals::{DIRTY, ERROR, READY, Signals};
 use recovery::Recovery;
 use std::{
@@ -149,7 +151,11 @@ fn on_event(
             signals.publish(ERROR | DIRTY);
         }
         Ok(event) if relevant(&event, raw, physical) => {
-            signals.publish(DIRTY);
+            if let Some(paths) = precise_children(&event, raw, physical) {
+                signals.children(paths);
+            } else {
+                signals.publish(DIRTY);
+            }
         }
         Err(_) => {
             failed.store(true, Ordering::Release);
@@ -157,6 +163,35 @@ fn on_event(
         }
         _ => {}
     }
+}
+
+fn precise_children(event: &Event, raw: &Path, physical: &Path) -> Option<Vec<PathBuf>> {
+    use notify::event::{AccessKind, AccessMode, ModifyKind};
+    if !matches!(
+        event.kind,
+        EventKind::Modify(ModifyKind::Data(_) | ModifyKind::Metadata(_))
+            | EventKind::Access(AccessKind::Close(AccessMode::Write))
+    ) || event.paths.is_empty()
+    {
+        return None;
+    }
+    event
+        .paths
+        .iter()
+        .map(|path| {
+            if ![raw, physical]
+                .iter()
+                .any(|dir| path.parent() == Some(*dir))
+            {
+                return None;
+            }
+            let name = path.file_name()?;
+            if [".gitignore", ".ignore", ".git"].iter().any(|p| name == *p) {
+                return None;
+            }
+            Some(raw.join(name))
+        })
+        .collect()
 }
 
 fn relevant(event: &Event, raw: &Path, physical: &Path) -> bool {

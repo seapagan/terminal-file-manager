@@ -64,7 +64,7 @@ fn metadata_times_follow_pane_mode_and_advance_from_cached_timestamps() {
 }
 
 #[test]
-fn each_metadata_time_value_toggles_only_the_open_metadata_view() {
+fn each_metadata_time_value_toggles_shared_metadata_format() {
     for floating in [false, true] {
         for (label, text) in [
             ("Modified:", "1970-01-11 00:00:00.123456700 (UTC)"),
@@ -91,6 +91,7 @@ fn each_metadata_time_value_toggles_only_the_open_metadata_view() {
             .unwrap();
             assert!(!settings.fuzzy_timestamps);
             assert!(c.app.metadata_format(floating).fuzzy_timestamps);
+            assert!(c.app.metadata_format(!floating).fuzzy_timestamps);
             assert!(c.app.request_metadata(0).is_none());
             let buffer = draw(&c.app, 180, 40, ColorLevel::NoColor);
             let geometry = ui::geometry(&c.app, Rect::new(0, 0, 180, 40));
@@ -178,6 +179,7 @@ fn timestamp_continuations_remain_clickable_after_narrow_overlay_and_sidebar_scr
         click(&mut c, position.x, position.y, &geometry);
         assert!(!c.app.panes[0].fuzzy_timestamps && !c.preferences.fuzzy_timestamps);
         assert!(c.app.metadata_format(floating).fuzzy_timestamps);
+        assert!(c.app.metadata_format(!floating).fuzzy_timestamps);
         assert!(c.app.request_metadata(0).is_none());
     }
 }

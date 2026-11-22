@@ -1,8 +1,11 @@
 mod context;
 mod context_text;
+mod fragments;
+mod policy_text;
 pub(super) use context::handle as context_handle;
 pub use context::{ContextHelp, HelpTopic, ViewHelpTopic};
-pub use context_text::{HelpFragment, HelpParagraph};
+pub(crate) use fragments::paragraph;
+pub use fragments::{HelpFragment, HelpParagraph};
 mod controller;
 pub(super) use controller::handle;
 mod metadata;

@@ -24,6 +24,10 @@ pub enum MetadataPresentation {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Settings {
+    pub keep_filter_on_navigation: bool,
+    pub compound_extensions: Vec<String>,
+    pub pattern_mode: crate::app::PatternMode,
+    pub pattern_case_sensitive: bool,
     pub clipboard: crate::path_copy::Preferences,
     pub path_hover: Option<String>,
     pub inactive_pane_border: Option<String>,
@@ -53,6 +57,20 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            keep_filter_on_navigation: false,
+            compound_extensions: [
+                ".tar.gz",
+                ".tar.xz",
+                ".tar.bz2",
+                ".tar.zst",
+                ".tar.lz",
+                ".tar.lzma",
+                ".tar.Z",
+            ]
+            .map(str::to_owned)
+            .to_vec(),
+            pattern_mode: crate::app::PatternMode::Wildcard,
+            pattern_case_sensitive: true,
             clipboard: Default::default(),
             path_hover: None,
             inactive_pane_border: None,
@@ -112,6 +130,7 @@ impl Settings {
             return Err("toast_expiry_seconds must be between 1 and 60".into());
         }
         settings.validate_colours()?;
+        settings.validate_compound_extensions()?;
         for name in settings.profiles.keys() {
             validate_profile_name(name)?;
         }
@@ -120,6 +139,21 @@ impl Settings {
         }
         Bindings::new(&settings.bindings)?;
         Ok(settings)
+    }
+
+    fn validate_compound_extensions(&self) -> Result<(), String> {
+        if self.compound_extensions.iter().any(|s| {
+            !s.starts_with('.')
+                || s.len() < 2
+                || s.ends_with('.')
+                || s.chars().any(|c| c.is_control() || matches!(c, '/' | '\\'))
+        }) {
+            return Err(
+                "compound_extensions must contain dotted filename suffixes without path separators"
+                    .into(),
+            );
+        }
+        Ok(())
     }
 
     fn validate_colours(&self) -> Result<(), String> {
@@ -138,6 +172,7 @@ impl Settings {
     /// Apply startup/view preferences without replacing native locations.
     pub fn apply(&self, app: &mut App) {
         self.apply_notifications(app);
+        app.keep_filter_on_navigation = self.keep_filter_on_navigation;
         app.sidebar = self.sidebar;
         app.dual = self.two_panes;
         app.split_percent = self.split_percent;

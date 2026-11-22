@@ -8,7 +8,7 @@ use std::{
     path::PathBuf,
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         mpsc,
     },
     time::Duration,
@@ -31,7 +31,23 @@ pub struct Completion {
 #[derive(Default)]
 struct Lane {
     running: Option<Arc<AtomicBool>>,
-    pending: Option<Request>,
+    pending: Option<Work>,
+}
+
+struct Work {
+    request: Request,
+    refresh: Option<(Snapshot, Vec<PathBuf>)>,
+}
+#[derive(Default)]
+struct Metrics {
+    full_scans: AtomicUsize,
+    metadata_refreshes: AtomicUsize,
+}
+/// Executed listing work, rather than hint or scheduling counts.
+#[derive(Clone, Copy, Debug)]
+pub struct ListingMetrics {
+    pub full_scans: usize,
+    pub metadata_refreshes: usize,
 }
 
 /// At most one running and one replaceable pending request per lane.
@@ -41,6 +57,7 @@ pub struct Pool {
     sender: mpsc::SyncSender<Completion>,
     receiver: mpsc::Receiver<Completion>,
     context: IgnoreContext,
+    metrics: Arc<Metrics>,
     #[cfg(test)]
     pub(crate) before_execute: Option<BeforeExecute>,
 }
@@ -65,6 +82,7 @@ impl Pool {
             sender,
             receiver,
             context,
+            metrics: Arc::default(),
             #[cfg(test)]
             before_execute: None,
         })
@@ -72,15 +90,38 @@ impl Pool {
 
     /// Replace queued work and cooperatively cancel the old read; never block input.
     pub fn submit(&mut self, request: Request) {
-        let Some(index) = lane_index(&request) else {
+        self.submit_work(Work {
+            request,
+            refresh: None,
+        });
+    }
+    pub(crate) fn submit_metadata_refresh(
+        &mut self,
+        request: Request,
+        seed: Snapshot,
+        paths: Vec<PathBuf>,
+    ) {
+        self.submit_work(Work {
+            request,
+            refresh: Some((seed, paths)),
+        });
+    }
+    fn submit_work(&mut self, work: Work) {
+        let Some(index) = lane_index(&work.request) else {
             return;
         };
         let lane = &mut self.lanes[index];
         if let Some(cancelled) = &lane.running {
             cancelled.store(true, Ordering::Relaxed);
         }
-        lane.pending = Some(request);
+        lane.pending = Some(work);
         self.pump();
+    }
+    pub fn listing_metrics(&self) -> ListingMetrics {
+        ListingMetrics {
+            full_scans: self.metrics.full_scans.load(Ordering::Relaxed),
+            metadata_refreshes: self.metrics.metadata_refreshes.load(Ordering::Relaxed),
+        }
     }
 
     /// Cancel a lane without claiming an in-flight kernel read was interrupted.
@@ -134,12 +175,13 @@ impl Pool {
             if lane.running.is_some() {
                 continue;
             }
-            let Some(request) = lane.pending.take() else {
+            let Some(Work { request, refresh }) = lane.pending.take() else {
                 continue;
             };
             let cancelled = Arc::new(AtomicBool::new(false));
             lane.running = Some(cancelled.clone());
             let context = self.context.clone();
+            let metrics = self.metrics.clone();
             let sender = self.sender.clone();
             #[cfg(test)]
             let before_execute = self.before_execute.clone();
@@ -153,7 +195,7 @@ impl Pool {
                         if let Some(before_execute) = before_execute {
                             before_execute(&work, &cancelled);
                         }
-                        execute(&work, &context, &cancelled)
+                        execute_work(&work, &context, &cancelled, refresh, &metrics)
                     })
                     .await;
                     let value = result.unwrap_or_else(|error| {
@@ -189,6 +231,29 @@ fn lane_index(request: &Request) -> Option<usize> {
         RequestKind::Totals => 2,
     };
     Some(kind * 2 + request.pane)
+}
+
+fn execute_work(
+    request: &Request,
+    context: &IgnoreContext,
+    cancelled: &AtomicBool,
+    refresh: Option<(Snapshot, Vec<PathBuf>)>,
+    metrics: &Metrics,
+) -> Value {
+    if let Some((seed, paths)) = refresh {
+        match fs::refresh_metadata(seed, &paths, cancelled) {
+            Ok(Some(snapshot)) => {
+                metrics.metadata_refreshes.fetch_add(1, Ordering::Relaxed);
+                return Value::Listing(Ok(snapshot));
+            }
+            Err(error) => return Value::Listing(Err(error.to_string())),
+            Ok(None) => {}
+        }
+    }
+    if request.kind == RequestKind::Listing {
+        metrics.full_scans.fetch_add(1, Ordering::Relaxed);
+    }
+    execute(request, context, cancelled)
 }
 
 fn execute(request: &Request, context: &IgnoreContext, cancelled: &AtomicBool) -> Value {

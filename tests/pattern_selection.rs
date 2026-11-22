@@ -1,4 +1,6 @@
-//! Pattern selection uses native names and a frozen visible working set.
+//! Pattern selection matches frozen visible native names and revalidates before applying.
+#[path = "pattern_selection/replacement.rs"]
+mod replacement;
 use std::{fs, sync::atomic::AtomicBool};
 use terminal_file_manager::{
     app::{App, PatternMode, PatternOperation, PatternSelection},
@@ -80,7 +82,7 @@ fn identities_without_object_ids_follow_manual_marking_and_revalidate() {
 }
 
 #[test]
-fn replace_and_unmark_preserve_excluded_marks_and_zero_never_marks_cursor() {
+fn mark_and_unmark_preserve_excluded_marks_and_zero_never_marks_cursor() {
     let (_root, mut app) = loaded();
     let pane = &mut app.panes[0];
     pane.show_hidden = true;
@@ -89,10 +91,9 @@ fn replace_and_unmark_preserve_excluded_marks_and_zero_never_marks_cursor() {
     pane.show_hidden = false;
     pane.set_filter("txt".into());
     let mut selection = PatternSelection::new(pane, 0);
+    pane.clear_visible();
     selection.set_expression("missing".into());
     selection.apply(pane, PatternOperation::Mark).unwrap();
-    assert_eq!(pane.marks.len(), 6);
-    selection.apply(pane, PatternOperation::Replace).unwrap();
     assert_eq!(pane.marks.len(), 2);
     assert!(pane.marks.contains_key(&pane.path.join(".hidden.txt")));
     assert!(pane.marks.contains_key(&pane.path.join("keep.log")));
@@ -334,7 +335,7 @@ fn windows_native_surrogate_names_never_match_replacement_display_text() {
 }
 
 #[test]
-fn ignored_marks_survive_visible_replace_and_unavailable_names_are_not_selectable() {
+fn replace_clears_excluded_marks_and_unavailable_names_are_not_selectable() {
     use terminal_file_manager::app::IgnoreMode;
     let (_root, mut app) = loaded();
     let pane = &mut app.panes[0];
@@ -368,13 +369,12 @@ fn ignored_marks_survive_visible_replace_and_unavailable_names_are_not_selectabl
     assert_eq!(selection.preview(pane).unwrap().visible, 3);
     assert_eq!(selection.preview(pane).unwrap().matches, 1);
     selection.apply(pane, PatternOperation::Replace).unwrap();
-    for path in [&unavailable, &ignored, &pane.path.join("λ.txt")] {
-        assert_eq!(pane.marks.get(path), original.get(path));
-        assert!(pane.marks.contains_key(path));
-    }
-    assert_eq!(pane.marks.len(), 3);
-    assert!(!pane.marks.contains_key(&pane.path.join("BETA.TXT")));
-    assert!(!pane.marks.contains_key(&pane.path.join("folder.txt")));
+    let matched = pane.path.join("λ.txt");
+    assert_eq!(pane.marks.get(&matched), original.get(&matched));
+    assert!(pane.marks.contains_key(&matched));
+    assert!(!pane.marks.contains_key(&unavailable));
+    assert!(!pane.marks.contains_key(&ignored));
+    assert_eq!(pane.marks.len(), 1);
     assert!(
         pane.entries
             .iter()

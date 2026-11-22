@@ -16,7 +16,9 @@ mod tests;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HelpTopic {
     FullPath,
+    PathCopy,
     Pattern,
+    Policy(crate::input::Action),
     View(ViewHelpTopic),
     Operation(Operation),
     Conflict,
@@ -72,7 +74,10 @@ impl HelpTopic {
                 ViewHelpTopic::Profiles
             }))
         } else {
-            None
+            app.policy_menu
+                .as_ref()
+                .filter(|_| !crate::input::policy_menu::preempted(app))
+                .map(|menu| Self::Policy(menu.action))
         }
     }
 
@@ -97,15 +102,17 @@ impl HelpTopic {
                 .as_ref()
                 .map(|_| Self::Pattern)
                 .or_else(|| app.path_picker.as_ref().map(|_| Self::FullPath))
+                .or_else(|| app.footer_workflow.as_ref().map(|_| Self::PathCopy))
         }
     }
 
     pub fn title(self) -> &'static str {
         match self {
-            Self::FullPath => "Go to directory Help",
+            Self::FullPath | Self::PathCopy => path_title(self),
             Self::View(view) => view.title(),
             Self::Operation(operation) => operation_title(operation),
             Self::Pattern => "Pattern Help",
+            Self::Policy(action) => super::policy_text::title(action),
             Self::Conflict => "Conflict Help",
             Self::Jobs => "Jobs Help",
             Self::Metadata => "Metadata Help",
@@ -116,6 +123,14 @@ impl HelpTopic {
 
     pub fn text(self, app: &App) -> Vec<super::HelpParagraph> {
         super::context_text::text(self, app)
+    }
+}
+
+fn path_title(topic: HelpTopic) -> &'static str {
+    if topic == HelpTopic::FullPath {
+        "Go to directory Help"
+    } else {
+        "Copy Path Help"
     }
 }
 
@@ -147,7 +162,8 @@ pub(in crate::input) fn handle(c: &mut Controller, event: &Event, geometry: &Geo
     let open = match event {
         Event::Key(key) => opens_with_key(c, *key, topic),
         Event::Mouse(mouse) => {
-            mouse.kind == MouseEventKind::Down(MouseButton::Left)
+            topic != HelpTopic::PathCopy
+                && mouse.kind == MouseEventKind::Down(MouseButton::Left)
                 && geometry
                     .context_control
                     .is_some_and(|area| area.contains((mouse.column, mouse.row).into()))
@@ -167,10 +183,17 @@ fn opens_with_key(c: &Controller, key: KeyEvent, topic: HelpTopic) -> bool {
     if key.code == KeyCode::F(1) && key.modifiers.is_empty() {
         return true;
     }
-    key.code == KeyCode::Char('?')
-        && (key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT)
+    if topic == HelpTopic::PathCopy {
+        return question_key(key);
+    }
+    question_key(key)
         && c.bindings.action(key) == Some(crate::input::Action::Help)
         && !editing(&c.app, topic)
+}
+
+fn question_key(key: KeyEvent) -> bool {
+    key.code == KeyCode::Char('?')
+        && (key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT)
 }
 
 fn editing(app: &App, topic: HelpTopic) -> bool {
@@ -208,7 +231,7 @@ fn overlay(c: &mut Controller, event: &Event, geometry: &Geometry) {
         return;
     }
     if matches!(event, Event::Key(key) if key.kind == KeyEventKind::Press && key.code == KeyCode::Esc)
-        || matches!(event, Event::Mouse(mouse) if mouse.kind == MouseEventKind::Down(MouseButton::Left) && geometry.context_help.as_ref().is_some_and(|layout| layout.shell.hit(mouse.column, mouse.row).is_some()))
+        || matches!(event, Event::Mouse(mouse) if mouse.kind == MouseEventKind::Down(MouseButton::Left) && geometry.context_help.as_ref().is_some_and(|layout| layout.shell.hit(mouse.column, mouse.row).is_some() || layout.shell.close.is_some_and(|area| area.contains((mouse.column, mouse.row).into()))))
     {
         c.app.context_help = None;
         return;

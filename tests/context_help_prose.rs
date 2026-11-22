@@ -9,6 +9,8 @@ use terminal_file_manager::{
     ui,
 };
 mod dialog_fixture;
+#[path = "context_help_prose/semantics.rs"]
+mod semantics;
 
 fn controller(bindings: &std::collections::BTreeMap<String, Action>) -> Controller {
     let mut app = dialog_fixture::dialog(Plan::create_file("/controlled".into()));
@@ -44,8 +46,28 @@ fn find(b: &Buffer, area: Rect, text: &str) -> (u16, u16) {
                 )
             })
         })
+        .unwrap_or_else(|| find_wrapped(b, area, text))
+}
+fn find_wrapped(b: &Buffer, area: Rect, text: &str) -> (u16, u16) {
+    let cells: Vec<_> = (area.y..area.bottom())
+        .flat_map(|y| {
+            (area.x..area.right()).flat_map(move |x| {
+                b[(x, y)]
+                    .symbol()
+                    .chars()
+                    .filter(|c| !c.is_whitespace())
+                    .map(move |c| (c, (x, y)))
+            })
+        })
+        .collect();
+    let needle: Vec<_> = text.chars().filter(|c| !c.is_whitespace()).collect();
+    cells
+        .windows(needle.len())
+        .find(|window| window.iter().map(|(c, _)| *c).eq(needle.iter().copied()))
+        .map(|window| window[0].1)
         .unwrap_or_else(|| panic!("missing {text}"))
 }
+
 #[test]
 fn prose_moves_whole_words_to_the_next_line() {
     let c = controller(&Default::default());
@@ -77,6 +99,48 @@ fn actual_shortcuts_are_styled_and_survive_configured_unicode_and_backticks() {
         }
         let (x, y) = find(&b, body, "Create");
         assert!(!b[(x, y)].modifier.contains(Modifier::BOLD));
+    }
+}
+
+#[test]
+fn copy_path_help_styles_fixed_keys_and_the_effective_opening_binding() {
+    let mut c = controller(&std::collections::BTreeMap::from([
+        ("y".into(), Action::Up),
+        ("Alt+y".into(), Action::PathCopy),
+        ("Shift+q".into(), Action::Up),
+        ("Alt+q".into(), Action::SaveQuit),
+    ]));
+    c.app.context_help.as_mut().unwrap().topic = HelpTopic::PathCopy;
+    for level in [ColorLevel::NoColor, ColorLevel::TrueColor] {
+        let theme = Theme::new(level);
+        let (b, body) = draw(&c.app, Rect::new(0, 0, 100, 180), level);
+        for key in [
+            "F1",
+            "?",
+            "Esc",
+            "m ‘Marked’",
+            "h ‘Highlighted’",
+            "c ‘Current folder’",
+            "n ‘Name’",
+            "r ‘Relative’",
+            "f ‘Full path’",
+            "Enter",
+            "Backspace",
+            "Shift+s",
+            "Ctrl+c",
+            "F5",
+            "F6",
+            "Alt+y",
+            "Alt+q",
+        ] {
+            let (x, y) = find(&b, body, key);
+            assert_eq!(
+                b[(x, y)].fg,
+                theme.style(Role::Key).fg.unwrap_or_default(),
+                "{key}"
+            );
+            assert!(b[(x, y)].modifier.contains(Modifier::BOLD), "{key}");
+        }
     }
 }
 #[test]
@@ -120,6 +184,30 @@ fn destructive_and_pattern_help_keep_their_case_sensitive_safety_instructions() 
     }
 }
 
+#[test]
+fn copy_help_keeps_clipboard_limits_compatibility_and_failure_guarantees() {
+    for needles in [
+        [
+            "Clipboard commands time out after three seconds.",
+            "Text limit: 16 MiB.",
+            "74,991 UTF-8 bytes.",
+        ],
+        ["wl-copy on Wayland", "xclip/xsel on X11", "pbcopy on macOS"],
+        [
+            "native Windows clipboard",
+            "clipboard.osc52_fallback = true",
+            "GNU screen and dumb/unknown terminals are unsupported.",
+        ],
+        [
+            "tmux needs set-clipboard on and outer terminal support",
+            "The terminal may refuse the text",
+            "Non-Unicode paths or paths containing control characters fail without changing the clipboard.",
+        ],
+    ] {
+        assert_safety_text(HelpTopic::PathCopy, needles);
+    }
+}
+
 fn assert_safety_text(topic: HelpTopic, needles: [&str; 3]) {
     let mut c = controller(&Default::default());
     c.app.context_help.as_mut().unwrap().topic = topic;
@@ -133,5 +221,75 @@ fn assert_safety_text(topic: HelpTopic, needles: [&str; 3]) {
         .join(" ");
     for needle in needles {
         assert!(text.contains(needle), "{needle}: {text}");
+    }
+}
+
+fn topics() -> Vec<HelpTopic> {
+    use terminal_file_manager::input::ViewHelpTopic;
+    let mut topics = vec![
+        HelpTopic::FullPath,
+        HelpTopic::PathCopy,
+        HelpTopic::Pattern,
+        HelpTopic::Conflict,
+        HelpTopic::Jobs,
+        HelpTopic::Metadata,
+        HelpTopic::Exit,
+        HelpTopic::Incident,
+    ];
+    topics.extend(
+        [
+            ViewHelpTopic::Options,
+            ViewHelpTopic::Profiles,
+            ViewHelpTopic::SaveProfile,
+        ]
+        .map(HelpTopic::View),
+    );
+    topics.extend(
+        [Action::Sort, Action::Group, Action::Hidden, Action::Ignore].map(HelpTopic::Policy),
+    );
+    topics.extend(
+        [
+            Operation::Copy,
+            Operation::Move,
+            Operation::Mkdir,
+            Operation::CreateFile,
+            Operation::Rename,
+            Operation::Trash,
+            Operation::Delete,
+            Operation::Permissions(0o600),
+            Operation::ReadOnly(true),
+        ]
+        .map(HelpTopic::Operation),
+    );
+    topics
+}
+
+#[test]
+fn title_close_and_shortcut_styles_work_for_each_contextual_topic() {
+    use crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    for topic in topics() {
+        let mut c = controller(&Default::default());
+        c.app.context_help.as_mut().unwrap().topic = topic;
+        let (buffer, body) = draw(&c.app, Rect::new(0, 0, 100, 180), ColorLevel::TrueColor);
+        let (x, y) = find(&buffer, body, "Esc");
+        assert!(
+            buffer[(x, y)].modifier.contains(Modifier::BOLD),
+            "{topic:?}"
+        );
+        let g = ui::geometry(&c.app, Rect::new(0, 0, 100, 30));
+        let close = g.context_help.as_ref().unwrap().shell.close.unwrap();
+        c.handle(
+            Event::Mouse(MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: close.x + 1,
+                row: close.y,
+                modifiers: KeyModifiers::NONE,
+            }),
+            &g,
+            Default::default(),
+        );
+        assert!(c.app.context_help.is_none(), "{topic:?}");
+        assert!(c.app.operations.dialog.is_some(), "{topic:?}");
+        assert!(c.app.operations.outbox.is_empty());
     }
 }

@@ -1,4 +1,6 @@
 //! Local mutations through the executable and native PTY/ConPTY.
+#[path = "terminal_operations/pattern_input.rs"]
+mod pattern_input;
 mod terminal_driver;
 #[cfg(windows)]
 #[path = "terminal_operations/windows_trash.rs"]
@@ -252,79 +254,6 @@ fn same_folder_batch_failure_explains_the_reason_before_evidence_in_a_real_termi
 }
 
 #[test]
-fn pattern_selection_alt_b_paste_mark_and_cancel_work_in_native_terminal() {
-    let root = tempfile::tempdir().unwrap();
-    fs::write(root.path().join("pattern-ready.txt"), "preserved").unwrap();
-    let transcript = drive(
-        command(root.path(), root.path(), None),
-        &[
-            ("pattern-ready.txt", "\x1bb"),
-            ("Pattern selection", "\x1b[200~*\x1b[201~"),
-            ("Matches: 1 / 1 selectable", "\r\r"),
-            ("[*]", "\x1bb"),
-            ("Pattern selection", "\x1bk\x1b[200~missing\x1b[201~\x1b"),
-            ("cancelled", "q"),
-        ],
-        true,
-    );
-    assert!(transcript.contains("[*]"));
-    assert_eq!(
-        fs::read_to_string(root.path().join("pattern-ready.txt")).unwrap(),
-        "preserved"
-    );
-}
-
-#[test]
-fn pattern_alt_controls_and_literal_letters_cross_the_native_terminal_parser() {
-    let root = tempfile::tempdir().unwrap();
-    fs::write(root.path().join("wxsmurQfile.txt"), "preserved").unwrap();
-    let transcript = drive(
-        command(root.path(), root.path(), None),
-        &[
-            ("wxsmurQfile.txt", "\x1bb"),
-            ("Pattern selection", "\x1bs\x1bx\x1bwwxsmur?*.txt\x1bm"),
-            ("[*]", "\x1bb"),
-            ("Pattern selection", "\x1bx"),
-            ("Regex searches", "\x1b"),
-            ("cancelled", "\x1bb"),
-            ("Pattern selection", "\x1b[200~*\x1b[201~"),
-            ("Matches: 1 / 1 selectable", "\x1bs\x1bw\x1bu"),
-            ("0 visible entries", "q"),
-        ],
-        false,
-    );
-    assert!(transcript.contains("[*]"));
-    assert_eq!(
-        fs::read_to_string(root.path().join("wxsmurQfile.txt")).unwrap(),
-        "preserved"
-    );
-}
-
-#[test]
-#[cfg(not(windows))]
-fn pattern_overlong_native_input_requires_correction_before_apply() {
-    let root = tempfile::tempdir().unwrap();
-    fs::write(root.path().join("overlong-ready.txt"), "preserved").unwrap();
-    // ConPTY key delivery is covered by the short native pattern tests above.
-    let paste = format!("\x1b[200~{}\x1b[201~", "a".repeat(4097));
-    let steps = [
-        ("overlong-ready.txt", "\x1bb"),
-        ("Pattern selection", paste.as_str()),
-        // The warning suffix is new output; earlier letters can reuse old cells.
-        ("Backspace to correct", "\x1bk\x1bm\x1bu\x1br\r\x1bx"),
-        // The new Regex anchor proves blocked actions left the form open.
-        ("^", "\x1bw\x7f*\r\r"),
-        ("[*]", "q"),
-    ];
-    let transcript = drive(command(root.path(), root.path(), None), &steps, false);
-    assert!(transcript.contains("[*]"));
-    assert_eq!(
-        fs::read(root.path().join("overlong-ready.txt")).unwrap(),
-        b"preserved"
-    );
-}
-
-#[test]
 fn searchable_help_jumps_and_layers_escape_in_a_native_terminal() {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("help-sentinel"), b"preserved").unwrap();
@@ -381,7 +310,7 @@ fn help_synonyms_choose_document_and_context_in_a_native_terminal() {
             ("Pattern selection", "\t?"),
             ("Pattern Help", "\x1b"),
             ("Esc cancels.", "\x1b"),
-            ("cancelled", "q"),
+            ("Pattern selection cancelled", "q"),
         ],
         false,
     );
@@ -396,12 +325,7 @@ fn view_dialog_help_and_profile_editing_cross_the_native_terminal_parser() {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("view-help-sentinel"), b"preserved").unwrap();
     for (open, title, help, restored) in [
-        (
-            "V",
-            "Human sizes",
-            "View Options Help",
-            "Space/Enter changes",
-        ),
+        ("V", "Human sizes", "View Options Help", "Attributes column"),
         (
             "\x1bv",
             "View profiles",
@@ -415,7 +339,8 @@ fn view_dialog_help_and_profile_editing_cross_the_native_terminal_parser() {
                 ("view-help-sentinel", open),
                 (title, "?"),
                 (help, "\x1b"),
-                // Observe the restored menu before the next independent key.
+                // Observe a repainted body row. The taller menu hint can stay
+                // outside the Help overlay without fresh writes on close.
                 (restored, "\x03"),
             ],
             false,
@@ -452,7 +377,7 @@ fn notification_history_opens_from_the_native_keyboard_and_restores_the_browser(
         command(root.path(), root.path(), None),
         &[
             ("notification-ready", "\x1bn"),
-            ("File name:", "notification-ready\r"),
+            ("Create empty file", "notification-ready\r"),
             ("Create file failed", "\x1bh"),
             ("Notifications", "\x1b"),
             ("notification-ready", "q"),
@@ -462,5 +387,74 @@ fn notification_history_opens_from_the_native_keyboard_and_restores_the_browser(
     assert_eq!(
         fs::read(root.path().join("notification-ready")).unwrap(),
         b"preserved"
+    );
+}
+
+#[test]
+fn alternate_metadata_popup_opens_through_native_terminal_input() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("metadata-ready"), "preserved").unwrap();
+    drive(
+        command(root.path(), root.path(), None),
+        &[("metadata-ready", "\x1bo"), ("Metadata", "q")],
+        false,
+    );
+    assert_eq!(
+        fs::read(root.path().join("metadata-ready")).unwrap(),
+        b"preserved"
+    );
+}
+
+#[test]
+fn extension_selection_chords_arrive_through_native_terminal_input() {
+    let root = tempfile::tempdir().unwrap();
+    for name in ["a.tar.gz", "b.tar.gz", "c.gz"] {
+        fs::write(root.path().join(name), "owned").unwrap();
+    }
+    drive(
+        command(root.path(), root.path(), None),
+        &[("a.tar.gz", "\x1be"), ("Selected:", "\x1bE"), ("3", "q")],
+        false,
+    );
+}
+
+#[test]
+fn editing_keys_correct_a_filename_through_native_terminal_input() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("editor-ready"), "owned").unwrap();
+    let transcript = drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("editor-ready", "\x1bn"),
+            ("Create empty file", "abx"),
+            ("abx", "\x1b[H\x1b[C\x1b[3~c\x1b[F\x7f\x1b[2~"),
+            ("ac", "\x1b[2~\r"),
+            ("Create file complete", "q"),
+        ],
+        false,
+    );
+    assert!(transcript.contains("\x1b[6 q"), "insertion cursor shape");
+    assert!(transcript.contains("\x1b[2 q"), "overwrite cursor shape");
+    assert!(transcript.contains("\x1b[0 q"), "cursor shape restored");
+    assert!(!transcript.contains('▏') && !transcript.contains('▐'));
+    assert!(root.path().join("ac").is_file());
+    assert!(!root.path().join("abx").exists());
+}
+
+#[test]
+fn notification_history_shift_f9_arrives_through_native_terminal_input() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("notification-alias-ready"), "owned").unwrap();
+    drive(
+        command(root.path(), root.path(), None),
+        &[
+            ("notification-alias-ready", "\x1b[20;2~"),
+            ("Notifications", "\x03"),
+        ],
+        false,
+    );
+    assert_eq!(
+        fs::read(root.path().join("notification-alias-ready")).unwrap(),
+        b"owned"
     );
 }

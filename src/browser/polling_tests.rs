@@ -52,10 +52,10 @@ fn open_notification_history_requests_clock_redraw_after_toast_expiry() {
     app.notifications.advance(Duration::from_secs(60));
     app.notifications.open = true;
     app.now = std::time::SystemTime::UNIX_EPOCH;
-    assert!(tick(&mut app));
+    assert!(tick(&mut app, 120));
     app.notifications.open = false;
     app.now = std::time::SystemTime::UNIX_EPOCH;
-    assert!(!tick(&mut app));
+    assert!(!tick(&mut app, 120));
 }
 
 fn reconcile(controller: &mut Controller, pool: &mut Pool) {

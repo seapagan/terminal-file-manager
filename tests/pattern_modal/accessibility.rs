@@ -1,4 +1,4 @@
-use super::refinement::{frame, text_at};
+use super::refinement::{assert_editor_cursor, frame, frame_with_cursor, text_at};
 use super::*;
 
 fn action_event(c: &mut Controller, size: (u16, u16), op: PatternOperation, mouse: bool) {
@@ -45,10 +45,10 @@ fn short_scrolling_forms_apply_when_fields_and_decision_context_are_readable() {
                     }
                     key(&mut c, "Alt+b");
                     event(&mut c, Event::Paste("*.txt".into()), size);
-                    let (buffer, layout) = frame(&c, size.0, size.1, level);
+                    let (buffer, layout, cursor) = frame_with_cursor(&c, size.0, size.1, level);
                     assert!(layout.scroll_limit > 0);
                     assert_eq!(layout.fields.len(), 4, "{size:?} {layout:?}");
-                    assert!(text_at(&buffer, layout.fields[0].0).contains("*.txt▏"));
+                    assert_editor_cursor(&cursor, layout.fields[0].0, "*.txt");
                     assert_decision_context(&buffer, &layout, c.app.panes[0].marks.len());
                     let region = layout
                         .shell
@@ -100,7 +100,7 @@ fn assert_decision_context(
     assert!(text.contains("Matches: 2 / 3 selectable"));
     let compact: String = text.chars().filter(|c| !c.is_whitespace()).collect();
     assert!(
-        compact.contains(&format!("Replace:{marked}visiblemarks->2matches")),
+        compact.contains(&format!("Replace:{marked}totalmarks->2matches")),
         "{text:?}"
     );
 }
@@ -116,10 +116,12 @@ fn scroll_and_resize_fail_closed_then_restore_each_action() {
             let (_root, mut c) = loaded();
             key(&mut c, "Alt+b");
             event(&mut c, Event::Paste("*.txt".into()), (70, 17));
-            let (before, layout) = frame(&c, 70, 17, level);
-            assert!(text_at(&before, layout.fields[0].0).contains("*.txt▏"));
+            let (before, layout, cursor) = frame_with_cursor(&c, 70, 17, level);
+            assert!(text_at(&before, layout.fields[0].0).contains("*.txt"));
+            assert_editor_cursor(&cursor, layout.fields[0].0, "*.txt");
             event(&mut c, Event::Key(KeyCode::PageDown.into()), (70, 17));
-            let (scrolled, hidden) = frame(&c, 70, 17, level);
+            let (scrolled, hidden, cursor) = frame_with_cursor(&c, 70, 17, level);
+            assert!(!cursor.cursor_visible());
             assert!(
                 !hidden
                     .fields
@@ -133,7 +135,8 @@ fn scroll_and_resize_fail_closed_then_restore_each_action() {
                 assert!(c.app.panes[0].marks.is_empty());
             }
             event(&mut c, Event::Key(KeyCode::PageUp.into()), (70, 17));
-            let (_, restored) = frame(&c, 70, 17, level);
+            let (_, restored, cursor) = frame_with_cursor(&c, 70, 17, level);
+            assert_editor_cursor(&cursor, restored.fields[0].0, "*.txt");
             assert_eq!(restored.fields, layout.fields);
             assert_eq!(restored.shell.outer, layout.shell.outer);
             event(&mut c, Event::Resize(70, 15), (70, 15));
@@ -213,17 +216,16 @@ fn expression_caret_tracks_editing_focus_in_color_and_no_color() {
         let (_root, mut c) = loaded();
         key(&mut c, "Alt+b");
         event(&mut c, Event::Paste("alpha".into()), (70, 17));
-        let (editing, layout) = frame(&c, 70, 17, level);
-        let (x, y) = find_label(&editing, "alpha▏");
-        assert!(
-            editing[(x + 5, y)]
-                .modifier
-                .contains(ratatui::style::Modifier::BOLD)
-        );
+        let (editing, layout, cursor) = frame_with_cursor(&c, 70, 17, level);
+        assert_editor_cursor(&cursor, layout.fields[0].0, "alpha");
         key(&mut c, "Tab");
-        let (focused, _) = frame(&c, 70, 17, level);
+        let (focused, _, cursor) = frame_with_cursor(&c, 70, 17, level);
         assert!(text_at(&focused, layout.fields[0].0).contains("alpha"));
-        assert!(!text_at(&focused, layout.fields[0].0).contains('▏'));
+        assert!(!cursor.cursor_visible());
+        assert_eq!(
+            text_at(&editing, layout.fields[0].0),
+            text_at(&focused, layout.fields[0].0)
+        );
         assert_eq!(
             text_at(&editing, layout.fields[1].0),
             text_at(&focused, layout.fields[1].0)

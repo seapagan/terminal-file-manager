@@ -107,7 +107,7 @@ fn measured_buttons_fields_counts_and_focus_match_keyboard_and_mouse() {
     ] {
         let (text, geometry) = rendered(&c, 100, 24, level);
         assert!(text.contains("Matches: 2 / 3 selectable"));
-        assert!(text.contains("Replace: 0 visible marks -> 2 matches"));
+        assert!(text.contains("Replace: 0 total marks -> 2 matches"));
         let layout = geometry.pattern.unwrap();
         for region in &layout.shell.actions {
             assert!(text.contains(&region.action.label));
@@ -137,6 +137,9 @@ fn measured_buttons_fields_counts_and_focus_match_keyboard_and_mouse() {
 fn invalid_and_empty_patterns_disable_apply_and_zero_replace_explicitly_clears() {
     let (_root, mut c) = loaded();
     c.app.panes[0].select_all();
+    c.app.panes[0].set_filter("alpha".into());
+    c.app.panes[1].select_all();
+    let other = c.app.panes[1].marks.clone();
     key(&mut c, "Alt+b");
     for expression in ["", "["] {
         c.app
@@ -167,9 +170,10 @@ fn invalid_and_empty_patterns_disable_apply_and_zero_replace_explicitly_clears()
         .unwrap()
         .set_expression("none".into());
     let (text, _) = rendered(&c, 100, 24, ColorLevel::NoColor);
-    assert!(text.contains("Replace: 3 visible marks -> 0 matches"));
+    assert!(text.contains("Replace: 3 total marks -> 0 matches"));
     click(&mut c, PatternControl::Apply(PatternOperation::Replace));
     assert!(c.app.panes[0].marks.is_empty());
+    assert_eq!(c.app.panes[1].marks, other);
 }
 
 #[test]
@@ -354,3 +358,34 @@ mod accessibility;
 
 #[path = "pattern_modal/review.rs"]
 mod review;
+
+#[test]
+fn matching_preferences_survive_reopen_but_expression_and_scope_are_fresh() {
+    let (_root, mut c) = loaded();
+    key(&mut c, "Alt+b");
+    key(&mut c, "a");
+    key(&mut c, "Alt+x");
+    key(&mut c, "Alt+s");
+    key(&mut c, "Esc");
+    key(&mut c, "Alt+b");
+    let pattern = c.app.pattern.as_ref().unwrap();
+    assert_eq!(pattern.mode, PatternMode::Regex);
+    assert!(!pattern.case_sensitive);
+    assert!(pattern.expression().is_empty());
+    assert!(!c.preferences_changed);
+    let settings = terminal_file_manager::settings::Settings::parse(
+        "pattern_mode = 'regex'\npattern_case_sensitive = false",
+    )
+    .unwrap();
+    let mut fresh = Controller::new(
+        App::new("owned".into()),
+        Bindings::new(&Default::default()).unwrap(),
+        settings,
+    );
+    key(&mut fresh, "Alt+b");
+    let pattern = fresh.app.pattern.as_ref().unwrap();
+    assert_eq!(pattern.mode, PatternMode::Regex);
+    assert!(!pattern.case_sensitive);
+    assert!(pattern.expression().is_empty());
+    assert!(terminal_file_manager::settings::Settings::parse("pattern_mode = 'unknown'").is_err());
+}

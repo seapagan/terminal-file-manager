@@ -1,4 +1,6 @@
 //! Categorised Help remains one document behind a temporary jump picker.
+#[path = "help/wrapping.rs"]
+mod wrapping;
 use colored_text::ColorLevel;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{Terminal, backend::TestBackend, layout::Rect};
@@ -31,6 +33,37 @@ fn key(c: &mut Controller, text: &str) {
     );
 }
 
+#[test]
+fn oversized_search_paste_atomically_preserves_query_cursor_and_overwrite_mode() {
+    let mut c = controller();
+    for input in ["?", "/", "a", "b", "界", "Home", "Right", "Insert"] {
+        key(&mut c, input);
+    }
+    c.app.help_picker.as_mut().unwrap().selected = 2;
+    let status = c.app.status.to_string();
+    for paste in ["é".repeat(2049), "x".repeat(4096)] {
+        let g = ui::geometry(&c.app, Rect::new(0, 0, 120, 32));
+        assert!(c.handle(Event::Paste(paste), &g, Duration::ZERO).is_empty());
+        let state = c.app.help_picker.as_ref().unwrap();
+        assert_eq!(state.query, "ab界");
+        assert_eq!(state.editor.position(&state.query), 1);
+        assert!(state.editor.overwrite);
+        assert_eq!(state.selected, 2);
+        assert_eq!(c.app.status.to_string(), status);
+    }
+    key(&mut c, "Z");
+    assert_eq!(c.app.help_picker.as_ref().unwrap().query, "aZ界");
+    key(&mut c, "Esc");
+    key(&mut c, "/");
+    let g = ui::geometry(&c.app, Rect::new(0, 0, 120, 32));
+    c.handle(Event::Paste("x".repeat(4096)), &g, Duration::ZERO);
+    let state = c.app.help_picker.as_ref().unwrap();
+    assert_eq!(state.query.len(), 4096);
+    assert_eq!(state.editor.position(&state.query), 4096);
+    key(&mut c, "y");
+    assert_eq!(c.app.help_picker.as_ref().unwrap().query.len(), 4096);
+}
+
 fn draw(c: &Controller, width: u16, height: u16) -> String {
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
     terminal
@@ -53,6 +86,17 @@ fn continuous_document_has_distinct_sections_and_keeps_all_effective_actions() {
     let mut c = controller();
     key(&mut c, "?");
     let text = draw(&c, 160, 160);
+    let prose = text
+        .lines()
+        .map(|line| {
+            line.split('│')
+                .max_by_key(|part| part.len())
+                .unwrap_or("")
+                .trim()
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    let prose: String = prose.chars().filter(|c| !c.is_whitespace()).collect();
     for section in [
         "Navigation",
         "Selection & Marking",
@@ -66,7 +110,13 @@ fn continuous_document_has_distinct_sections_and_keeps_all_effective_actions() {
     }
     for entry in &c.app.help_rows {
         assert!(
-            text.contains(entry.description),
+            prose.contains(
+                &entry
+                    .description
+                    .chars()
+                    .filter(|c| !c.is_whitespace())
+                    .collect::<String>()
+            ),
             "missing {}",
             entry.description
         );

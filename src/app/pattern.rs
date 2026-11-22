@@ -1,4 +1,4 @@
-//! Pattern marking is bounded by the native identities visible when opened.
+//! Pattern matches use the native identities visible when opened.
 use super::{Pane, pane::same_object};
 use crate::fs::Identity;
 use std::{cell::RefCell, collections::HashMap, path::PathBuf};
@@ -21,7 +21,8 @@ struct CachedPreview {
 }
 
 /// Filename matching syntax, independent of the listing's fuzzy filter.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum PatternMode {
     /// Globset whole-filename wildcards.
     Wildcard,
@@ -36,7 +37,7 @@ pub enum PatternOperation {
     Mark,
     /// Remove matching visible marks.
     Unmark,
-    /// Replace only marks in the captured visible working set.
+    /// Clear all pane marks, then mark matching visible identities.
     Replace,
 }
 
@@ -55,6 +56,7 @@ pub enum PatternControl {
 pub struct PatternPreview {
     pub matches: usize,
     pub visible: usize,
+    /// All marks in this pane, including excluded entries cleared by Replace.
     pub marked: usize,
 }
 
@@ -69,6 +71,7 @@ pub struct PatternSelection {
     pub mode: PatternMode,
     pub case_sensitive: bool,
     expression: String,
+    pub editor: crate::editor::Editor,
     matcher: Result<regex::bytes::Regex, String>,
     path: PathBuf,
     context: u64,
@@ -91,6 +94,7 @@ impl PatternSelection {
             mode: PatternMode::Wildcard,
             case_sensitive: true,
             expression: String::new(),
+            editor: Default::default(),
             preview_cache: RefCell::new(None),
             matcher: Err("Enter a non-empty pattern".into()),
             path: pane.path.clone(),
@@ -127,15 +131,31 @@ impl PatternSelection {
         if self.rejected_edit {
             return;
         }
+        let incoming: String = text.chars().filter(|c| !c.is_control()).collect();
         let mut expression = self.expression.clone();
-        for c in text.chars().filter(|c| !c.is_control()) {
-            if expression.len() + c.len_utf8() > 4096 {
-                self.reject_edit();
-                return;
-            }
-            expression.push(c);
+        match self.editor.insert(&mut expression, &incoming, 4096) {
+            crate::editor::Edit::Rejected => self.reject_edit(),
+            crate::editor::Edit::Changed => self.set_expression(expression),
+            _ => {}
         }
-        self.set_expression(expression);
+    }
+
+    /// Cursor edits invalidate the matcher only when text changes.
+    pub fn edit_key(&mut self, key: crossterm::event::KeyEvent) {
+        use crate::editor::Edit;
+        use crossterm::event::KeyCode;
+        if self.rejected_edit && matches!(key.code, KeyCode::Char(_)) {
+            return;
+        }
+        let mut expression = self.expression.clone();
+        match self.editor.key(&mut expression, key, 4096) {
+            Edit::Rejected => self.reject_edit(),
+            Edit::Changed => self.set_expression(expression),
+            _ if self.rejected_edit && key.code == KeyCode::Backspace => {
+                self.set_expression(expression)
+            }
+            _ => {}
+        }
     }
 
     fn reject_edit(&mut self) {
@@ -152,7 +172,7 @@ impl PatternSelection {
         self.matcher = self.compile();
     }
 
-    /// Matching starts case-sensitive on every open.
+    /// Toggle the session-initialized case preference.
     pub fn toggle_case(&mut self) {
         self.preview_cache.get_mut().take();
         self.feedback = None;
@@ -228,11 +248,7 @@ impl PatternSelection {
                 .filter(|e| matcher.is_match(e.name.as_encoded_bytes()))
                 .count(),
             visible: self.scope.len(),
-            marked: self
-                .scope
-                .keys()
-                .filter(|path| pane.marks.contains_key(*path))
-                .count(),
+            marked: pane.marks.len(),
         })
     }
 
@@ -258,7 +274,7 @@ impl PatternSelection {
         cache.as_ref().unwrap().result.clone()
     }
 
-    /// Revalidate immediately, then apply only this explicit visible-mark change.
+    /// Revalidate before changing marks; Replace clears all pane marks first.
     ///
     /// # Errors
     /// Invalid expressions and changed/unavailable listings leave marks untouched.
@@ -273,14 +289,13 @@ impl PatternSelection {
         let mut preview = PatternPreview {
             matches: 0,
             visible: self.scope.len(),
-            marked: self
-                .scope
-                .keys()
-                .filter(|path| pane.marks.contains_key(*path))
-                .count(),
+            marked: pane.marks.len(),
         };
         pane.reset_range();
         pane.selection_revision = pane.selection_revision.wrapping_add(1);
+        if operation == PatternOperation::Replace {
+            pane.marks.clear();
+        }
         for i in &pane.visible {
             let entry = &pane.entries[*i];
             if self.scope.contains_key(&entry.path) {
@@ -307,9 +322,6 @@ impl PatternSelection {
                 marks
                     .entry(entry.path.clone())
                     .or_insert_with(|| identity.clone());
-            }
-            PatternOperation::Replace => {
-                marks.remove(&entry.path);
             }
             PatternOperation::Unmark if matched => {
                 marks.remove(&entry.path);

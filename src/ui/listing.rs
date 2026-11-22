@@ -1,9 +1,11 @@
 use super::clean;
+mod focus;
 use crate::{
     app::{App, IgnoreMode, Pane},
     color::{Role, Theme},
     fs::{Entry, EntryKind},
 };
+pub(super) use focus::surfaces as mute_browser_surfaces;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Rect},
@@ -18,6 +20,7 @@ pub(super) fn render(
     id: usize,
     geometry: &super::Geometry,
     theme: &Theme,
+    preserve: Option<&dyn Fn(&Entry) -> bool>,
 ) {
     let pane = &app.panes[id];
     let area = geometry.panes[id].expect("visible pane");
@@ -56,6 +59,7 @@ pub(super) fn render(
     render_rows(frame, pane, rows_area, theme, id == app.active, app.now);
     render_summary(frame, summary, inner);
     render_status(frame, pane, inner, theme);
+    focus::dim(frame, pane, area, rows_area, theme, preserve);
 }
 
 fn render_summary(frame: &mut Frame, lines: Vec<Line<'static>>, inner: Rect) {
@@ -160,6 +164,8 @@ fn render_empty(frame: &mut Frame, pane: &Pane, area: Rect) {
     frame.render_widget(
         Paragraph::new(if pane.pending.is_some() {
             "Loading directory…"
+        } else if !pane.filter.is_empty() {
+            "No matches — FILTER active"
         } else {
             "No visible entries"
         }),

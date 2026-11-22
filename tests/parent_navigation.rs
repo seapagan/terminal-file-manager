@@ -206,7 +206,10 @@ fn parent_obeys_filters_hidden_ignore_rules_and_empty_listings() {
         let next = request(&mut c, Action::Parent);
         let mut listing = snapshot(root.path());
         match exclusion {
-            "filter" => c.app.panes[0].set_filter("child00".into()),
+            "filter" => {
+                c.app.keep_filter_on_navigation = true;
+                c.app.panes[0].set_filter("child00".into());
+            }
             "hidden" => listing.entries.iter_mut().for_each(|entry| {
                 entry.hidden = entry.path == root.path().join("child30");
             }),
@@ -386,4 +389,17 @@ fn back_does_not_restore_focus_to_a_replacement_child() {
     assert_eq!(c.app.panes[0].scroll, 0);
     navigate(&mut c, Action::Forward);
     assert_eq!(c.app.panes[0].path, child);
+}
+
+#[test]
+fn parent_and_history_navigation_clear_filters_by_default() {
+    let root = tempfile::tempdir().unwrap();
+    directories(root.path());
+    let mut c = controller(root.path());
+    navigate(&mut c, Action::Enter);
+    for action in [Action::Parent, Action::Back, Action::Forward] {
+        c.app.panes[0].set_filter("no-match".into());
+        navigate(&mut c, action);
+        assert!(c.app.panes[0].filter.is_empty());
+    }
 }

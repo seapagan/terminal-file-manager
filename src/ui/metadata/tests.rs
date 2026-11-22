@@ -231,3 +231,25 @@ fn totals_views_distinguish_running_complete_incomplete_and_failed_results() {
         assert!(!failed.contains("Descendants") && !failed.contains("INCOMPLETE"));
     }
 }
+
+#[test]
+fn floating_filename_row_omits_listing_classifier() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("plain-file");
+    std::fs::write(&path, "data").unwrap();
+    let mut app = App::new(root.path().into());
+    app.details[0].entry = Some(crate::fs::inspect(&path));
+    let theme = Theme::new(ColorLevel::NoColor);
+    let fields = fields(&app, &theme, true);
+    let (_, rows) = popup_layout(
+        &app,
+        &fields,
+        ratatui::layout::Rect::new(0, 0, 120, 40),
+        &theme,
+        &app.details[0],
+    );
+    assert!(rows[0].0.to_string().starts_with("plain-file"));
+    for name in ["Name", "Type", "Attributes"] {
+        assert!(fields.iter().any(|field| field.label == name));
+    }
+}

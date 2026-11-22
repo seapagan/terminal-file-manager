@@ -2,7 +2,7 @@ use crate::{
     app::App,
     color::{Role, Theme},
     input::{HelpHit, HelpTarget},
-    ui::{modal, text::wrap_value},
+    ui::modal,
 };
 use ratatui::{
     Frame,
@@ -123,27 +123,22 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, layout: &Picke
 
 fn render_query(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
     let state = app.help_picker.as_ref().expect("visible picker");
-    let label = modal::truncate(if area.width >= 10 { "Search: " } else { "/ " }, area.width);
-    let label_width = modal::width(&label);
-    let available = area.width.saturating_sub(label_width + 1);
-    let text = if available == 0 {
-        String::new()
-    } else {
-        wrap_value(&crate::ui::clean(&state.query), usize::from(available))
-            .pop()
-            .unwrap_or_default()
-    };
-    let cursor = label_width + modal::width(&text);
-    frame.render_widget(
-        Paragraph::new(Line::from(vec![
-            Span::styled(label, theme.style(Role::Label)),
-            Span::styled(text, theme.style(Role::Value)),
-        ])),
-        area,
+    let (label, label_width) = query_label(area.width);
+    let (mut line, _) = crate::ui::text_input::edited(
+        &state.query,
+        &state.editor,
+        area.width.saturating_sub(label_width),
+        theme,
     );
-    if area.width > 0 && area.height > 0 {
-        frame.set_cursor_position((area.x + cursor.min(area.width - 1), area.y));
-    }
+    line.spans
+        .insert(0, Span::styled(label, theme.style(Role::Label)));
+    frame.render_widget(Paragraph::new(line), area);
+}
+
+pub(super) fn query_label(width: u16) -> (String, u16) {
+    let label = modal::truncate(if width >= 10 { "Search: " } else { "/ " }, width);
+    let cells = modal::width(&label);
+    (label, cells)
 }
 
 fn render_hits(frame: &mut Frame, app: &App, theme: &Theme, layout: &PickerLayout) {
@@ -153,7 +148,16 @@ fn render_hits(frame: &mut Frame, app: &App, theme: &Theme, layout: &PickerLayou
         let selected = *index == state.selected.min(layout.hits.len().saturating_sub(1));
         let style = theme.style(if selected { Role::Cursor } else { Role::Value });
         let title = format!("{} {}", if selected { ">" } else { " " }, hit.title);
-        let mut lines = vec![Line::raw(modal::truncate(&title, area.width))];
+        let mut title = super::prose::truncate(
+            super::prose::line(&crate::input::help_paragraph(&title, &[]), Some(theme)),
+            area.width,
+        );
+        if selected {
+            for span in &mut title.spans {
+                span.style = span.style.patch(style);
+            }
+        }
+        let mut lines = vec![title];
         if area.height == 2 {
             lines.push(details(hit, area.width, theme, selected));
         }

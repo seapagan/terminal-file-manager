@@ -15,6 +15,9 @@ impl Controller {
         if let Some(requests) = super::path_navigation::header(self, event, geometry) {
             return requests;
         }
+        if super::policy_menu::open_at(self, event, geometry) {
+            return Vec::new();
+        }
         self.app.active = id;
         self.app.sidebar = self.app.panes[id].sidebar;
         let area = geometry.panes[id].expect("hit pane");
