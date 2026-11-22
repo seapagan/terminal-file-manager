@@ -53,6 +53,44 @@ fn replace_field(controller: &mut Controller, text: &str) {
 }
 
 #[test]
+fn clearing_operation_fields_preserves_overwrite_mode_and_resets_cursor() {
+    let (_root, mut controller) = fixture();
+    open(&mut controller, Action::Copy);
+    for field in 0..2 {
+        event(&mut controller, Event::Paste("abc".into()));
+        key(&mut controller, KeyCode::Left, KeyModifiers::NONE);
+        key(&mut controller, KeyCode::Insert, KeyModifiers::NONE);
+        key(&mut controller, KeyCode::Char('a'), KeyModifiers::CONTROL);
+        let Some(Dialog::Operation(dialog)) = &controller.app.operations.dialog else {
+            panic!("copy dialog");
+        };
+        let text = if field == 0 {
+            &dialog.text
+        } else {
+            &dialog.incoming
+        };
+        assert!(text.is_empty());
+        assert_eq!(dialog.editors[field].position(text), 0);
+        assert!(dialog.editors[field].overwrite);
+        event(&mut controller, Event::Paste("abc".into()));
+        key(&mut controller, KeyCode::Home, KeyModifiers::NONE);
+        key(&mut controller, KeyCode::Char('X'), KeyModifiers::NONE);
+        let Some(Dialog::Operation(dialog)) = &controller.app.operations.dialog else {
+            panic!("copy dialog");
+        };
+        assert_eq!(
+            if field == 0 {
+                &dialog.text
+            } else {
+                &dialog.incoming
+            },
+            "Xbc"
+        );
+        key(&mut controller, KeyCode::Tab, KeyModifiers::NONE);
+    }
+}
+
+#[test]
 fn late_preview_results_cannot_approve_a_reopened_destructive_dialog() {
     use terminal_file_manager::operations::Intent;
     for (action, confirm) in [(Action::Delete, 'D'), (Action::Trash, 'T')] {

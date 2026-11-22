@@ -67,7 +67,9 @@ fn operation_key(
         }
         KeyCode::Char('a') if key.modifiers == KeyModifiers::CONTROL => {
             field(dialog).clear();
+            let overwrite = dialog.editors[dialog.field].overwrite;
             dialog.editors[dialog.field] = Default::default();
+            dialog.editors[dialog.field].overwrite = overwrite;
             dialog.error = None;
             dialog.edited |= dialog.field == 0;
             true
