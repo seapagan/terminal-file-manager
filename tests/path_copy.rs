@@ -13,6 +13,8 @@ use terminal_file_manager::{
 mod context_help;
 #[path = "path_copy/focus.rs"]
 mod focus;
+#[path = "path_copy/grey.rs"]
+mod grey;
 
 fn controller(root: &Path) -> Controller {
     let mut app = App::new(root.into());

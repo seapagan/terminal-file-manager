@@ -5,6 +5,7 @@ use crate::{
     color::{Role, Theme},
     fs::{Entry, EntryKind},
 };
+pub(super) use focus::surfaces as mute_browser_surfaces;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Rect},
@@ -56,9 +57,9 @@ pub(super) fn render(
         ..inner
     };
     render_rows(frame, pane, rows_area, theme, id == app.active, app.now);
-    focus::dim(frame, pane, rows_area, theme, preserve);
     render_summary(frame, summary, inner);
     render_status(frame, pane, inner, theme);
+    focus::dim(frame, pane, area, rows_area, theme, preserve);
 }
 
 fn render_summary(frame: &mut Frame, lines: Vec<Line<'static>>, inner: Rect) {

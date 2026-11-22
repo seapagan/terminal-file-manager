@@ -233,9 +233,10 @@ Wait for the directory listing to load, then press `y`. Choose `m` Marked,
 Enter accepts defaults, Backspace returns to the previous step and Esc cancels.
 TFM copies plain, unquoted text, with one line per marked entry.
 
-While you choose, marked and highlighted entries stay bright and other entries
-in both panes fade. After choosing Marked or Highlighted, only that source
-stays bright. Finishing or cancelling restores the listing.
+While you choose, marked and highlighted entries keep their normal colours.
+Other entries and browser controls in both panes use muted grey, or faint text
+without colour. After choosing Marked or Highlighted, only that source stays
+fully styled. Finishing or cancelling restores the browser.
 
 The base folder for relative paths stays the same as you browse. It starts at
 the first directory argument or the folder you launched TFM from. At **From**,

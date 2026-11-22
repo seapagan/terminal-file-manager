@@ -4,14 +4,24 @@ use crate::fs::Entry;
 use ratatui::style::Style;
 
 impl Theme {
-    /// Dim a complete listing row, retaining colours and VTE faint compatibility.
+    /// Mute inactive browser foregrounds without changing any background colour.
     pub(crate) fn dim_listing_style(&self, style: Style) -> Style {
-        self.faint_style(
+        use colored_text::ColorLevel;
+        use ratatui::style::{Color, Modifier};
+        let foreground = match self.level {
+            ColorLevel::NoColor => Color::Reset,
+            ColorLevel::Ansi16 => Color::DarkGray,
+            ColorLevel::Ansi256 => Color::Indexed(242),
+            ColorLevel::TrueColor => Color::Rgb(110, 110, 110),
+        };
+        let style = style
+            .fg(foreground)
+            .remove_modifier(Modifier::BOLD | Modifier::DIM);
+        if self.level == ColorLevel::NoColor {
+            style.add_modifier(Modifier::DIM)
+        } else {
             style
-                .remove_modifier(ratatui::style::Modifier::BOLD)
-                .add_modifier(ratatui::style::Modifier::DIM),
-            None,
-        )
+        }
     }
     /// System filenames use the shared red accent; type indicators keep their style.
     pub fn name_style(&self, entry: &Entry) -> Style {
@@ -40,6 +50,42 @@ impl Theme {
             self.faint_style(style, None)
         } else {
             style
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use colored_text::ColorLevel;
+    use ratatui::style::{Color, Modifier};
+
+    #[test]
+    fn browser_muting_changes_only_foreground_intensity_and_preserves_backgrounds() {
+        for level in [
+            ColorLevel::NoColor,
+            ColorLevel::Ansi16,
+            ColorLevel::Ansi256,
+            ColorLevel::TrueColor,
+        ] {
+            for background in [Color::Reset, Color::Indexed(123), Color::Rgb(17, 28, 39)] {
+                let original = Style::default()
+                    .fg(Color::Red)
+                    .bg(background)
+                    .add_modifier(Modifier::BOLD | Modifier::ITALIC | Modifier::REVERSED);
+                let muted = Theme::new(level).dim_listing_style(original);
+                assert_eq!(muted.bg, original.bg);
+                assert!(
+                    muted
+                        .add_modifier
+                        .contains(Modifier::ITALIC | Modifier::REVERSED)
+                );
+                assert!(!muted.add_modifier.contains(Modifier::BOLD));
+                assert_eq!(
+                    muted.add_modifier.contains(Modifier::DIM),
+                    level == ColorLevel::NoColor
+                );
+            }
         }
     }
 }

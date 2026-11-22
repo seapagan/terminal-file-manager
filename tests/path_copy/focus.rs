@@ -1,9 +1,14 @@
 use super::*;
 use colored_text::ColorLevel;
-use ratatui::{Terminal, backend::TestBackend, buffer::Buffer, style::Modifier};
+use ratatui::{
+    Terminal,
+    backend::TestBackend,
+    buffer::Buffer,
+    style::{Color, Modifier},
+};
 use terminal_file_manager::color::Theme;
 
-fn fixture(pane: usize, overlap: bool) -> (tempfile::TempDir, Controller) {
+pub(super) fn fixture(pane: usize, overlap: bool) -> (tempfile::TempDir, Controller) {
     let root = tempfile::tempdir().unwrap();
     for name in ["alpha", "beta", "gamma"] {
         std::fs::write(root.path().join(name), "owned").unwrap();
@@ -19,7 +24,7 @@ fn fixture(pane: usize, overlap: bool) -> (tempfile::TempDir, Controller) {
     (root, c)
 }
 
-fn draw(c: &Controller, width: u16, theme: &Theme) -> (Buffer, ui::Geometry) {
+pub(super) fn draw(c: &Controller, width: u16, theme: &Theme) -> (Buffer, ui::Geometry) {
     let mut t = Terminal::new(TestBackend::new(width, 24)).unwrap();
     let mut geometry = None;
     t.draw(|f| geometry = Some(ui::render(f, &c.app, theme)))
@@ -27,7 +32,7 @@ fn draw(c: &Controller, width: u16, theme: &Theme) -> (Buffer, ui::Geometry) {
     (t.backend().buffer().clone(), geometry.unwrap())
 }
 
-fn entry_row(c: &Controller, g: &ui::Geometry, pane: usize, name: &str) -> Rect {
+pub(super) fn entry_row(c: &Controller, g: &ui::Geometry, pane: usize, name: &str) -> Rect {
     let p = &c.app.panes[pane];
     let row = p
         .visible
@@ -67,14 +72,26 @@ fn assert_rows(
                 } else {
                     assert_eq!(a.symbol(), b.symbol());
                     assert_eq!(a.bg, b.bg);
-                    assert!(
-                        a.modifier.contains(Modifier::DIM),
-                        "dim {pane} {name} {offset}: {a:?}"
-                    );
+                    assert_muted(a, theme.level);
                 }
             }
         }
     }
+}
+
+pub(super) fn assert_muted(cell: &ratatui::buffer::Cell, level: ColorLevel) {
+    let expected = match level {
+        ColorLevel::NoColor => Color::Reset,
+        ColorLevel::Ansi16 => Color::DarkGray,
+        ColorLevel::Ansi256 => Color::Indexed(242),
+        ColorLevel::TrueColor => Color::Rgb(110, 110, 110),
+    };
+    assert_eq!(cell.fg, expected);
+    assert!(!cell.modifier.contains(Modifier::BOLD));
+    assert_eq!(
+        cell.modifier.contains(Modifier::DIM),
+        level == ColorLevel::NoColor
+    );
 }
 
 #[test]
@@ -116,7 +133,7 @@ fn captured_sources_dim_complete_rows_in_both_panes_across_widths_and_colours() 
     }
 }
 
-fn assert_normal(c: &Controller, before: &(Buffer, ui::Geometry), theme: &Theme) {
+pub(super) fn assert_normal(c: &Controller, before: &(Buffer, ui::Geometry), theme: &Theme) {
     let (after, g) = draw(c, 180, theme);
     for pane in 0..2 {
         for name in ["alpha", "beta", "gamma"] {
@@ -205,48 +222,7 @@ fn invalid_origin_context_stops_dimming_before_any_reset_or_input_event() {
     assert_normal(&c, &before, &theme);
 }
 
-#[test]
-fn errors_headers_borders_status_and_workflow_controls_keep_their_normal_styles() {
-    let (_root, mut c) = fixture(0, false);
-    for pane in &mut c.app.panes {
-        pane.entries
-            .iter_mut()
-            .find(|e| e.name == "gamma")
-            .unwrap()
-            .error = Some("metadata unavailable".into());
-        pane.warnings
-            .push("Directory warning stays readable".into());
-    }
-    let theme = Theme::new(ColorLevel::TrueColor);
-    let before = draw(&c, 180, &theme);
-    sequence(&mut c, "ym");
-    let (after, g) = draw(&c, 180, &theme);
-    for pane in 0..2 {
-        let area = g.panes[pane].unwrap();
-        let error = entry_row(&c, &g, pane, "gamma");
-        let old_error = entry_row(&c, &before.1, pane, "gamma");
-        for x in 0..error.width {
-            assert_eq!(
-                after[(error.x + x, error.y)],
-                before.0[(old_error.x + x, old_error.y)]
-            );
-        }
-        let old = before.1.panes[pane].unwrap();
-        for (y, old_y) in [
-            (area.y, old.y),
-            (area.y + 1, old.y + 1),
-            (area.bottom() - 2, old.bottom() - 2),
-            (area.bottom() - 1, old.bottom() - 1),
-        ] {
-            for x in 0..area.width {
-                assert_eq!(after[(area.x + x, y)], before.0[(old.x + x, old_y)]);
-            }
-        }
-    }
-    assert_footer(&after, g.workflow.as_ref().unwrap(), &theme);
-}
-
-fn assert_footer(after: &Buffer, layout: &ui::workflow::Layout, theme: &Theme) {
+pub(super) fn assert_footer(after: &Buffer, layout: &ui::workflow::Layout, theme: &Theme) {
     let mut terminal = Terminal::new(TestBackend::new(180, 24)).unwrap();
     terminal
         .draw(|frame| ui::workflow::render(frame, layout, theme))
@@ -262,11 +238,8 @@ fn assert_footer(after: &Buffer, layout: &ui::workflow::Layout, theme: &Theme) {
 }
 
 #[test]
-fn vte_dimming_uses_indexed_foregrounds_and_terminal_faint_without_changing_bright_rows() {
-    use ratatui::{
-        backend::{Backend, CrosstermBackend},
-        style::Color,
-    };
+fn neutral_grey_on_vte_preserves_bright_rows_and_uses_faint_only_without_colour() {
+    use ratatui::backend::{Backend, CrosstermBackend};
     for level in [
         ColorLevel::NoColor,
         ColorLevel::Ansi16,
@@ -281,14 +254,18 @@ fn vte_dimming_uses_indexed_foregrounds_and_terminal_faint_without_changing_brig
         let (after, g) = draw(&c, 180, &theme);
         let area = entry_row(&c, &g, 0, "gamma");
         for x in area.x..area.right() {
-            assert!(!matches!(after[(x, area.y)].fg, Color::Rgb(..)));
+            assert_muted(&after[(x, area.y)], level);
         }
         let mut bytes = Vec::new();
         CrosstermBackend::new(&mut bytes)
             .draw((area.x..area.right()).map(|x| (x, area.y, &after[(x, area.y)])))
             .unwrap();
         let output = String::from_utf8(bytes).unwrap();
-        assert!(output.contains("\x1b[2m"), "{output:?}");
+        assert_eq!(
+            output.contains("\x1b[2m"),
+            level == ColorLevel::NoColor,
+            "{output:?}"
+        );
         assert!(output.ends_with("\x1b[0m"));
     }
 }

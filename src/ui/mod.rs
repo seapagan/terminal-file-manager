@@ -115,6 +115,9 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
         metadata::render(frame, app, area, theme, false);
     }
     status::render(frame, &geometry.status_segments, theme);
+    if focus.is_some() {
+        listing::mute_browser_surfaces(frame, &geometry, theme);
+    }
     footer::render_geometry(frame, &geometry, theme);
     if app.popup {
         metadata::render(frame, app, overlay_bounds(app, frame.area()), theme, true);
