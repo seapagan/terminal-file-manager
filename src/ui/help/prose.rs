@@ -34,6 +34,27 @@ pub(super) fn line(paragraph: &HelpParagraph, theme: Option<&Theme>) -> Line<'st
     )
 }
 
+pub(super) fn truncate(line: Line<'static>, width: u16) -> Line<'static> {
+    let plain = line.to_string();
+    let clipped = crate::ui::modal::truncate(&plain, width);
+    if clipped == plain {
+        return line;
+    }
+    let mut bytes = clipped.strip_suffix('…').unwrap_or(&clipped).len();
+    let mut result = Line::default();
+    for grapheme in line.styled_graphemes(Style::default()) {
+        if grapheme.symbol.len() > bytes {
+            break;
+        }
+        result.push_span(Span::styled(grapheme.symbol.to_owned(), grapheme.style));
+        bytes -= grapheme.symbol.len();
+    }
+    if width > 0 {
+        result.push_span("…");
+    }
+    result
+}
+
 pub(super) fn wrap(line: Line<'static>, width: usize) -> Vec<Line<'static>> {
     let mut rows = vec![Line::default()];
     if width == 0 {
@@ -96,6 +117,26 @@ mod tests {
     use super::*;
     fn strings(lines: &[Line<'_>]) -> Vec<String> {
         lines.iter().map(ToString::to_string).collect()
+    }
+    #[test]
+    fn semantic_truncation_matches_existing_display_cells_and_keeps_partial_styles() {
+        let style = Style::default()
+            .fg(ratatui::style::Color::Green)
+            .add_modifier(ratatui::style::Modifier::BOLD);
+        let source = "界e\u{301} OSC 52… end";
+        for width in 0..20 {
+            let result = truncate(Line::styled(source, style), width);
+            assert_eq!(
+                result.to_string(),
+                crate::ui::modal::truncate(source, width)
+            );
+            assert!(
+                result
+                    .styled_graphemes(Style::default())
+                    .filter(|grapheme| grapheme.symbol != "…")
+                    .all(|grapheme| grapheme.style == style)
+            );
+        }
     }
     #[test]
     fn keeps_words_together_and_splits_only_tokens_wider_than_the_line() {

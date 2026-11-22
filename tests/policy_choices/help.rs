@@ -111,7 +111,10 @@ fn contextual_help_explains_every_option_and_the_key_policy_distinctions() {
             .map(|fragment| fragment.text().to_owned())
             .collect::<String>();
         for option in options.split_whitespace() {
-            assert!(text.contains(option), "{action:?}: {option}");
+            assert!(
+                text.contains(&format!("‘{option}’")),
+                "{action:?}: {option}"
+            );
         }
         assert!(text.contains(distinction));
         assert!(text.contains("Esc") && text.contains("highlighted choice"));

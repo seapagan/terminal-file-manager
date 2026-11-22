@@ -82,16 +82,16 @@ const FULL_PATH: &[&str] = &[
     "Choose a parent directory from the path shown. This changes only the pane that opened the dialog. The current directory starts selected; press `Enter` to keep it.",
     "Use `Left` / `Up` and `Right` / `Down`, or `Tab` / `Shift+Tab`, to choose a segment. `Home` selects the root; `End` selects the current directory.",
     "Press `Enter` to open the selected ancestor, or click its segment. Use the mouse wheel to scroll long paths.",
-    "Press `Esc`, click Esc Cancel or click [×] to cancel. Close Help to return to the selected segment and scroll position.",
+    "Press `Esc`, click ‘Esc Cancel’ or click ‘[×]’ to cancel. Close Help to return to the selected segment and scroll position.",
 ];
 
 const PATTERN: &[&str] = &[
-    "Match filenames in this pane. Mark and Unmark keep hidden and filtered-out marks. Replace clears all marks in this pane before marking visible matches, even if nothing matches. The other pane keeps its marks. Check the status area for the visible marked count.",
-    "Wildcards match the whole filename: * matches a sequence; ? matches one byte. Regex searches names; ^ and $ anchor the match. Case sensitive applies to both modes.",
-    "While typing in Pattern, use `Alt+w` for Wildcard, `Alt+x` for Regex and `Alt+s` for Case sensitive. Type ? as part of the pattern; use `F1` for Help.",
-    "Outside Pattern, use `w`, `x` and `s` for those settings. Press `Tab` / `Shift+Tab` or click to choose a field or action. `Space` activates the focused control.",
-    "`m` Mark adds matching entries, `u` Unmark removes them, and `r` Replace clears all pane marks and marks the visible matches. While typing, use `Alt+m` / `Alt+u` / `Alt+r`.",
-    "`Enter` in Pattern moves to an available action; press `Enter` again to apply it. Correct invalid or overlong expressions before applying. `Esc` cancels the form without changing marks.",
+    "Match filenames in this pane. ‘Mark’ and ‘Unmark’ keep hidden and filtered-out marks. ‘Replace’ clears all marks in this pane before marking visible matches, even if nothing matches. The other pane keeps its marks. Check the status area for the visible marked count.",
+    "Wildcards match the whole filename: * matches a sequence; ? matches one byte. ‘Regex’ searches names; ^ and $ anchor the match. ‘Case sensitive’ applies to both modes.",
+    "While typing in ‘Pattern’, use `Alt+w` for ‘Wildcard’, `Alt+x` for ‘Regex’ and `Alt+s` for ‘Case sensitive’. Type ? as part of the pattern; use `F1` for Help.",
+    "Outside ‘Pattern’, use `w`, `x` and `s` for those settings. Press `Tab` / `Shift+Tab` or click to choose a field or action. `Space` activates the focused control.",
+    "`m` ‘Mark’ adds matching entries, `u` ‘Unmark’ removes them, and `r` ‘Replace’ clears all pane marks and marks the visible matches. While typing, use `Alt+m` / `Alt+u` / `Alt+r`.",
+    "`Enter` in ‘Pattern’ moves to an available action; press `Enter` again to apply it. Correct invalid or overlong expressions before applying. `Esc` cancels the form without changing marks.",
 ];
 const TRANSFER: &[&str] = &[
     "Copy or move the listed selection to the destination you enter. The selection stays fixed while you edit. `Ctrl+a` clears the destination, `Backspace` edits, `Enter` starts and `Esc` cancels.",
@@ -117,17 +117,17 @@ const ATTRIBUTES: &[&str] = &[
     "Change supported permissions or the read-only setting for the shown selection. tfm refuses links and unsupported entries. `Ctrl+a` clears the field; `Enter` applies the change and `Esc` cancels.",
 ];
 const CONFLICT: &[&str] = &[
-    "Compare Incoming (source) with Existing (destination). Use `Up` / `Down` to choose an available action, then `Enter` to apply it.",
-    "`s` Skip, `r` Replace, `k` Keep both, `n` Newer. `a` Apply to all uses your choice for later conflicts of the same kind. `Esc` cancels the job. These letters work in either case.",
-    "Newer requires both modification times. It keeps Existing unless Incoming is newer. Close Help to return to your choice and Apply to all setting.",
+    "Compare ‘Incoming’ (source) with ‘Existing’ (destination). Use `Up` / `Down` to choose an available action, then `Enter` to apply it.",
+    "`s` ‘Skip’, `r` ‘Replace’, `k` ‘Keep both’, `n` ‘Newer’. `a` ‘Apply to all’ uses your choice for later conflicts of the same kind. `Esc` cancels the job. These letters work in either case.",
+    "‘Newer’ requires both modification times. It keeps ‘Existing’ unless ‘Incoming’ is newer. Close Help to return to your choice and ‘Apply to all’ setting.",
 ];
 const JOBS: &[&str] = &[
-    "Choose a job with `Up` / `Down` or a click. Press `e` Evidence to see entry details, receipts and recovery paths; press it again for the summary.",
-    "`c` Cancel requests a safe stop. Use `r` Retry for unfinished work, or `x` Reconcile to check an unknown result. Only available actions are enabled. `Enter` opens a pending file conflict; `Esc` closes Jobs.",
+    "Choose a job with `Up` / `Down` or a click. Press `e` ‘Evidence’ to see entry details, receipts and recovery paths; press it again for the summary.",
+    "`c` ‘Cancel’ requests a safe stop. Use `r` ‘Retry’ for unfinished work, or `x` ‘Reconcile’ to check an unknown result. Only available actions are enabled. `Enter` opens a pending file conflict; `Esc` closes ‘Jobs’.",
     "Scroll details with `PageUp` / `PageDown` or the mouse wheel. Action letters work in either case. Close Help to return to the selected job and scroll position.",
 ];
 const EXIT: &[&str] = &[
-    "Wait for jobs to finish or stop safely before you quit. `r` Return (also `Enter` or `Esc`), `w` Wait then exit, `c` Cancel safely then exit. These letters work in either case.",
+    "Wait for jobs to finish or stop safely before you quit. `r` ‘Return’ (also `Enter` or `Esc`), `w` ‘Wait then exit’, `c` ‘Cancel safely then exit’. These letters work in either case.",
     "Close Help to return to the exit choices. Choose an action there to quit or stop jobs.",
 ];
 const INCIDENT: &[&str] = &[
@@ -154,7 +154,7 @@ fn metadata(app: &App) -> Vec<HelpParagraph> {
             &[bound(app, Action::Count)],
         ),
         paragraph(
-            "Stop a running count, or close Info when no count is running: `{}`.",
+            "Stop a running count, or close ‘Info’ when no count is running: `{}`.",
             &[bound(app, Action::Cancel)],
         ),
         paragraph(
@@ -169,7 +169,7 @@ fn metadata(app: &App) -> Vec<HelpParagraph> {
             ],
         ),
         paragraph(
-            "Open Info from the file list: `{}`. Close Help to return to Info at the same scroll position. Close Info to navigate or start a file operation.",
+            "Open ‘Info’ from the file list: `{}`. Close Help to return to ‘Info’ at the same scroll position. Close ‘Info’ to navigate or start a file operation.",
             &[bound(app, Action::Metadata)],
         ),
     ]
@@ -177,12 +177,12 @@ fn metadata(app: &App) -> Vec<HelpParagraph> {
 
 const VIEW_OPTIONS: &[&str] = &[
     "Change the active pane's display settings. Use `Up` / `Down` or the mouse wheel to select a setting. Press `Space` / `Enter` or click its row to change it.",
-    "Changes take effect at once. `Esc` closes the menu and keeps them. A changed named profile shows Modified; the saved profile stays unchanged.",
+    "Changes take effect at once. `Esc` closes the menu and keeps them. A changed named profile shows ‘Modified’; the saved profile stays unchanged.",
 ];
 const VIEW_PROFILES: &[&str] = &[
     "Choose saved display settings with `Up` / `Down`, `Home` / `End` or the mouse wheel. Click a profile to select it. Press `Enter` to apply it to the active pane.",
-    "Press `Space` on a profile to select Apply selected to both, then `Enter` or `Space` to apply it. You can also click that row. Profiles change display settings; your pane locations stay the same.",
-    "Choose Save active as… to name and save the active pane's settings. Check the status area for confirmation. `Esc` closes the list without applying the selected profile.",
+    "Press `Space` on a profile to select ‘Apply selected to both’, then `Enter` or `Space` to apply it. You can also click that row. Profiles change display settings; your pane locations stay the same.",
+    "Choose ‘Save active as…’ to name and save the active pane's settings. Check the status area for confirmation. `Esc` closes the list without applying the selected profile.",
 ];
 const SAVE_PROFILE: &[&str] = &[
     "Type a name for the active pane's display settings. You can include ? in the name; use `F1` for Help. `Backspace` removes the last character.",

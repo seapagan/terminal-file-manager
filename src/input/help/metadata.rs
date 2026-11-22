@@ -213,12 +213,12 @@ define_commands! {
     (
         Action::Group,
         HelpSection::Views,
-        "Cycle directory grouping: First, Last, Mixed",
+        "Cycle directory grouping: ‘First’, ‘Last’, ‘Mixed’",
     ),
     (
         Action::Ignore,
         HelpSection::Views,
-        "Cycle Git-ignore display: Dim, Hide, Off",
+        "Cycle Git-ignore display: ‘Dim’, ‘Hide’, ‘Off’",
     ),
     (Action::SortMenu, HelpSection::Views, "Choose sort order from a popup"),
     (Action::GroupMenu, HelpSection::Views, "Choose directory grouping from a popup"),
@@ -244,7 +244,7 @@ define_commands! {
         HelpSection::Views,
         "Count folder contents; cancel to stop",
     ),
-    (Action::ViewOptions, HelpSection::Views, "View options"),
+    (Action::ViewOptions, HelpSection::Views, "Open ‘View Options’"),
     (
         Action::ViewProfiles,
         HelpSection::Views,
@@ -302,8 +302,8 @@ define_commands! {
         "File editor (not available yet)",
     ),
     (Action::DismissToast, HelpSection::Jobs, "Dismiss the oldest visible notification"),
-    (Action::DismissToasts, HelpSection::Jobs, "Dismiss active notifications; keep history and Jobs evidence"),
-    (Action::Notifications, HelpSection::Jobs, "Read notification history; Enter opens linked Jobs evidence"),
+    (Action::DismissToasts, HelpSection::Jobs, "Dismiss active notifications; keep history and ‘Jobs’ evidence"),
+    (Action::Notifications, HelpSection::Jobs, "Read notification history; Enter opens linked ‘Jobs’ evidence"),
     (Action::Help, HelpSection::Application, "Help"),
     (
         Action::Cancel,

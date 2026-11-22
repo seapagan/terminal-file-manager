@@ -216,8 +216,18 @@ fn conflict_help_preserves_apply_all_choice_and_sends_no_decision() {
     key(&mut c, "Down");
     let choice = c.app.operations.conflicts.front().unwrap().choice;
     key(&mut c, "F1");
-    let (_, _, text) = conflict_fixture::draw(&c.app, 100, 40, ColorLevel::NoColor);
-    assert!(text.contains("Conflict Help") && text.contains("a Apply to all"));
+    let (terminal, g, text) = conflict_fixture::draw(&c.app, 100, 40, ColorLevel::NoColor);
+    let body = g.context_help.unwrap().shell.body;
+    let prose = (body.y..body.bottom())
+        .map(|y| {
+            (body.x..body.right())
+                .map(|x| terminal.backend().buffer()[(x, y)].symbol())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    let prose = prose.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(text.contains("Conflict Help") && prose.contains("a ‘Apply to all’"));
     for input in ["a", "A", "r", "R", "Enter", "F9"] {
         key(&mut c, input);
     }

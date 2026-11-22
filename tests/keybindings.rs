@@ -110,7 +110,7 @@ fn canonical_labels_preserve_case_modifiers_and_effective_overrides() {
     };
     for (description, expected) in [
         ("Reverse sort direction", "v"),
-        ("View options", "Shift+v"),
+        ("Open ‘View Options’", "Shift+v"),
         ("Select or save a named view profile", "Alt+v"),
         ("Mark all visible entries", "Ctrl+a"),
         ("Save the navigation session and quit", "Shift+q"),

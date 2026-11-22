@@ -7,13 +7,13 @@ pub use request::{BaseRequest, CopyRequest, ValidatedBase};
 mod paths;
 /// Detailed Help opens with `F1` or `?` during Copy Path, including at narrow widths.
 pub const HELP: &[&str] = &[
-    "Press `F1` or `?` during Copy Path for Help. `Esc` or [×] closes Help; press `Esc` again to cancel Copy Path.",
-    "Choose `m` Marked, `h` Highlighted or `c` Current folder, then `n` Name, `r` Relative or `f` Full path. With the default binding, `y h f` copies the highlighted path.",
-    "`Enter` accepts the highlighted choice. From defaults to visible marks, then a real highlighted entry, then the current folder. Format defaults to Full path. The .. row is navigation only; Current folder means the directory you are browsing.",
-    "Press a choice's letter or click it to continue. `Backspace` returns to From, or cancels if you are there. `Esc` cancels at either stage. Arrow keys and `Tab` leave the choice unchanged. There is no timeout.",
-    "From also offers `s` Set base and `Shift+s` Other base. Choose one to use the active or other pane's directory as the relative-path base. Wait for confirmation; this exits without copying. Other base requires a valid directory in two-pane mode. Relative copies from this session base; paths on incomparable roots are disabled.",
+    "Press `F1` or `?` during Copy Path for Help. `Esc` or ‘[×]’ closes Help; press `Esc` again to cancel Copy Path.",
+    "Choose `m` ‘Marked’, `h` ‘Highlighted’ or `c` ‘Current folder’, then `n` ‘Name’, `r` ‘Relative’ or `f` ‘Full path’. With the default binding, `y h f` copies the highlighted path.",
+    "`Enter` accepts the highlighted choice. ‘From’ defaults to visible marks, then a real highlighted entry, then the current folder. ‘Format’ defaults to ‘Full path’. The .. row is navigation only; ‘Current folder’ means the directory you are browsing.",
+    "Press a choice's letter or click it to continue. `Backspace` returns to ‘From’, or cancels if you are there. `Esc` cancels at either stage. Arrow keys and `Tab` leave the choice unchanged. There is no timeout.",
+    "‘From’ also offers `s` ‘Set base’ and `Shift+s` ‘Other base’. Choose one to use the active or other pane's directory as the relative-path base. Wait for confirmation; this exits without copying. ‘Other base’ requires a valid directory in two-pane mode. ‘Relative’ copies from this session base; paths on incomparable roots are disabled.",
     "The initial base is the first directory argument, or the working directory if none is given. Restoring a session restores its base; older sessions use the first pane. Save and quit or --save-session saves the base; ordinary quit does not. The base belongs to the navigation session, not configuration.",
-    "Relative requires an accessible directory as its base. If the base was deleted, became unreadable or is no longer a directory, copying fails and leaves the clipboard and base unchanged. Choose Set base or Other base to replace it. Name and Full path remain available.",
+    "The ‘Relative’ choice requires an accessible directory as its base. If the base was deleted, became unreadable or is no longer a directory, copying fails and leaves the clipboard and base unchanged. Choose ‘Set base’ or ‘Other base’ to replace it. ‘Name’ and ‘Full path’ remain available.",
     "Wait for a valid directory listing before starting Copy Path. After setting a base, wait for confirmation before copying relative paths.",
     "Copy Path consumes `Ctrl+c`, `F5` and `F6` while open. More than 1,024 recorded inputs cancels the workflow with an error; start it again to continue.",
     "Copy Path uses visible marks from the active pane in display order, one path per line (LF). Directories copy their own path without listing their contents. Text is literal and unquoted. Non-Unicode paths or paths containing control characters fail without changing the clipboard.",

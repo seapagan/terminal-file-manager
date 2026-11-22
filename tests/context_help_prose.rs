@@ -46,8 +46,28 @@ fn find(b: &Buffer, area: Rect, text: &str) -> (u16, u16) {
                 )
             })
         })
+        .unwrap_or_else(|| find_wrapped(b, area, text))
+}
+fn find_wrapped(b: &Buffer, area: Rect, text: &str) -> (u16, u16) {
+    let cells: Vec<_> = (area.y..area.bottom())
+        .flat_map(|y| {
+            (area.x..area.right()).flat_map(move |x| {
+                b[(x, y)]
+                    .symbol()
+                    .chars()
+                    .filter(|c| !c.is_whitespace())
+                    .map(move |c| (c, (x, y)))
+            })
+        })
+        .collect();
+    let needle: Vec<_> = text.chars().filter(|c| !c.is_whitespace()).collect();
+    cells
+        .windows(needle.len())
+        .find(|window| window.iter().map(|(c, _)| *c).eq(needle.iter().copied()))
+        .map(|window| window[0].1)
         .unwrap_or_else(|| panic!("missing {text}"))
 }
+
 #[test]
 fn prose_moves_whole_words_to_the_next_line() {
     let c = controller(&Default::default());
@@ -98,12 +118,12 @@ fn copy_path_help_styles_fixed_keys_and_the_effective_opening_binding() {
             "F1",
             "?",
             "Esc",
-            "m Marked",
-            "h Highlighted",
-            "c Current",
-            "n Name",
-            "r Relative",
-            "f Full",
+            "m ‘Marked’",
+            "h ‘Highlighted’",
+            "c ‘Current folder’",
+            "n ‘Name’",
+            "r ‘Relative’",
+            "f ‘Full path’",
             "Enter",
             "Backspace",
             "Shift+s",

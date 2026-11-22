@@ -148,7 +148,16 @@ fn render_hits(frame: &mut Frame, app: &App, theme: &Theme, layout: &PickerLayou
         let selected = *index == state.selected.min(layout.hits.len().saturating_sub(1));
         let style = theme.style(if selected { Role::Cursor } else { Role::Value });
         let title = format!("{} {}", if selected { ">" } else { " " }, hit.title);
-        let mut lines = vec![Line::raw(modal::truncate(&title, area.width))];
+        let mut title = super::prose::truncate(
+            super::prose::line(&crate::input::help_paragraph(&title, &[]), Some(theme)),
+            area.width,
+        );
+        if selected {
+            for span in &mut title.spans {
+                span.style = span.style.patch(style);
+            }
+        }
+        let mut lines = vec![title];
         if area.height == 2 {
             lines.push(details(hit, area.width, theme, selected));
         }
