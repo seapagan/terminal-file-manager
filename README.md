@@ -130,8 +130,10 @@ of a pane. The menu highlights the current setting and opens above the control.
 If the control is hidden at a narrow width, the keyboard shortcut still opens
 the menu near the bottom of the active pane.
 Use Up/Down and Enter, or click a choice; Esc closes the menu without applying
-it. Press F1 or click `[?]` to read about each option. Esc closes Help and returns
-to the same highlighted choice. Lowercase `s`, `g`, `h` and `i` keep their direct
+it. Press the same popup shortcut to close it, or another popup shortcut to
+switch menus. Switching discards the pending choice. Press F1 or click `[?]` to
+read about each option. Esc closes Help and returns to the same highlighted
+choice. Lowercase `s`, `g`, `h` and `i` keep their direct
 cycle or toggle behavior. Configure the popup shortcuts with the `sort-menu`,
 `group-menu`, `hidden-menu` and `ignore-menu` actions in `[bindings]`.
 

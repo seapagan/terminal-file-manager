@@ -69,7 +69,16 @@ pub(super) fn action(c: &mut Controller, action: Action) -> bool {
         Action::IgnoreMenu => Action::Ignore,
         _ => return false,
     };
-    open(c, c.app.active, policy);
+    let pane = c.app.policy_menu.as_ref().map_or(c.app.active, |m| m.pane);
+    if c.app
+        .policy_menu
+        .as_ref()
+        .is_some_and(|m| m.action == policy)
+    {
+        c.app.policy_menu = None;
+    } else {
+        open(c, pane, policy);
+    }
     true
 }
 
@@ -106,7 +115,13 @@ pub(super) fn handle(c: &mut Controller, event: &Event, g: &Geometry) -> bool {
         return false;
     }
     let apply = match event {
-        Event::Key(key) => key_input(c, *key, g),
+        Event::Key(key) => {
+            if popup_shortcut(c, *key) {
+                false
+            } else {
+                key_input(c, *key, g)
+            }
+        }
         Event::Mouse(mouse) => mouse_input(c, *mouse, g),
         Event::Resize(width, height) => {
             super::scroll::resize(c, *width, *height);
@@ -125,6 +140,13 @@ pub(crate) fn preempted(app: &App) -> bool {
         || !app.operations.conflicts.is_empty()
         || app.operations.waiting_exit.is_some()
         || app.operations.show_history
+}
+
+fn popup_shortcut(c: &mut Controller, key: crossterm::event::KeyEvent) -> bool {
+    key.kind == KeyEventKind::Press
+        && key.code != KeyCode::Esc
+        && !super::operations::interrupt(&Event::Key(key))
+        && c.bindings.action(key).is_some_and(|bound| action(c, bound))
 }
 
 fn key_input(c: &mut Controller, key: crossterm::event::KeyEvent, g: &Geometry) -> bool {

@@ -11,7 +11,7 @@ pub(super) fn text(action: crate::input::Action) -> &'static [&'static str] {
     }
 }
 
-const NAVIGATION: &str = "Use `Up` / `Down` or the mouse wheel to choose an option; `Home` / `End` selects the first or last. Press `Enter` or `Space`, or click a choice, to apply it. Press `Esc` or click outside to cancel. `F1` or `[?]` opens Help; `Esc` in Help returns to the same highlighted choice.";
+const NAVIGATION: &str = "Use `Up` / `Down` or the mouse wheel to choose an option; `Home` / `End` selects the first or last. Press `Enter` or `Space`, or click a choice, to apply it. Press `Esc` or click outside to cancel. Use the configured popup shortcuts to switch menus; press the current menu's shortcut to close it without applying the highlighted choice. `F1` or `[?]` opens Help; `Esc` in Help returns to the same highlighted choice.";
 
 const SORT: &[&str] = &[
     "Choose the order within each directory group. Natural compares digit runs as numbers, so file2 comes before file10; it ignores ASCII letter case. Name compares names without letter case, then uses the native name to break ties.",

@@ -15,6 +15,8 @@ mod keyboard_geometry;
 mod keyboard_safety;
 #[path = "policy_choices/priority.rs"]
 mod priority;
+#[path = "policy_choices/switching.rs"]
+mod switching;
 use crossterm::event::{Event, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::{Terminal, backend::TestBackend, layout::Rect};
 use terminal_file_manager::{

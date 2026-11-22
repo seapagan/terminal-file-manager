@@ -5,14 +5,14 @@ use terminal_file_manager::{
     settings::Settings,
 };
 
-const CASES: &[(&str, &str, Action, usize, usize)] = &[
+pub(super) const CASES: &[(&str, &str, Action, usize, usize)] = &[
     ("S", "s", Action::Sort, 7, 8),
     ("G", "g", Action::Group, 1, 2),
     ("H", "h", Action::Hidden, 1, 0),
     ("I", "i", Action::Ignore, 1, 2),
 ];
 
-fn nondefault_policy(c: &mut Controller, pane: usize) {
+pub(super) fn nondefault_policy(c: &mut Controller, pane: usize) {
     let pane = &mut c.app.panes[pane];
     pane.sort.sort = Sort::Version;
     pane.sort.grouping = Grouping::Last;
