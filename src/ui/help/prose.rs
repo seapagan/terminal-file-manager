@@ -1,8 +1,5 @@
 //! Main and contextual Help share word wrapping and lossless grapheme splitting.
-use crate::{
-    color::{Role, Theme},
-    input::{HelpFragment, HelpParagraph},
-};
+use crate::{color::Theme, input::HelpParagraph};
 use ratatui::{
     style::Style,
     text::{Line, Span},
@@ -18,22 +15,23 @@ pub(super) fn lines(
         if !rows.is_empty() {
             rows.push(Line::default());
         }
-        let spans: Vec<_> = paragraph
-            .iter()
-            .map(|fragment| {
-                let (text, role) = match fragment {
-                    HelpFragment::Text(text) => (text, Role::Value),
-                    HelpFragment::Key(text) => (text, Role::Key),
-                };
-                Span::styled(
-                    crate::ui::clean(text),
-                    theme.map_or(Style::default(), |theme| theme.style(role)),
-                )
-            })
-            .collect();
-        rows.extend(wrap(Line::from(spans), usize::from(width)));
+        rows.extend(wrap(line(paragraph, theme), usize::from(width)));
     }
     rows
+}
+
+pub(super) fn line(paragraph: &HelpParagraph, theme: Option<&Theme>) -> Line<'static> {
+    Line::from(
+        paragraph
+            .iter()
+            .map(|fragment| {
+                Span::styled(
+                    crate::ui::clean(fragment.text()),
+                    theme.map_or(Style::default(), |theme| theme.style(fragment.role())),
+                )
+            })
+            .collect::<Vec<_>>(),
+    )
 }
 
 pub(super) fn wrap(line: Line<'static>, width: usize) -> Vec<Line<'static>> {
@@ -132,5 +130,37 @@ mod tests {
             strings(&wrap(Line::raw("界e\u{301}"), 1)),
             ["界", "e\u{301}"]
         );
+    }
+
+    #[test]
+    fn semantic_fragments_keep_styles_and_unicode_through_word_splitting() {
+        use crate::{color::Role, input::HelpFragment};
+        let theme = Theme::new(colored_text::ColorLevel::TrueColor);
+        let paragraph = vec![
+            HelpFragment::Reference("界e\u{301}OSC".into()),
+            HelpFragment::Text(" ".into()),
+            HelpFragment::Key("Alt+界".into()),
+            HelpFragment::Text(" ".into()),
+            HelpFragment::Label("‘名称’".into()),
+        ];
+        let rows = lines(&[paragraph], 4, Some(&theme));
+        assert_eq!(
+            strings(&rows),
+            ["界e\u{301}O", "SC", "Alt+", "界", "‘名", "称’"]
+        );
+        let foregrounds: Vec<_> = rows.iter().map(|row| row.spans[0].style.fg).collect();
+        assert_eq!(
+            foregrounds,
+            [
+                Role::HelpReference,
+                Role::HelpReference,
+                Role::Key,
+                Role::Key,
+                Role::Value,
+                Role::Value
+            ]
+            .map(|role| theme.style(role).fg)
+        );
+        assert!(rows.iter().all(|row| row.width() <= 4));
     }
 }

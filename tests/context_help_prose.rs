@@ -9,6 +9,8 @@ use terminal_file_manager::{
     ui,
 };
 mod dialog_fixture;
+#[path = "context_help_prose/semantics.rs"]
+mod semantics;
 
 fn controller(bindings: &std::collections::BTreeMap<String, Action>) -> Controller {
     let mut app = dialog_fixture::dialog(Plan::create_file("/controlled".into()));

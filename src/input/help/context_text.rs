@@ -2,38 +2,7 @@
 use super::{HelpTopic, ViewHelpTopic};
 use crate::{app::App, input::Action, operations::Operation};
 
-/// A prose fragment or literal shortcut, styled only by the Help renderer.
-#[derive(Clone, Debug)]
-pub enum HelpFragment {
-    Text(String),
-    Key(String),
-}
-/// One paragraph before display-cell measurement.
-pub type HelpParagraph = Vec<HelpFragment>;
-
-// Backticks mark fixed keys; {} inserts one effective binding without parsing it.
-fn paragraph(text: &str, bindings: &[&str]) -> HelpParagraph {
-    let mut bindings = bindings.iter();
-    text.split('`')
-        .enumerate()
-        .filter(|(_, part)| !part.is_empty())
-        .map(|(index, part)| {
-            if index % 2 == 0 {
-                return HelpFragment::Text(part.into());
-            }
-            let key = if part == "{}" {
-                *bindings.next().expect("shortcut placeholder")
-            } else {
-                part
-            };
-            if key == "Unbound" {
-                HelpFragment::Text("Not bound".into())
-            } else {
-                HelpFragment::Key(key.into())
-            }
-        })
-        .collect()
-}
+use super::fragments::{HelpParagraph, paragraph};
 
 pub(super) fn text(topic: HelpTopic, app: &App) -> Vec<HelpParagraph> {
     let (action, lines) = match topic {

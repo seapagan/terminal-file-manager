@@ -1,5 +1,5 @@
 use super::*;
-use terminal_file_manager::input::{HelpFragment, HelpTopic};
+use terminal_file_manager::input::HelpTopic;
 
 const ACTIONS: [Action; 4] = [Action::Sort, Action::Group, Action::Hidden, Action::Ignore];
 
@@ -108,9 +108,7 @@ fn contextual_help_explains_every_option_and_the_key_policy_distinctions() {
             .text(&c.app)
             .into_iter()
             .flatten()
-            .map(|fragment| match fragment {
-                HelpFragment::Text(text) | HelpFragment::Key(text) => text,
-            })
+            .map(|fragment| fragment.text().to_owned())
             .collect::<String>();
         for option in options.split_whitespace() {
             assert!(text.contains(option), "{action:?}: {option}");

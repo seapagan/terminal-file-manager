@@ -104,7 +104,11 @@ fn detailed_help_opens_with_f1_and_question_only_in_the_active_workflow() {
     send(&mut c, KeyCode::Esc);
     send(&mut c, KeyCode::Char('?'));
     let text = HelpTopic::PathCopy.text(&c.app);
-    let prose = format!("{text:?}");
+    let prose: String = text
+        .iter()
+        .flatten()
+        .map(|fragment| fragment.text())
+        .collect();
     for expected in [
         "wl-copy",
         "xclip/xsel",

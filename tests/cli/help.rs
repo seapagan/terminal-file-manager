@@ -56,7 +56,7 @@ fn help_colours_semantic_elements_and_preserves_plain_text() {
         "--",
     ] {
         assert!(
-            coloured.contains(&format!("\u{1b}[32m{flag}\u{1b}[0m")),
+            coloured.contains(&format!("\u{1b}[1;32m{flag}\u{1b}[0m")),
             "{flag}: {coloured:?}"
         );
     }
@@ -64,8 +64,9 @@ fn help_colours_semantic_elements_and_preserves_plain_text() {
         assert!(coloured.contains(&format!("\u{1b}[36m{placeholder}\u{1b}[0m")));
     }
     assert!(
-        coloured
-            .contains("press \u{1b}[36m?\u{1b}[0m or \u{1b}[36mF1\u{1b}[0m for interactive help.")
+        coloured.contains(
+            "press \u{1b}[1;36m?\u{1b}[0m or \u{1b}[1;36mF1\u{1b}[0m for interactive help."
+        )
     );
     assert!(coloured.contains("\u{1b}[0m        Start with two panes\n"));
     let sgr = regex::Regex::new("\u{1b}\\[[0-9;]*m").unwrap();

@@ -108,8 +108,9 @@ fn help() -> String {
             let text = &captures[0];
             let styled = match text {
                 "Usage:" | "Options:" => text.cyan().bold(),
-                "DIRECTORY" | "OTHER_DIRECTORY" | "?" | "F1" => text.cyan(),
-                _ => text.green(),
+                "DIRECTORY" | "OTHER_DIRECTORY" => text.cyan(),
+                "?" | "F1" => return input::HelpFragment::Key(text.into()).stdout(),
+                _ => return input::HelpFragment::Reference(text.into()).stdout(),
             };
             styled.render(RenderTarget::Stdout)
         })

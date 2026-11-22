@@ -1,4 +1,4 @@
-//! One measured document supplies rendering, scroll bounds and jump anchors.
+//! One wrapping path supplies rendering, scroll bounds and jump anchors.
 pub(super) mod context;
 mod picker;
 mod prose;
@@ -17,7 +17,7 @@ use ratatui::{
 #[derive(Clone, Debug)]
 struct Row {
     keys: String,
-    text: String,
+    text: Line<'static>,
     heading: bool,
     target: HelpTarget,
 }
@@ -32,7 +32,6 @@ pub struct HelpLayout {
     pub anchors: Vec<(HelpTarget, u16)>,
     pub scroll_limit: u16,
     pub picker: Option<picker::PickerLayout>,
-    rows: Vec<Row>,
     keys_width: usize,
 }
 
@@ -48,7 +47,7 @@ pub(super) fn layout(app: &App, bounds: Rect) -> Option<HelpLayout> {
         .max()
         .unwrap_or(0)
         .min(usize::from(width.saturating_sub(3)) / 3);
-    let (rows, anchors) = document(app, usize::from(width.saturating_sub(2)), keys_width);
+    let (rows, anchors) = document(app, usize::from(width.saturating_sub(2)), keys_width, None);
     let height = (rows.len() + 2).min(usize::from(bounds.height.saturating_sub(2))) as u16;
     let outer = super::centered(bounds, width, height);
     let body = Rect::new(
@@ -70,12 +69,16 @@ pub(super) fn layout(app: &App, bounds: Rect) -> Option<HelpLayout> {
         anchors,
         scroll_limit,
         picker: picker::layout(app, bounds),
-        rows,
         keys_width,
     })
 }
 
-fn document(app: &App, width: usize, keys_width: usize) -> (Vec<Row>, Vec<(HelpTarget, u16)>) {
+fn document(
+    app: &App,
+    width: usize,
+    keys_width: usize,
+    theme: Option<&Theme>,
+) -> (Vec<Row>, Vec<(HelpTarget, u16)>) {
     let mut rows = Vec::new();
     let mut anchors = Vec::new();
     for section in HelpSection::ALL {
@@ -83,7 +86,7 @@ fn document(app: &App, width: usize, keys_width: usize) -> (Vec<Row>, Vec<(HelpT
         if !rows.is_empty() {
             rows.push(Row {
                 keys: String::new(),
-                text: String::new(),
+                text: Line::default(),
                 heading: false,
                 target,
             });
@@ -92,7 +95,7 @@ fn document(app: &App, width: usize, keys_width: usize) -> (Vec<Row>, Vec<(HelpT
         for text in prose::wrap(Line::raw(section.title()), width) {
             rows.push(Row {
                 keys: String::new(),
-                text: text.to_string(),
+                text,
                 heading: true,
                 target,
             });
@@ -104,7 +107,7 @@ fn document(app: &App, width: usize, keys_width: usize) -> (Vec<Row>, Vec<(HelpT
         {
             let target = HelpTarget::Action(entry.action);
             anchors.push((target, rows.len() as u16));
-            command_rows(&mut rows, entry, width, keys_width);
+            command_rows(&mut rows, entry, width, keys_width, theme);
         }
     }
     (rows, anchors)
@@ -115,15 +118,19 @@ fn command_rows(
     entry: &crate::input::HelpEntry,
     width: usize,
     keys_width: usize,
+    theme: Option<&Theme>,
 ) {
     let target = HelpTarget::Action(entry.action);
     let keys = super::text::wrap_value(&entry.keys, keys_width);
     let text_width = width.saturating_sub(keys_width + 1);
-    let text = prose::wrap(Line::raw(entry.description), text_width);
+    let text = prose::wrap(
+        prose::line(&crate::input::help_paragraph(entry.description, &[]), theme),
+        text_width,
+    );
     for index in 0..keys.len().max(text.len()) {
         rows.push(Row {
             keys: keys.get(index).cloned().unwrap_or_default(),
-            text: text.get(index).map(ToString::to_string).unwrap_or_default(),
+            text: text.get(index).cloned().unwrap_or_default(),
             heading: false,
             target,
         });
@@ -138,8 +145,13 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, layout: &HelpL
             area,
         );
     }
-    let lines: Vec<_> = layout
-        .rows
+    let (rows, _) = document(
+        app,
+        usize::from(layout.body.width),
+        layout.keys_width,
+        Some(theme),
+    );
+    let lines: Vec<_> = rows
         .iter()
         .map(|row| line(row, app, theme, layout.keys_width))
         .collect();
@@ -154,18 +166,17 @@ pub(super) fn render(frame: &mut Frame, app: &App, theme: &Theme, layout: &HelpL
 
 fn line(row: &Row, app: &App, theme: &Theme, key_width: usize) -> Line<'static> {
     let mut line = if row.heading {
-        Line::styled(row.text.clone(), theme.style(Role::SectionHeader))
+        row.text.clone().style(theme.style(Role::SectionHeader))
     } else {
         let padding = key_width.saturating_sub(Line::raw(&row.keys).width()) + 1;
-        Line::from(vec![
-            Span::styled(
-                format!("{}{}", row.keys, " ".repeat(padding)),
-                theme.style(Role::Key),
-            ),
-            Span::styled(row.text.clone(), theme.style(Role::Value)),
-        ])
+        let mut line = Line::from(vec![Span::styled(
+            format!("{}{}", row.keys, " ".repeat(padding)),
+            theme.style(Role::Key),
+        )]);
+        line.spans.extend(row.text.spans.clone());
+        line
     };
-    if (!row.keys.is_empty() || !row.text.is_empty())
+    if (!row.keys.is_empty() || !row.text.spans.is_empty())
         && app
             .help_landing
             .is_some_and(|(target, until)| target == row.target && app.now < until)
@@ -193,13 +204,17 @@ mod quick_copy_help_tests {
             description: text,
         };
         let mut rows = Vec::new();
-        super::command_rows(&mut rows, &entry, 2, 0);
+        super::command_rows(&mut rows, &entry, 2, 0, None);
         assert_eq!(
-            rows.iter().map(|row| row.text.as_str()).collect::<Vec<_>>(),
+            rows.iter()
+                .map(|row| row.text.to_string())
+                .collect::<Vec<_>>(),
             ["界", "e\u{301}", "🙂"]
         );
         assert_eq!(
-            rows.iter().map(|row| row.text.as_str()).collect::<String>(),
+            rows.iter()
+                .map(|row| row.text.to_string())
+                .collect::<String>(),
             text
         );
     }
@@ -213,11 +228,11 @@ mod quick_copy_help_tests {
             .find(|e| e.action == crate::input::Action::PathCopy)
             .unwrap();
         let mut rows = Vec::new();
-        super::command_rows(&mut rows, &entry, 100, 12);
+        super::command_rows(&mut rows, &entry, 100, 12, None);
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].keys, "y");
         assert_eq!(
-            rows[0].text,
+            rows[0].text.to_string(),
             "Copy selected names or paths to the clipboard"
         );
     }

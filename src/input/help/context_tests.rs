@@ -37,10 +37,7 @@ fn view_topics_keep_distinct_titles_prose_and_opening_hints() {
         let plain = |paragraph: &crate::input::HelpParagraph| {
             paragraph
                 .iter()
-                .map(|fragment| match fragment {
-                    crate::input::HelpFragment::Text(text)
-                    | crate::input::HelpFragment::Key(text) => text.as_str(),
-                })
+                .map(|fragment| fragment.text())
                 .collect::<String>()
         };
         assert!(plain(&paragraphs[0]).starts_with(start));

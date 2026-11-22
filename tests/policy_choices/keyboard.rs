@@ -1,7 +1,7 @@
 use super::*;
 use terminal_file_manager::{app::IgnoreMode, view::ViewSettings};
 use terminal_file_manager::{
-    input::{HelpFragment, HelpSection, HelpTopic},
+    input::{HelpSection, HelpTopic},
     settings::Settings,
 };
 
@@ -56,9 +56,7 @@ fn popup_actions_use_configured_bindings_and_effective_help_labels() {
             .text(&c.app)
             .into_iter()
             .flatten()
-            .map(|fragment| match fragment {
-                HelpFragment::Text(text) | HelpFragment::Key(text) => text,
-            })
+            .map(|fragment| fragment.text().to_owned())
             .collect();
         assert!(text.contains("Open from the file list: F11."));
         assert!(text.contains("Change directly from the file list:"));

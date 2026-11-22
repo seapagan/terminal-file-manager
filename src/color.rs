@@ -34,6 +34,7 @@ pub enum Role {
     Muted,
     Value,
     Key,
+    HelpReference,
     Status,
     Error,
     Marked,
@@ -120,9 +121,12 @@ impl Theme {
                 self.pair((220, 225, 230), (22, 28, 36))
             }
             Role::Cursor | Role::InactiveCursor => self.cursor_style(matches!(role, Role::Cursor)),
-            Role::Header | Role::Marked | Role::Label | Role::Key | Role::Error => {
-                style.add_modifier(Modifier::BOLD)
-            }
+            Role::Header
+            | Role::Marked
+            | Role::Label
+            | Role::Key
+            | Role::HelpReference
+            | Role::Error => style.add_modifier(Modifier::BOLD),
             Role::Ignored | Role::Hidden | Role::Disabled | Role::Muted => {
                 style.add_modifier(Modifier::DIM)
             }
@@ -348,7 +352,7 @@ fn role_accent(role: Role) -> Option<AnsiColor> {
     match role {
         Role::Header | Role::Link | Role::Label | Role::Key | Role::Hidden => Some(AnsiColor::Cyan),
         Role::Muted => Some(AnsiColor::BrightBlack),
-        Role::Status | Role::Attribute => Some(AnsiColor::Green),
+        Role::Status | Role::Attribute | Role::HelpReference => Some(AnsiColor::Green),
         Role::Error | Role::System => Some(AnsiColor::Red),
         Role::Directory => Some(AnsiColor::Blue),
         Role::Executable => Some(AnsiColor::Green),

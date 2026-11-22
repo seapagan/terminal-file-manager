@@ -139,3 +139,5 @@ impl Action {
         )
     }
 }
+
+pub(crate) use help::paragraph as help_paragraph;
