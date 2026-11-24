@@ -50,7 +50,10 @@ fn excluded_defaults_skip_cleanup_when_the_replacement_is_retained() {
             "compound_extensions = []\ncompound_extensions_extend = ['.tar.gz', '.user.js']",
             "0.1.0",
         );
+        let before = toml::to_string(&c.preferences).unwrap();
         key(&mut c, KeyCode::Char('r'));
+        assert_eq!(toml::to_string(&c.preferences).unwrap(), before);
+        assert!(!c.preferences_changed);
         assert_eq!(
             c.app.compound_extension_review.as_ref().unwrap().stage,
             Stage::Replacement

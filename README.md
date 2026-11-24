@@ -203,26 +203,23 @@ additions still apply. An empty additive list has no effect. Matching is case
 sensitive. Duplicate extensions count once, keeping their first occurrence.
 
 On the first interactive start of each newer TFM version, TFM checks these
-settings against its shipped defaults. If your replacement differs, the first
+settings against its shipped defaults. If your replacement differs, a
 dialog shows your complete list, the current defaults and their differences.
 Choose **Keep my configuration** or **Use current defaults**. Choosing defaults
 removes the replacement setting.
 
 TFM then checks your additions against the chosen base list. If it finds
-duplicates, a second dialog shows those entries and the custom additions to
+duplicates, a separate dialog shows those entries and the custom additions to
 keep. Choose **Keep additions** or **Remove duplicates**. Entries excluded by a
 retained replacement stay in the additive list.
 
 Each dialog starts with its Keep action focused. Use Tab or Left/Right to
-choose an action and Space or Enter to select it. An action advances to the
-next applicable dialog, with no extra confirmation step. Use Up/Down or
-Page Up/Page Down to scroll long lists. Esc or the close control keeps the
-current dialog's configuration; choices you approved in an earlier dialog
-remain in effect.
+choose and Space or Enter to select. Use Up/Down or Page Up/Page Down to scroll
+long lists. Esc or the close control keeps the current list; earlier approved
+choices remain in effect. TFM shows only the dialogs that need a decision.
 
-TFM saves the configuration when the sequence completes, including declined
-changes. It also saves a completed check when no dialog or other preference
-change is needed, and maintains this marker:
+TFM saves the completed check, even if you keep your lists or no dialog appears,
+with this marker:
 
 ```toml
 compound_extensions_checked_version = "0.1.0"

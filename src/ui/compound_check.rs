@@ -73,7 +73,15 @@ fn group(
 ) {
     prose(rows, label, Role::SectionHeader, width);
     if values.is_empty() {
-        prose(rows, "  No compound extensions", Role::Muted, width);
+        let indent = " ".repeat(usize::from(width.min(2)));
+        rows.extend(
+            super::text::wrap_words(
+                "No compound extensions",
+                usize::from(width.saturating_sub(2)),
+            )
+            .into_iter()
+            .map(|text| modal::Row::styled(format!("{indent}{text}"), Role::Muted)),
+        );
     } else {
         rows.extend(value_rows(values, marker, role, width));
     }

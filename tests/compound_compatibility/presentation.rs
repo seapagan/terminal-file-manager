@@ -77,7 +77,10 @@ fn removal_and_addition_differences_use_semantic_colors_and_monochrome_markers()
         let (t, g) = canvas(&c, 120, 40, level);
         let buffer = t.backend().buffer();
         let theme = Theme::new(level);
-        for (marker, role) in [("+ .tar.xz", Role::Status), ("- .custom.js", Role::Warning)] {
+        for (marker, role) in [
+            ("+ .tar.xz", Role::Addition),
+            ("- .custom.js", Role::Warning),
+        ] {
             let point = find(buffer, marker);
             assert_eq!(
                 buffer[point].fg,
@@ -115,6 +118,31 @@ fn empty_replacement_is_explicit_and_unnecessary_additive_explanations_are_absen
     let (text, _) = draw(&c, 120, 40);
     assert!(!text.contains("Custom additions to keep"));
     assert!(!text.contains("No compound extensions"));
+}
+
+#[test]
+fn empty_replacement_placeholder_keeps_the_extension_rows_indent_when_wrapped() {
+    let c = controller("compound_extensions = []", "0.1.0");
+    for width in [28, 32, 40, 120] {
+        let (text, g) = draw(&c, width, 60);
+        let rows = body_rows(&text, g.compound_extension_review.unwrap().shell.body);
+        let start = rows.iter().position(|r| r.contains("(0)")).unwrap();
+        let end = rows[start + 1..].iter().position(String::is_empty).unwrap() + start + 1;
+        assert!(end > start + 1);
+        let placeholder = &rows[start + 1..end];
+        assert!(
+            placeholder.iter().all(|r| r.starts_with("  ")),
+            "{width}: {placeholder:?}"
+        );
+        assert_eq!(
+            placeholder
+                .iter()
+                .map(|r| r.trim())
+                .collect::<Vec<_>>()
+                .join(" "),
+            "No compound extensions"
+        );
+    }
 }
 
 #[test]
@@ -326,7 +354,7 @@ fn assert_green_highlight(c: &Controller, marker: &str, level: colored_text::Col
     assert_eq!(
         cell.fg,
         theme
-            .style(Role::Status)
+            .style(Role::Addition)
             .fg
             .unwrap_or(ratatui::style::Color::Reset)
     );
