@@ -133,3 +133,41 @@ fn assert_checked(root: &std::path::Path) {
         Some(env!("CARGO_PKG_VERSION"))
     );
 }
+
+#[test]
+fn configuration_save_errors_allow_startup_interactive_browsing_and_normal_quit() {
+    for checked in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        fs::write(root.path().join("save-error-ready"), "owned").unwrap();
+        let path = root.path().join("config/tfm/config.toml");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let target = root.path().join("original.toml");
+        let mut text = "mouse = false\n".to_owned();
+        if checked {
+            text.push_str(&format!(
+                "compound_extensions_checked_version = '{}'\n",
+                env!("CARGO_PKG_VERSION")
+            ));
+        }
+        fs::write(&target, &text).unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&target, &path).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_file(&target, &path).unwrap();
+        let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+        command.cwd(root.path());
+        isolate(&mut command, root.path());
+        let mut steps = Vec::new();
+        if checked {
+            steps.push(("save-error-ready", "h"));
+        }
+        steps.extend([
+            ("Could not save configuration", "?"),
+            ("Help", "\u{1b}"),
+            ("save-error-ready", "q"),
+        ]);
+        drive(command, &steps, false);
+        assert_eq!(fs::read_to_string(&target).unwrap(), text);
+        assert!(fs::symlink_metadata(path).unwrap().is_symlink());
+    }
+}

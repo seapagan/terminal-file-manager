@@ -14,28 +14,19 @@ impl Controller {
     /// # Errors
     /// Reports malformed version markers; never resets invalid configuration.
     pub fn check_compound_extensions(&mut self, running: &str) -> Result<(), String> {
-        if self.app.compound_extension_review.is_some()
-            || !self.preferences.compound_check_due(running)?
-        {
+        if self.app.compound_extension_review.is_some() {
             return Ok(());
         }
-        self.app.compound_extension_review = Review::new(&self.preferences, running);
-        if self.app.compound_extension_review.is_none() {
-            self.preferences.compound_extensions_checked_version = Some(running.into());
-            self.completed_compound_check();
-        }
+        let (review, completed) = self.preferences.check_compound_extensions(running)?;
+        self.app.compound_extension_review = review;
+        self.preferences_changed |= completed;
         Ok(())
-    }
-
-    fn completed_compound_check(&mut self) {
-        self.preferences_changed = true;
-        self.compound_check_save_pending = true;
     }
 
     fn finish_compound_check(&mut self, remove: bool) {
         if let Some(review) = self.app.compound_extension_review.take() {
             review.complete(&mut self.preferences, remove);
-            self.completed_compound_check();
+            self.preferences_changed = true;
         }
     }
 }

@@ -1,10 +1,12 @@
 //! Validated TOML preferences and atomic persistence.
 pub mod compound_check;
+mod configuration;
 use crate::{
     app::{App, IgnoreMode},
     input::{Action, Bindings},
     listing::{Grouping, Sort, SortPolicy},
 };
+pub use configuration::Configuration;
 use std::{
     collections::BTreeMap,
     fs,
@@ -273,12 +275,17 @@ impl Store {
     /// # Errors
     /// Returns invalid/oversized settings, access errors or a nonregular config error.
     pub fn load(path: PathBuf) -> Result<Self, String> {
+        Self::load_state(path).map(|(store, _)| store)
+    }
+
+    fn load_state(path: PathBuf) -> Result<(Self, bool), String> {
         let text = config_text(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let missing = text.is_none();
         let settings = match text {
             Some(text) => Settings::parse(&text).map_err(|e| format!("{}: {e}", path.display()))?,
             None => Settings::default(),
         };
-        Ok(Self { path, settings })
+        Ok((Self { path, settings }, missing))
     }
 
     /// Save through an owned same-directory stage, retaining old bytes on failure.

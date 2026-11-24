@@ -161,7 +161,7 @@ fn save(controller: &mut Controller) {
     controller.app.profile_name = None;
     controller.app.profile_menu = None;
     controller.app.profile_names = controller.preferences.profiles.keys().cloned().collect();
-    controller.app.status = format!("View profile “{name}” saved; preferences save on exit").into();
+    controller.app.status = format!("View profile “{name}” updated").into();
 }
 
 pub(super) fn mouse(

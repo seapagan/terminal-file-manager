@@ -355,7 +355,7 @@ and Jobs last for the current run.
 
 You can start TFM without a configuration file. On interactive startup, TFM
 creates or updates it to record completed compound-extension checks and saves
-your preference changes in
+your preference changes as you make them in
 `tfm/config.toml` under your platform's configuration directory:
 
 | Platform | Configuration directory |
@@ -363,6 +363,11 @@ your preference changes in
 | Linux | `$XDG_CONFIG_HOME` or `~/.config` |
 | macOS | `$XDG_CONFIG_HOME` or `~/Library/Application Support` |
 | Windows | `%APPDATA%` |
+
+If a save fails, your settings remain active for the current run. TFM reports
+the path and error in notifications and history, then retries after input.
+Invalid or unreadable existing configuration produces a startup error; TFM
+does not replace it with defaults.
 
 Example:
 

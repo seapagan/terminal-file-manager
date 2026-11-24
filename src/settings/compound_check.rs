@@ -22,6 +22,22 @@ pub struct Review {
 }
 
 impl Settings {
+    /// Review a due check, recording completion even when no decision is needed.
+    pub(crate) fn check_compound_extensions(
+        &mut self,
+        running: &str,
+    ) -> Result<(Option<Review>, bool), String> {
+        if !self.compound_check_due(running)? {
+            return Ok((None, false));
+        }
+        let review = Review::new(self, running);
+        let completed = review.is_none();
+        if completed {
+            self.compound_extensions_checked_version = Some(running.into());
+        }
+        Ok((review, completed))
+    }
+
     /// Compare SemVer precedence, ignoring build metadata.
     ///
     /// # Errors

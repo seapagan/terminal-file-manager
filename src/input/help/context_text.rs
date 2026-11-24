@@ -186,5 +186,5 @@ const VIEW_PROFILES: &[&str] = &[
 ];
 const SAVE_PROFILE: &[&str] = &[
     "Type a name for the active pane's display settings. You can include ? in the name; use `F1` for Help. `Backspace` removes the last character.",
-    "Press `Enter` to save. Using an existing name replaces that profile. Correct name errors in the form; check the status area for confirmation. Preferences save on exit. Pane locations stay unchanged. `Esc` discards the name and returns to the profile list.",
+    "Press `Enter` to save. Using an existing name replaces that profile. Correct name errors in the form. TFM reports configuration save failures in notifications. Pane locations stay unchanged. `Esc` discards the name and returns to the profile list.",
 ];
