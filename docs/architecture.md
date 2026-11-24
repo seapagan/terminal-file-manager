@@ -138,7 +138,8 @@ completed compatibility checks share the same owned, synced same-directory
 stage. Missing configuration is scheduled for creation. Invalid or inaccessible
 existing configuration fails startup without fallback. Write failures retain
 effective settings and pending state, report the full path and diagnostic through
-notification history once per continuing error, and retry after subsequent input.
+notification history once per continuing error, and attempt another save only
+when configuration changes. Unrelated input does not retry failed writes.
 Interactive startup also runs a SemVer-gated compound-extension check. The shared
 modal first resolves replacement differences, then offers additive cleanup only
 for entries already supplied by the chosen base. Each dialog has a safe Keep

@@ -51,6 +51,11 @@ fn automatic_creation_failure_remains_pending_without_any_feature_request() {
     assert!(!path.exists());
     fs::remove_file(parent).unwrap();
     config.synchronize(&mut c);
+    assert!(config.is_unsaved());
+    assert!(!path.exists());
+    let g = ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 120, 24));
+    c.dispatch(Action::Hidden, &g);
+    config.synchronize(&mut c);
     assert!(!config.is_unsaved());
     assert!(
         Store::load(path)
@@ -71,7 +76,7 @@ fn startup_save_failure_retains_marker_and_reports_os_error_once_then_recovers()
     fs::write(&parent, "blocked").unwrap();
     c.check_compound_extensions("0.1.0").unwrap();
     config.synchronize(&mut c);
-    assert!(config.is_unsaved() && c.preferences_changed);
+    assert!(config.is_unsaved() && !c.preferences_changed);
     assert!(!c.quit);
     assert_eq!(
         c.preferences.compound_extensions_checked_version.as_deref(),
@@ -92,6 +97,11 @@ fn startup_save_failure_retains_marker_and_reports_os_error_once_then_recovers()
     assert_eq!(c.app.notifications.history.len(), 1);
     assert_eq!(c.app.notifications.history[0].occurrences, 1);
     fs::remove_file(parent).unwrap();
+    config.synchronize(&mut c);
+    assert!(config.is_unsaved());
+    assert!(!path.exists());
+    let g = ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 120, 24));
+    c.dispatch(Action::Hidden, &g);
     config.synchronize(&mut c);
     assert!(!config.is_unsaved() && !c.preferences_changed);
     let saved = Store::load(path).unwrap().settings;
@@ -126,9 +136,13 @@ fn interactive_save_failure_keeps_preferences_and_browsing_then_saves_latest_cha
     assert_eq!(c.app.notifications.history.len(), 1);
     fs::remove_dir(&path).unwrap();
     config.synchronize(&mut c);
+    assert!(config.is_unsaved());
+    assert!(!path.exists());
+    c.dispatch(Action::Reverse, &g);
+    config.synchronize(&mut c);
     assert!(!config.is_unsaved());
     let saved = Store::load(path).unwrap().settings;
-    assert!(saved.hidden && saved.sidebar && !saved.mouse);
+    assert!(saved.hidden && saved.sidebar && saved.reverse && !saved.mouse);
     assert_eq!(
         saved.compound_extensions_checked_version.as_deref(),
         Some("9.0.0")
@@ -174,7 +188,7 @@ fn unavailable_configuration_location_retains_changes_with_one_general_diagnosti
     c.check_compound_extensions("0.1.0").unwrap();
     config.synchronize(&mut c);
     config.synchronize(&mut c);
-    assert!(config.is_unsaved() && c.preferences_changed && !c.quit);
+    assert!(config.is_unsaved() && !c.preferences_changed && !c.quit);
     assert_eq!(
         config
             .preferences()

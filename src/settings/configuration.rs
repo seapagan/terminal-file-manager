@@ -1,4 +1,4 @@
-//! Runtime configuration owns storage and nonfatal save/retry policy.
+//! Runtime configuration owns storage and nonfatal save policy.
 use super::{Settings, Store};
 use crate::{input::Controller, notifications::Severity};
 use std::path::PathBuf;
@@ -8,6 +8,7 @@ pub struct Configuration {
     path: Option<PathBuf>,
     settings: Settings,
     unsaved: bool,
+    save_requested: bool,
     reported_error: Option<String>,
 }
 
@@ -37,6 +38,7 @@ impl Configuration {
             path,
             settings,
             unsaved,
+            save_requested: unsaved,
             reported_error: None,
         })
     }
@@ -46,18 +48,19 @@ impl Configuration {
         self.settings.clone()
     }
 
-    /// A failed write remains pending until a subsequent persistence attempt succeeds.
+    /// Failed settings remain unsaved until a later configuration change is saved.
     pub fn is_unsaved(&self) -> bool {
         self.unsaved
     }
 
     /// Persist creation, preference changes and completed compatibility checks together.
-    /// Call at startup and after input; repeated failures retain one diagnostic until recovery.
+    /// Consume each change request once; unrelated input never retries a failed write.
     pub fn synchronize(&mut self, controller: &mut Controller) {
-        self.unsaved |= controller.preferences_changed;
-        if !self.unsaved {
+        self.save_requested |= std::mem::take(&mut controller.preferences_changed);
+        if !std::mem::take(&mut self.save_requested) {
             return;
         }
+        self.unsaved = true;
         self.settings = controller.preferences.clone();
         let result = match &self.path {
             Some(path) => Store {
@@ -70,7 +73,6 @@ impl Configuration {
         match result {
             Ok(()) => {
                 self.unsaved = false;
-                controller.preferences_changed = false;
                 self.reported_error = None;
             }
             Err(error) => self.report(controller, error),
@@ -82,7 +84,7 @@ impl Configuration {
             return;
         }
         controller.app.notifications.notify(
-            format!("Could not save configuration: {error}. Settings remain active but unsaved; check the path and permissions. TFM will retry after input."),
+            format!("Could not save configuration: {error}. Settings remain active but unsaved; check the path and permissions. TFM will try again when configuration changes."),
             controller.app.now,
             Severity::Error,
         );

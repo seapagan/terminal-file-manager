@@ -362,7 +362,8 @@ your preference changes as you make them in
 | Windows | `%APPDATA%` |
 
 If a save fails, your settings remain active for the current run. TFM reports
-the path and error in notifications and history, then retries after input.
+the path and error in notifications and history. A later configuration change
+triggers another save attempt; unrelated input does not retry the failed save.
 Invalid or unreadable existing configuration produces a startup error; TFM
 does not replace it with defaults.
 
