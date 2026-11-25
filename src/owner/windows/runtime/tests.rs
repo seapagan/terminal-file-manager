@@ -29,6 +29,9 @@ fn loaded(count: usize) -> (tempfile::TempDir, App, Geometry) {
     let mut app = App::new(root.path().into());
     app.complete_listing(0, 1, Ok(snapshot.clone()));
     app.complete_listing(1, 1, Ok(snapshot));
+    for pane in &mut app.panes {
+        pane.move_cursor(1, 20);
+    }
     app.dual = true;
     let geometry = ui::geometry(&app, Rect::new(0, 0, 240, 40));
     (root, app, geometry)

@@ -49,6 +49,9 @@ letter shortcuts as `Shift+` plus the lowercase letter.
 
 ### Navigation and layout
 
+Newly opened directories highlight `..`, so Enter returns to the parent.
+Going up selects the directory you left; back and forward restore saved focus.
+
 | Keys | Action |
 | --- | --- |
 | Up/Down or `k`/`j` | Move through the listing |

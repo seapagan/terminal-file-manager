@@ -382,6 +382,7 @@ fn genuine_metadata_worker_failure_notifies_but_stale_failures_do_not() {
         )
         .unwrap()),
     );
+    c.app.panes[0].move_cursor(1, 20);
     let request = c.app.request_metadata(0).unwrap();
     assert!(c.app.complete_failure(&request, "Worker failed".into()));
     assert_eq!(c.app.notifications.history[0].severity, Severity::Error);

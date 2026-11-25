@@ -27,6 +27,7 @@ fn loaded() -> (tempfile::TempDir, Controller) {
                 errors: vec![],
             }),
         );
+        app.panes[id].move_cursor(1, 20);
         app.panes[id].sidebar = true;
     }
     app.panes[1].move_cursor(2, 20);
@@ -108,6 +109,7 @@ fn navigation_keeps_the_old_stale_view_until_success_and_reports_failure() {
         };
         c.app.complete_listing(0, navigation.generation, result);
         if success {
+            c.app.panes[0].move_cursor(1, 20);
             c.app.request_metadata(0).unwrap();
         }
         for floating in [false, true] {

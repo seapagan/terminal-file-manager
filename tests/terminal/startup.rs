@@ -2,6 +2,25 @@
 use super::*;
 
 #[test]
+fn startup_parent_focus_is_immediately_actionable_in_a_real_terminal() {
+    let storage = tempfile::tempdir().unwrap();
+    let root = tempfile::tempdir_in(storage.path()).unwrap();
+    let child = root.path().join("child");
+    fs::create_dir(&child).unwrap();
+    fs::write(child.join("inside-ready"), "owned").unwrap();
+    fs::write(root.path().join("parent-ready"), "owned").unwrap();
+    let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+    command.arg(&child);
+    command.cwd(storage.path());
+    isolate(&mut command, storage.path());
+    drive(
+        command,
+        &[("inside-ready", "\r"), ("parent-ready", "q")],
+        false,
+    );
+}
+
+#[test]
 fn browser_starts_at_cwd_and_explicit_path_and_restores_terminal() {
     let storage = tempfile::tempdir().unwrap();
     let root = tempfile::tempdir_in(storage.path()).unwrap();
@@ -16,7 +35,7 @@ fn browser_starts_at_cwd_and_explicit_path_and_restores_terminal() {
         let output = drive(
             command,
             &[
-                ("browser-sentinel", "\r"),
+                ("browser-sentinel", "\x1b[B\r"),
                 ("The file viewer is not available yet.", "\u{1b}p"),
                 ("Pane 2", "q"),
             ],

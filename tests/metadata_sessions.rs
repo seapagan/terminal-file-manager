@@ -42,6 +42,7 @@ fn loaded() -> (tempfile::TempDir, Controller) {
                 errors: vec![],
             }),
         );
+        app.panes[id].move_cursor(1, 20);
         let request = app.request_metadata(id).unwrap();
         assert!(app.complete_metadata(&request, entry, None));
         std::fs::remove_file(path).unwrap();

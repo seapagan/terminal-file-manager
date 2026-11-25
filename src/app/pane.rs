@@ -115,12 +115,15 @@ impl Pane {
 
     pub(super) fn new(path: PathBuf) -> Self {
         Self {
+            cursor: path
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .map(PathBuf::from),
             entry_identity: None,
             directory: None,
             path,
             entries: Vec::new(),
             visible: Vec::new(),
-            cursor: None,
             marks: HashMap::new(),
             scroll: 0,
             listing_installs: 0,
@@ -185,7 +188,7 @@ impl Pane {
             }
             self.path = snapshot.path;
             self.marks.clear();
-            self.cursor = None;
+            self.cursor = self.path.parent().map(PathBuf::from);
             self.scroll = 0;
         }
         self.directory = snapshot.directory.map(|entry| *entry);

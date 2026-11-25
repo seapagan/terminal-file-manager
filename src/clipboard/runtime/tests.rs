@@ -13,6 +13,7 @@ fn app(root: &std::path::Path) -> crate::app::App {
     let mut app = crate::app::App::new(root.into());
     let listing = crate::fs::list(root, &Default::default(), &Default::default()).unwrap();
     app.complete_listing(0, 1, Ok(listing));
+    app.panes[0].move_cursor(1, 20);
     app
 }
 

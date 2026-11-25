@@ -30,10 +30,9 @@ fn parent_row_is_keyboard_accessible_and_never_a_filesystem_operand() {
     std::fs::write(root.path().join("file"), "owned").unwrap();
     let mut c = controller(root.path());
     let g = ui::geometry(&c.app, Rect::new(0, 0, 100, 24));
-    c.dispatch(Action::Home, &g);
     assert!(
         c.app.panes[0].current().is_none(),
-        "Home must focus virtual parent"
+        "Startup must focus virtual parent"
     );
     c.dispatch(Action::Mark, &g);
     assert!(c.app.panes[0].marks.is_empty());

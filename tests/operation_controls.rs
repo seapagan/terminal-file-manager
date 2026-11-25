@@ -25,6 +25,7 @@ fn controller() -> (tempfile::TempDir, Controller) {
         )
         .unwrap();
         app.complete_listing(id, 1, Ok(snapshot));
+        app.panes[id].move_cursor(1, 20);
     }
     let bindings = Bindings::new(&Default::default()).unwrap();
     (root, Controller::new(app, bindings, Default::default()))

@@ -112,6 +112,7 @@ fn floating_metadata_uses_the_file_row_without_changing_the_sidebar() {
     .unwrap();
     let mut app = App::new(root.path().into());
     app.complete_listing(0, 1, Ok(snapshot));
+    app.panes[0].move_cursor(1, 20);
     app.request_metadata(0);
     app.popup = true;
     app.panes[0].entries.clear();

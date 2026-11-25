@@ -18,6 +18,7 @@ fn loaded() -> (tempfile::TempDir, App) {
         1,
         Ok(list(root.path(), &IgnoreContext::isolated(), &false.into()).unwrap()),
     );
+    app.panes[0].move_cursor(1, 20);
     let mut state = PatternSelection::new(&app.panes[0], 0);
     state.set_expression("*".into());
     app.pattern = Some(state);

@@ -87,6 +87,7 @@ fn dual_pane_focus_distinguishes_retained_cursor_and_background() {
         )
         .unwrap();
         app.complete_listing(id, 1, Ok(snapshot));
+        app.panes[id].move_cursor(1, 20);
     }
     app.dual = true;
     for level in [
@@ -210,6 +211,7 @@ fn metadata_fields_have_separate_rows_and_share_the_cached_entry() {
     )
     .unwrap();
     app.complete_listing(0, 1, Ok(snapshot));
+    app.panes[0].move_cursor(1, 20);
     let request = app.request_metadata(0).unwrap();
     app.complete_metadata(
         &request,

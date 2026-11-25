@@ -65,7 +65,7 @@ fn healthy_silent_watcher_reconciles_unconditionally_at_thirty_seconds() {
     assert!(
         app.panes
             .iter()
-            .all(|p| p.current().unwrap().name == "silent-change")
+            .all(|p| p.entries.iter().any(|entry| entry.name == "silent-change"))
     );
     runtime.poll(&mut app, &mut pool, Duration::from_secs(31));
     assert_eq!(pool.active_count(), 0);
@@ -143,7 +143,7 @@ fn repeated_errors_are_bounded_and_fallback_recovers_without_warning_spam() {
     std::fs::write(root.path().join("fallback"), "data").unwrap();
     runtime.poll(&mut app, &mut pool, Duration::from_secs(6));
     finish(&mut app, &mut pool);
-    assert_eq!(app.panes[0].current().unwrap().name, "fallback");
+    assert_eq!(app.panes[0].entries[0].name, "fallback");
     runtime.slots[0]
         .signals
         .bits

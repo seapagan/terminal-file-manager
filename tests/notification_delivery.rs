@@ -17,6 +17,7 @@ fn loaded() -> (tempfile::TempDir, App) {
     fs::write(root.path().join("entry"), "owned").unwrap();
     let mut app = App::new(root.path().into());
     assert!(app.complete_listing(0, 1, Ok(snapshot(root.path()))));
+    app.panes[0].move_cursor(1, 20);
     (root, app)
 }
 

@@ -18,6 +18,7 @@ fn cached_times(c: &mut Controller) {
             errors: vec![],
         }),
     );
+    c.app.panes[0].move_cursor(1, 20);
     c.app.panes[0].columns.modified = false;
     let request = c.app.request_metadata(0).unwrap();
     assert!(c.app.complete_metadata(&request, entry.clone(), None));

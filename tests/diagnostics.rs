@@ -36,6 +36,7 @@ fn controller() -> (tempfile::TempDir, Controller) {
             )
             .unwrap()),
         );
+        app.panes[id].move_cursor(1, 20);
     }
     let controller = Controller::new(
         app,

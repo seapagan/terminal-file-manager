@@ -23,6 +23,7 @@ fn loaded() -> (tempfile::TempDir, Controller) {
     let mut app = App::new(root.path().into());
     for id in 0..2 {
         app.complete_listing(id, 1, Ok(snapshot.clone()));
+        app.panes[id].move_cursor(1, 20);
     }
     (
         root,

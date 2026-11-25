@@ -214,6 +214,7 @@ mod tests {
             1,
             Ok(fs::list(root, &IgnoreContext::isolated(), &AtomicBool::new(false)).unwrap()),
         );
+        app.panes[0].move_cursor(1, 20);
         Controller::new(
             app,
             Bindings::new(&Default::default()).unwrap(),
@@ -375,6 +376,7 @@ mod tests {
         )
         .unwrap();
         controller.app.complete_listing(1, 1, Ok(snapshot));
+        controller.app.panes[1].move_cursor(1, 20);
         let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
         for pane in 0..2 {
             controller.app.active = pane;
