@@ -234,7 +234,7 @@ impl Controller {
             }
             Action::SelectAll => pane.select_all(),
             Action::MarkExtension | Action::MarkFinalExtension => pane.mark_extension(
-                &self.preferences.compound_extensions,
+                &self.preferences.effective_compound_extensions(),
                 action == Action::MarkFinalExtension,
             ),
             Action::ClearVisible => pane.clear_visible(),

@@ -182,16 +182,17 @@ fn copy_and_move_replace_are_accessible_from_the_real_dual_pane_manager() {
 
 #[test]
 fn permanent_delete_requires_separate_confirmation_and_enter_cancels() {
-    let root = tempfile::tempdir().unwrap();
+    let storage = tempfile::tempdir().unwrap();
+    let root = tempfile::tempdir_in(storage.path()).unwrap();
     fs::write(root.path().join("selected"), "owned").unwrap();
     drive(
-        command(root.path(), root.path(), None),
+        command(storage.path(), root.path(), None),
         &[("selected", "\x1bd"), ("1 file · 5 B", "\rq")],
         false,
     );
     assert_eq!(fs::read(root.path().join("selected")).unwrap(), b"owned");
     drive(
-        command(root.path(), root.path(), None),
+        command(storage.path(), root.path(), None),
         &[
             ("selected", "\x1bd"),
             ("1 file · 5 B", "D"),
@@ -204,12 +205,13 @@ fn permanent_delete_requires_separate_confirmation_and_enter_cancels() {
 
 #[test]
 fn completed_directory_delete_can_be_followed_by_a_real_create_dialog() {
-    let root = tempfile::tempdir().unwrap();
+    let storage = tempfile::tempdir().unwrap();
+    let root = tempfile::tempdir_in(storage.path()).unwrap();
     fs::create_dir(root.path().join("selected-directory")).unwrap();
     fs::write(root.path().join("selected-directory/child"), "owned").unwrap();
     fs::write(root.path().join("zzz-ready"), "retained").unwrap();
     drive(
-        command(root.path(), root.path(), None),
+        command(storage.path(), root.path(), None),
         &[
             ("zzz-ready", "\x1bd"),
             ("1 file, 1 directory · 5 B", "D"),
@@ -230,13 +232,14 @@ fn completed_directory_delete_can_be_followed_by_a_real_create_dialog() {
 #[test]
 fn same_folder_batch_failure_explains_the_reason_before_evidence_in_a_real_terminal() {
     for shortcut in ["\x1b[15~", "\x1b[17~"] {
-        let root = tempfile::tempdir().unwrap();
+        let storage = tempfile::tempdir().unwrap();
+        let root = tempfile::tempdir_in(storage.path()).unwrap();
         for name in ["first-owned", "second-owned"] {
             fs::write(root.path().join(name), "retained").unwrap();
         }
         // Only the active pane is visible; a filename cannot signal readiness of Pane 2.
         drive(
-            command(root.path(), root.path(), None),
+            command(storage.path(), root.path(), None),
             &[
                 ("second-owned", "\x01"),
                 ("Selected: 2 visible", shortcut),
@@ -362,7 +365,14 @@ fn view_dialog_help_and_profile_editing_cross_the_native_terminal_parser() {
         fs::read(root.path().join("view-help-sentinel")).unwrap(),
         b"preserved"
     );
-    assert!(!root.path().join("config/tfm/config.toml").exists());
+    assert_eq!(
+        terminal_file_manager::settings::Store::load(root.path().join("config/tfm/config.toml"))
+            .unwrap()
+            .settings
+            .compound_extensions_checked_version
+            .as_deref(),
+        Some(env!("CARGO_PKG_VERSION"))
+    );
 }
 
 #[test]
@@ -407,12 +417,13 @@ fn alternate_metadata_popup_opens_through_native_terminal_input() {
 
 #[test]
 fn extension_selection_chords_arrive_through_native_terminal_input() {
-    let root = tempfile::tempdir().unwrap();
+    let storage = tempfile::tempdir().unwrap();
+    let root = tempfile::tempdir_in(storage.path()).unwrap();
     for name in ["a.tar.gz", "b.tar.gz", "c.gz"] {
         fs::write(root.path().join(name), "owned").unwrap();
     }
     drive(
-        command(root.path(), root.path(), None),
+        command(storage.path(), root.path(), None),
         &[("a.tar.gz", "\x1be"), ("Selected:", "\x1bE"), ("3", "q")],
         false,
     );

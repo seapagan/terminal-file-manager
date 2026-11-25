@@ -181,3 +181,52 @@ fn invalid_native_extension_bytes_never_match_the_lossy_replacement_character() 
     assert!(c.app.panes[0].marks.contains_key(&b));
     assert!(!c.app.panes[0].marks.contains_key(&different));
 }
+
+#[test]
+fn additive_compounds_retain_defaults_and_final_extension_matching() {
+    let root = tempfile::tempdir().unwrap();
+    for name in [
+        "a.user.js",
+        "b.user.js",
+        "plain.js",
+        "upper.USER.js",
+        "c.long.user.js",
+        "a.tar.gz",
+        "plain.gz",
+    ] {
+        std::fs::write(root.path().join(name), "owned").unwrap();
+    }
+    let mut c = loaded(root.path());
+    c.preferences =
+        Settings::parse("compound_extensions_extend = ['.user.js', '.long.user.js']").unwrap();
+    for (target, expected) in [
+        ("a.user.js", vec!["a.user.js", "b.user.js"]),
+        ("c.long.user.js", vec!["c.long.user.js"]),
+        ("a.tar.gz", vec!["a.tar.gz"]),
+    ] {
+        c.app.panes[0].cursor = Some(root.path().join(target));
+        key(&mut c, "Alt+e");
+        assert_eq!(marks(&c), expected);
+    }
+    c.app.panes[0].cursor = Some(root.path().join("a.user.js"));
+    key(&mut c, "Alt+Shift+e");
+    assert_eq!(
+        marks(&c),
+        [
+            "a.user.js",
+            "b.user.js",
+            "c.long.user.js",
+            "plain.js",
+            "upper.USER.js",
+        ]
+    );
+    c.preferences =
+        Settings::parse("compound_extensions = []\ncompound_extensions_extend = ['.user.js']")
+            .unwrap();
+    c.app.panes[0].cursor = Some(root.path().join("a.tar.gz"));
+    key(&mut c, "Alt+e");
+    assert_eq!(marks(&c), ["a.tar.gz", "plain.gz"]);
+    c.app.panes[0].cursor = Some(root.path().join("a.user.js"));
+    key(&mut c, "Alt+e");
+    assert_eq!(marks(&c), ["a.user.js", "b.user.js", "c.long.user.js"]);
+}

@@ -1,4 +1,6 @@
 //! Render cached state only. No filesystem calls, subprocesses or worker submission.
+pub(crate) mod compound_check;
+pub use compound_check::{CheckIntent, CheckLayout};
 mod diagnostics;
 mod footer;
 mod help;
@@ -129,15 +131,20 @@ pub fn render(frame: &mut Frame, app: &App, theme: &Theme) -> Geometry {
     if let Some(lines) = diagnostics {
         diagnostics::render(frame, app, theme, &mut geometry, lines);
     }
-    path_picker::render(frame, app, theme, geometry.path_picker.as_ref());
-    pattern::render(frame, app, theme, geometry.pattern.as_ref());
-    operations::render(frame, app, theme, &geometry);
-    help::context::render(frame, app, theme, geometry.context_help.as_ref());
-    notifications::render(frame, app, &geometry, theme);
+    render_overlays(frame, app, &geometry, theme);
     if let Some(cursor) = editing_cursor(app, &geometry) {
         frame.set_cursor_position(cursor.position);
     }
     geometry
+}
+
+fn render_overlays(frame: &mut Frame, app: &App, geometry: &Geometry, theme: &Theme) {
+    path_picker::render(frame, app, theme, geometry.path_picker.as_ref());
+    pattern::render(frame, app, theme, geometry.pattern.as_ref());
+    operations::render(frame, app, theme, geometry);
+    help::context::render(frame, app, theme, geometry.context_help.as_ref());
+    notifications::render(frame, app, geometry, theme);
+    compound_check::render(frame, app, geometry, theme);
 }
 
 fn render_menus(frame: &mut Frame, app: &App, geometry: &Geometry, theme: &Theme) {

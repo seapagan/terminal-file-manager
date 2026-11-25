@@ -1,37 +1,10 @@
 //! Native PTY/ConPTY lifecycle and real executable acceptance.
 use portable_pty::CommandBuilder;
+#[path = "terminal/startup.rs"]
+mod startup;
 mod terminal_driver;
 use std::fs;
 use terminal_driver::drive;
-
-#[test]
-fn browser_starts_at_cwd_and_explicit_path_and_restores_terminal() {
-    let root = tempfile::tempdir().unwrap();
-    fs::write(root.path().join("browser-sentinel"), "read only").unwrap();
-    for explicit in [false, true] {
-        let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
-        if explicit {
-            command.arg(root.path());
-        }
-        command.cwd(root.path());
-        isolate(&mut command, root.path());
-        let output = drive(
-            command,
-            &[
-                ("browser-sentinel", "\r"),
-                ("The file viewer is not available yet.", "\u{1b}p"),
-                ("Pane 2", "q"),
-            ],
-            true,
-        );
-        assert!(output.contains("browser-sentinel"));
-        assert_eq!(
-            fs::read(root.path().join("browser-sentinel")).unwrap(),
-            b"read only"
-        );
-        assert!(!root.path().join("config/tfm/config.toml").exists());
-    }
-}
 
 #[test]
 fn preference_change_survives_exit_from_other_pane_and_real_restart() {
@@ -397,54 +370,6 @@ fn printable_inputs() -> Vec<&'static str> {
 }
 
 #[test]
-fn diagnostics_uses_startup_capability_in_a_controlled_real_terminal() {
-    let root = tempfile::tempdir().unwrap();
-    fs::write(root.path().join("diagnostics-sentinel"), "read only").unwrap();
-    for (forced, expected, vte) in [
-        (None, "TrueColor", None),
-        (Some("0"), "NoColor", Some("8400")),
-        (Some("1"), "Ansi16", Some("")),
-        (Some("2"), "Ansi256", Some("bad")),
-        (Some("3"), "TrueColor", Some("8400")),
-    ] {
-        let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
-        command.cwd(root.path());
-        isolate(&mut command, root.path());
-        // Only this child drops inherited overrides; precedence tests stay intact.
-        for name in ["NO_COLOR", "FORCE_COLOR", "CLICOLOR", "CLICOLOR_FORCE"] {
-            command.env_remove(name);
-        }
-        command.env("COLORTERM", "truecolor");
-        if let Some(value) = vte {
-            command.env("VTE_VERSION", value);
-        }
-        if let Some(value) = forced {
-            command.env("FORCE_COLOR", value);
-        }
-        let scroll = "\u{1b}[6;3~".repeat(200);
-        let output = drive(
-            command,
-            &[
-                ("diagnostics-sentinel", "\u{1b}[24~"),
-                (&format!("Applied ColorLevel: {expected}"), &scroll),
-                // Exact values are checked in the diagnostics buffer tests;
-                // differential output may reuse <unset> from the previous row.
-                ("VTE_VERSION", "\u{1b}[24~\r"),
-                ("The file viewer is not available yet.", "q"),
-            ],
-            true,
-        );
-        assert!(output.contains("Startup stdout TTY"));
-        assert!(output.contains("xterm-256color"));
-    }
-    assert_eq!(
-        fs::read(root.path().join("diagnostics-sentinel")).unwrap(),
-        b"read only"
-    );
-    assert!(!root.path().join("config/tfm/config.toml").exists());
-}
-
-#[test]
 fn shifted_arrow_marks_a_range_in_a_real_terminal() {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("range-a"), "one").unwrap();
@@ -507,9 +432,11 @@ fn save_quit_restores_both_navigated_locations_and_normal_quit_keeps_session() {
 #[test]
 fn normal_exit_emits_accepted_osc52_before_terminal_restoration() {
     let root = tempfile::tempdir().unwrap();
-    fs::write(root.path().join("osc-exit"), "read only").unwrap();
+    let files = root.path().join("files");
+    fs::create_dir(&files).unwrap();
+    fs::write(files.join("osc-exit"), "read only").unwrap();
     let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
-    command.cwd(root.path());
+    command.cwd(&files);
     isolate(&mut command, root.path());
     command.env("SSH_CONNECTION", "isolated-test");
     command.env_remove("STY");

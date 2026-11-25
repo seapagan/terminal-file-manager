@@ -1,9 +1,12 @@
-//! Optional TOML preferences; no eager writes or navigation persistence.
+//! Validated TOML preferences and atomic persistence.
+pub mod compound_check;
+mod configuration;
 use crate::{
     app::{App, IgnoreMode},
     input::{Action, Bindings},
     listing::{Grouping, Sort, SortPolicy},
 };
+pub use configuration::Configuration;
 use std::{
     collections::BTreeMap,
     fs,
@@ -25,7 +28,11 @@ pub enum MetadataPresentation {
 #[serde(default, deny_unknown_fields)]
 pub struct Settings {
     pub keep_filter_on_navigation: bool,
-    pub compound_extensions: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compound_extensions: Option<Vec<String>>,
+    pub compound_extensions_extend: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compound_extensions_checked_version: Option<String>,
     pub pattern_mode: crate::app::PatternMode,
     pub pattern_case_sensitive: bool,
     pub clipboard: crate::path_copy::Preferences,
@@ -58,17 +65,9 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             keep_filter_on_navigation: false,
-            compound_extensions: [
-                ".tar.gz",
-                ".tar.xz",
-                ".tar.bz2",
-                ".tar.zst",
-                ".tar.lz",
-                ".tar.lzma",
-                ".tar.Z",
-            ]
-            .map(str::to_owned)
-            .to_vec(),
+            compound_extensions: None,
+            compound_extensions_extend: Vec::new(),
+            compound_extensions_checked_version: None,
             pattern_mode: crate::app::PatternMode::Wildcard,
             pattern_case_sensitive: true,
             clipboard: Default::default(),
@@ -141,19 +140,52 @@ impl Settings {
         Ok(settings)
     }
 
-    fn validate_compound_extensions(&self) -> Result<(), String> {
-        if self.compound_extensions.iter().any(|s| {
-            !s.starts_with('.')
-                || s.len() < 2
-                || s.ends_with('.')
-                || s.chars().any(|c| c.is_control() || matches!(c, '/' | '\\'))
-        }) {
-            return Err(
-                "compound_extensions must contain dotted filename suffixes without path separators"
-                    .into(),
-            );
+    /// Resolve defaults or an explicit replacement, then append unique additions.
+    pub fn effective_compound_extensions(&self) -> Vec<String> {
+        let defaults = [
+            ".tar.gz",
+            ".tar.xz",
+            ".tar.bz2",
+            ".tar.zst",
+            ".tar.lz",
+            ".tar.lzma",
+            ".tar.Z",
+        ]
+        .map(str::to_owned);
+        let base = self.compound_extensions.as_deref().unwrap_or(&defaults);
+        let mut effective = Vec::new();
+        for suffix in base.iter().chain(&self.compound_extensions_extend) {
+            if !effective.contains(suffix) {
+                effective.push(suffix.clone());
+            }
         }
-        Ok(())
+        effective
+    }
+
+    fn validate_compound_extensions(&self) -> Result<(), String> {
+        for (name, suffixes) in [
+            (
+                "compound_extensions",
+                self.compound_extensions.as_deref().unwrap_or_default(),
+            ),
+            (
+                "compound_extensions_extend",
+                self.compound_extensions_extend.as_slice(),
+            ),
+        ] {
+            if suffixes.iter().any(|s| {
+                !s.starts_with('.')
+                    || s.len() < 2
+                    || s.ends_with('.')
+                    || s.chars().any(|c| c.is_control() || matches!(c, '/' | '\\'))
+            }) {
+                return Err(format!(
+                    "{name} must contain dotted filename suffixes without path separators"
+                ));
+            }
+        }
+        self.compound_check_due(env!("CARGO_PKG_VERSION"))
+            .map(|_| ())
     }
 
     fn validate_colours(&self) -> Result<(), String> {
@@ -243,12 +275,17 @@ impl Store {
     /// # Errors
     /// Returns invalid/oversized settings, access errors or a nonregular config error.
     pub fn load(path: PathBuf) -> Result<Self, String> {
+        Self::load_state(path).map(|(store, _)| store)
+    }
+
+    fn load_state(path: PathBuf) -> Result<(Self, bool), String> {
         let text = config_text(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let missing = text.is_none();
         let settings = match text {
             Some(text) => Settings::parse(&text).map_err(|e| format!("{}: {e}", path.display()))?,
             None => Settings::default(),
         };
-        Ok(Self { path, settings })
+        Ok((Self { path, settings }, missing))
     }
 
     /// Save through an owned same-directory stage, retaining old bytes on failure.

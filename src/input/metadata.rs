@@ -12,10 +12,7 @@ impl Controller {
     pub fn handle(&mut self, event: Event, geometry: &Geometry, now: Duration) -> Vec<Request> {
         self.app.path_pointer = None;
         self.app.notifications.advance(now);
-        if super::notifications::handle(self, &event, geometry) {
-            return Vec::new();
-        }
-        if super::path_copy::handle(self, &event, geometry) {
+        if self.capture_overlay(&event, geometry) {
             return Vec::new();
         }
         let closing = close_hit(&event, geometry.modal_close);
@@ -47,6 +44,12 @@ impl Controller {
         requests
     }
 
+    fn capture_overlay(&mut self, event: &Event, geometry: &Geometry) -> bool {
+        super::compound_check::handle(self, event, geometry)
+            || super::notifications::handle(self, event, geometry)
+            || super::path_copy::handle(self, event, geometry)
+    }
+
     fn sync_metadata(&mut self, geometry: &Geometry) {
         self.app
             .sync_metadata_views(self.app.sidebar_visible(geometry.footer.width));
@@ -67,6 +70,9 @@ impl Controller {
 
     /// Keyboard and clickable controls share this dispatcher and availability policy.
     pub fn dispatch(&mut self, action: Action, geometry: &Geometry) -> Vec<Request> {
+        if self.app.compound_extension_review.is_some() {
+            return Vec::new();
+        }
         if super::notifications::dismiss(self, action, geometry) {
             return Vec::new();
         }

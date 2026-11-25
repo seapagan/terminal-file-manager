@@ -3,10 +3,11 @@ use super::*;
 
 #[test]
 fn pattern_selection_alt_b_paste_mark_and_cancel_work_in_native_terminal() {
-    let root = tempfile::tempdir().unwrap();
+    let storage = tempfile::tempdir().unwrap();
+    let root = tempfile::tempdir_in(storage.path()).unwrap();
     fs::write(root.path().join("pattern-ready.txt"), "preserved").unwrap();
     let mut session =
-        terminal_driver::Session::open(command(root.path(), root.path(), None)).unwrap();
+        terminal_driver::Session::open(command(storage.path(), root.path(), None)).unwrap();
     let mut output = Vec::new();
     let deadline = mark_after_fresh_readiness(&mut session, &mut output);
     use std::io::Write;
@@ -44,10 +45,11 @@ fn pattern_selection_alt_b_paste_mark_and_cancel_work_in_native_terminal() {
 
 #[test]
 fn pattern_alt_controls_and_literal_letters_cross_the_native_terminal_parser() {
-    let root = tempfile::tempdir().unwrap();
+    let storage = tempfile::tempdir().unwrap();
+    let root = tempfile::tempdir_in(storage.path()).unwrap();
     fs::write(root.path().join("wxsmurQfile.txt"), "preserved").unwrap();
     let transcript = drive(
-        command(root.path(), root.path(), None),
+        command(storage.path(), root.path(), None),
         &[
             ("wxsmurQfile.txt", "\x1bb"),
             ("Pattern selection", "\x1bs\x1bx\x1bwwxsmur?*.txt\x1bm"),
@@ -71,7 +73,8 @@ fn pattern_alt_controls_and_literal_letters_cross_the_native_terminal_parser() {
 #[test]
 #[cfg(not(windows))]
 fn pattern_overlong_native_input_requires_correction_before_apply() {
-    let root = tempfile::tempdir().unwrap();
+    let storage = tempfile::tempdir().unwrap();
+    let root = tempfile::tempdir_in(storage.path()).unwrap();
     fs::write(root.path().join("overlong-ready.txt"), "preserved").unwrap();
     // Keep each PTY write bounded; the final paste exceeds the field limit.
     let prefixes: [String; 5] =
@@ -94,7 +97,7 @@ fn pattern_overlong_native_input_requires_correction_before_apply() {
         ("Pattern selection", "*\r\r"),
         ("[*]", "q"),
     ];
-    let transcript = drive(command(root.path(), root.path(), None), &steps, false);
+    let transcript = drive(command(storage.path(), root.path(), None), &steps, false);
     assert!(transcript.contains("[*]"));
     assert_eq!(
         fs::read(root.path().join("overlong-ready.txt")).unwrap(),

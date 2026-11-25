@@ -1316,6 +1316,7 @@ dependencies = [
  "ratatui",
  "regex",
  "rustix",
+ "semver",
  "serde",
  "sha2",
  "tempfile",

@@ -54,6 +54,7 @@ pub struct Detail {
 
 /// Both panes remain alive when hidden or temporarily collapsed by width.
 pub struct App {
+    pub compound_extension_review: Option<crate::settings::compound_check::Review>,
     pub keep_filter_on_navigation: bool,
     pub relative_path_base: PathBuf,
     pub footer_workflow: Option<crate::path_copy::Workflow>,
@@ -98,6 +99,7 @@ impl App {
     /// Every invocation starts single-pane, with two independent original locations.
     pub fn new(path: PathBuf) -> Self {
         Self {
+            compound_extension_review: None,
             keep_filter_on_navigation: false,
             relative_path_base: path.clone(),
             footer_workflow: None,

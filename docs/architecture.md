@@ -27,7 +27,8 @@ by `colored_text`; plain and coloured output retain the same diagnostic text.
 The M1 browser retains two independent pane models, with configurable one/two-pane
 startup, bounded divider adjustment and temporary active-pane maximisation.
 Cursor, scroll, marks, filter and back/forward history are session-only;
-preferences persist lazily.
+preferences persist after explicit changes, with completed startup compatibility
+checks saved immediately.
 
 `app` owns pure transitions and request generations; `input` maps keyboard and
 mouse to the same application actions. `ui` renders cached data through Ratatui,
@@ -130,9 +131,22 @@ normal exit, I/O errors and unwind. Keyboard protocol pushes are capability
 negotiated and paired with pops. Unix selects Crossterm's level-triggered
 use-dev-tty input source: its default Mio path can lose a keyboard readiness
 edge when resize is returned first. Native PTY/ConPTY tests exercise resize,
-quit and error/unwind cleanup. `settings` loads before terminal setup and saves
-changed preferences after teardown through an owned same-directory stage.
-Linked config files fail explicitly. `session` owns a separate strict version-1
+quit and error/unwind cleanup. `settings::Configuration` owns configuration
+loading, defaults, validation and persistence policy. The browser requests a
+synchronization at startup and after input; ordinary preference changes and
+completed compatibility checks share the same owned, synced same-directory
+stage. Missing configuration is scheduled for creation. Invalid or inaccessible
+existing configuration fails startup without fallback. Write failures retain
+effective settings and pending state, report the full path and diagnostic through
+notification history once per continuing error, and attempt another save only
+when configuration changes. Unrelated input does not retry failed writes.
+Interactive startup also runs a SemVer-gated compound-extension check. The shared
+modal first resolves replacement differences, then offers additive cleanup only
+for entries already supplied by the chosen base. Each dialog has a safe Keep
+default; only explicit choices change either list. Completion records the running
+version and saves immediately through the same atomic store, including checks with no popup.
+Configuration reads accept links to valid files; writes refuse linked destinations.
+`session` owns a separate strict version-1
 navigation schema: current native locations, relative-path base and layout.
 Unix byte arrays
 and Windows UTF-16 arrays preserve identity without Unicode coercion. Q saves
@@ -140,8 +154,8 @@ after teardown through the same owned atomic staging; normal quit never replaces
 session bytes. Restore is opt-in and validates both paths without fallback.
 
 The M1 browsing workers do not mutate selected files; completed M2 operations
-use the separate planner and executor below. Only deliberate preference/session
-actions write TFM's own configuration data. Unimplemented viewer/editor and
+use the separate planner and executor below. Deliberate preference/session
+actions and completed startup compatibility checks write TFM's own configuration data. Unimplemented viewer/editor and
 direct-path/zoxide actions explain their later scope instead of falling back to
 a subprocess.
 

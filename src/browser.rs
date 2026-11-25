@@ -7,7 +7,7 @@ use crate::{
     color::Theme,
     fs::IgnoreContext,
     input::{Bindings, Controller},
-    settings::{Settings, Store},
+    settings::{Configuration, Settings},
     terminal::{self, NativeTerminal},
     ui,
     workers::{Pool, Value},
@@ -35,12 +35,8 @@ pub fn run(path: &Path) -> Result<(), String> {
 /// # Errors
 /// Reports either selected path's error before terminal setup; never substitutes a path.
 pub fn run_startup(options: &crate::startup::Startup) -> Result<(), String> {
-    let mut store = crate::settings::config_path()
-        .map(Store::load)
-        .transpose()?;
-    let settings = store
-        .as_ref()
-        .map_or_else(Settings::default, |store| store.settings.clone());
+    let mut config = Configuration::open()?;
+    let settings = config.preferences();
     let app = options.prepare(&settings)?;
     if options.save_session {
         return crate::startup::session_store()?.save(&app);
@@ -48,12 +44,14 @@ pub fn run_startup(options: &crate::startup::Startup) -> Result<(), String> {
     if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
         return Err("interactive browsing requires a terminal on stdin and stdout".into());
     }
-    browse(app, settings, &mut store)
+    browse(app, settings, &mut config)
 }
 
-fn browse(app: App, settings: Settings, store: &mut Option<Store>) -> Result<(), String> {
+fn browse(app: App, settings: Settings, config: &mut Configuration) -> Result<(), String> {
     let bindings = Bindings::new(&settings.bindings)?;
     let mut controller = Controller::new(app, bindings, settings.clone());
+    controller.check_compound_extensions(env!("CARGO_PKG_VERSION"))?;
+    config.synchronize(&mut controller);
     let mut theme = Theme::for_stdout();
     theme
         .set_path_hover(settings.path_hover.as_deref())
@@ -63,9 +61,6 @@ fn browse(app: App, settings: Settings, store: &mut Option<Store>) -> Result<(),
         .map_err(|e| e.to_string())?;
     let mut pool = Pool::new(IgnoreContext::default()).map_err(|e| e.to_string())?;
     let mut jobs = crate::operations::Queue::new().map_err(|error| error.to_string())?;
-    #[cfg(windows)]
-    let mut owners =
-        crate::owner::windows::runtime::Runtime::new().map_err(|error| error.to_string())?;
     for pane in 0..2 {
         pool.submit(Request {
             pane,
@@ -74,41 +69,40 @@ fn browse(app: App, settings: Settings, store: &mut Option<Store>) -> Result<(),
             kind: RequestKind::Listing,
         });
     }
-    terminal::with_terminal(settings.mouse, |terminal| {
+    run_terminal(&mut controller, &mut pool, &mut jobs, &theme, config)?;
+    save_state(controller)
+}
+
+fn run_terminal(
+    controller: &mut Controller,
+    pool: &mut Pool,
+    jobs: &mut crate::operations::Queue,
+    theme: &Theme,
+    config: &mut Configuration,
+) -> Result<(), String> {
+    #[cfg(windows)]
+    let mut owners =
+        crate::owner::windows::runtime::Runtime::new().map_err(|error| error.to_string())?;
+    terminal::with_terminal(controller.preferences.mouse, |terminal| {
         #[cfg(windows)]
         {
-            drive(
-                terminal,
-                &mut controller,
-                &mut pool,
-                &mut jobs,
-                &theme,
-                &mut owners,
-            )
+            drive(terminal, controller, pool, jobs, theme, config, &mut owners)
         }
         #[cfg(not(windows))]
         {
-            drive(terminal, &mut controller, &mut pool, &mut jobs, &theme)
+            drive(terminal, controller, pool, jobs, theme, config)
         }
     })
-    .map_err(|e| e.to_string())?;
-    save_state(controller, store)
+    .map_err(|e| e.to_string())
 }
 
-fn save_state(controller: Controller, store: &mut Option<Store>) -> Result<(), String> {
+fn save_state(controller: Controller) -> Result<(), String> {
     if controller.save_session {
         if let Some(snapshot) = &controller.app.operations.exit_snapshot {
             crate::startup::session_store()?.save_snapshot(snapshot)?;
         } else {
             crate::startup::session_store()?.save(&controller.app)?;
         }
-    }
-    if controller.preferences_changed {
-        let Some(store) = store.as_mut() else {
-            return Err("preferences changed but no user config directory is available".into());
-        };
-        store.settings = controller.preferences;
-        store.save()?;
     }
     Ok(())
 }
@@ -119,6 +113,7 @@ fn drive(
     pool: &mut Pool,
     jobs: &mut crate::operations::Queue,
     theme: &Theme,
+    config: &mut Configuration,
     #[cfg(windows)] owners: &mut crate::owner::windows::runtime::Runtime,
 ) -> io::Result<()> {
     let started = Instant::now();
@@ -147,14 +142,14 @@ fn drive(
             dirty = false;
         }
         if crossterm::event::poll(Duration::from_millis(16))? {
-            let requests = controller.handle(
+            for request in controller.handle(
                 crossterm::event::read()?,
                 &renderer.geometry,
                 started.elapsed(),
-            );
-            for request in requests {
+            ) {
                 pool.submit(request);
             }
+            config.synchronize(controller);
             operations::submit(controller, jobs);
             clipboard::submit(controller, &mut clipboard);
             dirty = true;

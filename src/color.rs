@@ -38,6 +38,7 @@ pub enum Role {
     Status,
     Error,
     Marked,
+    Addition,
     Disabled,
 }
 
@@ -123,6 +124,7 @@ impl Theme {
             Role::Cursor | Role::InactiveCursor => self.cursor_style(matches!(role, Role::Cursor)),
             Role::Header
             | Role::Marked
+            | Role::Addition
             | Role::Label
             | Role::Key
             | Role::HelpReference
@@ -352,7 +354,9 @@ fn role_accent(role: Role) -> Option<AnsiColor> {
     match role {
         Role::Header | Role::Link | Role::Label | Role::Key | Role::Hidden => Some(AnsiColor::Cyan),
         Role::Muted => Some(AnsiColor::BrightBlack),
-        Role::Status | Role::Attribute | Role::HelpReference => Some(AnsiColor::Green),
+        Role::Status | Role::Attribute | Role::HelpReference | Role::Addition => {
+            Some(AnsiColor::Green)
+        }
         Role::Error | Role::System => Some(AnsiColor::Red),
         Role::Directory => Some(AnsiColor::Blue),
         Role::Executable => Some(AnsiColor::Green),

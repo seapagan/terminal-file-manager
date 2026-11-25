@@ -176,12 +176,58 @@ attribute. Windows permissions still determine access.
 Use `Alt+e` to select visible files with the same extension as the highlighted
 file. Configured compound extensions such as `.tar.gz` stay distinct from `.gz`.
 Use `Alt+Shift+e` to match the final extension, including both `.gz` and `.tar.gz`
-files. Set `compound_extensions` in `config.toml` to choose which compound
-extensions TFM recognises. The defaults are:
+files. By default, TFM recognises seven compound extensions: `.tar.gz`,
+`.tar.xz`, `.tar.bz2`, `.tar.zst`, `.tar.lz`, `.tar.lzma` and `.tar.Z`.
+
+To add extensions while keeping these defaults, set this in `config.toml`:
 
 ```toml
-compound_extensions = [".tar.gz", ".tar.xz", ".tar.bz2", ".tar.zst", ".tar.lz", ".tar.lzma", ".tar.Z"]
+compound_extensions_extend = [".tar.br", ".user.js"]
 ```
+
+To replace the defaults, use `compound_extensions`:
+
+```toml
+compound_extensions = [".tar.gz", ".tar.xz"]
+```
+
+You can combine both settings. This recognises only the four listed extensions:
+
+```toml
+compound_extensions = [".tar.gz", ".tar.xz"]
+compound_extensions_extend = [".tar.br", ".user.js"]
+```
+
+An empty replacement (`compound_extensions = []`) disables the defaults; any
+additions still apply. An empty additive list has no effect. Matching is case
+sensitive. Duplicate extensions count once, keeping their first occurrence.
+
+On the first interactive start of each newer TFM version, TFM checks these
+settings against its shipped defaults. If your replacement differs, a
+dialog shows your complete list, the current defaults and their differences.
+Choose **Keep my configuration** or **Use current defaults**. Choosing defaults
+removes the replacement setting.
+
+TFM then checks your additions against the chosen base list. If it finds
+duplicates, a separate dialog shows those entries and the custom additions to
+keep. Choose **Keep additions** or **Remove duplicates**. Entries excluded by a
+retained replacement stay in the additive list.
+
+Each dialog starts with its Keep action focused. Use Tab or Left/Right to
+choose and Space or Enter to select. Use Up/Down or Page Up/Page Down to scroll
+long lists. Esc or the close control keeps the current list; earlier approved
+choices remain in effect. TFM shows only the dialogs that need a decision.
+
+TFM saves the completed check, even if you keep your lists or no dialog appears,
+with this marker:
+
+```toml
+compound_extensions_checked_version = "0.1.0"
+```
+
+TFM compares semantic versions, including prereleases. Equal or newer markers
+skip the check and retain their recorded value. An invalid marker produces a
+configuration error.
 
 Both shortcuts clear all marks in the active pane, including marks on hidden
 and filtered-out entries, then mark visible matches. The other pane keeps its
@@ -304,7 +350,9 @@ and Jobs last for the current run.
 
 ## Configuration
 
-You can use TFM without a configuration file. TFM saves preference changes in
+You can start TFM without a configuration file. On interactive startup, TFM
+creates or updates it to record completed compound-extension checks and saves
+your preference changes as you make them in
 `tfm/config.toml` under your platform's configuration directory:
 
 | Platform | Configuration directory |
@@ -312,6 +360,12 @@ You can use TFM without a configuration file. TFM saves preference changes in
 | Linux | `$XDG_CONFIG_HOME` or `~/.config` |
 | macOS | `$XDG_CONFIG_HOME` or `~/Library/Application Support` |
 | Windows | `%APPDATA%` |
+
+If a save fails, your settings remain active for the current run. TFM reports
+the path and error in notifications and history. A later configuration change
+triggers another save attempt; unrelated input does not retry the failed save.
+Invalid or unreadable existing configuration produces a startup error; TFM
+does not replace it with defaults.
 
 Example:
 
