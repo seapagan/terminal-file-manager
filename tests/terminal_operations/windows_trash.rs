@@ -14,7 +14,10 @@ fn windows_trash_enter_cancels_tfm_approval_without_changing_identity() {
     let before = object(&source);
     drive(
         command(root.path(), root.path(), None),
-        &[("tfm-trash-cancel.txt", "\x1b[19~"), ("T Trash", "\rq")],
+        &[
+            ("tfm-trash-cancel.txt", "\x1b[F\x1b[19~"),
+            ("T Trash", "\rq"),
+        ],
         false,
     );
     assert_eq!(object(&source), before);
@@ -40,7 +43,7 @@ fn windows_trash_t_approval_recycles_from_the_actual_executable() {
     drive(
         command(root.path(), &folder, None),
         &[
-            ("tfm-trash-approve.txt", "\x1b[19~"),
+            ("tfm-trash-approve.txt", "\x1b[B\x1b[19~"),
             ("1 file · 30 B", "T"),
             ("sent to Trash", "q"),
         ],

@@ -154,6 +154,7 @@ impl Session {
                             pixel_height: 0,
                         })
                         .map_err(io::Error::other)?;
+                    script.screen.resize(usize::from(cols));
                 }
                 Ok(chunk.is_empty())
             }
