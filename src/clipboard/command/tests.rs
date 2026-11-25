@@ -5,14 +5,7 @@ fn nonreading_provider_times_out_while_payload_exceeds_pipe_capacity() {
     let root = tempfile::tempdir().unwrap();
     let pid_file = root.path().join("descendant.pid");
     let mut child = spawn_provider("sleep 30 & printf '%s' \"$!\" > \"$1\"; wait", &pid_file);
-    let ready = Instant::now() + Duration::from_secs(3);
-    while !pid_file.exists() {
-        assert!(
-            Instant::now() < ready,
-            "provider did not start its descendant"
-        );
-        std::thread::yield_now();
-    }
+    await_descendant(&pid_file);
     let error = drive(
         "hung",
         &mut child,
@@ -176,6 +169,17 @@ fn assert_descendant_terminated(pid_file: &std::path::Path) {
     }
 }
 
+fn await_descendant(pid_file: &std::path::Path) {
+    let ready = Instant::now() + Duration::from_secs(3);
+    while !std::fs::read_to_string(pid_file).is_ok_and(|pid| pid.parse::<u32>().is_ok()) {
+        assert!(
+            Instant::now() < ready,
+            "provider did not start its descendant"
+        );
+        std::thread::yield_now();
+    }
+}
+
 fn process_state(pid: &str) -> String {
     let state = Command::new("/bin/ps")
         .args(["-o", "stat=", "-p", pid])
@@ -222,19 +226,20 @@ fn early_stdin_close_preserves_failure_diagnostics_and_rejects_incomplete_succes
 fn closed_stdin_does_not_disable_deadline_or_descendant_cleanup() {
     let root = tempfile::tempdir().unwrap();
     let pid_file = root.path().join("descendant.pid");
-    let error = run_with_deadline(
+    let mut child = spawn_provider(
+        "exec 0<&-; sleep 30 & printf '%s' \"$!\" > \"$1\"; wait",
+        &pid_file,
+    );
+    await_descendant(&pid_file);
+    let error = drive(
         "closed",
-        "/bin/sh",
-        &[
-            "-c",
-            "exec 0<&-; sleep 30 & printf '%s' \"$!\" > \"$1\"; wait",
-            "sh",
-            pid_file.to_str().unwrap(),
-        ],
+        &mut child,
         &vec![b'x'; 1024 * 1024],
-        Duration::from_millis(100),
+        Instant::now() + Duration::from_millis(100),
     )
     .unwrap_err();
+    terminate(&mut child).unwrap();
+    child.wait().unwrap();
     assert!(error.to_string().contains("timed out"), "{error}");
     assert_descendant_terminated(&pid_file);
 }
