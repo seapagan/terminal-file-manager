@@ -39,6 +39,7 @@ pub(super) fn handle(c: &mut Controller, event: &Event, geometry: &Geometry) -> 
         Event::Key(key) if key.kind == KeyEventKind::Press => key_input(c, *key, geometry),
         Event::Mouse(mouse) => mouse_input(c, *mouse, geometry),
         Event::Resize(width, height) => {
+            super::scroll::resize(c, *width, *height);
             let next =
                 crate::ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, *width, *height));
             if let Some(layout) = next.compound_extension_review {

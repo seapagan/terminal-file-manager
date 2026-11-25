@@ -203,8 +203,12 @@ fn both_dialogs_scroll_long_unicode_values_without_elision_and_clamp_after_resiz
         for value in values {
             assert!(seen.contains(&value), "{value}\n{seen}");
         }
+        c.app.overlay_scroll = u16::MAX;
+        c.app.metadata_scroll = u16::MAX;
         event(&mut c, Event::Resize(120, 60), 40, 18);
         let (_, g) = draw(&c, 120, 60);
+        assert!(c.app.overlay_scroll <= g.overlay_scroll_limit);
+        assert!(c.app.metadata_scroll <= g.metadata_scroll_limit);
         let layout = g.compound_extension_review.unwrap();
         assert_eq!(
             c.app.compound_extension_review.as_ref().unwrap().scroll,

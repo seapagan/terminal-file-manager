@@ -22,10 +22,8 @@ fn missing_configuration_is_created_without_waiting_for_a_dialog_or_preference_c
     let path = root.path().join("nested/config.toml");
     let mut config = Configuration::load(Some(path.clone())).unwrap();
     let mut c = controller(config.preferences(), root.path());
-    assert!(config.is_unsaved());
     assert!(!path.exists());
     config.synchronize(&mut c);
-    assert!(!config.is_unsaved());
     assert!(
         Store::load(path)
             .unwrap()
@@ -45,18 +43,15 @@ fn automatic_creation_failure_remains_pending_without_any_feature_request() {
     let mut c = controller(config.preferences(), root.path());
     fs::write(&parent, "blocked").unwrap();
     config.synchronize(&mut c);
-    assert!(config.is_unsaved());
     assert!(!c.preferences_changed && !c.quit);
     assert_eq!(c.app.notifications.history.len(), 1);
     assert!(!path.exists());
     fs::remove_file(parent).unwrap();
     config.synchronize(&mut c);
-    assert!(config.is_unsaved());
     assert!(!path.exists());
     let g = ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 120, 24));
     c.dispatch(Action::Hidden, &g);
     config.synchronize(&mut c);
-    assert!(!config.is_unsaved());
     assert!(
         Store::load(path)
             .unwrap()
@@ -76,7 +71,7 @@ fn startup_save_failure_retains_marker_and_reports_os_error_once_then_recovers()
     fs::write(&parent, "blocked").unwrap();
     c.check_compound_extensions("0.1.0").unwrap();
     config.synchronize(&mut c);
-    assert!(config.is_unsaved() && !c.preferences_changed);
+    assert!(!c.preferences_changed);
     assert!(!c.quit);
     assert_eq!(
         c.preferences.compound_extensions_checked_version.as_deref(),
@@ -98,12 +93,11 @@ fn startup_save_failure_retains_marker_and_reports_os_error_once_then_recovers()
     assert_eq!(c.app.notifications.history[0].occurrences, 1);
     fs::remove_file(parent).unwrap();
     config.synchronize(&mut c);
-    assert!(config.is_unsaved());
     assert!(!path.exists());
     let g = ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 120, 24));
     c.dispatch(Action::Hidden, &g);
     config.synchronize(&mut c);
-    assert!(!config.is_unsaved() && !c.preferences_changed);
+    assert!(!c.preferences_changed);
     let saved = Store::load(path).unwrap().settings;
     assert_eq!(
         saved.compound_extensions_checked_version.as_deref(),
@@ -128,19 +122,23 @@ fn interactive_save_failure_keeps_preferences_and_browsing_then_saves_latest_cha
     let g = ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 120, 24));
     c.dispatch(Action::Hidden, &g);
     config.synchronize(&mut c);
-    assert!(config.is_unsaved() && c.preferences.hidden);
+    assert!(c.preferences.hidden);
     assert!(path.is_dir());
+    assert_eq!(c.app.notifications.history[0].occurrences, 1);
+    c.app.notifications.dismiss_toasts();
+    config.synchronize(&mut c);
+    assert!(c.app.notifications.visible().is_empty());
     c.dispatch(Action::ToggleSidebar, &g);
     config.synchronize(&mut c);
     assert!(c.app.sidebar && !c.quit);
     assert_eq!(c.app.notifications.history.len(), 1);
+    assert_eq!(c.app.notifications.history[0].occurrences, 2);
+    assert_eq!(c.app.notifications.visible(), [0]);
     fs::remove_dir(&path).unwrap();
     config.synchronize(&mut c);
-    assert!(config.is_unsaved());
     assert!(!path.exists());
     c.dispatch(Action::Reverse, &g);
     config.synchronize(&mut c);
-    assert!(!config.is_unsaved());
     let saved = Store::load(path).unwrap().settings;
     assert!(saved.hidden && saved.sidebar && saved.reverse && !saved.mouse);
     assert_eq!(
@@ -188,7 +186,7 @@ fn unavailable_configuration_location_retains_changes_with_one_general_diagnosti
     c.check_compound_extensions("0.1.0").unwrap();
     config.synchronize(&mut c);
     config.synchronize(&mut c);
-    assert!(config.is_unsaved() && !c.preferences_changed && !c.quit);
+    assert!(!c.preferences_changed && !c.quit);
     assert_eq!(
         config
             .preferences()

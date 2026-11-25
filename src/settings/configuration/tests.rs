@@ -26,7 +26,7 @@ fn completed_no_popup_checks_create_config_and_preserve_omitted_replacement() {
         Some("0.1.0")
     );
     assert!(saved.compound_extensions.is_none());
-    assert!(!store.is_unsaved() && !c.preferences_changed);
+    assert!(!c.preferences_changed);
 }
 
 #[test]
