@@ -1,7 +1,13 @@
 //! Virtual navigation rows and path overlays follow their owning pane.
-use super::{App, Pane, Request, RequestKind};
-use crate::fs::{Identity, Snapshot};
+use super::{App, Pane, Request, RequestKind, pane::Visit};
+use crate::fs::Identity;
 use std::path::{Path, PathBuf};
+
+pub(super) struct ParentRestore {
+    visit: Visit,
+    waiting: bool,
+    installed_revision: Option<u64>,
+}
 
 impl App {
     /// Return to the lexical parent, retaining the exited entry's native identity.
@@ -11,26 +17,46 @@ impl App {
         let parent = state.path.parent()?.to_path_buf();
         let visit = state.parent_visit(parent.clone());
         // Keep an established context's original identity, including its absence.
-        let exited = (state.context == 0).then(|| state.path.clone());
+        let waiting = state.context == 0 && visit.cursor_identity.is_none();
+        let exited = waiting.then(|| state.path.clone());
         let request = self.request_location(pane, parent, RequestKind::ParentListing(exited));
-        self.panes[pane].parent_restoring = Some(visit);
+        self.panes[pane].parent_restoring = Some(ParentRestore {
+            visit,
+            waiting,
+            installed_revision: None,
+        });
         Some(request)
     }
 
-    pub(crate) fn complete_parent_listing(
+    pub(crate) fn complete_parent_identity(
         &mut self,
         request: &Request,
-        result: Result<Snapshot, String>,
         identity: Option<Identity>,
-    ) {
-        if let Some(state) = self.panes.get_mut(request.pane)
-            && state.generation == request.generation
-            && let Some(visit) = &mut state.parent_restoring
-            && visit.cursor_identity.is_none()
+    ) -> bool {
+        let Some(state) = self.panes.get_mut(request.pane) else {
+            return false;
+        };
+        if state.generation != request.generation
+            || !state
+                .parent_restoring
+                .as_ref()
+                .is_some_and(|restore| restore.waiting)
         {
-            visit.cursor_identity = identity;
+            return false;
         }
-        self.complete_listing(request.pane, request.generation, result);
+        let mut restore = state.parent_restoring.take().unwrap();
+        restore.waiting = false;
+        restore.visit.cursor_identity = identity;
+        if let Some(revision) = restore.installed_revision {
+            if revision != state.selection_revision || !state.restore_parent_visit(&restore.visit) {
+                return false;
+            }
+            state.selection_revision = state.selection_revision.wrapping_add(1);
+            self.invalidate_listing_details(request.pane);
+            return true;
+        }
+        state.parent_restoring = Some(restore);
+        false
     }
 
     pub(super) fn close_stale_path_picker(&mut self, pane: usize) {
@@ -53,6 +79,18 @@ impl App {
 }
 
 impl Pane {
+    pub(super) fn restore_parent(&mut self) {
+        let Some(mut restore) = self.parent_restoring.take() else {
+            return;
+        };
+        if restore.waiting {
+            restore.installed_revision = Some(self.selection_revision);
+            self.parent_restoring = Some(restore);
+        } else {
+            self.restore_parent_visit(&restore.visit);
+        }
+    }
+
     pub(crate) fn pending_navigation(&self) -> Option<&Path> {
         self.pending.as_deref()
     }

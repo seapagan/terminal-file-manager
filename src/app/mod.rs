@@ -36,6 +36,8 @@ pub enum RequestKind {
     Listing,
     /// Parent listing with a lexical source to inspect if it has never been listed.
     ParentListing(Option<PathBuf>),
+    /// Best-effort no-follow identity lookup for a pending or completed Parent request.
+    ParentIdentity,
     Metadata,
     Totals,
 }
@@ -262,6 +264,7 @@ impl App {
         state.refresh_pending = false;
         state.listing = true;
         state.generation += 1;
+        state.parent_restoring = None;
         Some(Request {
             pane,
             generation: state.generation,
@@ -502,6 +505,7 @@ impl App {
             RequestKind::Listing | RequestKind::ParentListing(_) => {
                 self.complete_listing(request.pane, request.generation, Err(error))
             }
+            RequestKind::ParentIdentity => self.complete_parent_identity(request, None),
             RequestKind::Totals => self.complete_totals(request, Err(error)),
             RequestKind::Metadata => {
                 if !self.detail_matches(request) {

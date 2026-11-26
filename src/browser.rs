@@ -248,6 +248,7 @@ mod tests {
             let request = match kind {
                 RequestKind::Listing => controller.app.request_listing(0, root.path().into()),
                 RequestKind::ParentListing(_) => controller.app.parent().unwrap(),
+                RequestKind::ParentIdentity => unreachable!(),
                 RequestKind::Metadata => metadata,
                 RequestKind::Totals => controller.app.request_totals().unwrap(),
             };
@@ -259,6 +260,7 @@ mod tests {
                 RequestKind::Listing | RequestKind::ParentListing(_) => {
                     controller.app.panes[0].error.as_ref().unwrap()
                 }
+                RequestKind::ParentIdentity => unreachable!(),
                 RequestKind::Metadata => controller.app.details[0]
                     .entry
                     .as_ref()

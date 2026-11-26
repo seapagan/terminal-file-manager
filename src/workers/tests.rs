@@ -35,17 +35,18 @@ fn listing_metrics_count_only_successful_targeted_refreshes() {
 
 #[test]
 fn panic_releases_each_lane_and_runs_only_the_latest_pending_request() {
-    for kind in [
-        RequestKind::Listing,
-        RequestKind::ParentListing(None),
-        RequestKind::Metadata,
-        RequestKind::Totals,
+    for (kind, label) in [
+        (RequestKind::Listing, "Directory listing"),
+        (RequestKind::ParentListing(None), "Parent listing"),
+        (RequestKind::ParentIdentity, "Parent identity lookup"),
+        (RequestKind::Metadata, "Metadata"),
+        (RequestKind::Totals, "Directory totals"),
     ] {
-        recover_lane(kind);
+        recover_lane(kind, label);
     }
 }
 
-fn recover_lane(kind: RequestKind) {
+fn recover_lane(kind: RequestKind, label: &str) {
     let root = tempfile::tempdir().unwrap();
     let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
     let slots = match kind {
@@ -77,7 +78,7 @@ fn recover_lane(kind: RequestKind) {
     assert_eq!(pool.active_count() as u64, slots);
     // Release the second slot first for listings. Its completion must free that slot.
     release[slots as usize - 1].send(()).unwrap();
-    assert_panic_completion(&mut pool, slots);
+    assert_panic_completion(&mut pool, slots, label);
     let latest = pool
         .next(Duration::from_secs(10))
         .expect("lane must recover");
@@ -87,7 +88,7 @@ fn recover_lane(kind: RequestKind) {
     if slots == 2 {
         assert_eq!(pool.active_count(), 1);
         release[0].send(()).unwrap();
-        assert_panic_completion(&mut pool, 1);
+        assert_panic_completion(&mut pool, 1, label);
     }
     assert_eq!(pool.active_count(), 0);
     assert_eq!(pool.pending_count(), 0);
@@ -113,7 +114,7 @@ fn queue_replacement_burst(pool: &mut Pool, request: &Request, slots: u64) -> Re
     newest
 }
 
-fn assert_panic_completion(pool: &mut Pool, generation: u64) {
+fn assert_panic_completion(pool: &mut Pool, generation: u64, label: &str) {
     let failed = pool
         .next(Duration::from_secs(10))
         .expect("panic must complete");
@@ -123,7 +124,7 @@ fn assert_panic_completion(pool: &mut Pool, generation: u64) {
         panic!("worker failure must be explicit")
     };
     assert!(error.contains("controlled worker failure"));
-    assert!(error.contains("worker failed"));
+    assert!(error.starts_with(&format!("{label} worker failed:")));
 }
 
 fn block_until_panic(pool: &mut Pool, slots: u64) -> (mpsc::Receiver<u64>, Vec<mpsc::Sender<()>>) {

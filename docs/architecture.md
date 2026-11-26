@@ -46,11 +46,13 @@ handles use standard ownership. Neither adjusts privileges or changes files.
 Unsupported reparse points remain visible and cannot be entered or recursed.
 
 `workers` gives each pane two interchangeable slots and one replaceable
-pending request for listings. Metadata and totals each have their own slot
-and replaceable pending request. New listings cancel older ones and can start
-in a free slot while a cancelled listing is still in a kernel read. Before the
-pane's first successful listing, the parent worker inspects the exited entry's
-no-follow identity directly.
+pending request for listings. Parent identity lookups, metadata and totals each
+have their own slot and replaceable pending request. New listings cancel older
+ones and can start in a free slot while a cancelled listing is still in a
+kernel read. When Parent needs the exited entry's identity, a separate worker
+looks it up without following links. The parent listing can open on `..`
+while the lookup runs. A late match can restore the exited entry if the user
+has left the selection alone.
 Metadata is debounced and shared by sidebar/popup; generations reject stale
 listing, selection and count results. Cancellation is cooperative: a running
 kernel read cannot be forcibly interrupted, and no mutation is submitted.

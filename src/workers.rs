@@ -1,4 +1,4 @@
-//! Bounded I/O lanes for listings, metadata and totals.
+//! Bounded I/O lanes for listings, parent identity lookups, metadata and totals.
 use crate::{
     app::{Request, RequestKind},
     fs::{self, Entry, Identity, IgnoreContext, Snapshot, Totals},
@@ -15,13 +15,13 @@ use std::{
 };
 
 const PANE_COUNT: usize = 2;
-const LANE_COUNT: usize = 3 * PANE_COUNT;
+const LANE_COUNT: usize = 4 * PANE_COUNT;
 const WORKER_COUNT: usize = LANE_COUNT + PANE_COUNT;
 
 /// Background values are installed only by generation-checked model transitions.
 pub enum Value {
     Listing(Result<Snapshot, String>),
-    ParentListing(Result<Snapshot, String>, Option<Identity>),
+    ParentIdentity(Option<Identity>),
     Metadata(Box<Entry>, Option<PathBuf>),
     Totals(Result<Totals, String>),
     Failed(String),
@@ -52,6 +52,12 @@ impl Lane {
             cancelled.store(true, Ordering::Relaxed);
         }
     }
+
+    fn take_work(&mut self) -> Option<(usize, Work)> {
+        let capacity = self.pending.as_ref()?.request.kind.worker_capacity();
+        let slot = self.running[..capacity].iter().position(Option::is_none)?;
+        Some((slot, self.pending.take()?))
+    }
 }
 
 struct Work {
@@ -70,7 +76,7 @@ pub struct ListingMetrics {
     pub metadata_refreshes: usize,
 }
 
-/// Two listing slots and one metadata and totals slot each per pane.
+/// Two listing slots, plus one slot each for parent identity, metadata and totals per pane.
 /// Each lane holds at most one replaceable pending request.
 pub struct Pool {
     runtime: Option<tokio::runtime::Runtime>,
@@ -132,6 +138,23 @@ impl Pool {
         let Some(index) = lane_index(*pane, kind) else {
             return;
         };
+        if kind.is_listing()
+            && let Some(lookup_index) = lane_index(*pane, &RequestKind::ParentIdentity)
+        {
+            let lookup = &mut self.lanes[lookup_index];
+            lookup.cancel();
+            if let RequestKind::ParentListing(Some(path)) = kind {
+                lookup.pending = Some(Work {
+                    request: Request {
+                        pane: *pane,
+                        generation: work.request.generation,
+                        path: path.clone(),
+                        kind: RequestKind::ParentIdentity,
+                    },
+                    refresh: None,
+                });
+            }
+        }
         let lane = &mut self.lanes[index];
         lane.cancel();
         lane.pending = Some(work);
@@ -181,12 +204,7 @@ impl Pool {
 
     fn pump(&mut self) {
         for (index, lane) in self.lanes.iter_mut().enumerate() {
-            // Either listing kind can replace a scan still blocked in the kernel.
-            let capacity = if index < PANE_COUNT { 2 } else { 1 };
-            let Some(slot) = lane.running[..capacity].iter().position(Option::is_none) else {
-                continue;
-            };
-            let Some(Work { request, refresh }) = lane.pending.take() else {
+            let Some((slot, Work { request, refresh })) = lane.take_work() else {
                 continue;
             };
             let cancelled = Arc::new(AtomicBool::new(false));
@@ -210,7 +228,10 @@ impl Pool {
                     })
                     .await;
                     let value = result.unwrap_or_else(|error| {
-                        Value::Failed(format!("{:?} worker failed: {error}", request.kind))
+                        Value::Failed(format!(
+                            "{} worker failed: {error}",
+                            request.kind.worker_name()
+                        ))
                     });
                     let _ = sender.send(Finished {
                         lane: index,
@@ -242,8 +263,29 @@ fn lane_index(pane: usize, kind: &RequestKind) -> Option<usize> {
         RequestKind::Listing | RequestKind::ParentListing(_) => 0,
         RequestKind::Metadata => 1,
         RequestKind::Totals => 2,
+        RequestKind::ParentIdentity => 3,
     };
     Some(kind * PANE_COUNT + pane)
+}
+
+impl RequestKind {
+    fn is_listing(&self) -> bool {
+        matches!(self, Self::Listing | Self::ParentListing(_))
+    }
+
+    fn worker_capacity(&self) -> usize {
+        if self.is_listing() { 2 } else { 1 }
+    }
+
+    fn worker_name(&self) -> &'static str {
+        match self {
+            Self::Listing => "Directory listing",
+            Self::ParentListing(_) => "Parent listing",
+            Self::ParentIdentity => "Parent identity lookup",
+            Self::Metadata => "Metadata",
+            Self::Totals => "Directory totals",
+        }
+    }
 }
 
 fn execute_work(
@@ -263,10 +305,7 @@ fn execute_work(
             Ok(None) => {}
         }
     }
-    if matches!(
-        request.kind,
-        RequestKind::Listing | RequestKind::ParentListing(_)
-    ) {
+    if request.kind.is_listing() {
         metrics.full_scans.fetch_add(1, Ordering::Relaxed);
     }
     execute(request, context, cancelled)
@@ -274,12 +313,15 @@ fn execute_work(
 
 fn execute(request: &Request, context: &IgnoreContext, cancelled: &AtomicBool) -> Value {
     match &request.kind {
-        RequestKind::Listing => {
+        RequestKind::Listing | RequestKind::ParentListing(_) => {
             Value::Listing(fs::list(&request.path, context, cancelled).map_err(|e| e.to_string()))
         }
-        RequestKind::ParentListing(exited) => {
-            execute_parent(request, exited.as_deref(), context, cancelled)
-        }
+        RequestKind::ParentIdentity => Value::ParentIdentity(
+            fs::check_cancelled(cancelled)
+                .ok()
+                .and_then(|()| fs::inspect_identity(&request.path).identity)
+                .filter(|identity| identity.object.is_some()),
+        ),
         RequestKind::Metadata => Value::Metadata(
             Box::new(fs::inspect(&request.path)),
             std::fs::canonicalize(&request.path).ok(),
@@ -288,20 +330,6 @@ fn execute(request: &Request, context: &IgnoreContext, cancelled: &AtomicBool) -
             Value::Totals(fs::totals(&request.path, cancelled).map_err(|e| e.to_string()))
         }
     }
-}
-
-fn execute_parent(
-    request: &Request,
-    exited: Option<&std::path::Path>,
-    context: &IgnoreContext,
-    cancelled: &AtomicBool,
-) -> Value {
-    let identity = exited
-        .filter(|_| !cancelled.load(Ordering::Relaxed))
-        .and_then(|path| fs::inspect_identity(path).identity)
-        .filter(|identity| identity.object.is_some());
-    let result = fs::list(&request.path, context, cancelled).map_err(|error| error.to_string());
-    Value::ParentListing(result, identity)
 }
 
 #[cfg(test)]

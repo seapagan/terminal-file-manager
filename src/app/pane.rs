@@ -82,7 +82,7 @@ pub struct Pane {
     pub(super) back: Vec<Visit>,
     pub(super) forward: Vec<Visit>,
     pub(super) restoring: Option<Visit>,
-    pub(super) parent_restoring: Option<Visit>,
+    pub(super) parent_restoring: Option<super::navigation::ParentRestore>,
     pub(super) history_forward: bool,
 }
 
@@ -463,16 +463,15 @@ impl Pane {
         }
     }
 
-    fn restore_parent(&mut self) {
-        let Some(visit) = self.parent_restoring.take() else {
-            return;
+    pub(super) fn restore_parent_visit(&mut self, visit: &Visit) -> bool {
+        let Some(cursor) = self.visit_cursor(visit) else {
+            return false;
         };
-        if let Some(cursor) = self.visit_cursor(&visit) {
-            self.cursor = Some(cursor);
-            if self.matches_visit(&visit) {
-                self.scroll = visit.scroll.min(self.row_index().unwrap_or(0));
-            }
+        self.cursor = Some(cursor);
+        if self.matches_visit(visit) {
+            self.scroll = visit.scroll.min(self.row_index().unwrap_or(0));
         }
+        true
     }
 
     fn visit_cursor(&self, visit: &Visit) -> Option<PathBuf> {

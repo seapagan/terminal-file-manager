@@ -1,3 +1,5 @@
+mod parent_identity;
+
 use super::*;
 use crate::{
     app::{PatternControl, PatternOperation, Request, RequestKind},
@@ -452,22 +454,31 @@ fn startup_child() -> (tempfile::TempDir, Controller) {
 }
 
 fn block_listing(pool: &mut Pool, request: Request) -> (mpsc::Sender<()>, mpsc::Receiver<bool>) {
-    let generation = request.generation;
+    let (started, release, cancelled) =
+        hold_request(pool, request.generation, request.kind.clone());
+    pool.submit(request);
+    started.recv_timeout(Duration::from_secs(10)).unwrap();
+    (release, cancelled)
+}
+
+fn hold_request(
+    pool: &mut Pool,
+    generation: u64,
+    kind: RequestKind,
+) -> (mpsc::Receiver<()>, mpsc::Sender<()>, mpsc::Receiver<bool>) {
     let (entered, started) = mpsc::channel();
     let (release, blocked) = mpsc::channel();
     let (stopped, cancelled_on_release) = mpsc::channel();
     let blocked = Mutex::new(blocked);
     pool.before_execute = Some(Arc::new(move |request, cancelled| {
-        if request.generation == generation {
+        if request.generation == generation && request.kind == kind {
             entered.send(()).unwrap();
             if blocked.lock().unwrap().recv().is_ok() {
                 stopped.send(cancelled.load(Ordering::Relaxed)).unwrap();
             }
         }
     }));
-    pool.submit(request);
-    started.recv_timeout(Duration::from_secs(10)).unwrap();
-    (release, cancelled_on_release)
+    (started, release, cancelled_on_release)
 }
 
 fn collect_until(controller: &mut Controller, pool: &mut Pool, ready: impl Fn(&App) -> bool) {
@@ -475,7 +486,7 @@ fn collect_until(controller: &mut Controller, pool: &mut Pool, ready: impl Fn(&A
     while !ready(&controller.app) {
         assert!(
             Instant::now() < deadline,
-            "new navigation waited for an old listing"
+            "navigation did not complete while another worker was blocked"
         );
         collect(controller, pool);
         std::thread::yield_now();
