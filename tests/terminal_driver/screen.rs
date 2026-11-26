@@ -138,6 +138,11 @@ impl Screen {
             self.position.1 = self.position.1.min(self.columns - 1);
         }
         let arguments = String::from_utf8_lossy(&self.escape[2..self.escape.len() - 1]);
+        if command == b'h' && arguments == "?1049" {
+            self.cells.clear();
+            self.position = (0, 0);
+            return;
+        }
         let values: Vec<usize> = arguments
             .split(';')
             .map(|v| v.parse().unwrap_or(0))

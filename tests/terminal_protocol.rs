@@ -7,6 +7,7 @@ use screen::Screen;
 fn wrapped_rows_retain_reused_letters_for_fresh_readiness_markers() {
     let mut screen = Screen::default();
     screen.resize(100);
+    screen.observe(b"\x1b]0;tfm.exe\x07\x1b[?1049h").unwrap();
     screen.observe(&vec![b' '; 300]).unwrap();
     screen.observe(b"No visible entries").unwrap();
     screen.clear_fresh();
