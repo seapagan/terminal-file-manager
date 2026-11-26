@@ -24,8 +24,12 @@ impl Default for Screen {
 
 impl Screen {
     pub fn resize(&mut self, columns: usize) {
+        let previous = self.columns;
         self.columns = columns.max(1);
         self.position.1 = self.position.1.min(self.columns - 1);
+        if self.columns < previous {
+            self.cells.retain(|&(_, column), _| column < self.columns);
+        }
     }
 
     pub fn observe(&mut self, bytes: &[u8]) -> io::Result<()> {

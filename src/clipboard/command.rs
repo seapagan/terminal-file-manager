@@ -21,24 +21,27 @@ pub(super) fn run_provider(
     args: &[&str],
     payload: &[u8],
 ) -> Result<(), ClipboardError> {
-    run_with_deadline(name, program, args, payload, Duration::from_secs(3))
+    let child = spawn_provider(name, program, args)?;
+    run_with_deadline(name, child, payload, Duration::from_secs(3))
 }
 
-fn run_with_deadline(
-    name: &str,
-    program: &str,
-    args: &[&str],
-    payload: &[u8],
-    timeout: Duration,
-) -> Result<(), ClipboardError> {
-    let mut child = Command::new(program)
+fn spawn_provider(name: &str, program: &str, args: &[&str]) -> Result<Child, ClipboardError> {
+    Command::new(program)
         .args(args)
         .process_group(0)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| ClipboardError(format!("cannot start clipboard provider '{name}': {e}")))?;
+        .map_err(|e| ClipboardError(format!("cannot start clipboard provider '{name}': {e}")))
+}
+
+fn run_with_deadline(
+    name: &str,
+    mut child: Child,
+    payload: &[u8],
+    timeout: Duration,
+) -> Result<(), ClipboardError> {
     let result = drive(name, &mut child, payload, Instant::now() + timeout);
     if result.is_err() {
         let _ = terminate(&mut child);

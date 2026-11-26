@@ -32,6 +32,20 @@ fn resized_widths_and_wide_characters_keep_wrapped_coordinates() {
 }
 
 #[test]
+fn shrinking_discards_marker_cells_beyond_the_right_edge() {
+    let mut screen = Screen::default();
+    screen.resize(8);
+    screen.observe(b"ready").unwrap();
+    screen.clear_fresh();
+    screen.resize(4);
+    screen.observe(b"\x1b[1;1Hr").unwrap();
+    assert!(screen.contains_fresh(b"read"));
+    assert!(!screen.contains_fresh(b"ready"));
+    screen.resize(8);
+    assert!(!screen.contains_fresh(b"ready"));
+}
+
+#[test]
 fn cursor_motion_cancels_pending_wrap_at_the_last_column() {
     let mut screen = Screen::default();
     screen.resize(4);

@@ -2,21 +2,7 @@ use super::*;
 
 #[test]
 fn nonreading_provider_times_out_while_payload_exceeds_pipe_capacity() {
-    let root = tempfile::tempdir().unwrap();
-    let pid_file = root.path().join("descendant.pid");
-    let mut child = spawn_provider("sleep 30 & printf '%s' \"$!\" > \"$1\"; wait", &pid_file);
-    await_descendant(&pid_file);
-    let error = drive(
-        "hung",
-        &mut child,
-        &vec![b'x'; 1024 * 1024],
-        Instant::now() + Duration::from_millis(100),
-    )
-    .unwrap_err();
-    terminate(&mut child).unwrap();
-    child.wait().unwrap();
-    assert!(error.to_string().contains("timed out"));
-    assert_descendant_terminated(&pid_file);
+    assert_provider_timeout("hung", "");
 }
 
 #[test]
@@ -58,7 +44,7 @@ fn unexpected_output_is_captured_instead_of_printed_over_the_tui() {
 fn successful_daemon_parent_does_not_wait_for_inherited_output_pipe_eof() {
     let root = tempfile::tempdir().unwrap();
     let pid_file = root.path().join("daemon.pid");
-    let result = run_with_deadline(
+    let result = run_provider(
         "daemon",
         "/bin/sh",
         &[
@@ -68,7 +54,6 @@ fn successful_daemon_parent_does_not_wait_for_inherited_output_pipe_eof() {
             pid_file.to_str().unwrap(),
         ],
         b"text",
-        Duration::from_secs(3),
     );
     let pid: i32 = std::fs::read_to_string(pid_file).unwrap().parse().unwrap();
     let state = process_state(&pid.to_string());
@@ -100,7 +85,7 @@ fn failed_and_noisy_exits_clean_up_the_provider_descendants() {
 #[test]
 fn observing_an_exited_provider_retains_its_pid_until_cleanup() {
     let root = tempfile::tempdir().unwrap();
-    let mut child = spawn_provider("cat >/dev/null; exit 7", &root.path().join("unused"));
+    let mut child = spawn_fixture("cat >/dev/null; exit 7", &root.path().join("unused"));
     assert!(
         drive(
             "failed",
@@ -121,7 +106,7 @@ fn observing_an_exited_provider_retains_its_pid_until_cleanup() {
 #[test]
 fn observing_a_signaled_provider_preserves_status_without_reaping() {
     let root = tempfile::tempdir().unwrap();
-    let mut child = spawn_provider(
+    let mut child = spawn_fixture(
         "cat >/dev/null; kill -TERM \"$$\"",
         &root.path().join("unused"),
     );
@@ -192,15 +177,13 @@ fn process_state(pid: &str) -> String {
     String::from_utf8(state.stdout).unwrap()
 }
 
-fn spawn_provider(script: &str, pid_file: &std::path::Path) -> Child {
-    Command::new("/bin/sh")
-        .args(["-c", script, "sh", pid_file.to_str().unwrap()])
-        .process_group(0)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap()
+fn spawn_fixture(script: &str, pid_file: &std::path::Path) -> Child {
+    spawn_provider(
+        "fixture",
+        "/bin/sh",
+        &["-c", script, "sh", pid_file.to_str().unwrap()],
+    )
+    .unwrap()
 }
 
 #[test]
@@ -224,22 +207,30 @@ fn early_stdin_close_preserves_failure_diagnostics_and_rejects_incomplete_succes
 
 #[test]
 fn closed_stdin_does_not_disable_deadline_or_descendant_cleanup() {
+    assert_provider_timeout("closed", "exec 0<&-; ");
+}
+
+fn assert_provider_timeout(name: &str, setup: &str) {
+    use nix::sys::wait::{WaitPidFlag, waitpid};
+
     let root = tempfile::tempdir().unwrap();
     let pid_file = root.path().join("descendant.pid");
-    let mut child = spawn_provider(
-        "exec 0<&-; sleep 30 & printf '%s' \"$!\" > \"$1\"; wait",
-        &pid_file,
-    );
+    // The descendant must outlive the leader's fallback exit if cleanup is broken.
+    let script = format!("{setup}sleep 30 & printf '%s' \"$!\" > \"$1\"; sleep 10");
+    let child = spawn_fixture(&script, &pid_file);
     await_descendant(&pid_file);
-    let error = drive(
-        "closed",
-        &mut child,
+    let leader = Pid::from_raw(child.id() as i32);
+    let error = run_with_deadline(
+        name,
+        child,
         &vec![b'x'; 1024 * 1024],
-        Instant::now() + Duration::from_millis(100),
+        Duration::from_millis(100),
     )
     .unwrap_err();
-    terminate(&mut child).unwrap();
-    child.wait().unwrap();
     assert!(error.to_string().contains("timed out"), "{error}");
+    assert_eq!(
+        waitpid(leader, Some(WaitPidFlag::WNOHANG)),
+        Err(nix::errno::Errno::ECHILD)
+    );
     assert_descendant_terminated(&pid_file);
 }

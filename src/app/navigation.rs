@@ -1,8 +1,46 @@
 //! Virtual navigation rows and path overlays follow their owning pane.
-use super::{App, Pane};
-use std::path::PathBuf;
+use super::{App, Pane, Request};
+use std::path::{Path, PathBuf};
 
 impl App {
+    /// Return to the lexical parent, retaining the exited entry's native identity.
+    pub fn parent(&mut self) -> Option<Request> {
+        self.request_parent(self.active)
+    }
+
+    pub(crate) fn activate_parent_row(&mut self) -> Option<Request> {
+        let state = &mut self.panes[self.active];
+        if state.generation == 1 && state.listing {
+            // The initial listing supplies the exited child's no-follow identity.
+            if !state.startup_parent_pending {
+                state.refresh_pending = false;
+            }
+            state.startup_parent_pending = true;
+            return None;
+        }
+        self.parent()
+    }
+
+    fn request_parent(&mut self, pane: usize) -> Option<Request> {
+        let state = &self.panes[pane];
+        let parent = state.path.parent()?.to_path_buf();
+        let visit = state.parent_visit(parent.clone());
+        let request = self.request_listing(pane, parent);
+        self.panes[pane].parent_restoring = Some(visit);
+        Some(request)
+    }
+
+    pub(crate) fn take_startup_parent(&mut self, pane: usize) -> Option<Request> {
+        let state = &mut self.panes[pane];
+        if state.listing || !state.startup_parent_pending {
+            return None;
+        }
+        let refresh = std::mem::take(&mut state.refresh_pending);
+        let request = self.request_parent(pane)?;
+        self.panes[pane].refresh_pending = refresh;
+        Some(request)
+    }
+
     pub(super) fn close_stale_path_picker(&mut self, pane: usize) {
         if self
             .path_picker
@@ -23,6 +61,14 @@ impl App {
 }
 
 impl Pane {
+    pub(super) fn pending_navigation(&self) -> Option<&Path> {
+        if self.startup_parent_pending {
+            self.path.parent()
+        } else {
+            self.pending.as_deref()
+        }
+    }
+
     /// A parent exists according to native lexical path semantics.
     pub fn has_parent(&self) -> bool {
         self.path

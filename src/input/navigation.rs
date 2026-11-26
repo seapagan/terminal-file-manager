@@ -14,32 +14,35 @@ impl Controller {
         if action == Action::Forward {
             return self.app.history(true).into_iter().collect();
         }
-        if parent_action(action, self.app.panes[id].parent_focused()) {
+        if action == Action::Parent {
             if let Some(request) = self.app.parent() {
                 return vec![request];
             }
             self.app.status = "Filesystem root".into();
             return Vec::new();
         }
-        let pane = &self.app.panes[id];
-        let path = match action {
-            Action::Enter => {
-                let Some(entry) = pane.current() else {
-                    self.app.status = "No visible entry".into();
-                    return Vec::new();
-                };
-                if !entry.enterable {
-                    self.app.status = "The file viewer is not available yet.".into();
-                    return Vec::new();
-                }
-                entry.path.clone()
-            }
-            _ => pane.path.clone(),
-        };
-        vec![self.app.request_listing(id, path)]
+        if action == Action::Enter {
+            return self.enter_row(id);
+        }
+        vec![
+            self.app
+                .request_listing(id, self.app.panes[id].path.clone()),
+        ]
     }
-}
 
-fn parent_action(action: Action, parent_focused: bool) -> bool {
-    action == Action::Parent || (action == Action::Enter && parent_focused)
+    fn enter_row(&mut self, id: usize) -> Vec<Request> {
+        let pane = &self.app.panes[id];
+        if pane.parent_focused() {
+            return self.app.activate_parent_row().into_iter().collect();
+        }
+        let Some(entry) = pane.current() else {
+            self.app.status = "No visible entry".into();
+            return Vec::new();
+        };
+        if !entry.enterable {
+            self.app.status = "The file viewer is not available yet.".into();
+            return Vec::new();
+        }
+        vec![self.app.request_listing(id, entry.path.clone())]
+    }
 }

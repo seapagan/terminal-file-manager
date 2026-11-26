@@ -131,7 +131,7 @@ fn drive(
         dirty |= watches.poll(&mut controller.app, pool, started.elapsed());
         dirty |= controller.reconcile_footer();
         dirty |= clipboard::collect(controller, &mut clipboard);
-        submit_refreshes(&mut controller.app, pool);
+        submit_deferred_listings(&mut controller.app, pool);
         dirty |= schedule_metadata(controller, pool, &mut metadata);
         #[cfg(windows)]
         {
@@ -158,9 +158,12 @@ fn drive(
     clipboard::shutdown(controller, &mut clipboard)
 }
 
-fn submit_refreshes(app: &mut App, pool: &mut Pool) {
+fn submit_deferred_listings(app: &mut App, pool: &mut Pool) {
     for pane in 0..2 {
-        if let Some(request) = app.take_refresh(pane) {
+        if let Some(request) = app
+            .take_startup_parent(pane)
+            .or_else(|| app.take_refresh(pane))
+        {
             pool.submit(request);
         }
     }

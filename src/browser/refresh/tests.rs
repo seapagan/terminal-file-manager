@@ -1,7 +1,10 @@
 use super::*;
 use crate::{
-    app::{PatternControl, PatternOperation},
-    input::Action,
+    app::{PatternControl, PatternOperation, Request, RequestKind},
+    browser::{submit_deferred_listings, tests::collect_until_idle},
+    fs::IgnoreContext,
+    input::{Action, Bindings},
+    settings::Settings,
 };
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{Terminal, backend::TestBackend};
@@ -208,4 +211,64 @@ fn hidden_sidebar_does_not_request_metadata_clock_redraw() {
             "listing timestamps still need updates"
         );
     }
+}
+
+#[test]
+fn enter_before_startup_listing_returns_focus_to_the_exited_child() {
+    let root = tempfile::tempdir().unwrap();
+    let child = root.path().join("child");
+    std::fs::create_dir(&child).unwrap();
+    let mut controller = Controller::new(
+        App::new(child.clone()),
+        Bindings::new(&Default::default()).unwrap(),
+        Settings::default(),
+    );
+    let geometry = ui::geometry(&controller.app, ratatui::layout::Rect::new(0, 0, 100, 24));
+    let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
+    pool.submit(Request {
+        pane: 0,
+        generation: 1,
+        path: child.clone(),
+        kind: RequestKind::Listing,
+    });
+    assert!(controller.app.panes[0].parent_focused());
+    // Process Enter while the initial listing is still awaiting collection.
+    for request in controller.handle(
+        Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
+        &geometry,
+        Duration::ZERO,
+    ) {
+        pool.submit(request);
+    }
+    controller.app.active = 1;
+    collect_until_idle(&mut controller, &mut pool);
+    assert_eq!(controller.app.panes[0].path, child);
+    submit_deferred_listings(&mut controller.app, &mut pool);
+    collect_until_idle(&mut controller, &mut pool);
+    assert_eq!(controller.app.panes[0].path, root.path());
+    assert_eq!(controller.app.panes[0].cursor, Some(child));
+}
+
+#[test]
+fn refresh_during_deferred_startup_navigation_follows_the_parent() {
+    let root = tempfile::tempdir().unwrap();
+    let child = root.path().join("child");
+    std::fs::create_dir(&child).unwrap();
+    let listing = |path: &std::path::Path| {
+        crate::fs::list(
+            path,
+            &IgnoreContext::isolated(),
+            &std::sync::atomic::AtomicBool::new(false),
+        )
+        .map_err(|error| error.to_string())
+    };
+    let mut app = App::new(child.clone());
+    assert!(app.activate_parent_row().is_none());
+    assert!(app.request_refresh(0).is_none());
+    assert!(app.complete_listing(0, 1, listing(&child)));
+    assert!(app.take_refresh(0).is_none());
+    let parent = app.take_startup_parent(0).unwrap();
+    assert_eq!(parent.path, root.path());
+    assert!(app.complete_listing(0, parent.generation, listing(&parent.path)));
+    assert_eq!(app.take_refresh(0).unwrap().path, root.path());
 }

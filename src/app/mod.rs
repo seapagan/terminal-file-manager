@@ -201,7 +201,7 @@ impl App {
     /// Request navigation; commit the location/history only on successful completion.
     pub fn request_listing(&mut self, pane: usize, path: PathBuf) -> Request {
         let state = &mut self.panes[pane];
-        if state.pending.is_some() && state.refresh_pending {
+        if state.pending_navigation().is_some() && state.refresh_pending {
             self.status = "Deferred refresh cancelled by newer navigation".into();
         }
         state.reset_range();
@@ -211,6 +211,7 @@ impl App {
         state.error = None;
         state.restoring = None;
         state.parent_restoring = None;
+        state.startup_parent_pending = false;
         state.listing = true;
         state.refresh_pending = false;
         Request {
@@ -221,23 +222,13 @@ impl App {
         }
     }
 
-    /// Return to the lexical parent, retaining the exited entry's native identity.
-    pub fn parent(&mut self) -> Option<Request> {
-        let pane = &self.panes[self.active];
-        let parent = pane.path.parent()?.to_path_buf();
-        let visit = pane.parent_visit(parent.clone());
-        let request = self.request_listing(self.active, parent);
-        self.panes[self.active].parent_restoring = Some(visit);
-        Some(request)
-    }
-
     /// Refresh explicitly, or defer once to the pending navigation's successful target.
     /// Failed or superseding navigation cancels that deferred intent.
     pub fn request_refresh(&mut self, pane: usize) -> Option<Request> {
         let state = self.panes.get_mut(pane)?;
-        if let Some(path) = &state.pending {
-            state.refresh_pending = true;
+        if let Some(path) = state.pending_navigation() {
             self.status = format!("Refresh queued for {} after navigation", path.display()).into();
+            state.refresh_pending = true;
             return None;
         }
         self.invalidate_listing_details(pane);
@@ -247,7 +238,7 @@ impl App {
     /// Reconcile without stealing navigation or cancelling a scan or unchanged count.
     pub(crate) fn request_reconciliation(&mut self, pane: usize) -> Option<Request> {
         let state = self.panes.get_mut(pane)?;
-        if state.pending.is_some() {
+        if state.pending_navigation().is_some() {
             return None;
         }
         state.refresh_pending = true;
@@ -257,7 +248,7 @@ impl App {
     /// Start one deferred ordinary refresh after the current listing has completed.
     pub fn take_refresh(&mut self, pane: usize) -> Option<Request> {
         let state = self.panes.get_mut(pane)?;
-        if !state.refresh_pending || state.listing || state.pending.is_some() {
+        if !state.refresh_pending || state.listing || state.pending_navigation().is_some() {
             return None;
         }
         state.refresh_pending = false;
