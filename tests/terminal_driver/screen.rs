@@ -2,6 +2,8 @@
 use std::collections::BTreeMap;
 use std::io;
 
+pub const INITIAL_COLUMNS: u16 = 100;
+
 pub struct Screen {
     cells: BTreeMap<(usize, usize), (String, bool)>,
     position: (usize, usize),
@@ -17,19 +19,22 @@ impl Default for Screen {
             position: (0, 0),
             escape: Vec::new(),
             utf8: Vec::new(),
-            columns: 100,
+            columns: usize::from(INITIAL_COLUMNS),
         }
     }
 }
 
 impl Screen {
     pub fn resize(&mut self, columns: usize) {
-        let previous = self.columns;
-        self.columns = columns.max(1);
-        self.position.1 = self.position.1.min(self.columns - 1);
-        if self.columns < previous {
-            self.cells.retain(|&(_, column), _| column < self.columns);
+        let columns = columns.max(1);
+        if columns == self.columns {
+            return;
         }
+        if columns < self.columns {
+            self.cells.retain(|&(_, column), _| column < columns);
+        }
+        self.columns = columns;
+        self.position.1 = self.position.1.min(columns - 1);
     }
 
     pub fn observe(&mut self, bytes: &[u8]) -> io::Result<()> {

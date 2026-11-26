@@ -48,24 +48,17 @@ fn session_startup_normalizes_locations_before_initializing_focus() {
 }
 
 #[test]
-fn startup_highlights_parent_in_both_panes_for_relative_and_absolute_paths() {
-    let cwd = std::env::current_dir().unwrap();
-    let root = tempfile::tempdir_in(&cwd).unwrap();
+fn startup_highlights_parent_in_both_panes_for_explicit_paths() {
+    let root = tempfile::tempdir().unwrap();
     let left = root.path().join("first/left");
     let right = root.path().join("second/right");
     for path in [&left, &right] {
         std::fs::create_dir_all(path).unwrap();
         std::fs::write(path.join("visible"), b"fixture").unwrap();
     }
-    let rel_left = left.strip_prefix(&cwd).unwrap();
-    let rel_right = right.strip_prefix(&cwd).unwrap();
     for (paths, expected) in [
-        (vec![rel_left], [&left, &left]),
         (vec![left.as_path()], [&left, &left]),
-        (vec![rel_left, rel_right], [&left, &right]),
         (vec![left.as_path(), right.as_path()], [&left, &right]),
-        (vec![left.as_path(), rel_right], [&left, &right]),
-        (vec![rel_left, right.as_path()], [&left, &right]),
     ] {
         let startup = Startup {
             paths: paths.into_iter().map(PathBuf::from).collect(),

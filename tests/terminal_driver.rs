@@ -55,7 +55,7 @@ pub struct Session {
 
 impl Session {
     pub fn open(command: CommandBuilder) -> io::Result<Self> {
-        let cols = 100;
+        let cols = screen::INITIAL_COLUMNS;
         let pair = native_pty_system()
             .openpty(PtySize {
                 rows: 24,

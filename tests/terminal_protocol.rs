@@ -6,7 +6,6 @@ use screen::Screen;
 #[test]
 fn wrapped_rows_retain_reused_letters_for_fresh_readiness_markers() {
     let mut screen = Screen::default();
-    screen.resize(100);
     screen.observe(&vec![b' '; 300]).unwrap();
     screen.observe(b"No visible entries").unwrap();
     screen.clear_fresh();
@@ -20,7 +19,9 @@ fn wrapped_rows_retain_reused_letters_for_fresh_readiness_markers() {
 fn resized_widths_and_wide_characters_keep_wrapped_coordinates() {
     let mut screen = Screen::default();
     screen.resize(4);
-    screen.observe(b"abcd\x1b[31mef").unwrap();
+    screen.observe(b"abcd").unwrap();
+    screen.resize(4);
+    screen.observe(b"\x1b[31mef").unwrap();
     screen.clear_fresh();
     screen.observe(b"\x1b[2;2H!").unwrap();
     assert!(screen.contains_fresh(b"e!"));

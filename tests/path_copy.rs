@@ -169,7 +169,6 @@ fn activation_waits_for_cached_identity_and_first_listing_enables_copy() {
         1,
         Ok(fs::list(root.path(), &Default::default(), &AtomicBool::new(false)).unwrap()),
     );
-    c.app.panes[0].move_cursor(1, 20);
     sequence(&mut c, "ycf");
     assert!(c.path_copy_request.take().unwrap().prepare().is_ok());
 }

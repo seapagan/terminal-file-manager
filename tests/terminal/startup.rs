@@ -9,15 +9,63 @@ fn startup_parent_focus_is_immediately_actionable_in_a_real_terminal() {
     fs::create_dir(&child).unwrap();
     fs::write(child.join("inside-ready"), "owned").unwrap();
     fs::write(root.path().join("parent-ready"), "owned").unwrap();
-    let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
-    command.arg(&child);
-    command.cwd(storage.path());
-    isolate(&mut command, storage.path());
-    drive(
-        command,
-        &[("inside-ready", "\r"), ("parent-ready", "q")],
-        false,
-    );
+    for path in [child.as_path(), child.strip_prefix(storage.path()).unwrap()] {
+        let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+        command.arg(path);
+        command.cwd(storage.path());
+        isolate(&mut command, storage.path());
+        drive(
+            command,
+            &[
+                ("inside-ready", "\r"),
+                ("parent-ready", "\r"),
+                ("inside-ready", "\u{1b}p"),
+                ("Two-pane layout", "\t\u{1b}p"),
+                ("Single-pane layout", "\r"),
+                ("parent-ready", "q"),
+            ],
+            false,
+        );
+    }
+}
+
+#[test]
+fn both_panes_start_on_parent_with_relative_and_mixed_paths() {
+    let storage = tempfile::tempdir().unwrap();
+    let left = storage.path().join("first/left");
+    let right = storage.path().join("second/right");
+    for (path, side) in [(&left, "left"), (&right, "right")] {
+        fs::create_dir_all(path).unwrap();
+        fs::write(path.join(format!("{side}-startup")), "owned").unwrap();
+        fs::write(
+            path.parent().unwrap().join(format!("{side}-parent-ok")),
+            "owned",
+        )
+        .unwrap();
+    }
+    let rel_left = left.strip_prefix(storage.path()).unwrap();
+    let rel_right = right.strip_prefix(storage.path()).unwrap();
+    for (left, right) in [
+        (rel_left, rel_right),
+        (left.as_path(), rel_right),
+        (rel_left, right.as_path()),
+    ] {
+        let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+        command.arg(left);
+        command.arg(right);
+        command.cwd(storage.path());
+        isolate(&mut command, storage.path());
+        drive(
+            command,
+            &[
+                ("left-startup", "\r"),
+                ("left-parent-ok", "\t\r"),
+                ("right-parent-ok", "\r"),
+                ("right-startup", "q"),
+            ],
+            false,
+        );
+    }
 }
 
 #[test]
