@@ -50,14 +50,16 @@ pub struct Session {
     // Keep recv_timeout usable after the reader sends EOF and exits.
     _sender: mpsc::Sender<io::Result<Vec<u8>>>,
     exited: bool,
+    cols: u16,
 }
 
 impl Session {
     pub fn open(command: CommandBuilder) -> io::Result<Self> {
+        let cols = screen::INITIAL_COLUMNS;
         let pair = native_pty_system()
             .openpty(PtySize {
                 rows: 24,
-                cols: 100,
+                cols,
                 pixel_width: 0,
                 pixel_height: 0,
             })
@@ -78,11 +80,24 @@ impl Session {
             output,
             _sender: sender.clone(),
             exited: false,
+            cols,
         };
         session.reader = Some(thread::Builder::new().spawn(move || {
             read_output(reader, sender);
         })?);
         Ok(session)
+    }
+
+    pub fn script(&self) -> Script {
+        let mut screen = screen::Screen::default();
+        screen.resize(usize::from(self.cols));
+        Script {
+            pending: Vec::new(),
+            screen,
+            query: Default::default(),
+            step: 0,
+            ansi: 0,
+        }
     }
 
     pub fn drive(
@@ -92,7 +107,7 @@ impl Session {
         transcript: &mut Vec<u8>,
         resize: bool,
     ) -> io::Result<()> {
-        let mut script = Script::default();
+        let mut script = self.script();
         let mut eof = false;
         let mut status = None;
         while !eof || status.is_none() {
@@ -154,6 +169,8 @@ impl Session {
                             pixel_height: 0,
                         })
                         .map_err(io::Error::other)?;
+                    self.cols = cols;
+                    script.screen.resize(usize::from(cols));
                 }
                 Ok(chunk.is_empty())
             }
@@ -201,7 +218,6 @@ fn read_output(mut reader: Box<dyn Read + Send>, sender: mpsc::Sender<io::Result
     }
 }
 
-#[derive(Default)]
 pub struct Script {
     pending: Vec<u8>,
     screen: screen::Screen,
@@ -231,7 +247,7 @@ impl Script {
         Ok(())
     }
 
-    fn observe(
+    pub(crate) fn observe(
         &mut self,
         chunk: &[u8],
         steps: &[(&str, &str)],

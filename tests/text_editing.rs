@@ -15,6 +15,7 @@ fn controller() -> (tempfile::TempDir, Controller) {
         terminal_file_manager::fs::list(root.path(), &Default::default(), &Default::default())
             .unwrap();
     app.complete_listing(0, 1, Ok(snapshot));
+    app.panes[0].move_cursor(1, 20);
     (
         root,
         Controller::new(

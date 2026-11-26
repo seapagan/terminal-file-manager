@@ -34,6 +34,7 @@ fn manual_refresh_updates_only_the_requested_pane_and_preserves_its_mark() {
     std::fs::write(&selected, "first").unwrap();
     pool.submit(app.request_refresh(0).unwrap());
     finish(&mut app, &mut pool);
+    app.panes[0].move_cursor(1, 20);
     app.panes[0].toggle_mark();
     let hidden_generation = app.panes[1].generation;
     std::fs::write(&selected, "updated size").unwrap();

@@ -17,6 +17,65 @@ fn install(app: &mut crate::app::App, request: &crate::app::Request) {
     assert!(app.complete_listing(request.pane, request.generation, Ok(snapshot)));
 }
 
+fn assert_initial_panes(app: &crate::app::App, paths: [&std::path::Path; 2]) {
+    for (pane, path) in app.panes.iter().zip(paths) {
+        assert_eq!(pane.path, path);
+        assert_eq!(pane.cursor.as_deref(), path.parent(), "focus in {path:?}");
+        assert!(pane.parent_focused(), "parent row in {path:?}");
+        assert_eq!(pane.row_index(), Some(0));
+    }
+}
+
+#[test]
+fn session_startup_normalizes_locations_before_initializing_focus() {
+    let root = tempfile::tempdir().unwrap();
+    let left = root.path().join("first/left");
+    let right = root.path().join("second/right");
+    let saved_left = left.join("child/..");
+    let saved_right = right.join("child/..");
+    for path in [&left, &right] {
+        std::fs::create_dir_all(path.join("child")).unwrap();
+    }
+    let mut saved = crate::app::App::with_locations([saved_left, saved_right]);
+    saved.dual = true;
+    let session = crate::session::NavigationSession::capture(&saved);
+    let app = session
+        .restore_with(&Settings::default(), |path| validate_path(&path))
+        .unwrap();
+    assert_initial_panes(&app, [&left, &right]);
+    assert!(app.dual);
+    assert_eq!(app.relative_path_base, saved.relative_path_base);
+}
+
+#[test]
+fn startup_highlights_parent_in_both_panes_for_explicit_paths() {
+    let root = tempfile::tempdir().unwrap();
+    let left = root.path().join("first/left");
+    let right = root.path().join("second/right");
+    for path in [&left, &right] {
+        std::fs::create_dir_all(path).unwrap();
+        std::fs::write(path.join("visible"), b"fixture").unwrap();
+    }
+    for (paths, expected) in [
+        (vec![left.as_path()], [&left, &left]),
+        (vec![left.as_path(), right.as_path()], [&left, &right]),
+    ] {
+        let startup = Startup {
+            paths: paths.into_iter().map(PathBuf::from).collect(),
+            ..Startup::default()
+        };
+        let mut app = startup.prepare(&Settings::default()).unwrap();
+        let expected = expected.map(PathBuf::as_path);
+        assert_initial_panes(&app, expected);
+        assert_eq!(app.dual, startup.paths.len() == 2);
+        for (pane, path) in expected.into_iter().enumerate() {
+            let request = app.request_listing(pane, path.into());
+            install(&mut app, &request);
+        }
+        assert_initial_panes(&app, expected);
+    }
+}
+
 #[test]
 fn startup_parent_and_history_use_normalized_explicit_locations() {
     let root = tempfile::tempdir().unwrap();
@@ -27,8 +86,7 @@ fn startup_parent_and_history_use_normalized_explicit_locations() {
         ..Startup::default()
     };
     let mut app = startup.prepare(&Settings::default()).unwrap();
-    assert_eq!(app.panes[0].path, start);
-    assert_eq!(app.panes[1].path, start);
+    assert_initial_panes(&app, [&start, &start]);
     assert_eq!(app.relative_path_base, start);
     let initial = app.request_listing(0, app.panes[0].path.clone());
     install(&mut app, &initial);
@@ -139,7 +197,10 @@ fn startup_base_uses_first_explicit_directory_or_process_cwd() {
         std::env::current_dir().unwrap()
     );
     let app = Startup::default().prepare(&Settings::default()).unwrap();
-    assert_eq!(app.relative_path_base, std::env::current_dir().unwrap());
+    let cwd = std::env::current_dir().unwrap();
+    assert_eq!(app.relative_path_base, cwd);
+    assert_initial_panes(&app, [&cwd, &cwd]);
+    assert_initial_panes(&relative, [&cwd, &cwd]);
 }
 
 #[test]

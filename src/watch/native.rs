@@ -414,6 +414,7 @@ mod tests {
         runtime.slots[0].signals.publish(READY | DIRTY);
         runtime.poll(&mut app, &mut pool, Duration::ZERO);
         finish(&mut app, &mut pool);
+        app.panes[0].move_cursor(1, 20);
         app.panes[0].toggle_mark();
         let marks = app.panes[0].marks.clone();
         let raw = root.path();

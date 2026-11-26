@@ -70,6 +70,7 @@ fn controller(root: &std::path::Path) -> Controller {
                 .unwrap(),
         ),
     );
+    app.panes[0].move_cursor(1, 20);
     Controller::new(
         app,
         Bindings::new(&Default::default()).unwrap(),

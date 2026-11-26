@@ -25,6 +25,7 @@ fn loaded() -> (tempfile::TempDir, Controller) {
         )
         .unwrap()),
     );
+    app.panes[0].move_cursor(1, 20);
     (
         root,
         Controller::new(

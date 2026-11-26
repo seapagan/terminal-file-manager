@@ -2,15 +2,41 @@
 use std::collections::BTreeMap;
 use std::io;
 
-#[derive(Default)]
+pub const INITIAL_COLUMNS: u16 = 100;
+
 pub struct Screen {
     cells: BTreeMap<(usize, usize), (String, bool)>,
     position: (usize, usize),
     escape: Vec<u8>,
     utf8: Vec<u8>,
+    columns: usize,
+}
+
+impl Default for Screen {
+    fn default() -> Self {
+        Self {
+            cells: BTreeMap::new(),
+            position: (0, 0),
+            escape: Vec::new(),
+            utf8: Vec::new(),
+            columns: usize::from(INITIAL_COLUMNS),
+        }
+    }
 }
 
 impl Screen {
+    pub fn resize(&mut self, columns: usize) {
+        let columns = columns.max(1);
+        if columns == self.columns {
+            return;
+        }
+        if columns < self.columns {
+            self.cells.retain(|&(_, column), _| column < columns);
+        }
+        self.columns = columns;
+        self.position.1 = self.position.1.min(columns - 1);
+    }
+
     pub fn observe(&mut self, bytes: &[u8]) -> io::Result<()> {
         for &byte in bytes {
             if !self.escape.is_empty() {
@@ -62,8 +88,11 @@ impl Screen {
         match byte {
             0x1b => self.escape.push(byte),
             b'\r' => self.position.1 = 0,
-            b'\n' => self.position.0 = self.position.0.saturating_add(1),
-            8 => self.position.1 = self.position.1.saturating_sub(1),
+            b'\n' => {
+                self.position.0 = self.position.0.saturating_add(1);
+                self.position.1 = self.position.1.min(self.columns - 1);
+            }
+            8 => self.position.1 = self.position.1.min(self.columns - 1).saturating_sub(1),
             0..=31 | 127 => {}
             _ => {
                 self.utf8.push(byte);
@@ -86,6 +115,9 @@ impl Screen {
             }
             return;
         }
+        if self.position.1.saturating_add(width) > self.columns {
+            self.position = (self.position.0.saturating_add(1), 0);
+        }
         self.cells.insert(self.position, (text, true));
         for offset in 1..width {
             self.cells.insert(
@@ -98,7 +130,19 @@ impl Screen {
 
     fn control(&mut self) {
         let command = *self.escape.last().unwrap();
+        let moves = matches!(
+            command,
+            b'H' | b'f' | b'G' | b'd' | b'A' | b'B' | b'C' | b'D' | b'J' | b'K'
+        );
+        if moves {
+            self.position.1 = self.position.1.min(self.columns - 1);
+        }
         let arguments = String::from_utf8_lossy(&self.escape[2..self.escape.len() - 1]);
+        if command == b'h' && arguments == "?1049" {
+            self.cells.clear();
+            self.position = (0, 0);
+            return;
+        }
         let values: Vec<usize> = arguments
             .split(';')
             .map(|v| v.parse().unwrap_or(0))
@@ -118,6 +162,9 @@ impl Screen {
             b'J' => self.erase_display(first),
             b'K' => self.erase_line(first),
             _ => {}
+        }
+        if moves {
+            self.position.1 = self.position.1.min(self.columns - 1);
         }
     }
 

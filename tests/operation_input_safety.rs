@@ -23,6 +23,7 @@ fn fixture() -> (tempfile::TempDir, Controller) {
         )
         .unwrap();
         app.complete_listing(id, 1, Ok(snapshot));
+        app.panes[id].move_cursor(1, 20);
     }
     let controller = Controller::new(
         app,

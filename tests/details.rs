@@ -21,6 +21,7 @@ fn counts_reject_cursor_changes_cancellation_and_old_generations() {
         )
         .unwrap()),
     );
+    app.panes[0].move_cursor(1, 20);
     app.request_metadata(0).unwrap();
     let first = app.request_totals().unwrap();
     app.panes[0].move_cursor(1, 10);
@@ -61,6 +62,7 @@ fn same_path_replacement_refresh_reloads_metadata_and_rejects_old_responses() {
     };
     let mut app = App::new(root.path().to_path_buf());
     app.complete_listing(0, 1, Ok(snapshot()));
+    app.panes[0].move_cursor(1, 20);
     let old_request = app.request_metadata(0).unwrap();
     let old = terminal_file_manager::fs::inspect(&path);
     assert!(app.complete_metadata(&old_request, old.clone(), Some(path.clone())));
@@ -107,6 +109,7 @@ fn counting_controller() -> (tempfile::TempDir, terminal_file_manager::input::Co
         )
         .unwrap()),
     );
+    app.panes[0].move_cursor(1, 20);
     app.request_metadata(0).unwrap();
     let controller = terminal_file_manager::input::Controller::new(
         app,

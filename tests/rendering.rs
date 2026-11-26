@@ -87,6 +87,7 @@ fn dual_pane_focus_distinguishes_retained_cursor_and_background() {
         )
         .unwrap();
         app.complete_listing(id, 1, Ok(snapshot));
+        app.panes[id].move_cursor(1, 20);
     }
     app.dual = true;
     for level in [
@@ -138,11 +139,14 @@ fn tiny_unicode_and_control_names_render_without_escapes_or_losing_focus() {
     )
     .unwrap();
     app.complete_listing(0, 1, Ok(snapshot));
+    app.panes[0].move_cursor(1, 20);
+    assert!(app.panes[0].current().is_some());
     app.panes[0].select_all();
     app.dual = true;
     app.sidebar = true;
     for (width, height) in [(1, 1), (20, 5), (79, 12), (120, 24), (200, 40)] {
         let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        let geometry = ui::geometry(&app, terminal.size().unwrap().into());
         terminal
             .draw(|frame| {
                 ui::render(frame, &app, &Theme::new(ColorLevel::NoColor));
@@ -162,11 +166,11 @@ fn tiny_unicode_and_control_names_render_without_escapes_or_losing_focus() {
                 .all(|c| c.fg == Color::Reset && c.bg == Color::Reset)
         );
         if width >= 79 {
+            let pane = geometry.panes[0].unwrap();
             assert!(
-                buffer
-                    .content()
-                    .iter()
-                    .any(|c| c.modifier.contains(Modifier::REVERSED))
+                buffer[(pane.x + 8, pane.y + 3)]
+                    .modifier
+                    .contains(Modifier::REVERSED)
             );
         }
     }
@@ -210,6 +214,7 @@ fn metadata_fields_have_separate_rows_and_share_the_cached_entry() {
     )
     .unwrap();
     app.complete_listing(0, 1, Ok(snapshot));
+    app.panes[0].move_cursor(1, 20);
     let request = app.request_metadata(0).unwrap();
     app.complete_metadata(
         &request,

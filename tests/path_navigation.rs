@@ -27,14 +27,26 @@ fn controller(path: &std::path::Path) -> Controller {
 #[test]
 fn parent_row_is_keyboard_accessible_and_never_a_filesystem_operand() {
     let root = tempfile::tempdir().unwrap();
-    std::fs::write(root.path().join("file"), "owned").unwrap();
+    let file = root.path().join("file");
+    std::fs::write(&file, "owned").unwrap();
     let mut c = controller(root.path());
     let g = ui::geometry(&c.app, Rect::new(0, 0, 100, 24));
-    c.dispatch(Action::Home, &g);
+    assert!(c.app.panes[0].parent_focused());
+    c.dispatch(Action::Down, &g);
+    assert_eq!(c.app.panes[0].current().unwrap().path, file);
     assert!(
-        c.app.panes[0].current().is_none(),
+        c.handle(
+            Event::Key(KeyEvent::new(KeyCode::Home, KeyModifiers::NONE)),
+            &g,
+            Default::default(),
+        )
+        .is_empty()
+    );
+    assert!(
+        c.app.panes[0].parent_focused(),
         "Home must focus virtual parent"
     );
+    assert!(c.app.panes[0].current().is_none());
     c.dispatch(Action::Mark, &g);
     assert!(c.app.panes[0].marks.is_empty());
     assert!(c.app.panes[0].eligible().is_empty());

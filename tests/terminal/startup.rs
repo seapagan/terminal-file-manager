@@ -2,6 +2,115 @@
 use super::*;
 
 #[test]
+fn startup_parent_focus_is_immediately_actionable_in_a_real_terminal() {
+    let storage = tempfile::tempdir().unwrap();
+    let root = tempfile::tempdir_in(storage.path()).unwrap();
+    let child = root.path().join("child");
+    fs::create_dir(&child).unwrap();
+    fs::write(child.join("inside-ready"), "owned").unwrap();
+    fs::write(root.path().join("parent-ready"), "owned").unwrap();
+    for path in [child.as_path(), child.strip_prefix(storage.path()).unwrap()] {
+        let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+        command.arg(path);
+        command.cwd(storage.path());
+        isolate(&mut command, storage.path());
+        drive(
+            command,
+            &[
+                ("inside-ready", "\r"),
+                ("parent-ready", "\r"),
+                ("inside-ready", "\u{1b}p"),
+                ("Two-pane layout", "\t\u{1b}p"),
+                ("Single-pane layout", "\r"),
+                ("parent-ready", "q"),
+            ],
+            false,
+        );
+    }
+}
+
+#[test]
+fn both_panes_start_on_parent_with_relative_and_mixed_paths() {
+    let storage = tempfile::tempdir().unwrap();
+    let left = storage.path().join("first/left");
+    let right = storage.path().join("second/right");
+    for (path, side) in [(&left, "left"), (&right, "right")] {
+        fs::create_dir_all(path).unwrap();
+        fs::write(path.join(format!("{side}-startup")), "owned").unwrap();
+        fs::write(
+            path.parent().unwrap().join(format!("{side}-parent-ok")),
+            "owned",
+        )
+        .unwrap();
+    }
+    let rel_left = left.strip_prefix(storage.path()).unwrap();
+    let rel_right = right.strip_prefix(storage.path()).unwrap();
+    for (left, right) in [
+        (rel_left, rel_right),
+        (left.as_path(), rel_right),
+        (rel_left, right.as_path()),
+    ] {
+        let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+        command.arg(left);
+        command.arg(right);
+        command.cwd(storage.path());
+        isolate(&mut command, storage.path());
+        drive(
+            command,
+            &[
+                ("left-startup", "\r"),
+                ("left-parent-ok", "\t\r"),
+                ("right-parent-ok", "\r"),
+                ("right-startup", "q"),
+            ],
+            false,
+        );
+    }
+}
+
+#[test]
+fn fresh_script_matches_wrapped_cells_at_the_resized_session_width() {
+    use std::{
+        io::Write,
+        time::{Duration, Instant},
+    };
+
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("resize-ready"), "owned").unwrap();
+    let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+    command.cwd(root.path());
+    isolate(&mut command, root.path());
+    let mut session = terminal_driver::Session::open(command).unwrap();
+    let mut script = session.script();
+    let mut transcript = Vec::new();
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while script.step == 0 {
+        assert!(Instant::now() < deadline, "initial listing timed out");
+        session
+            .read_step(
+                Duration::from_millis(20),
+                &mut script,
+                &[("resize-ready", "")],
+                &mut transcript,
+                true,
+            )
+            .unwrap();
+    }
+
+    let mut keys = Vec::new();
+    // At 65 columns, the trailing a wraps to row 2 and X overwrites it.
+    session
+        .script()
+        .observe(b"\x1b[1;65Hba\x1b[2;1HX", &[("bX", "q")], &mut keys)
+        .unwrap();
+    assert_eq!(keys, b"q");
+    session.writer.as_mut().unwrap().write_all(&keys).unwrap();
+    session
+        .drive(&[], deadline, &mut transcript, false)
+        .unwrap();
+}
+
+#[test]
 fn browser_starts_at_cwd_and_explicit_path_and_restores_terminal() {
     let storage = tempfile::tempdir().unwrap();
     let root = tempfile::tempdir_in(storage.path()).unwrap();
@@ -16,7 +125,7 @@ fn browser_starts_at_cwd_and_explicit_path_and_restores_terminal() {
         let output = drive(
             command,
             &[
-                ("browser-sentinel", "\r"),
+                ("browser-sentinel", "\x1b[B\r"),
                 ("The file viewer is not available yet.", "\u{1b}p"),
                 ("Pane 2", "q"),
             ],
@@ -65,7 +174,7 @@ fn diagnostics_uses_startup_capability_in_a_controlled_real_terminal() {
                 (&format!("Applied ColorLevel: {expected}"), &scroll),
                 // Exact values are checked in the diagnostics buffer tests;
                 // differential output may reuse <unset> from the previous row.
-                ("VTE_VERSION", "\u{1b}[24~\r"),
+                ("VTE_VERSION", "\u{1b}[24~\u{1b}[F\r"),
                 ("The file viewer is not available yet.", "q"),
             ],
             true,

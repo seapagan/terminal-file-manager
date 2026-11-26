@@ -131,7 +131,7 @@ fn drive(
         dirty |= watches.poll(&mut controller.app, pool, started.elapsed());
         dirty |= controller.reconcile_footer();
         dirty |= clipboard::collect(controller, &mut clipboard);
-        submit_refreshes(&mut controller.app, pool);
+        submit_deferred_listings(&mut controller.app, pool);
         dirty |= schedule_metadata(controller, pool, &mut metadata);
         #[cfg(windows)]
         {
@@ -158,7 +158,7 @@ fn drive(
     clipboard::shutdown(controller, &mut clipboard)
 }
 
-fn submit_refreshes(app: &mut App, pool: &mut Pool) {
+fn submit_deferred_listings(app: &mut App, pool: &mut Pool) {
     for pane in 0..2 {
         if let Some(request) = app.take_refresh(pane) {
             pool.submit(request);
@@ -214,6 +214,7 @@ mod tests {
             1,
             Ok(fs::list(root, &IgnoreContext::isolated(), &AtomicBool::new(false)).unwrap()),
         );
+        app.panes[0].move_cursor(1, 20);
         Controller::new(
             app,
             Bindings::new(&Default::default()).unwrap(),
@@ -237,6 +238,7 @@ mod tests {
     fn worker_panics_are_visible_in_the_requesting_model() {
         for kind in [
             RequestKind::Listing,
+            RequestKind::ParentListing(None),
             RequestKind::Metadata,
             RequestKind::Totals,
         ] {
@@ -245,6 +247,8 @@ mod tests {
             let metadata = controller.app.request_metadata(0).unwrap();
             let request = match kind {
                 RequestKind::Listing => controller.app.request_listing(0, root.path().into()),
+                RequestKind::ParentListing(_) => controller.app.parent().unwrap(),
+                RequestKind::ParentIdentity => unreachable!(),
                 RequestKind::Metadata => metadata,
                 RequestKind::Totals => controller.app.request_totals().unwrap(),
             };
@@ -253,7 +257,10 @@ mod tests {
             pool.submit(request.clone());
             collect_until_idle(&mut controller, &mut pool);
             let error = match kind {
-                RequestKind::Listing => controller.app.panes[0].error.as_ref().unwrap(),
+                RequestKind::Listing | RequestKind::ParentListing(_) => {
+                    controller.app.panes[0].error.as_ref().unwrap()
+                }
+                RequestKind::ParentIdentity => unreachable!(),
                 RequestKind::Metadata => controller.app.details[0]
                     .entry
                     .as_ref()
@@ -375,6 +382,7 @@ mod tests {
         )
         .unwrap();
         controller.app.complete_listing(1, 1, Ok(snapshot));
+        controller.app.panes[1].move_cursor(1, 20);
         let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
         for pane in 0..2 {
             controller.app.active = pane;

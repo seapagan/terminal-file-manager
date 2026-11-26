@@ -4,6 +4,62 @@ mod screen;
 use screen::Screen;
 
 #[test]
+fn wrapped_rows_retain_reused_letters_for_fresh_readiness_markers() {
+    let mut screen = Screen::default();
+    screen.resize(100);
+    screen.observe(b"\x1b]0;tfm.exe\x07\x1b[?1049h").unwrap();
+    screen.observe(&vec![b' '; 300]).unwrap();
+    screen.observe(b"No visible entries").unwrap();
+    screen.clear_fresh();
+    screen.observe(b"\x1b[4;9Hrowser-s\x1b[1Cntinel").unwrap();
+    assert!(screen.contains_fresh(b"browser-sentinel"));
+    screen.clear_fresh();
+    assert!(!screen.contains_fresh(b"browser-sentinel"));
+}
+
+#[test]
+fn resized_widths_and_wide_characters_keep_wrapped_coordinates() {
+    let mut screen = Screen::default();
+    screen.resize(4);
+    screen.observe(b"abcd").unwrap();
+    screen.resize(4);
+    screen.observe(b"\x1b[31mef").unwrap();
+    screen.clear_fresh();
+    screen.observe(b"\x1b[2;2H!").unwrap();
+    assert!(screen.contains_fresh(b"e!"));
+    assert!(!screen.contains_fresh(b"abcd"));
+    screen.resize(5);
+    screen.observe("\x1b[3;5H界".as_bytes()).unwrap();
+    screen.clear_fresh();
+    screen.observe(b"\x1b[4;3HX").unwrap();
+    assert!(screen.contains_fresh("界X".as_bytes()));
+}
+
+#[test]
+fn shrinking_discards_marker_cells_beyond_the_right_edge() {
+    let mut screen = Screen::default();
+    screen.resize(8);
+    screen.observe(b"ready").unwrap();
+    screen.clear_fresh();
+    screen.resize(4);
+    screen.observe(b"\x1b[1;1Hr").unwrap();
+    assert!(screen.contains_fresh(b"read"));
+    assert!(!screen.contains_fresh(b"ready"));
+    screen.resize(8);
+    assert!(!screen.contains_fresh(b"ready"));
+}
+
+#[test]
+fn cursor_motion_cancels_pending_wrap_at_the_last_column() {
+    let mut screen = Screen::default();
+    screen.resize(4);
+    screen.observe(b"abcd").unwrap();
+    screen.clear_fresh();
+    screen.observe(b"\x1b[1DX\x1b[31mY\rz").unwrap();
+    assert!(screen.contains_fresh(b"zbXY"));
+}
+
+#[test]
 fn incremental_redraw_reuses_unchanged_cells_without_accepting_stale_rows() {
     let mut screen = Screen::default();
     screen

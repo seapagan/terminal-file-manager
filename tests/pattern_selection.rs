@@ -32,6 +32,7 @@ fn loaded() -> (tempfile::TempDir, App) {
         )
         .unwrap()),
     );
+    app.panes[0].move_cursor(1, 20);
     (root, app)
 }
 
@@ -233,6 +234,7 @@ fn hidden_filter_and_replaced_identity_changes_cannot_retarget_approval() {
 fn wildcard_is_whole_name_regex_is_unicode_substring_and_zero_is_a_noop() {
     let (_root, mut app) = loaded();
     let pane = &mut app.panes[0];
+    assert!(pane.current().is_some());
     let mut selection = PatternSelection::new(pane, 0);
     selection.set_expression("txt".into());
     assert_eq!(selection.preview(pane).unwrap().matches, 0);

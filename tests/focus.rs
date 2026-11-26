@@ -27,6 +27,7 @@ fn marked_directory_app(root: &std::path::Path) -> App {
             1,
             Ok(list(root, &IgnoreContext::isolated(), &AtomicBool::new(false)).unwrap()),
         );
+        app.panes[id].move_cursor(1, 20);
         let pane = &mut app.panes[id];
         pane.entries[0].size = Some(2_000_000_000);
         pane.entries[0].modified = Some(app.now);

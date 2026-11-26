@@ -23,6 +23,7 @@ fn controller() -> (tempfile::TempDir, Controller) {
     .unwrap();
     for pane in 0..2 {
         app.complete_listing(pane, 1, Ok(snapshot.clone()));
+        app.panes[pane].move_cursor(1, 20);
     }
     (
         root,

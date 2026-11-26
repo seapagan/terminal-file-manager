@@ -31,6 +31,7 @@ fn failed_reconciliation_retries_promptly_and_only_success_unblocks_operations()
     std::fs::write(root.path().join("selected"), "data").unwrap();
     pool.submit(app.request_refresh(0).unwrap());
     finish(&mut app, &mut pool);
+    app.panes[0].move_cursor(1, 20);
     let failed = app.request_reconciliation(0).unwrap();
     app.complete_listing(0, failed.generation, Err("transient read failure".into()));
     runtime.poll(&mut app, &mut pool, Duration::ZERO);
@@ -128,6 +129,7 @@ fn retry_cannot_adopt_a_replacement_directory_or_unblock_its_operations() {
     std::fs::write(root.path().join("selected"), "original").unwrap();
     pool.submit(app.request_refresh(0).unwrap());
     finish(&mut app, &mut pool);
+    app.panes[0].move_cursor(1, 20);
     let request = app.request_reconciliation(0).unwrap();
     app.complete_listing(0, request.generation, Err("transient failure".into()));
     let preserved = tempfile::tempdir().unwrap();

@@ -28,6 +28,7 @@ fn inactive_listing_does_not_select_sources_until_the_active_listing_is_ready() 
         press(&mut controller, KeyCode::Char('a'), KeyModifiers::CONTROL);
         assert!(controller.app.panes[0].marks.is_empty());
         controller.app.complete_listing(0, 1, Ok(snapshot.clone()));
+        controller.app.panes[0].move_cursor(1, 20);
         assert!(controller.app.panes[0].marks.is_empty());
         // Reproduce the hosted ordering: Ctrl+A preceded the active listing completion.
         press(&mut controller, key, KeyModifiers::NONE);

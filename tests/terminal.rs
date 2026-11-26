@@ -51,7 +51,7 @@ fn two_explicit_locations_and_configured_dual_startup_run_in_a_real_terminal() {
     isolate(&mut command, root.path());
     let output = drive(
         command,
-        &[("left-startup", "\t"), ("right-startup", "q")],
+        &[("left-startup", "\x1b[B\t\x1b[B"), ("right-startup", "q")],
         false,
     );
     assert!(output.contains("left-startup"));
@@ -63,7 +63,11 @@ fn two_explicit_locations_and_configured_dual_startup_run_in_a_real_terminal() {
     command.arg(&left);
     command.cwd(root.path());
     isolate(&mut command, root.path());
-    let output = drive(command, &[("left-startup", "\t"), ("Pane 2", "q")], false);
+    let output = drive(
+        command,
+        &[("left-startup", "\x1b[B\t\x1b[B"), ("Pane 2", "q")],
+        false,
+    );
     assert!(output.contains("left"));
 }
 
@@ -379,7 +383,10 @@ fn shifted_arrow_marks_a_range_in_a_real_terminal() {
     isolate(&mut command, root.path());
     drive(
         command,
-        &[("range-a", "\u{1b}[1;2B"), ("Selected: 2 visible", "q")],
+        &[
+            ("range-a", "\x1b[B\u{1b}[1;2B"),
+            ("Selected: 2 visible", "q"),
+        ],
         false,
     );
     assert_eq!(fs::read(root.path().join("range-a")).unwrap(), b"one");
@@ -403,7 +410,11 @@ fn save_quit_restores_both_navigated_locations_and_normal_quit_keeps_session() {
     isolate(&mut command, root.path());
     drive(
         command,
-        &[("child", "\r"), ("left-session", "\t"), ("Pane 2", "Q")],
+        &[
+            ("child", "\x1b[B\r"),
+            ("left-session", "\t\x1b[B"),
+            ("Pane 2", "Q"),
+        ],
         false,
     );
     let store = SessionStore {
@@ -418,7 +429,11 @@ fn save_quit_restores_both_navigated_locations_and_normal_quit_keeps_session() {
     command.arg("--restore-session");
     command.cwd(root.path());
     isolate(&mut command, root.path());
-    let output = drive(command, &[("left-session", "\t"), ("Pane 1", "q")], false);
+    let output = drive(
+        command,
+        &[("left-session", "\t\x1b[B"), ("Pane 1", "q")],
+        false,
+    );
     assert!(output.contains("right-session"));
     assert_eq!(fs::read(&store.path).unwrap(), saved);
     let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
@@ -440,7 +455,7 @@ fn normal_exit_emits_accepted_osc52_before_terminal_restoration() {
     isolate(&mut command, root.path());
     command.env("SSH_CONNECTION", "isolated-test");
     command.env_remove("STY");
-    let output = drive(command, &[("osc-exit", "yhnq")], false);
+    let output = drive(command, &[("osc-exit", "\x1b[Byhnq")], false);
     let sequence = "\x1b]52;c;b3NjLWV4aXQ=\x1b\\";
     assert_eq!(output.matches(sequence).count(), 1, "{output:?}");
     assert!(output.find(sequence).unwrap() < output.rfind("\x1b[?1049l").unwrap());

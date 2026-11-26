@@ -57,6 +57,7 @@ fn loaded(path: &Path) -> App {
             1,
             Ok(fs::list(path, &IgnoreContext::isolated(), &AtomicBool::new(false)).unwrap()),
         );
+        app.panes[pane].move_cursor(1, 20);
     }
     app
 }

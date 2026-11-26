@@ -54,7 +54,9 @@ fn ancestor_clicks_keep_independent_focus_marks_and_back_forward_cursor_history(
     let (root, mut c) = fixture();
     let initial = c.app.panes[1].path.clone();
     c.app.panes[0].select_all();
+    c.app.panes[1].move_cursor(1, 20);
     let cursor = c.app.panes[1].cursor.clone();
+    assert_eq!(cursor.as_deref(), Some(initial.join("cursor").as_path()));
     let g = ui::geometry(&c.app, Rect::new(0, 0, 240, 24));
     let control = g
         .path_controls

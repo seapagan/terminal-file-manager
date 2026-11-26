@@ -47,6 +47,7 @@ impl Browser {
         let mut app = App::new(path.into());
         for pane in 0..2 {
             app.complete_listing(pane, 1, Ok(snapshot(path)));
+            app.panes[pane].move_cursor(1, 20);
         }
         let mut browser = Self {
             app,
@@ -242,7 +243,8 @@ fn windows_manual_navigation_discards_old_results_and_refresh_still_works() {
     browser.until(|app| app.panes[0].path == next);
     std::fs::write(next.join("manual"), "manual update").unwrap();
     browser.refresh(0);
-    browser.until(|app| app.panes[0].current().is_some_and(|e| e.name == "manual"));
+    browser.until(|app| app.panes[0].entries.iter().any(|e| e.name == "manual"));
+    assert!(browser.app.panes[0].parent_focused());
     assert_eq!(browser.app.panes[1].path, root.path());
     assert!(browser.app.notifications.history.is_empty());
 }

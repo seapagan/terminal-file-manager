@@ -12,6 +12,7 @@ fn snapshot(path: &Path) -> Snapshot {
 fn loaded(path: &Path) -> App {
     let mut app = App::new(path.into());
     app.complete_listing(0, 1, Ok(snapshot(path)));
+    app.panes[0].move_cursor(1, 20);
     app
 }
 
@@ -197,6 +198,7 @@ fn unverified_initial_context_cannot_automatically_adopt_a_new_identity() {
     let mut unverified = snapshot(root.path());
     unverified.directory = None;
     app.complete_listing(0, 1, Ok(unverified));
+    app.panes[0].move_cursor(1, 20);
     std::fs::write(root.path().join("new-view"), "new").unwrap();
     let refresh = app.request_refresh(0).unwrap();
     app.complete_listing(0, refresh.generation, Ok(snapshot(root.path())));

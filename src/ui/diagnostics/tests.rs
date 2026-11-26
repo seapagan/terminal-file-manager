@@ -20,6 +20,7 @@ fn fixture() -> (tempfile::TempDir, App) {
             )
             .unwrap()),
         );
+        app.panes[id].move_cursor(1, 20);
         app.panes[id].entries[0].ignored = Some(true);
         app.panes[id].select_all();
     }

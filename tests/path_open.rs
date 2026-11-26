@@ -85,8 +85,18 @@ F2 = "full-path"
 
 #[test]
 fn opened_picker_cancels_or_navigates_to_the_chosen_ancestor() {
+    let root = tempfile::tempdir().unwrap();
+    let child = root.path().join("leaf");
+    std::fs::create_dir(&child).unwrap();
     for cancel in [false, true] {
-        let mut c = controller(path());
+        let mut c = controller(child.clone());
+        let listing = terminal_file_manager::fs::list(
+            &child,
+            &terminal_file_manager::fs::IgnoreContext::isolated(),
+            &false.into(),
+        )
+        .unwrap();
+        assert!(c.app.complete_listing(0, 1, Ok(listing)));
         let area = Rect::new(0, 0, 80, 24);
         let g = ui::geometry(&c.app, area);
         c.handle(
@@ -111,10 +121,10 @@ fn opened_picker_cancels_or_navigates_to_the_chosen_ancestor() {
         assert!(c.app.path_picker.is_none());
         if cancel {
             assert!(requests.is_empty());
-            assert_eq!(c.app.panes[0].path, path());
+            assert_eq!(c.app.panes[0].path, child);
         } else {
             assert_eq!(requests.len(), 1);
-            assert_eq!(requests[0].path, path().parent().unwrap());
+            assert_eq!(requests[0].path, root.path());
         }
     }
 }

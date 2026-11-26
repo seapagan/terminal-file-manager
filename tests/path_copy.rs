@@ -21,6 +21,7 @@ fn controller(root: &Path) -> Controller {
     for pane in 0..2 {
         let snapshot = fs::list(root, &Default::default(), &AtomicBool::new(false)).unwrap();
         app.complete_listing(pane, 1, Ok(snapshot));
+        app.panes[pane].move_cursor(1, 20);
     }
     Controller::new(
         app,

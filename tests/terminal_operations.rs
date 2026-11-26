@@ -12,13 +12,13 @@ use terminal_driver::drive;
 #[test]
 fn platform_refresh_renders_external_changes_and_terminal_reentry_is_clean() {
     use std::time::{Duration, Instant};
-    use terminal_driver::{Script, Session};
+    use terminal_driver::Session;
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("initial-ready"), "owned").unwrap();
     for attempt in 0..2 {
         let mut session = Session::open(command(root.path(), root.path(), None)).unwrap();
         let mut transcript = Vec::new();
-        let mut script = Script::default();
+        let mut script = session.script();
         let deadline = Instant::now() + Duration::from_secs(20);
         while script.step == 0 {
             assert!(Instant::now() < deadline, "initial listing timed out");
@@ -158,7 +158,7 @@ fn copy_and_move_replace_are_accessible_from_the_real_dual_pane_manager() {
     drive(
         command(root.path(), &left, Some(&right)),
         &[
-            ("zzz-left-ready", "\t"),
+            ("zzz-left-ready", "\x1b[B\t\x1b[B"),
             ("aaa-right-ready", "\x1b[Z\x1b[15~"),
             ("Copy complete", "q"),
         ],
@@ -169,7 +169,7 @@ fn copy_and_move_replace_are_accessible_from_the_real_dual_pane_manager() {
     drive(
         command(root.path(), &left, Some(&right)),
         &[
-            ("zzz-left-ready", "\t"),
+            ("zzz-left-ready", "\x1b[B\t\x1b[B"),
             ("aaa-right-ready", "\x1b[Z\x1b[17~"),
             ("File already exists", "r"),
             ("Move complete", "q"),
@@ -187,14 +187,14 @@ fn permanent_delete_requires_separate_confirmation_and_enter_cancels() {
     fs::write(root.path().join("selected"), "owned").unwrap();
     drive(
         command(storage.path(), root.path(), None),
-        &[("selected", "\x1bd"), ("1 file · 5 B", "\rq")],
+        &[("selected", "\x1b[B\x1bd"), ("1 file · 5 B", "\rq")],
         false,
     );
     assert_eq!(fs::read(root.path().join("selected")).unwrap(), b"owned");
     drive(
         command(storage.path(), root.path(), None),
         &[
-            ("selected", "\x1bd"),
+            ("selected", "\x1b[B\x1bd"),
             ("1 file · 5 B", "D"),
             ("Success", "q"),
         ],
@@ -213,7 +213,7 @@ fn completed_directory_delete_can_be_followed_by_a_real_create_dialog() {
     drive(
         command(storage.path(), root.path(), None),
         &[
-            ("zzz-ready", "\x1bd"),
+            ("zzz-ready", "\x1b[B\x1bd"),
             ("1 file, 1 directory · 5 B", "D"),
             ("Success", "\x1b[18~"),
             ("Directory name:", "after-delete\r"),
@@ -424,7 +424,11 @@ fn extension_selection_chords_arrive_through_native_terminal_input() {
     }
     drive(
         command(storage.path(), root.path(), None),
-        &[("a.tar.gz", "\x1be"), ("Selected:", "\x1bE"), ("3", "q")],
+        &[
+            ("a.tar.gz", "\x1b[B\x1be"),
+            ("Selected:", "\x1bE"),
+            ("3", "q"),
+        ],
         false,
     );
 }

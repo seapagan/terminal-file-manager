@@ -5,41 +5,36 @@ use crate::app::Request;
 impl Controller {
     pub(super) fn navigate(&mut self, action: Action) -> Vec<Request> {
         let id = self.app.active;
-        if action == Action::Refresh {
-            return self.app.request_refresh(id).into_iter().collect();
-        }
-        if action == Action::Back {
-            return self.app.history(false).into_iter().collect();
-        }
-        if action == Action::Forward {
-            return self.app.history(true).into_iter().collect();
-        }
-        if parent_action(action, self.app.panes[id].parent_focused()) {
-            if let Some(request) = self.app.parent() {
-                return vec![request];
+        let request = match action {
+            Action::Refresh => self.app.request_refresh(id),
+            Action::Back => self.app.history(false),
+            Action::Forward => self.app.history(true),
+            Action::Parent => {
+                let request = self.app.parent();
+                if request.is_none() {
+                    self.app.status = "Filesystem root".into();
+                }
+                request
             }
-            self.app.status = "Filesystem root".into();
+            Action::Enter => return self.enter_row(id),
+            _ => unreachable!(),
+        };
+        request.into_iter().collect()
+    }
+
+    fn enter_row(&mut self, id: usize) -> Vec<Request> {
+        let pane = &self.app.panes[id];
+        if pane.parent_focused() {
+            return self.app.parent().into_iter().collect();
+        }
+        let Some(entry) = pane.current() else {
+            self.app.status = "No visible entry".into();
+            return Vec::new();
+        };
+        if !entry.enterable {
+            self.app.status = "The file viewer is not available yet.".into();
             return Vec::new();
         }
-        let pane = &self.app.panes[id];
-        let path = match action {
-            Action::Enter => {
-                let Some(entry) = pane.current() else {
-                    self.app.status = "No visible entry".into();
-                    return Vec::new();
-                };
-                if !entry.enterable {
-                    self.app.status = "The file viewer is not available yet.".into();
-                    return Vec::new();
-                }
-                entry.path.clone()
-            }
-            _ => pane.path.clone(),
-        };
-        vec![self.app.request_listing(id, path)]
+        vec![self.app.request_listing(id, entry.path.clone())]
     }
-}
-
-fn parent_action(action: Action, parent_focused: bool) -> bool {
-    action == Action::Parent || (action == Action::Enter && parent_focused)
 }

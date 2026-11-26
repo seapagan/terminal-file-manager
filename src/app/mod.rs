@@ -31,9 +31,13 @@ pub struct Request {
 }
 
 /// Independent request lanes keep slow counts from starving listings.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RequestKind {
     Listing,
+    /// Parent listing with a lexical source to inspect if it has never been listed.
+    ParentListing(Option<PathBuf>),
+    /// Best-effort no-follow identity lookup for a pending or completed Parent request.
+    ParentIdentity,
     Metadata,
     Totals,
 }
@@ -98,16 +102,20 @@ pub struct App {
 impl App {
     /// Every invocation starts single-pane, with two independent original locations.
     pub fn new(path: PathBuf) -> Self {
+        Self::with_locations([path.clone(), path])
+    }
+
+    pub(crate) fn with_locations(locations: [PathBuf; 2]) -> Self {
         Self {
             compound_extension_review: None,
             keep_filter_on_navigation: false,
-            relative_path_base: path.clone(),
+            relative_path_base: locations[0].clone(),
             footer_workflow: None,
             path_picker: None,
             path_pointer: None,
             notifications: Default::default(),
             operations: Default::default(),
-            panes: [Pane::new(path.clone()), Pane::new(path)],
+            panes: locations.map(Pane::new),
             active: 0,
             dual: false,
             maximized: false,
@@ -196,8 +204,15 @@ impl App {
 
     /// Request navigation; commit the location/history only on successful completion.
     pub fn request_listing(&mut self, pane: usize, path: PathBuf) -> Request {
+        self.request_location(pane, path, RequestKind::Listing)
+    }
+
+    fn request_location(&mut self, pane: usize, path: PathBuf, kind: RequestKind) -> Request {
         let state = &mut self.panes[pane];
-        if state.pending.is_some() && state.refresh_pending {
+        if state.refresh_pending
+            && (state.pending_navigation().is_some()
+                || matches!(kind, RequestKind::ParentListing(_)))
+        {
             self.status = "Deferred refresh cancelled by newer navigation".into();
         }
         state.reset_range();
@@ -213,27 +228,17 @@ impl App {
             pane,
             generation: state.generation,
             path,
-            kind: RequestKind::Listing,
+            kind,
         }
-    }
-
-    /// Return to the lexical parent, retaining the exited entry's native identity.
-    pub fn parent(&mut self) -> Option<Request> {
-        let pane = &self.panes[self.active];
-        let parent = pane.path.parent()?.to_path_buf();
-        let visit = pane.parent_visit(parent.clone());
-        let request = self.request_listing(self.active, parent);
-        self.panes[self.active].parent_restoring = Some(visit);
-        Some(request)
     }
 
     /// Refresh explicitly, or defer once to the pending navigation's successful target.
     /// Failed or superseding navigation cancels that deferred intent.
     pub fn request_refresh(&mut self, pane: usize) -> Option<Request> {
         let state = self.panes.get_mut(pane)?;
-        if let Some(path) = &state.pending {
-            state.refresh_pending = true;
+        if let Some(path) = state.pending_navigation() {
             self.status = format!("Refresh queued for {} after navigation", path.display()).into();
+            state.refresh_pending = true;
             return None;
         }
         self.invalidate_listing_details(pane);
@@ -243,7 +248,7 @@ impl App {
     /// Reconcile without stealing navigation or cancelling a scan or unchanged count.
     pub(crate) fn request_reconciliation(&mut self, pane: usize) -> Option<Request> {
         let state = self.panes.get_mut(pane)?;
-        if state.pending.is_some() {
+        if state.pending_navigation().is_some() {
             return None;
         }
         state.refresh_pending = true;
@@ -253,12 +258,13 @@ impl App {
     /// Start one deferred ordinary refresh after the current listing has completed.
     pub fn take_refresh(&mut self, pane: usize) -> Option<Request> {
         let state = self.panes.get_mut(pane)?;
-        if !state.refresh_pending || state.listing || state.pending.is_some() {
+        if !state.refresh_pending || state.listing || state.pending_navigation().is_some() {
             return None;
         }
         state.refresh_pending = false;
         state.listing = true;
         state.generation += 1;
+        state.parent_restoring = None;
         Some(Request {
             pane,
             generation: state.generation,
@@ -496,9 +502,10 @@ impl App {
     /// Report worker failures through the same generation checks as successful work.
     pub fn complete_failure(&mut self, request: &Request, error: String) -> bool {
         match request.kind {
-            RequestKind::Listing => {
+            RequestKind::Listing | RequestKind::ParentListing(_) => {
                 self.complete_listing(request.pane, request.generation, Err(error))
             }
+            RequestKind::ParentIdentity => self.complete_parent_identity(request, None),
             RequestKind::Totals => self.complete_totals(request, Err(error)),
             RequestKind::Metadata => {
                 if !self.detail_matches(request) {

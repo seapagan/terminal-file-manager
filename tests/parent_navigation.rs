@@ -48,12 +48,56 @@ fn directories(root: &Path) {
 }
 
 #[test]
+fn fresh_directories_focus_parent_and_enter_immediately_returns_to_the_exited_child() {
+    let root = tempfile::tempdir().unwrap();
+    let child = root.path().join("child");
+    std::fs::create_dir(&child).unwrap();
+    std::fs::write(child.join("file"), "owned").unwrap();
+    let mut c = controller(root.path());
+    for pane in &c.app.panes {
+        assert!(pane.parent_focused());
+        assert_eq!(pane.row_index(), Some(0));
+    }
+    c.app.panes[0].move_cursor(1, 5);
+    navigate(&mut c, Action::Enter);
+    assert_eq!(c.app.panes[0].path, child);
+    assert!(c.app.panes[0].parent_focused());
+    assert_eq!(c.app.panes[0].scroll, 0);
+    let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(80, 24)).unwrap();
+    terminal
+        .draw(|frame| {
+            ui::render(
+                frame,
+                &c.app,
+                &terminal_file_manager::color::Theme::new(colored_text::ColorLevel::NoColor),
+            );
+        })
+        .unwrap();
+    let buffer = terminal.backend().buffer();
+    assert!(
+        buffer[(2, 2)]
+            .modifier
+            .contains(ratatui::style::Modifier::REVERSED)
+    );
+    assert!(
+        !buffer[(2, 3)]
+            .modifier
+            .contains(ratatui::style::Modifier::REVERSED)
+    );
+    navigate(&mut c, Action::Refresh);
+    assert!(c.app.panes[0].parent_focused());
+    navigate(&mut c, Action::Enter);
+    assert_eq!(c.app.panes[0].path, root.path());
+    assert_eq!(c.app.panes[0].cursor.as_ref(), Some(&child));
+}
+
+#[test]
 fn parent_and_back_restore_the_exited_child_and_saved_viewport() {
     for action in [Action::Parent, Action::Back] {
         let root = tempfile::tempdir().unwrap();
         directories(root.path());
         let mut c = controller(root.path());
-        c.app.panes[0].move_cursor(30, 5);
+        c.app.panes[0].move_cursor(31, 5);
         let child = root.path().join("child30");
         assert_eq!(c.app.panes[0].cursor.as_ref(), Some(&child));
         assert_eq!(c.app.panes[0].scroll, 27);
@@ -64,7 +108,10 @@ fn parent_and_back_restore_the_exited_child_and_saved_viewport() {
         assert_eq!(pane.scroll, 27);
         assert_eq!(pane.viewport_start(5), 27);
         assert_eq!(pane.viewport_start(1), 31);
-        assert_eq!(c.app.panes[1].cursor, Some(root.path().join("child00")));
+        assert_eq!(
+            c.app.panes[1].cursor,
+            Some(root.path().parent().unwrap().into())
+        );
     }
 }
 
@@ -107,8 +154,9 @@ fn nested_parent_history_and_unrelated_back_forward_remain_distinct() {
     let grandchild = child.join("nested");
     std::fs::create_dir(&grandchild).unwrap();
     let mut c = controller(root.path());
-    c.app.panes[0].move_cursor(30, 5);
+    c.app.panes[0].move_cursor(31, 5);
     navigate(&mut c, Action::Enter);
+    c.app.panes[0].move_cursor(1, 5);
     navigate(&mut c, Action::Enter);
     navigate(&mut c, Action::Parent);
     assert_eq!(c.app.panes[0].cursor, Some(grandchild.clone()));
@@ -138,7 +186,7 @@ fn failed_and_superseded_parent_completions_do_not_consume_history() {
     let root = tempfile::tempdir().unwrap();
     directories(root.path());
     let mut c = controller(root.path());
-    c.app.panes[0].move_cursor(30, 5);
+    c.app.panes[0].move_cursor(31, 5);
     navigate(&mut c, Action::Enter);
     let failed = request(&mut c, Action::Parent);
     assert!(
@@ -165,7 +213,10 @@ fn failed_and_superseded_parent_completions_do_not_consume_history() {
         !c.app
             .complete_listing(0, stale.generation, Err("late".into()))
     );
-    assert_eq!(c.app.panes[0].cursor, Some(other.path().join("other")));
+    assert_eq!(
+        c.app.panes[0].cursor,
+        Some(other.path().parent().unwrap().into())
+    );
     assert!(c.app.panes[0].error.is_none());
 }
 
@@ -176,7 +227,7 @@ fn parent_does_not_restore_removed_replaced_or_unidentified_children_or_marks() 
         directories(root.path());
         let child = root.path().join("child30");
         let mut c = controller(root.path());
-        c.app.panes[0].move_cursor(30, 5);
+        c.app.panes[0].move_cursor(31, 5);
         c.app.panes[0].toggle_mark();
         navigate(&mut c, Action::Enter);
         std::fs::rename(&child, root.path().join("old-child")).unwrap();
@@ -184,7 +235,10 @@ fn parent_does_not_restore_removed_replaced_or_unidentified_children_or_marks() 
             std::fs::create_dir(&child).unwrap();
         }
         navigate(&mut c, Action::Parent);
-        assert_eq!(c.app.panes[0].cursor, Some(root.path().join("child00")));
+        assert_eq!(
+            c.app.panes[0].cursor,
+            Some(root.path().parent().unwrap().into())
+        );
         assert_eq!(c.app.panes[0].scroll, 0);
         assert!(c.app.panes[0].marks.is_empty());
     }
@@ -193,7 +247,10 @@ fn parent_does_not_restore_removed_replaced_or_unidentified_children_or_marks() 
     let mut c = controller(&root.path().join("child30"));
     c.app.panes[0].directory = None;
     navigate(&mut c, Action::Parent);
-    assert_eq!(c.app.panes[0].cursor, Some(root.path().join("child00")));
+    assert_eq!(
+        c.app.panes[0].cursor,
+        Some(root.path().parent().unwrap().into())
+    );
 }
 
 #[test]
@@ -222,7 +279,7 @@ fn parent_obeys_filters_hidden_ignore_rules_and_empty_listings() {
             _ => listing.entries.clear(),
         }
         assert!(c.app.complete_listing(0, next.generation, Ok(listing)));
-        let expected = (exclusion != "empty").then(|| root.path().join("child00"));
+        let expected = Some(root.path().parent().unwrap().into());
         assert_eq!(c.app.panes[0].cursor, expected);
         assert_eq!(c.app.panes[0].scroll, 0);
     }
@@ -295,7 +352,7 @@ fn mismatched_completion_cannot_leak_parent_restoration_into_refresh() {
         !c.app
             .complete_listing(0, next.generation, Ok(snapshot(&child)))
     );
-    assert_eq!(c.app.panes[0].cursor, Some(child.join("entry")));
+    assert_eq!(c.app.panes[0].cursor, Some(child.parent().unwrap().into()));
     let refresh = c.app.request_refresh(0).unwrap();
     complete(&mut c, refresh);
     assert_eq!(c.app.panes[0].path, child);
@@ -307,7 +364,7 @@ fn replaced_parent_identity_discards_the_saved_viewport() {
     let root = tempfile::tempdir().unwrap();
     directories(root.path());
     let mut c = controller(root.path());
-    c.app.panes[0].move_cursor(30, 5);
+    c.app.panes[0].move_cursor(31, 5);
     navigate(&mut c, Action::Enter);
     let next = request(&mut c, Action::Parent);
     let mut listing = snapshot(root.path());
@@ -350,7 +407,10 @@ fn parent_restores_a_link_entry_by_its_saved_no_follow_identity() {
     std::fs::rename(&link, root.path().join("old-link")).unwrap();
     std::os::unix::fs::symlink(target.path(), &link).unwrap();
     navigate(&mut c, Action::Parent);
-    assert_eq!(c.app.panes[0].cursor, Some(root.path().join("child00")));
+    assert_eq!(
+        c.app.panes[0].cursor,
+        Some(root.path().parent().unwrap().into())
+    );
     assert_eq!(c.app.panes[0].scroll, 0);
 }
 
@@ -359,11 +419,11 @@ fn concurrent_parent_requests_restore_each_pane_independently() {
     let root = tempfile::tempdir().unwrap();
     directories(root.path());
     let mut c = controller(root.path());
-    c.app.panes[0].move_cursor(30, 5);
+    c.app.panes[0].move_cursor(31, 5);
     navigate(&mut c, Action::Enter);
     let left = request(&mut c, Action::Parent);
     c.app.active = 1;
-    c.app.panes[1].move_cursor(20, 5);
+    c.app.panes[1].move_cursor(21, 5);
     navigate(&mut c, Action::Enter);
     let right = request(&mut c, Action::Parent);
     complete(&mut c, right);
@@ -380,7 +440,7 @@ fn back_does_not_restore_focus_to_a_replacement_child() {
     directories(root.path());
     let child = root.path().join("child30");
     let mut c = controller(root.path());
-    c.app.panes[0].move_cursor(30, 5);
+    c.app.panes[0].move_cursor(31, 5);
     navigate(&mut c, Action::Enter);
     std::fs::rename(&child, root.path().join("old-child")).unwrap();
     std::fs::create_dir(&child).unwrap();
@@ -396,7 +456,9 @@ fn parent_and_history_navigation_clear_filters_by_default() {
     let root = tempfile::tempdir().unwrap();
     directories(root.path());
     let mut c = controller(root.path());
+    c.app.panes[0].move_cursor(1, 5);
     navigate(&mut c, Action::Enter);
+    assert_eq!(c.app.panes[0].path, root.path().join("child00"));
     for action in [Action::Parent, Action::Back, Action::Forward] {
         c.app.panes[0].set_filter("no-match".into());
         navigate(&mut c, action);

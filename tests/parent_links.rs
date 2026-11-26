@@ -113,7 +113,10 @@ fn direct_start_link_replacement_or_removal_cannot_restore_focus() {
         );
         let request = app.parent().unwrap();
         complete(&mut app, request);
-        assert_eq!(app.panes[0].cursor, Some(root.path().join("aaa")));
+        assert_eq!(
+            app.panes[0].cursor,
+            Some(root.path().parent().unwrap().into())
+        );
     }
 }
 
@@ -155,11 +158,11 @@ fn direct_start_link_obeys_visibility_and_missing_identity() {
         }
         assert!(app.complete_listing(0, request.generation, Ok(listing)));
         let expected = if exclusion == "cleared-filter" {
-            "link"
+            root.path().join("link")
         } else {
-            "aaa"
+            root.path().parent().unwrap().into()
         };
-        assert_eq!(app.panes[0].cursor, Some(root.path().join(expected)));
+        assert_eq!(app.panes[0].cursor, Some(expected));
     }
 }
 
@@ -174,7 +177,10 @@ fn missing_original_lexical_identity_uses_safe_parent_fallback() {
     app.complete_listing(0, 1, Ok(listing));
     let request = app.parent().unwrap();
     complete(&mut app, request);
-    assert_eq!(app.panes[0].cursor, Some(root.path().join("aaa")));
+    assert_eq!(
+        app.panes[0].cursor,
+        Some(root.path().parent().unwrap().into())
+    );
 }
 
 #[cfg(windows)]

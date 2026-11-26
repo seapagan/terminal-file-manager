@@ -23,6 +23,10 @@ fn controller(long: bool) -> Controller {
     } else {
         path
     };
+    controller_at(path)
+}
+
+fn controller_at(path: std::path::PathBuf) -> Controller {
     Controller::new(
         App::new(path),
         Bindings::new(&Default::default()).unwrap(),
@@ -219,7 +223,19 @@ fn help_prose_uses_the_effective_binding_and_both_close_buttons_remain_safe() {
 
 #[test]
 fn resizing_help_reveals_the_parent_selection_and_returns_to_ancestor_navigation() {
-    let mut c = controller(true);
+    let root = tempfile::tempdir().unwrap();
+    let path = (0..24).fold(root.path().join("current-directory"), |p, _| {
+        p.join("parent")
+    });
+    std::fs::create_dir_all(&path).unwrap();
+    let listing = terminal_file_manager::fs::list(
+        &path,
+        &terminal_file_manager::fs::IgnoreContext::isolated(),
+        &false.into(),
+    )
+    .unwrap();
+    let mut c = controller_at(path);
+    assert!(c.app.complete_listing(0, 1, Ok(listing)));
     let mut bounds = Rect::new(0, 0, 80, 24);
     key(&mut c, "Alt+l", bounds);
     let original = snapshot(&c);

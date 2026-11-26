@@ -38,6 +38,9 @@ pub(super) fn collect(controller: &mut Controller, pool: &mut Pool) -> bool {
                     .complete_listing(pane, request.generation, result);
                 changed |= before != listing_presentation(&controller.app, pane);
             }
+            Value::ParentIdentity(identity) => {
+                changed |= controller.app.complete_parent_identity(&request, identity);
+            }
             Value::Metadata(entry, canonical) => {
                 controller
                     .app

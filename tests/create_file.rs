@@ -150,7 +150,11 @@ fn creation_highlight_survives_refresh_and_respects_native_visibility() {
         assert!(root.path().join(name).is_file());
         assert_eq!(
             c.app.panes[0].cursor,
-            visible.then(|| root.path().join(name))
+            Some(if visible {
+                root.path().join(name)
+            } else {
+                root.path().parent().unwrap().into()
+            })
         );
     }
 }
@@ -494,7 +498,7 @@ fn creation_completion_during_an_older_scan_uses_the_deferred_refresh() {
     assert!(requests.is_empty());
     c.app
         .complete_listing(0, old_request.generation, Ok(old_snapshot));
-    assert!(c.app.panes[0].cursor.is_none());
+    assert!(c.app.panes[0].parent_focused());
     let request = c
         .app
         .take_refresh(0)

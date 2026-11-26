@@ -60,6 +60,13 @@ fn symlink_ancestors_navigate_lexically_and_failed_navigation_preserves_history(
         Bindings::new(&Default::default()).unwrap(),
         Settings::default(),
     );
+    let listing = terminal_file_manager::fs::list(
+        &path,
+        &terminal_file_manager::fs::IgnoreContext::isolated(),
+        &false.into(),
+    )
+    .unwrap();
+    assert!(c.app.complete_listing(0, 1, Ok(listing)));
     let g = ui::geometry(&c.app, Rect::new(0, 0, 240, 24));
     let control = g
         .path_controls
