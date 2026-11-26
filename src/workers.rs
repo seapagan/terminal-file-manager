@@ -1,7 +1,7 @@
-//! Six bounded I/O lanes: listing, metadata and totals independently for each pane.
+//! Bounded I/O lanes for ordinary listings, parent listings, metadata and totals.
 use crate::{
     app::{Request, RequestKind},
-    fs::{self, Entry, IgnoreContext, Snapshot, Totals},
+    fs::{self, Entry, Identity, IgnoreContext, Snapshot, Totals},
 };
 use std::{
     io,
@@ -14,9 +14,12 @@ use std::{
     time::Duration,
 };
 
+const LANE_COUNT: usize = 8;
+
 /// Background values are installed only by generation-checked model transitions.
 pub enum Value {
     Listing(Result<Snapshot, String>),
+    ParentListing(Result<Snapshot, String>, Option<Identity>),
     Metadata(Box<Entry>, Option<PathBuf>),
     Totals(Result<Totals, String>),
     Failed(String),
@@ -32,6 +35,15 @@ pub struct Completion {
 struct Lane {
     running: Option<Arc<AtomicBool>>,
     pending: Option<Work>,
+}
+
+impl Lane {
+    fn cancel(&mut self) {
+        self.pending = None;
+        if let Some(cancelled) = &self.running {
+            cancelled.store(true, Ordering::Relaxed);
+        }
+    }
 }
 
 struct Work {
@@ -53,7 +65,7 @@ pub struct ListingMetrics {
 /// At most one running and one replaceable pending request per lane.
 pub struct Pool {
     runtime: Option<tokio::runtime::Runtime>,
-    lanes: [Lane; 6],
+    lanes: [Lane; LANE_COUNT],
     sender: mpsc::SyncSender<Completion>,
     receiver: mpsc::Receiver<Completion>,
     context: IgnoreContext,
@@ -73,9 +85,9 @@ impl Pool {
     pub fn new(context: IgnoreContext) -> io::Result<Self> {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(1)
-            .max_blocking_threads(6)
+            .max_blocking_threads(LANE_COUNT)
             .build()?;
-        let (sender, receiver) = mpsc::sync_channel(6);
+        let (sender, receiver) = mpsc::sync_channel(LANE_COUNT);
         Ok(Self {
             runtime: Some(runtime),
             lanes: std::array::from_fn(|_| Lane::default()),
@@ -107,13 +119,18 @@ impl Pool {
         });
     }
     fn submit_work(&mut self, work: Work) {
-        let Some(index) = lane_index(&work.request) else {
+        let Request { pane, kind, .. } = &work.request;
+        let Some(index) = lane_index(*pane, kind) else {
             return;
         };
-        let lane = &mut self.lanes[index];
-        if let Some(cancelled) = &lane.running {
-            cancelled.store(true, Ordering::Relaxed);
+        // A slow scan can be blocked in the kernel while its replacement starts.
+        match kind {
+            RequestKind::Listing => self.cancel(*pane, RequestKind::ParentListing(None)),
+            RequestKind::ParentListing(_) => self.cancel(*pane, RequestKind::Listing),
+            _ => {}
         }
+        let lane = &mut self.lanes[index];
+        lane.cancel();
         lane.pending = Some(work);
         self.pump();
     }
@@ -126,17 +143,8 @@ impl Pool {
 
     /// Cancel a lane without claiming an in-flight kernel read was interrupted.
     pub fn cancel(&mut self, pane: usize, kind: RequestKind) {
-        let request = Request {
-            pane,
-            kind,
-            generation: 0,
-            path: PathBuf::new(),
-        };
-        if let Some(index) = lane_index(&request) {
-            self.lanes[index].pending = None;
-            if let Some(cancelled) = &self.lanes[index].running {
-                cancelled.store(true, Ordering::Relaxed);
-            }
+        if let Some(index) = lane_index(pane, &kind) {
+            self.lanes[index].cancel();
         }
     }
 
@@ -147,7 +155,7 @@ impl Pool {
         } else {
             self.receiver.recv_timeout(timeout).ok()
         }?;
-        if let Some(index) = lane_index(&completion.request) {
+        if let Some(index) = lane_index(completion.request.pane, &completion.request.kind) {
             self.lanes[index].running = None;
         }
         self.pump();
@@ -210,9 +218,7 @@ impl Pool {
 impl Drop for Pool {
     fn drop(&mut self) {
         for lane in &mut self.lanes {
-            if let Some(cancelled) = &lane.running {
-                cancelled.store(true, Ordering::Relaxed);
-            }
+            lane.cancel();
         }
         if let Some(runtime) = self.runtime.take() {
             // Blocking syscalls cannot be forcibly cancelled; all workers are read-only.
@@ -221,16 +227,17 @@ impl Drop for Pool {
     }
 }
 
-fn lane_index(request: &Request) -> Option<usize> {
-    if request.pane >= 2 {
+fn lane_index(pane: usize, kind: &RequestKind) -> Option<usize> {
+    if pane >= 2 {
         return None;
     }
-    let kind = match request.kind {
+    let kind = match kind {
         RequestKind::Listing => 0,
-        RequestKind::Metadata => 1,
-        RequestKind::Totals => 2,
+        RequestKind::ParentListing(_) => 1,
+        RequestKind::Metadata => 2,
+        RequestKind::Totals => 3,
     };
-    Some(kind * 2 + request.pane)
+    Some(kind * 2 + pane)
 }
 
 fn execute_work(
@@ -250,16 +257,22 @@ fn execute_work(
             Ok(None) => {}
         }
     }
-    if request.kind == RequestKind::Listing {
+    if matches!(
+        request.kind,
+        RequestKind::Listing | RequestKind::ParentListing(_)
+    ) {
         metrics.full_scans.fetch_add(1, Ordering::Relaxed);
     }
     execute(request, context, cancelled)
 }
 
 fn execute(request: &Request, context: &IgnoreContext, cancelled: &AtomicBool) -> Value {
-    match request.kind {
+    match &request.kind {
         RequestKind::Listing => {
             Value::Listing(fs::list(&request.path, context, cancelled).map_err(|e| e.to_string()))
+        }
+        RequestKind::ParentListing(exited) => {
+            execute_parent(request, exited.as_deref(), context, cancelled)
         }
         RequestKind::Metadata => Value::Metadata(
             Box::new(fs::inspect(&request.path)),
@@ -269,6 +282,20 @@ fn execute(request: &Request, context: &IgnoreContext, cancelled: &AtomicBool) -
             Value::Totals(fs::totals(&request.path, cancelled).map_err(|e| e.to_string()))
         }
     }
+}
+
+fn execute_parent(
+    request: &Request,
+    exited: Option<&std::path::Path>,
+    context: &IgnoreContext,
+    cancelled: &AtomicBool,
+) -> Value {
+    let identity = exited
+        .filter(|_| !cancelled.load(Ordering::Relaxed))
+        .and_then(|path| fs::inspect_identity(path).identity)
+        .filter(|identity| identity.object.is_some());
+    let result = fs::list(&request.path, context, cancelled).map_err(|error| error.to_string());
+    Value::ParentListing(result, identity)
 }
 
 #[cfg(test)]

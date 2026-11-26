@@ -5,28 +5,21 @@ use crate::app::Request;
 impl Controller {
     pub(super) fn navigate(&mut self, action: Action) -> Vec<Request> {
         let id = self.app.active;
-        if action == Action::Refresh {
-            return self.app.request_refresh(id).into_iter().collect();
-        }
-        if action == Action::Back {
-            return self.app.history(false).into_iter().collect();
-        }
-        if action == Action::Forward {
-            return self.app.history(true).into_iter().collect();
-        }
-        if action == Action::Parent {
-            if self.app.panes[id].path.parent().is_none() {
-                self.app.status = "Filesystem root".into();
+        let request = match action {
+            Action::Refresh => self.app.request_refresh(id),
+            Action::Back => self.app.history(false),
+            Action::Forward => self.app.history(true),
+            Action::Parent => {
+                let request = self.app.parent();
+                if request.is_none() {
+                    self.app.status = "Filesystem root".into();
+                }
+                request
             }
-            return self.app.parent().into_iter().collect();
-        }
-        if action == Action::Enter {
-            return self.enter_row(id);
-        }
-        vec![
-            self.app
-                .request_listing(id, self.app.panes[id].path.clone()),
-        ]
+            Action::Enter => return self.enter_row(id),
+            _ => unreachable!(),
+        };
+        request.into_iter().collect()
     }
 
     fn enter_row(&mut self, id: usize) -> Vec<Request> {

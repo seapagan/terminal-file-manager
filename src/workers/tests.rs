@@ -37,6 +37,7 @@ fn listing_metrics_count_only_successful_targeted_refreshes() {
 fn panic_releases_each_lane_and_runs_only_the_latest_pending_request() {
     for kind in [
         RequestKind::Listing,
+        RequestKind::ParentListing(None),
         RequestKind::Metadata,
         RequestKind::Totals,
     ] {
@@ -47,7 +48,7 @@ fn panic_releases_each_lane_and_runs_only_the_latest_pending_request() {
 fn recover_lane(kind: RequestKind) {
     let root = tempfile::tempdir().unwrap();
     let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
-    let (running, release) = panic_first(&mut pool, kind);
+    let (running, release) = panic_first(&mut pool, kind.clone());
     let request = Request {
         pane: 0,
         kind,

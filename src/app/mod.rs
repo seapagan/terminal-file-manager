@@ -31,9 +31,11 @@ pub struct Request {
 }
 
 /// Independent request lanes keep slow counts from starving listings.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RequestKind {
     Listing,
+    /// Parent listing with a lexical source to inspect if it has never been listed.
+    ParentListing(Option<PathBuf>),
     Metadata,
     Totals,
 }
@@ -200,8 +202,15 @@ impl App {
 
     /// Request navigation; commit the location/history only on successful completion.
     pub fn request_listing(&mut self, pane: usize, path: PathBuf) -> Request {
+        self.request_location(pane, path, RequestKind::Listing)
+    }
+
+    fn request_location(&mut self, pane: usize, path: PathBuf, kind: RequestKind) -> Request {
         let state = &mut self.panes[pane];
-        if state.pending_navigation().is_some() && state.refresh_pending {
+        if state.refresh_pending
+            && (state.pending_navigation().is_some()
+                || matches!(kind, RequestKind::ParentListing(_)))
+        {
             self.status = "Deferred refresh cancelled by newer navigation".into();
         }
         state.reset_range();
@@ -211,14 +220,13 @@ impl App {
         state.error = None;
         state.restoring = None;
         state.parent_restoring = None;
-        state.startup_parent_pending = false;
         state.listing = true;
         state.refresh_pending = false;
         Request {
             pane,
             generation: state.generation,
             path,
-            kind: RequestKind::Listing,
+            kind,
         }
     }
 
@@ -491,7 +499,7 @@ impl App {
     /// Report worker failures through the same generation checks as successful work.
     pub fn complete_failure(&mut self, request: &Request, error: String) -> bool {
         match request.kind {
-            RequestKind::Listing => {
+            RequestKind::Listing | RequestKind::ParentListing(_) => {
                 self.complete_listing(request.pane, request.generation, Err(error))
             }
             RequestKind::Totals => self.complete_totals(request, Err(error)),

@@ -1,40 +1,36 @@
 //! Virtual navigation rows and path overlays follow their owning pane.
-use super::{App, Pane, Request};
+use super::{App, Pane, Request, RequestKind};
+use crate::fs::{Identity, Snapshot};
 use std::path::{Path, PathBuf};
 
 impl App {
     /// Return to the lexical parent, retaining the exited entry's native identity.
     pub fn parent(&mut self) -> Option<Request> {
-        self.request_parent(self.active)
-    }
-
-    fn request_parent(&mut self, pane: usize) -> Option<Request> {
-        let state = &mut self.panes[pane];
-        let parent = state.path.parent()?;
-        if state.generation == 1 && state.listing {
-            // The initial listing supplies the exited child's no-follow identity.
-            if !state.startup_parent_pending {
-                state.refresh_pending = false;
-            }
-            state.startup_parent_pending = true;
-            return None;
-        }
-        let parent = parent.to_path_buf();
+        let pane = self.active;
+        let state = &self.panes[pane];
+        let parent = state.path.parent()?.to_path_buf();
         let visit = state.parent_visit(parent.clone());
-        let request = self.request_listing(pane, parent);
+        // Keep an established context's original identity, including its absence.
+        let exited = (state.context == 0).then(|| state.path.clone());
+        let request = self.request_location(pane, parent, RequestKind::ParentListing(exited));
         self.panes[pane].parent_restoring = Some(visit);
         Some(request)
     }
 
-    pub(crate) fn take_startup_parent(&mut self, pane: usize) -> Option<Request> {
-        let state = &mut self.panes[pane];
-        if state.listing || !state.startup_parent_pending {
-            return None;
+    pub(crate) fn complete_parent_listing(
+        &mut self,
+        request: &Request,
+        result: Result<Snapshot, String>,
+        identity: Option<Identity>,
+    ) {
+        if let Some(state) = self.panes.get_mut(request.pane)
+            && state.generation == request.generation
+            && let Some(visit) = &mut state.parent_restoring
+            && visit.cursor_identity.is_none()
+        {
+            visit.cursor_identity = identity;
         }
-        let refresh = std::mem::take(&mut state.refresh_pending);
-        let request = self.request_parent(pane)?;
-        self.panes[pane].refresh_pending = refresh;
-        Some(request)
+        self.complete_listing(request.pane, request.generation, result);
     }
 
     pub(super) fn close_stale_path_picker(&mut self, pane: usize) {
@@ -57,12 +53,8 @@ impl App {
 }
 
 impl Pane {
-    pub(super) fn pending_navigation(&self) -> Option<&Path> {
-        if self.startup_parent_pending {
-            self.path.parent()
-        } else {
-            self.pending.as_deref()
-        }
+    pub(crate) fn pending_navigation(&self) -> Option<&Path> {
+        self.pending.as_deref()
     }
 
     /// A parent exists according to native lexical path semantics.

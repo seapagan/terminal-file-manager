@@ -45,8 +45,11 @@ no-follow identity queries. Search handles use FindClose through RAII; File
 handles use standard ownership. Neither adjusts privileges or changes files.
 Unsupported reparse points remain visible and cannot be entered or recursed.
 
-`workers` bounds filesystem work to six lanes (listing, metadata, totals for
-each pane), with one running and one replaceable pending request per lane.
+`workers` gives each pane four lanes for ordinary listings, parent listings,
+metadata and totals, with one running and one replaceable pending request per
+lane. Parent navigation cancels the ordinary listing and can start while that
+listing is still in a kernel read. Before the pane's first successful listing,
+the parent worker inspects the exited entry's no-follow identity directly.
 Metadata is debounced and shared by sidebar/popup; generations reject stale
 listing, selection and count results. Cancellation is cooperative: a running
 kernel read cannot be forcibly interrupted, and no mutation is submitted.

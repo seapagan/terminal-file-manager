@@ -136,10 +136,12 @@ pub struct Snapshot {
 /// # Errors
 /// Returns the selected directory's error, or Interrupted on cancellation.
 pub fn list(path: &Path, context: &IgnoreContext, cancelled: &AtomicBool) -> io::Result<Snapshot> {
+    check_cancelled(cancelled)?;
     let mut owners = crate::owner::Cache::default();
     let initial_directory = directory_identity(path, &mut owners);
     let initial_entry = inspect_no_follow(path, None);
     let directory = fs::read_dir(path)?;
+    check_cancelled(cancelled)?;
     let (rules, mut errors) = rules::load(path, context);
     let mut entries = Vec::new();
     for item in directory {

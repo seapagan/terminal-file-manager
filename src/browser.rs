@@ -160,10 +160,7 @@ fn drive(
 
 fn submit_deferred_listings(app: &mut App, pool: &mut Pool) {
     for pane in 0..2 {
-        if let Some(request) = app
-            .take_startup_parent(pane)
-            .or_else(|| app.take_refresh(pane))
-        {
+        if let Some(request) = app.take_refresh(pane) {
             pool.submit(request);
         }
     }
@@ -241,6 +238,7 @@ mod tests {
     fn worker_panics_are_visible_in_the_requesting_model() {
         for kind in [
             RequestKind::Listing,
+            RequestKind::ParentListing(None),
             RequestKind::Metadata,
             RequestKind::Totals,
         ] {
@@ -249,6 +247,7 @@ mod tests {
             let metadata = controller.app.request_metadata(0).unwrap();
             let request = match kind {
                 RequestKind::Listing => controller.app.request_listing(0, root.path().into()),
+                RequestKind::ParentListing(_) => controller.app.parent().unwrap(),
                 RequestKind::Metadata => metadata,
                 RequestKind::Totals => controller.app.request_totals().unwrap(),
             };
@@ -257,7 +256,9 @@ mod tests {
             pool.submit(request.clone());
             collect_until_idle(&mut controller, &mut pool);
             let error = match kind {
-                RequestKind::Listing => controller.app.panes[0].error.as_ref().unwrap(),
+                RequestKind::Listing | RequestKind::ParentListing(_) => {
+                    controller.app.panes[0].error.as_ref().unwrap()
+                }
                 RequestKind::Metadata => controller.app.details[0]
                     .entry
                     .as_ref()
