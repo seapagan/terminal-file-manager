@@ -1,4 +1,4 @@
-//! Bounded I/O lanes for ordinary listings, parent listings, metadata and totals.
+//! Bounded I/O lanes for listings, metadata and totals.
 use crate::{
     app::{Request, RequestKind},
     fs::{self, Entry, Identity, IgnoreContext, Snapshot, Totals},
@@ -14,7 +14,9 @@ use std::{
     time::Duration,
 };
 
-const LANE_COUNT: usize = 8;
+const PANE_COUNT: usize = 2;
+const LANE_COUNT: usize = 3 * PANE_COUNT;
+const WORKER_COUNT: usize = LANE_COUNT + PANE_COUNT;
 
 /// Background values are installed only by generation-checked model transitions.
 pub enum Value {
@@ -25,22 +27,28 @@ pub enum Value {
     Failed(String),
 }
 
-/// A terminal completion always releases its lane, including cancelled requests.
+/// A terminal completion always releases its worker slot, including cancelled requests.
 pub struct Completion {
     pub request: Request,
     pub value: Value,
 }
 
+struct Finished {
+    lane: usize,
+    slot: usize,
+    completion: Completion,
+}
+
 #[derive(Default)]
 struct Lane {
-    running: Option<Arc<AtomicBool>>,
+    running: [Option<Arc<AtomicBool>>; 2],
     pending: Option<Work>,
 }
 
 impl Lane {
     fn cancel(&mut self) {
         self.pending = None;
-        if let Some(cancelled) = &self.running {
+        for cancelled in self.running.iter().flatten() {
             cancelled.store(true, Ordering::Relaxed);
         }
     }
@@ -62,12 +70,13 @@ pub struct ListingMetrics {
     pub metadata_refreshes: usize,
 }
 
-/// At most one running and one replaceable pending request per lane.
+/// Two listing slots and one metadata and totals slot each per pane.
+/// Each lane holds at most one replaceable pending request.
 pub struct Pool {
     runtime: Option<tokio::runtime::Runtime>,
     lanes: [Lane; LANE_COUNT],
-    sender: mpsc::SyncSender<Completion>,
-    receiver: mpsc::Receiver<Completion>,
+    sender: mpsc::SyncSender<Finished>,
+    receiver: mpsc::Receiver<Finished>,
     context: IgnoreContext,
     metrics: Arc<Metrics>,
     #[cfg(test)]
@@ -85,9 +94,9 @@ impl Pool {
     pub fn new(context: IgnoreContext) -> io::Result<Self> {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(1)
-            .max_blocking_threads(LANE_COUNT)
+            .max_blocking_threads(WORKER_COUNT)
             .build()?;
-        let (sender, receiver) = mpsc::sync_channel(LANE_COUNT);
+        let (sender, receiver) = mpsc::sync_channel(WORKER_COUNT);
         Ok(Self {
             runtime: Some(runtime),
             lanes: std::array::from_fn(|_| Lane::default()),
@@ -123,12 +132,6 @@ impl Pool {
         let Some(index) = lane_index(*pane, kind) else {
             return;
         };
-        // A slow scan can be blocked in the kernel while its replacement starts.
-        match kind {
-            RequestKind::Listing => self.cancel(*pane, RequestKind::ParentListing(None)),
-            RequestKind::ParentListing(_) => self.cancel(*pane, RequestKind::Listing),
-            _ => {}
-        }
         let lane = &mut self.lanes[index];
         lane.cancel();
         lane.pending = Some(work);
@@ -150,23 +153,21 @@ impl Pool {
 
     /// Nonblocking event collection on the UI loop; tests may use a bounded wait.
     pub fn next(&mut self, timeout: Duration) -> Option<Completion> {
-        let completion = if timeout.is_zero() {
+        let finished = if timeout.is_zero() {
             self.receiver.try_recv().ok()
         } else {
             self.receiver.recv_timeout(timeout).ok()
         }?;
-        if let Some(index) = lane_index(completion.request.pane, &completion.request.kind) {
-            self.lanes[index].running = None;
-        }
+        self.lanes[finished.lane].running[finished.slot] = None;
         self.pump();
-        Some(completion)
+        Some(finished.completion)
     }
 
     /// Current read concurrency for measurement and resource-budget assertions.
     pub fn active_count(&self) -> usize {
         self.lanes
             .iter()
-            .filter(|lane| lane.running.is_some())
+            .flat_map(|lane| lane.running.iter().flatten())
             .count()
     }
 
@@ -179,15 +180,17 @@ impl Pool {
     }
 
     fn pump(&mut self) {
-        for lane in &mut self.lanes {
-            if lane.running.is_some() {
+        for (index, lane) in self.lanes.iter_mut().enumerate() {
+            // Either listing kind can replace a scan still blocked in the kernel.
+            let capacity = if index < PANE_COUNT { 2 } else { 1 };
+            let Some(slot) = lane.running[..capacity].iter().position(Option::is_none) else {
                 continue;
-            }
+            };
             let Some(Work { request, refresh }) = lane.pending.take() else {
                 continue;
             };
             let cancelled = Arc::new(AtomicBool::new(false));
-            lane.running = Some(cancelled.clone());
+            lane.running[slot] = Some(cancelled.clone());
             let context = self.context.clone();
             let metrics = self.metrics.clone();
             let sender = self.sender.clone();
@@ -209,7 +212,11 @@ impl Pool {
                     let value = result.unwrap_or_else(|error| {
                         Value::Failed(format!("{:?} worker failed: {error}", request.kind))
                     });
-                    let _ = sender.send(Completion { request, value });
+                    let _ = sender.send(Finished {
+                        lane: index,
+                        slot,
+                        completion: Completion { request, value },
+                    });
                 });
         }
     }
@@ -228,16 +235,15 @@ impl Drop for Pool {
 }
 
 fn lane_index(pane: usize, kind: &RequestKind) -> Option<usize> {
-    if pane >= 2 {
+    if pane >= PANE_COUNT {
         return None;
     }
     let kind = match kind {
-        RequestKind::Listing => 0,
-        RequestKind::ParentListing(_) => 1,
-        RequestKind::Metadata => 2,
-        RequestKind::Totals => 3,
+        RequestKind::Listing | RequestKind::ParentListing(_) => 0,
+        RequestKind::Metadata => 1,
+        RequestKind::Totals => 2,
     };
-    Some(kind * 2 + pane)
+    Some(kind * PANE_COUNT + pane)
 }
 
 fn execute_work(

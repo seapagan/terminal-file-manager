@@ -346,6 +346,30 @@ fn current_directory_selection_supersedes_parent_navigation() {
     }
 }
 
+#[test]
+fn ordinary_navigation_completes_while_a_superseded_listing_is_blocked() {
+    let (root, mut controller) = startup_child();
+    let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
+    let child = controller.app.panes[0].path.clone();
+    let initial = controller.app.request_listing(0, child);
+    let (release, cancelled) = block_listing(&mut pool, initial);
+    pool.submit(controller.app.request_listing(0, root.path().into()));
+    assert_eq!(
+        pool.active_count(),
+        2,
+        "replacement must start before release"
+    );
+    collect_until(&mut controller, &mut pool, |app| {
+        app.panes[0].path == root.path()
+    });
+    assert_eq!(pool.active_count(), 1);
+    release.send(()).unwrap();
+    assert!(cancelled.recv_timeout(Duration::from_secs(10)).unwrap());
+    drain_stale_listing(&mut controller, &mut pool);
+    assert_eq!(controller.app.panes[0].path, root.path());
+    assert!(controller.app.panes[0].error.is_none());
+}
+
 fn picker_enter(
     controller: &mut Controller,
     geometry: &ui::Geometry,
