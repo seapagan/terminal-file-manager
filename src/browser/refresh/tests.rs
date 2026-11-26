@@ -214,7 +214,17 @@ fn hidden_sidebar_does_not_request_metadata_clock_redraw() {
 }
 
 #[test]
-fn enter_before_startup_listing_returns_focus_to_the_exited_child() {
+fn parent_keys_before_startup_listing_return_focus_to_the_exited_child() {
+    for key in [
+        KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+        KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
+        KeyEvent::new(KeyCode::Up, KeyModifiers::ALT),
+    ] {
+        assert_startup_parent_focus(key);
+    }
+}
+
+fn assert_startup_parent_focus(key: KeyEvent) {
     let root = tempfile::tempdir().unwrap();
     let child = root.path().join("child");
     std::fs::create_dir(&child).unwrap();
@@ -232,14 +242,13 @@ fn enter_before_startup_listing_returns_focus_to_the_exited_child() {
         kind: RequestKind::Listing,
     });
     assert!(controller.app.panes[0].parent_focused());
-    // Process Enter while the initial listing is still awaiting collection.
-    for request in controller.handle(
-        Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
-        &geometry,
-        Duration::ZERO,
-    ) {
-        pool.submit(request);
-    }
+    // Process the key while the initial listing is still awaiting collection.
+    assert!(
+        controller
+            .handle(Event::Key(key), &geometry, Duration::ZERO)
+            .is_empty(),
+        "{key:?} superseded the initial listing"
+    );
     controller.app.active = 1;
     collect_until_idle(&mut controller, &mut pool);
     assert_eq!(controller.app.panes[0].path, child);
@@ -263,7 +272,7 @@ fn refresh_during_deferred_startup_navigation_follows_the_parent() {
         .map_err(|error| error.to_string())
     };
     let mut app = App::new(child.clone());
-    assert!(app.activate_parent_row().is_none());
+    assert!(app.parent().is_none());
     assert!(app.request_refresh(0).is_none());
     assert!(app.complete_listing(0, 1, listing(&child)));
     assert!(app.take_refresh(0).is_none());

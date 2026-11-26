@@ -38,7 +38,7 @@ fn terminal_observe(
     transcript: &mut Vec<u8>,
     duration: Duration,
 ) {
-    let mut script = terminal_driver::Script::default();
+    let mut script = session.script();
     let started = Instant::now();
     while started.elapsed() < duration {
         session
@@ -82,13 +82,13 @@ fn terminal_idle(entries: usize, session: &mut terminal_driver::Session, transcr
 }
 
 pub fn sample(entries: usize, root: &Path) {
-    use terminal_driver::{Script, Session};
+    use terminal_driver::Session;
     for index in 0..3 {
         std::fs::remove_file(root.join(format!("isolated-{index}"))).unwrap();
     }
     let mut session = Session::open(terminal_command(root)).unwrap();
     let mut transcript = Vec::new();
-    let mut script = Script::default();
+    let mut script = session.script();
     let deadline = Instant::now() + Duration::from_secs(20);
     while script.step == 0 {
         assert!(Instant::now() < deadline, "native TUI listing timed out");

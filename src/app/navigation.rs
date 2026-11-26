@@ -8,8 +8,9 @@ impl App {
         self.request_parent(self.active)
     }
 
-    pub(crate) fn activate_parent_row(&mut self) -> Option<Request> {
-        let state = &mut self.panes[self.active];
+    fn request_parent(&mut self, pane: usize) -> Option<Request> {
+        let state = &mut self.panes[pane];
+        let parent = state.path.parent()?;
         if state.generation == 1 && state.listing {
             // The initial listing supplies the exited child's no-follow identity.
             if !state.startup_parent_pending {
@@ -18,12 +19,7 @@ impl App {
             state.startup_parent_pending = true;
             return None;
         }
-        self.parent()
-    }
-
-    fn request_parent(&mut self, pane: usize) -> Option<Request> {
-        let state = &self.panes[pane];
-        let parent = state.path.parent()?.to_path_buf();
+        let parent = parent.to_path_buf();
         let visit = state.parent_visit(parent.clone());
         let request = self.request_listing(pane, parent);
         self.panes[pane].parent_restoring = Some(visit);

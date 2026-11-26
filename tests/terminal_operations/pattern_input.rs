@@ -111,7 +111,7 @@ fn mark_after_fresh_readiness(
 ) -> std::time::Instant {
     use std::time::{Duration, Instant};
     let deadline = Instant::now() + Duration::from_secs(20);
-    let mut script = terminal_driver::Script::default();
+    let mut script = session.script();
     let steps = [
         ("pattern-ready.txt", "\x1bb"),
         ("Pattern selection", "\x1b[200~*\x1b[201~"),

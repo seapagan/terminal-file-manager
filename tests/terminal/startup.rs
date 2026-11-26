@@ -21,6 +21,48 @@ fn startup_parent_focus_is_immediately_actionable_in_a_real_terminal() {
 }
 
 #[test]
+fn fresh_script_matches_wrapped_cells_at_the_resized_session_width() {
+    use std::{
+        io::Write,
+        time::{Duration, Instant},
+    };
+
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("resize-ready"), "owned").unwrap();
+    let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_tfm"));
+    command.cwd(root.path());
+    isolate(&mut command, root.path());
+    let mut session = terminal_driver::Session::open(command).unwrap();
+    let mut script = session.script();
+    let mut transcript = Vec::new();
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while script.step == 0 {
+        assert!(Instant::now() < deadline, "initial listing timed out");
+        session
+            .read_step(
+                Duration::from_millis(20),
+                &mut script,
+                &[("resize-ready", "")],
+                &mut transcript,
+                true,
+            )
+            .unwrap();
+    }
+
+    let mut keys = Vec::new();
+    // At 65 columns, the trailing a wraps to row 2 and X overwrites it.
+    session
+        .script()
+        .observe(b"\x1b[1;65Hba\x1b[2;1HX", &[("bX", "q")], &mut keys)
+        .unwrap();
+    assert_eq!(keys, b"q");
+    session.writer.as_mut().unwrap().write_all(&keys).unwrap();
+    session
+        .drive(&[], deadline, &mut transcript, false)
+        .unwrap();
+}
+
+#[test]
 fn browser_starts_at_cwd_and_explicit_path_and_restores_terminal() {
     let storage = tempfile::tempdir().unwrap();
     let root = tempfile::tempdir_in(storage.path()).unwrap();

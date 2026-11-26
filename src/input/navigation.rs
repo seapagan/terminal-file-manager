@@ -15,11 +15,10 @@ impl Controller {
             return self.app.history(true).into_iter().collect();
         }
         if action == Action::Parent {
-            if let Some(request) = self.app.parent() {
-                return vec![request];
+            if self.app.panes[id].path.parent().is_none() {
+                self.app.status = "Filesystem root".into();
             }
-            self.app.status = "Filesystem root".into();
-            return Vec::new();
+            return self.app.parent().into_iter().collect();
         }
         if action == Action::Enter {
             return self.enter_row(id);
@@ -33,7 +32,7 @@ impl Controller {
     fn enter_row(&mut self, id: usize) -> Vec<Request> {
         let pane = &self.app.panes[id];
         if pane.parent_focused() {
-            return self.app.activate_parent_row().into_iter().collect();
+            return self.app.parent().into_iter().collect();
         }
         let Some(entry) = pane.current() else {
             self.app.status = "No visible entry".into();

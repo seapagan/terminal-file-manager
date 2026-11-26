@@ -6,6 +6,7 @@ use screen::Screen;
 #[test]
 fn wrapped_rows_retain_reused_letters_for_fresh_readiness_markers() {
     let mut screen = Screen::default();
+    screen.resize(100);
     screen.observe(&vec![b' '; 300]).unwrap();
     screen.observe(b"No visible entries").unwrap();
     screen.clear_fresh();

@@ -12,13 +12,13 @@ use terminal_driver::drive;
 #[test]
 fn platform_refresh_renders_external_changes_and_terminal_reentry_is_clean() {
     use std::time::{Duration, Instant};
-    use terminal_driver::{Script, Session};
+    use terminal_driver::Session;
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("initial-ready"), "owned").unwrap();
     for attempt in 0..2 {
         let mut session = Session::open(command(root.path(), root.path(), None)).unwrap();
         let mut transcript = Vec::new();
-        let mut script = Script::default();
+        let mut script = session.script();
         let deadline = Instant::now() + Duration::from_secs(20);
         while script.step == 0 {
             assert!(Instant::now() < deadline, "initial listing timed out");
