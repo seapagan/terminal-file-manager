@@ -84,7 +84,7 @@ fn diagnostics_uses_startup_capability_in_a_controlled_real_terminal() {
                 (&format!("Applied ColorLevel: {expected}"), &scroll),
                 // Exact values are checked in the diagnostics buffer tests;
                 // differential output may reuse <unset> from the previous row.
-                ("VTE_VERSION", "\u{1b}[24~\r"),
+                ("VTE_VERSION", "\u{1b}[24~\u{1b}[F\r"),
                 ("The file viewer is not available yet.", "q"),
             ],
             true,

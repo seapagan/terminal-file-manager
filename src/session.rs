@@ -108,6 +108,14 @@ impl NavigationSession {
     /// # Errors
     /// Returns schema/path validation errors. The caller checks filesystem access.
     pub fn restore(&self, settings: &Settings) -> Result<App, String> {
+        self.restore_with(settings, Ok)
+    }
+
+    pub(crate) fn restore_with(
+        &self,
+        settings: &Settings,
+        validate: impl Fn(PathBuf) -> Result<PathBuf, String>,
+    ) -> Result<App, String> {
         let [left, right] = self.locations()?;
         let base = self
             .relative_path_base
@@ -115,9 +123,8 @@ impl NavigationSession {
             .map(NativePath::decode)
             .transpose()?
             .unwrap_or_else(|| left.clone());
-        let mut app = App::new(left);
+        let mut app = App::with_locations([validate(left)?, validate(right)?]);
         app.relative_path_base = base;
-        app.panes[1].path = right;
         settings.apply(&mut app);
         app.active = self.active;
         app.sidebar = app.panes[app.active].sidebar;

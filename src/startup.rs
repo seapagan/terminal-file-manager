@@ -78,25 +78,31 @@ impl Startup {
         if self.paths.len() > 2 {
             return Err("at most two directory paths are supported".into());
         }
-        let restore = self.restoring(settings);
-        let mut app = if restore {
-            session_store()?.load()?.restore(settings)?
+        let app = if self.restoring(settings) {
+            session_store()?
+                .load()?
+                .restore_with(settings, |path| validate_path(&path))?
         } else {
-            let relative_path_base = self
-                .paths
-                .first()
-                .map_or_else(capture_launch_directory, |path| validate_path(path))?;
-            let [left, right] = self.locations();
-            let mut app = crate::app::App::new(left);
-            app.panes[1].path = right;
-            settings.apply(&mut app);
-            app.relative_path_base = relative_path_base;
-            app
+            self.prepare_locations(settings)?
         };
-        for pane in &mut app.panes {
-            pane.path = validate_path(&pane.path)?;
-        }
         Ok(finish_layout(app, self.two_panes || self.paths.len() == 2))
+    }
+
+    fn prepare_locations(
+        &self,
+        settings: &crate::settings::Settings,
+    ) -> Result<crate::app::App, String> {
+        let launch = self
+            .paths
+            .is_empty()
+            .then(capture_launch_directory)
+            .transpose()?;
+        let [left, right] = self.locations();
+        let mut app =
+            crate::app::App::with_locations([validate_path(&left)?, validate_path(&right)?]);
+        settings.apply(&mut app);
+        app.relative_path_base = launch.unwrap_or(app.relative_path_base);
+        Ok(app)
     }
 }
 

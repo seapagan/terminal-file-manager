@@ -9,7 +9,7 @@ use terminal_file_manager::{
 fn session_storage_round_trips_layout_and_both_native_locations() {
     let root = tempfile::tempdir().unwrap();
     let mut app = App::new(root.path().join("left"));
-    app.panes[1].path = root.path().join("right");
+    app.panes[1].path = root.path().join("other/right");
     app.relative_path_base = root.path().join("captured-base");
     app.active = 1;
     app.dual = true;
@@ -23,6 +23,9 @@ fn session_storage_round_trips_layout_and_both_native_locations() {
     let restored = session.restore(&Settings::default()).unwrap();
     assert_eq!(restored.panes[0].path, app.panes[0].path);
     assert_eq!(restored.panes[1].path, app.panes[1].path);
+    for pane in &restored.panes {
+        assert!(pane.parent_focused(), "parent row in {:?}", pane.path);
+    }
     assert_eq!(restored.relative_path_base, app.relative_path_base);
     assert_eq!(restored.active, 1);
     assert!(restored.dual && restored.maximized);

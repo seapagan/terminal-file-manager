@@ -98,16 +98,20 @@ pub struct App {
 impl App {
     /// Every invocation starts single-pane, with two independent original locations.
     pub fn new(path: PathBuf) -> Self {
+        Self::with_locations([path.clone(), path])
+    }
+
+    pub(crate) fn with_locations(locations: [PathBuf; 2]) -> Self {
         Self {
             compound_extension_review: None,
             keep_filter_on_navigation: false,
-            relative_path_base: path.clone(),
+            relative_path_base: locations[0].clone(),
             footer_workflow: None,
             path_picker: None,
             path_pointer: None,
             notifications: Default::default(),
             operations: Default::default(),
-            panes: [Pane::new(path.clone()), Pane::new(path)],
+            panes: locations.map(Pane::new),
             active: 0,
             dual: false,
             maximized: false,
