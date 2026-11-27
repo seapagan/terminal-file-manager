@@ -1,9 +1,9 @@
 [advisories]
 version = 2
 # Maintainer-approved exception for chrono's unmaintained notice only; no
-# patched version exists. Remove after replacing Linux-only chrono (TODO.md).
+# patched version exists. Remove once both dependency paths are gone.
 ignore = [
-    { id = "RUSTSEC-2026-0543", reason = "Preserve Linux Trash local timestamps pending the replacement investigation in TODO.md." },
+    { id = "RUSTSEC-2026-0543", reason = "Preserve Linux Trash local timestamps pending the replacement investigation in TODO.md. russh-util also depends on chrono for WASM only." },
 ]
 
 [licenses]
@@ -11,6 +11,7 @@ version = 2
 allow = [
     "MIT",
     "Apache-2.0",
+    "BSD-3-Clause",
     "ISC",
     "Zlib",
     "Unicode-3.0",
@@ -21,6 +22,9 @@ allow = [
 [bans]
 multiple-versions = "deny"
 wildcards = "deny"
+
+# Maintainer-approved prerelease: russh 0.65.4 pins ssh-key 0.7.0-rc.12.
+# Reassess when updating russh.
 
 # notify's Windows backend remains in Cargo's all-target resolution, even though
 # TFM only enables notify on Linux/macOS. The Windows target graph excludes it.
@@ -44,6 +48,61 @@ version = "=1.0.69"
 [[bans.skip]]
 name = "thiserror-impl"
 version = "=1.0.69"
+
+# ring uses getrandom 0.2 while the rest of the graph uses 0.4.
+# Remove when ring adopts the shared version.
+[[bans.skip]]
+name = "getrandom"
+version = "=0.2.17"
+
+# russh-sftp's DashMap uses hashbrown 0.14 while Ratatui uses 0.17.
+# Remove when DashMap adopts the shared version.
+[[bans.skip]]
+name = "hashbrown"
+version = "=0.14.5"
+
+# ring's Windows ARM64 backend needs windows-sys 0.52.0. Its older target
+# packages also appear in the all-target graph. Remove these exceptions when
+# ring adopts the shared bindings version.
+[[bans.skip]]
+name = "windows-sys"
+version = "=0.52.0"
+
+[[bans.skip]]
+name = "windows-targets"
+version = "=0.52.6"
+
+[[bans.skip]]
+name = "windows_aarch64_gnullvm"
+version = "=0.52.6"
+
+[[bans.skip]]
+name = "windows_aarch64_msvc"
+version = "=0.52.6"
+
+[[bans.skip]]
+name = "windows_i686_gnu"
+version = "=0.52.6"
+
+[[bans.skip]]
+name = "windows_i686_gnullvm"
+version = "=0.52.6"
+
+[[bans.skip]]
+name = "windows_i686_msvc"
+version = "=0.52.6"
+
+[[bans.skip]]
+name = "windows_x86_64_gnu"
+version = "=0.52.6"
+
+[[bans.skip]]
+name = "windows_x86_64_gnullvm"
+version = "=0.52.6"
+
+[[bans.skip]]
+name = "windows_x86_64_msvc"
+version = "=0.52.6"
 
 [sources]
 unknown-registry = "deny"
