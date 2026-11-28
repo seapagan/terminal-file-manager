@@ -19,7 +19,7 @@ fn callback_refusal_preserves_known_failure_classification_only_with_retained_id
         };
         let error = finish(
             &entry,
-            &Parents::capture(&entry.path).unwrap(),
+            &Parents::capture(entry.local_path()).unwrap(),
             &observed,
             Ok(()),
             Ok(true),
@@ -40,7 +40,7 @@ fn callback_refusal_preserves_known_failure_classification_only_with_retained_id
     assert_eq!(
         finish(
             &entry,
-            &Parents::capture(&entry.path).unwrap(),
+            &Parents::capture(entry.local_path()).unwrap(),
             &observed,
             Ok(()),
             Ok(true)

@@ -148,7 +148,7 @@ fn permanent_trash_success_is_distinct_and_never_retried() {
     assert_eq!(job.state, JobState::Partial);
     let retry = job.plan.retry(&record).unwrap();
     assert_eq!(retry.operands.len(), 1);
-    assert_eq!(retry.operands[0].path, record.entries[1].source);
+    assert_eq!(*retry.operands[0].local_path(), record.entries[1].source);
     record.entries[1].outcome = Outcome::PermanentlyDeleted;
     job.finish(record, SystemTime::UNIX_EPOCH);
     assert!(!Presentation::job(&job).message.contains("sent to Trash"));

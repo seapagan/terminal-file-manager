@@ -80,7 +80,10 @@ pub(super) fn layout(app: &App, terminal: Rect) -> Option<Layout> {
 }
 
 fn preferred_width(source: &Entry, destination: &Entry, trusted: bool) -> u16 {
-    let root = modal::common_root([source.path.as_path(), destination.path.as_path()]);
+    let root = modal::common_root([
+        source.local_path().as_path(),
+        destination.local_path().as_path(),
+    ]);
     let column = [source, destination]
         .into_iter()
         .flat_map(|entry| facts(entry, root.as_deref(), u16::MAX))
@@ -110,7 +113,10 @@ fn header(source: &Entry, destination: &Entry, width: u16) -> Vec<Row> {
             Row::key_value("Existing", name(destination)).single_line(),
         ]
     };
-    if let Some(root) = modal::common_root([source.path.as_path(), destination.path.as_path()]) {
+    if let Some(root) = modal::common_root([
+        source.local_path().as_path(),
+        destination.local_path().as_path(),
+    ]) {
         rows.push(
             Row::key_value(
                 "Root",
@@ -123,7 +129,10 @@ fn header(source: &Entry, destination: &Entry, width: u16) -> Vec<Row> {
 }
 
 fn comparison(source: &Entry, destination: &Entry, trusted: bool, width: u16) -> Vec<Row> {
-    let root = modal::common_root([source.path.as_path(), destination.path.as_path()]);
+    let root = modal::common_root([
+        source.local_path().as_path(),
+        destination.local_path().as_path(),
+    ]);
     let mut rows = if width >= 59 {
         columns(source, destination, root.as_deref(), width)
     } else {
@@ -185,7 +194,7 @@ fn section(title: &str, entry: &Entry, root: Option<&Path>, width: u16) -> Vec<R
 }
 
 fn facts(entry: &Entry, root: Option<&Path>, width: u16) -> [(&'static str, String, Role); 4] {
-    let path = relative(&entry.path, root);
+    let path = relative(entry.local_path(), root);
     let directory = entry.kind == EntryKind::Directory
         || (entry.kind == EntryKind::Junction && entry.enterable);
     let mut shown =

@@ -72,7 +72,7 @@ fn same_path_replacement_refresh_reloads_metadata_and_rejects_old_responses() {
     fs::write(&path, "replacement").unwrap();
     let request = app.request_listing(0, root.path().to_path_buf());
     assert!(app.complete_listing(0, request.generation, Ok(snapshot())));
-    assert_eq!(app.panes[0].current().unwrap().path, path);
+    assert_eq!(app.panes[0].current().unwrap().local_path(), &path);
     let fresh_request = app.request_metadata(0).unwrap();
     assert!(fresh_request.generation > old_request.generation);
     assert_eq!(

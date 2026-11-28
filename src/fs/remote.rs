@@ -44,7 +44,7 @@ impl Entry {
             SystemTime::UNIX_EPOCH.checked_add(Duration::from_secs(u64::from(seconds)))
         };
         Self {
-            path: Default::default(),
+            path: None,
             name: String::from_utf8_lossy(name.as_bytes()).as_ref().into(),
             hidden: name.as_bytes().starts_with(b"."),
             remote: Some(RemoteEntry {

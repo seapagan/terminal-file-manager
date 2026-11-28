@@ -61,7 +61,7 @@ fn apply(
     let mut result = EntryResult {
         recovery: None,
         trash: None,
-        source: source.path.clone(),
+        source: source.local_path().clone(),
         destination: plan.destination.clone(),
         kind: source.kind,
         outcome: Outcome::Completed,
@@ -109,7 +109,7 @@ fn mutate_existing(
     depth: usize,
     result: &mut EntryResult,
 ) -> Result<()> {
-    let parents = Parents::capture(&source.path)?;
+    let parents = Parents::capture(source.local_path())?;
     safety::revalidate(source, true)?;
     match plan.operation {
         Operation::Rename => rename(source, plan, result, notify, cancel, &parents),
@@ -158,7 +158,7 @@ fn rename(
     }
     let parents = Parents::capture(destination)?;
     (notify)(Event::Progress {
-        source: source.path.clone(),
+        source: source.local_path().clone(),
         destination: destination.into(),
         stage: Stage::Verified,
         bytes: 0,
@@ -183,7 +183,7 @@ fn commit_rename(
     destination: &std::path::Path,
     result: &mut EntryResult,
 ) -> Result<()> {
-    if let Err(error) = staging::rename_new(&source.path, destination) {
+    if let Err(error) = staging::rename_new(source.local_path(), destination) {
         if safety::revalidate(source, true).is_err() {
             return Err(safety::Failure {
                 outcome: Outcome::OutcomeUnknown,
@@ -200,7 +200,7 @@ fn commit_rename(
         return Err(error.into());
     }
     let mut moved = source.clone();
-    moved.path = destination.into();
+    moved.path = Some(destination.into());
     safety::revalidate(&moved, true).map_err(|error| safety::Failure {
         outcome: Outcome::OutcomeUnknown,
         detail: format!("Renamed object identity unverified: {}", error.detail),
@@ -297,7 +297,7 @@ pub(super) fn open_attributes(source: &Entry) -> io::Result<fs::File> {
         use std::os::windows::fs::OpenOptionsExt;
         options.custom_flags(0x0220_0000).access_mode(0x0000_0180);
     }
-    options.open(&source.path)
+    options.open(source.local_path())
 }
 
 pub(super) fn set_attributes(file: &fs::File, permissions: fs::Permissions) -> io::Result<()> {
@@ -364,7 +364,7 @@ fn delete(
     parents: &Parents,
 ) -> Result<()> {
     if source.may_recurse() {
-        let children: io::Result<Vec<_>> = fs::read_dir(&source.path)?.collect();
+        let children: io::Result<Vec<_>> = fs::read_dir(source.local_path())?.collect();
         for child in children? {
             crate::fs::check_cancelled(cancel)?;
             parents.validate()?;
@@ -399,8 +399,8 @@ fn remove(
 ) -> Result<()> {
     crate::fs::check_cancelled(cancel)?;
     (notify)(Event::Progress {
-        source: source.path.clone(),
-        destination: source.path.clone(),
+        source: source.local_path().clone(),
+        destination: source.local_path().clone(),
         stage: Stage::Removing,
         bytes: 0,
     });
@@ -431,11 +431,11 @@ fn recycle(
         .preview
         .as_ref()
         .ok_or_else(|| io::Error::other("Validated Trash inventory required"))?;
-    let (files, directories) = approval.inventory(&source.path);
+    let (files, directories) = approval.inventory(source.local_path());
     crate::fs::check_cancelled(cancel)?;
     (notify)(Event::Progress {
-        source: source.path.clone(),
-        destination: source.path.clone(),
+        source: source.local_path().clone(),
+        destination: source.local_path().clone(),
         stage: Stage::Removing,
         bytes: 0,
     });

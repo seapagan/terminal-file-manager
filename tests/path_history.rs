@@ -12,7 +12,12 @@ use terminal_file_manager::{
 };
 
 fn complete(c: &mut Controller, request: Request) {
-    let snapshot = fs::list(&request.path, &IgnoreContext::isolated(), &false.into()).unwrap();
+    let snapshot = fs::list(
+        request.local_path(),
+        &IgnoreContext::isolated(),
+        &false.into(),
+    )
+    .unwrap();
     assert!(
         c.app
             .complete_listing(request.pane, request.generation, Ok(snapshot))
@@ -52,7 +57,7 @@ fn fixture() -> (tempfile::TempDir, Controller) {
 #[test]
 fn ancestor_clicks_keep_independent_focus_marks_and_back_forward_cursor_history() {
     let (root, mut c) = fixture();
-    let initial = c.app.panes[1].path.clone();
+    let initial = c.app.panes[1].local_path().clone();
     c.app.panes[0].select_all();
     c.app.panes[1].move_cursor(1, 20);
     let cursor = c.app.panes[1].cursor.clone();
@@ -66,16 +71,16 @@ fn ancestor_clicks_keep_independent_focus_marks_and_back_forward_cursor_history(
     let request = c.handle(event(control), &g, Default::default()).remove(0);
     assert_eq!(c.app.active, 1);
     complete(&mut c, request);
-    assert_eq!(c.app.panes[1].path, root.path());
-    assert_eq!(c.app.panes[0].path, initial);
+    assert_eq!(*c.app.panes[1].local_path(), root.path());
+    assert_eq!(*c.app.panes[0].local_path(), initial);
     assert_eq!(c.app.panes[0].marks.len(), 1);
     let back = c.app.history(false).unwrap();
     complete(&mut c, back);
-    assert_eq!(c.app.panes[1].path, initial);
+    assert_eq!(*c.app.panes[1].local_path(), initial);
     assert_eq!(c.app.panes[1].cursor, cursor);
     let forward = c.app.history(true).unwrap();
     complete(&mut c, forward);
-    assert_eq!(c.app.panes[1].path, root.path());
+    assert_eq!(*c.app.panes[1].local_path(), root.path());
 }
 
 #[test]
@@ -109,7 +114,7 @@ fn stale_header_geometry_cannot_navigate_from_a_replaced_source_path() {
     let (_root, mut c) = fixture();
     let g = ui::geometry(&c.app, Rect::new(0, 0, 240, 24));
     let control = g.path_controls[0].clone();
-    c.app.panes[0].path.push("new");
+    c.app.panes[0].path.as_mut().unwrap().push("new");
     assert!(c.handle(event(&control), &g, Default::default()).is_empty());
     assert!(c.app.panes[0].pending.is_none());
 }
@@ -132,7 +137,12 @@ fn open_picker(c: &mut Controller, help: bool) {
 }
 
 fn reject(c: &mut Controller, request: &Request) {
-    let snapshot = fs::list(&request.path, &IgnoreContext::isolated(), &false.into()).unwrap();
+    let snapshot = fs::list(
+        request.local_path(),
+        &IgnoreContext::isolated(),
+        &false.into(),
+    )
+    .unwrap();
     assert!(
         !c.app
             .complete_listing(request.pane, request.generation, Ok(snapshot))
@@ -155,7 +165,7 @@ fn bound_navigation_completion_closes_picker_before_the_next_keyboard_or_mouse_e
         for keyboard in [false, true] {
             let (root, mut c) = fixture();
             c.app.active = 1;
-            let initial = c.app.panes[0].path.clone();
+            let initial = c.app.panes[0].local_path().clone();
             let stale = c.app.request_listing(1, root.path().join("child"));
             let request = c.app.request_listing(1, root.path().into());
             open_picker(&mut c, help);
@@ -175,7 +185,7 @@ fn bound_navigation_completion_closes_picker_before_the_next_keyboard_or_mouse_e
             };
             assert!(c.handle(input, &g, Default::default()).is_empty());
             assert!(c.app.panes[1].parent_focused());
-            assert_eq!(c.app.panes[0].path, initial);
+            assert_eq!(*c.app.panes[0].local_path(), initial);
         }
     }
 }
@@ -228,7 +238,9 @@ fn choose_current(c: &mut Controller, route: usize) -> Vec<Request> {
     };
     let control = controls
         .into_iter()
-        .find(|control| control.pane == 0 && control.target.as_ref() == Some(&c.app.panes[0].path))
+        .find(|control| {
+            control.pane == 0 && control.target.as_ref() == Some(c.app.panes[0].local_path())
+        })
         .unwrap();
     c.handle(event(control), &g, Default::default())
 }
@@ -237,20 +249,20 @@ fn choose_current(c: &mut Controller, route: usize) -> Vec<Request> {
 fn current_directory_choice_supersedes_pending_header_and_keyboard_or_mouse_picker_navigation() {
     for route in 0..3 {
         let (root, mut c) = fixture();
-        let initial = c.app.panes[0].path.clone();
+        let initial = c.app.panes[0].local_path().clone();
         c.app.panes[0].select_all();
         let marks = c.app.panes[0].marks.clone();
         let stale = c.app.request_listing(0, root.path().into());
         let requests = choose_current(&mut c, route);
         assert_eq!(requests.len(), 1);
         let request = requests.into_iter().next().unwrap();
-        assert_eq!(request.path, initial);
+        assert_eq!(*request.local_path(), initial);
         assert!(request.generation > stale.generation);
         reject(&mut c, &stale);
         assert_eq!(c.app.panes[0].pending.as_ref(), Some(&initial));
         complete(&mut c, request);
         reject(&mut c, &stale);
-        assert_eq!(c.app.panes[0].path, initial);
+        assert_eq!(*c.app.panes[0].local_path(), initial);
         assert_eq!(c.app.panes[0].marks, marks);
         assert!(c.app.panes[0].pending.is_none());
         assert!(c.app.path_picker.is_none());

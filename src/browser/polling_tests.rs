@@ -23,7 +23,7 @@ fn ownership_presentation_updates_do_not_invalidate_unchanged_directory_counts()
         if finished {
             app.complete_totals(
                 &count,
-                Ok(crate::fs::totals(&count.path, &AtomicBool::new(false)).unwrap()),
+                Ok(crate::fs::totals(count.local_path(), &AtomicBool::new(false)).unwrap()),
             );
         }
         app.metadata_scroll = 3;

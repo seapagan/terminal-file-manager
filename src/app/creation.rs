@@ -24,7 +24,7 @@ impl Pane {
     }
 
     pub(crate) fn track_creation(&mut self, id: u64, path: PathBuf) {
-        if self.pending.is_none() && path.parent() == Some(self.path.as_path()) {
+        if self.pending.is_none() && path.parent() == self.path.as_deref() {
             self.creation = Some(CreationFocus {
                 id,
                 path,
@@ -56,7 +56,7 @@ impl Pane {
             if self
                 .visible
                 .iter()
-                .any(|i| self.entries[*i].path == intent.path)
+                .any(|i| self.entries[*i].native_path() == Some(&intent.path))
             {
                 self.cursor = Some(intent.path);
                 self.reset_range();

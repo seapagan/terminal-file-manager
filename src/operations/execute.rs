@@ -75,7 +75,7 @@ struct Worker<'a, F> {
 impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
     fn run(&mut self) {
         for entry in &self.plan.operands {
-            if self.plan.completed.contains(&entry.path) {
+            if self.plan.completed.contains(entry.local_path()) {
                 continue;
             }
             let destination = self.plan.target(entry);
@@ -87,13 +87,13 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
     }
 
     fn entry(&mut self, source: &Entry, destination: Option<&Path>, depth: usize) -> bool {
-        if self.plan.completed.contains(&source.path) {
+        if self.plan.completed.contains(source.local_path()) {
             return true;
         }
         let mut result = EntryResult {
             recovery: None,
             trash: None,
-            source: source.path.clone(),
+            source: source.local_path().clone(),
             destination: destination.map(Path::to_owned),
             kind: source.kind,
             outcome: Outcome::Completed,
@@ -238,7 +238,7 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
             .into());
         }
         let guards = [
-            Parents::capture(&source.path)?,
+            Parents::capture(source.local_path())?,
             Parents::capture(destination)?,
         ];
         let mut stage = staging::OwnedStage::create(
@@ -281,7 +281,7 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
         stage.commit(destination, previous.is_some())?;
         let committed = stage.committed(destination)?;
         (self.notify)(Event::Progress {
-            source: source.path.clone(),
+            source: source.local_path().clone(),
             destination: destination.into(),
             stage: Stage::Committed,
             bytes: result.bytes,
@@ -310,7 +310,7 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
         self.stage_payload(source, destination, stage, result)?;
         stage.seal()?;
         (self.notify)(Event::Progress {
-            source: source.path.clone(),
+            source: source.local_path().clone(),
             destination: destination.into(),
             stage: Stage::Verified,
             bytes: result.bytes,
@@ -343,7 +343,7 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
                 self.cancel,
                 &mut |bytes| {
                     (self.notify)(Event::Progress {
-                        source: source.path.clone(),
+                        source: source.local_path().clone(),
                         destination: destination.into(),
                         stage: Stage::Reading,
                         bytes,
@@ -366,8 +366,8 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
         safety::revalidate(source, true)?;
         safety::revalidate(destination, true)?;
         (self.notify)(Event::Progress {
-            source: source.path.clone(),
-            destination: destination.path.clone(),
+            source: source.local_path().clone(),
+            destination: destination.local_path().clone(),
             stage: Stage::Removing,
             bytes: source.size.unwrap_or(0),
         });
@@ -418,7 +418,7 @@ fn prepare_source(source: &Entry, depth: usize) -> Result<()> {
     if depth > 128 {
         return Err(super::plan::invalid("Maximum recursion depth reached").into());
     }
-    Parents::capture(&source.path)?.validate()?;
+    Parents::capture(source.local_path())?.validate()?;
     safety::revalidate(source, true)
 }
 

@@ -51,7 +51,7 @@ fn assert_partial(plan: &Plan, record: &Record) {
     assert!(job.can_retry());
     assert!(!job.can_reconcile());
     assert_eq!(
-        terminal_file_manager::fs::inspect(&plan.operands[0].path)
+        terminal_file_manager::fs::inspect(plan.operands[0].local_path())
             .identity
             .unwrap()
             .object,

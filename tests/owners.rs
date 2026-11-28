@@ -113,7 +113,7 @@ fn owner_clicks_select_focus_and_double_click_directories_without_toggling() {
         assert_eq!(c.app.active, id);
         let requests = click(&mut c, &geometry, x, 3);
         assert_eq!(requests.len(), 1);
-        assert_eq!(requests[0].path, root.path().join("entry"));
+        assert_eq!(*requests[0].local_path(), root.path().join("entry"));
         assert_eq!(c.app.panes[id].owner_display, mode);
         assert_eq!(c.preferences.owner_display, OwnerDisplay::Names);
         assert!(!c.preferences_changed);

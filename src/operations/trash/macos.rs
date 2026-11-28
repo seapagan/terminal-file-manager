@@ -19,8 +19,8 @@ use std::{
 
 pub(super) fn put(entry: &Entry, cancel: &AtomicBool) -> Result<Receipt> {
     autoreleasepool(|_| {
-        let parents = Parents::capture(&entry.path)?;
-        let path = crate::operations::locks::namespace(&entry.path)?;
+        let parents = Parents::capture(entry.local_path())?;
+        let path = crate::operations::locks::namespace(entry.local_path())?;
         let url = file_url(&path, entry.may_recurse())?;
         parents.validate()?;
         safety::revalidate(entry, true)?;
@@ -47,7 +47,7 @@ pub(super) fn put(entry: &Entry, cancel: &AtomicBool) -> Result<Receipt> {
 }
 
 fn acknowledged(entry: &Entry, path: Option<PathBuf>) -> Result<Receipt> {
-    if std::fs::symlink_metadata(&entry.path).is_ok() {
+    if std::fs::symlink_metadata(entry.local_path()).is_ok() {
         return Err(unknown(
             "macOS acknowledged Trash but source remains; reconciliation required",
         ));

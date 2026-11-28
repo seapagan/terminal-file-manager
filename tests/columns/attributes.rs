@@ -85,7 +85,7 @@ fn metadata_only_toggles_preserve_listing_heading_width_and_serialized_preferenc
         let (_root, mut app) = loaded();
         app.dual = floating;
         let entry = app.panes[0].entries[0].clone();
-        app.details[0].path = Some(entry.path.clone());
+        app.details[0].path = Some(entry.local_path().clone());
         app.details[0].entry = Some(entry);
         app.sidebar = !floating;
         app.panes[0].sidebar = !floating;

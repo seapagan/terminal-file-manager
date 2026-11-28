@@ -208,7 +208,7 @@ fn source_claim(
         None => aliases::capture(entry),
     };
     Ok(Claim {
-        path: namespace(&entry.path)?,
+        path: namespace(entry.local_path())?,
         object: identity.object,
         write: operation != Operation::Copy,
         unknown_aliases: objects.is_err(),

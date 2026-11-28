@@ -24,7 +24,7 @@ impl Preview {
         safety::revalidate(root, false).map_err(|error| io::Error::other(error.detail))?;
         if !self
             .entries
-            .get(&root.path)
+            .get(root.local_path())
             .is_some_and(|entry| same_entry(entry, root))
         {
             return Err(io::Error::other(
@@ -33,7 +33,7 @@ impl Preview {
         }
         self.entries
             .values()
-            .filter(|entry| entry.path.starts_with(&root.path))
+            .filter(|entry| entry.local_path().starts_with(root.local_path()))
             .map(|entry| {
                 entry
                     .identity
@@ -54,7 +54,7 @@ impl Preview {
         }
         self.entries
             .values()
-            .filter(|entry| entry.path.starts_with(root))
+            .filter(|entry| entry.local_path().starts_with(root))
             .fold((0, 0), |(files, directories), entry| {
                 if entry.kind == EntryKind::Directory {
                     (files, directories + 1)
@@ -83,7 +83,7 @@ impl Preview {
         for source in &plan.operands {
             crate::fs::check_cancelled(cancel)?;
             safety::revalidate(source, true)?;
-            preview.parents.push(Parents::capture(&source.path)?);
+            preview.parents.push(Parents::capture(source.local_path())?);
             preview.scan(source, cancel, 0, &mounts)?;
         }
         for parent in &preview.parents {
@@ -109,7 +109,8 @@ impl Preview {
         } else {
             self.add_file(source)?;
         }
-        self.entries.insert(source.path.clone(), source.clone());
+        self.entries
+            .insert(source.local_path().clone(), source.clone());
         Ok(())
     }
 
@@ -124,7 +125,7 @@ impl Preview {
             .directories
             .checked_add(1)
             .ok_or_else(|| io::Error::other("Directory count overflow"))?;
-        let children: io::Result<Vec<_>> = fs::read_dir(&source.path)?.collect();
+        let children: io::Result<Vec<_>> = fs::read_dir(source.local_path())?.collect();
         for child in children? {
             self.scan(
                 &crate::fs::inspect(&child.path()),
@@ -177,11 +178,12 @@ impl Preview {
             parent.validate()?;
         }
         let mounts = super::mounts::Mounts::capture(super::Operation::Trash)?;
-        let count = self.validate_entry(&crate::fs::inspect(&root.path), cancel, &mounts, 0)?;
+        let count =
+            self.validate_entry(&crate::fs::inspect(root.local_path()), cancel, &mounts, 0)?;
         let expected = if root.may_recurse() {
             self.entries
                 .keys()
-                .filter(|path| path.starts_with(&root.path))
+                .filter(|path| path.starts_with(root.local_path()))
                 .count()
         } else {
             1
@@ -206,7 +208,7 @@ impl Preview {
         mounts.reject(fresh)?;
         let before = self
             .entries
-            .get(&fresh.path)
+            .get(fresh.local_path())
             .ok_or_else(|| safety::changed("Unapproved descendant after preview"))?;
         if depth > 128 || !same_entry(before, fresh) {
             return Err(safety::changed(
@@ -230,7 +232,7 @@ impl Preview {
         depth: usize,
     ) -> Result<usize> {
         let mut count = 0;
-        for child in fs::read_dir(&root.path)? {
+        for child in fs::read_dir(root.local_path())? {
             count += self.validate_entry(
                 &crate::fs::inspect(&child?.path()),
                 cancel,

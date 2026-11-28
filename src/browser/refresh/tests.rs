@@ -253,7 +253,7 @@ fn assert_startup_parent_focus(input: ParentInput) {
     let startup = Request {
         pane: 0,
         generation: 1,
-        path: child.clone(),
+        path: Some(child.clone()),
         kind: RequestKind::Listing,
     };
     let (release, cancelled) = block_listing(&mut pool, startup);
@@ -268,9 +268,9 @@ fn assert_startup_parent_focus(input: ParentInput) {
     controller.dispatch(Action::FocusPane, &geometry);
     assert_eq!(controller.app.active, 1);
     collect_until(&mut controller, &mut pool, |app| {
-        app.panes[0].path == root.path()
+        app.panes[0].local_path() == root.path()
     });
-    assert_eq!(controller.app.panes[0].path, root.path());
+    assert_eq!(*controller.app.panes[0].local_path(), root.path());
     release.send(()).unwrap();
     assert!(cancelled.recv_timeout(Duration::from_secs(10)).unwrap());
     drain_stale_listing(&mut controller, &mut pool);
@@ -310,11 +310,11 @@ fn parent_after_startup_listing_failure_restores_the_child_by_identity() {
     assert!(app.complete_listing(0, 1, Err("owned startup failure".into())));
     assert!(app.panes[0].error.is_some());
     let parent = app.parent().unwrap();
-    assert_eq!(parent.path, root.path());
+    assert_eq!(parent.local_path(), root.path());
     let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
     pool.submit(parent);
     collect_until_idle(&mut controller, &mut pool);
-    assert_eq!(controller.app.panes[0].path, root.path());
+    assert_eq!(*controller.app.panes[0].local_path(), root.path());
     assert_eq!(controller.app.panes[0].cursor, Some(child));
     assert!(controller.app.panes[0].error.is_none());
 }
@@ -323,7 +323,7 @@ fn parent_after_startup_listing_failure_restores_the_child_by_identity() {
 fn current_directory_selection_supersedes_parent_navigation() {
     for picker in [false, true] {
         let (_root, mut controller) = startup_child();
-        let child = controller.app.panes[0].path.clone();
+        let child = controller.app.panes[0].local_path().clone();
         let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
         let parent = controller.app.parent().unwrap();
         let (release, cancelled) = block_listing(&mut pool, parent);
@@ -335,13 +335,13 @@ fn current_directory_selection_supersedes_parent_navigation() {
             controller.handle(breadcrumb(&geometry, &child), &geometry, Duration::ZERO)
         }
         .remove(0);
-        assert_eq!(current.path, child);
+        assert_eq!(current.native_path(), Some(&child));
         pool.submit(current);
         collect_until(&mut controller, &mut pool, |app| !app.panes[0].listing);
         release.send(()).unwrap();
         assert!(cancelled.recv_timeout(Duration::from_secs(10)).unwrap());
         drain_stale_listing(&mut controller, &mut pool);
-        assert_eq!(controller.app.panes[0].path, child);
+        assert_eq!(*controller.app.panes[0].local_path(), child);
         assert!(controller.app.panes[0].parent_focused());
         assert!(controller.app.panes[0].error.is_none());
         assert!(controller.app.history(false).is_none());
@@ -352,7 +352,7 @@ fn current_directory_selection_supersedes_parent_navigation() {
 fn ordinary_navigation_completes_while_a_superseded_listing_is_blocked() {
     let (root, mut controller) = startup_child();
     let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
-    let child = controller.app.panes[0].path.clone();
+    let child = controller.app.panes[0].local_path().clone();
     let initial = controller.app.request_listing(0, child);
     let (release, cancelled) = block_listing(&mut pool, initial);
     pool.submit(controller.app.request_listing(0, root.path().into()));
@@ -362,13 +362,13 @@ fn ordinary_navigation_completes_while_a_superseded_listing_is_blocked() {
         "replacement must start before release"
     );
     collect_until(&mut controller, &mut pool, |app| {
-        app.panes[0].path == root.path()
+        app.panes[0].local_path() == root.path()
     });
     assert_eq!(pool.active_count(), 1);
     release.send(()).unwrap();
     assert!(cancelled.recv_timeout(Duration::from_secs(10)).unwrap());
     drain_stale_listing(&mut controller, &mut pool);
-    assert_eq!(controller.app.panes[0].path, root.path());
+    assert_eq!(*controller.app.panes[0].local_path(), root.path());
     assert!(controller.app.panes[0].error.is_none());
 }
 
@@ -427,7 +427,7 @@ fn parent_cancels_earlier_refresh_but_later_refresh_follows_it() {
         let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
         pool.submit(parent);
         collect_until_idle(&mut controller, &mut pool);
-        assert_eq!(controller.app.panes[0].path, root.path());
+        assert_eq!(*controller.app.panes[0].local_path(), root.path());
         deferred_listings(&mut controller.app, &mut pool);
         assert_eq!(pool.active_count(), usize::from(refresh_after_parent));
         if refresh_after_parent {

@@ -45,7 +45,7 @@ pub fn run_startup(options: &crate::startup::Startup) -> Result<(), String> {
         return crate::startup::session_store()?.save(&app);
     }
     require_terminal()?;
-    browse(app, settings, &mut config)
+    browse(app, settings, &mut config, None)
 }
 
 fn require_terminal() -> Result<(), String> {
@@ -55,7 +55,12 @@ fn require_terminal() -> Result<(), String> {
     Ok(())
 }
 
-fn browse(app: App, settings: Settings, config: &mut Configuration) -> Result<(), String> {
+fn browse(
+    app: App,
+    settings: Settings,
+    config: &mut Configuration,
+    sftp: Option<std::sync::Arc<crate::ssh::Session>>,
+) -> Result<(), String> {
     let bindings = Bindings::new(&settings.bindings)?;
     let mut controller = Controller::new(app, bindings, settings.clone());
     controller.check_compound_extensions(env!("CARGO_PKG_VERSION"))?;
@@ -69,6 +74,9 @@ fn browse(app: App, settings: Settings, config: &mut Configuration) -> Result<()
         .map_err(|e| e.to_string())?;
     let mut pool = Pool::new(IgnoreContext::default()).map_err(|e| e.to_string())?;
     let mut jobs = crate::operations::Queue::new().map_err(|error| error.to_string())?;
+    if let Some(session) = sftp {
+        pool.attach_sftp(session);
+    }
     requests::initial_listings(&controller.app, &mut pool);
     run_terminal(&mut controller, &mut pool, &mut jobs, &theme, config)?;
     save_state(controller)
@@ -240,7 +248,7 @@ mod tests {
             let request = match kind {
                 RequestKind::Listing => controller.app.request_listing(0, root.path().into()),
                 RequestKind::ParentListing(_) => controller.app.parent().unwrap(),
-                RequestKind::ParentIdentity => unreachable!(),
+                RequestKind::ParentIdentity | RequestKind::SftpListing(_) => unreachable!(),
                 RequestKind::Metadata => metadata,
                 RequestKind::Totals => controller.app.request_totals().unwrap(),
             };
@@ -252,7 +260,7 @@ mod tests {
                 RequestKind::Listing | RequestKind::ParentListing(_) => {
                     controller.app.panes[0].error.as_ref().unwrap()
                 }
-                RequestKind::ParentIdentity => unreachable!(),
+                RequestKind::ParentIdentity | RequestKind::SftpListing(_) => unreachable!(),
                 RequestKind::Metadata => controller.app.details[0]
                     .entry
                     .as_ref()
@@ -339,7 +347,7 @@ mod tests {
         );
         assert_eq!(
             detail.canonical,
-            Some(std::fs::canonicalize(&request.path).unwrap())
+            Some(std::fs::canonicalize(request.local_path()).unwrap())
         );
         assert!(controller.app.details[1].entry.is_none());
         assert!(!controller.preferences_changed);
@@ -351,8 +359,8 @@ mod tests {
         let mut controller = counting_controller(root.path());
         let request = controller.app.request_metadata(0).unwrap();
         assert!(controller.app.details[0].canonical_pending);
-        std::fs::remove_dir_all(&request.path).unwrap();
-        assert!(std::fs::canonicalize(&request.path).is_err());
+        std::fs::remove_dir_all(request.local_path()).unwrap();
+        assert!(std::fs::canonicalize(request.local_path()).is_err());
         let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
         pool.submit(request.clone());
         collect_until_idle(&mut controller, &mut pool);
@@ -389,7 +397,7 @@ mod tests {
             assert!(!detail.counting);
         }
         let request = controller.app.request_totals().unwrap();
-        std::fs::remove_dir_all(&request.path).unwrap();
+        std::fs::remove_dir_all(request.local_path()).unwrap();
         pool.submit(request);
         collect_until_idle(&mut controller, &mut pool);
         assert!(controller.app.details[0].totals.as_ref().unwrap().is_err());

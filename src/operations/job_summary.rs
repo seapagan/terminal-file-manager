@@ -19,7 +19,7 @@ impl JobSummary {
             .plan
             .operands
             .iter()
-            .map(|operand| (operand.path.as_path(), None))
+            .map(|operand| (operand.local_path().as_path(), None))
             .collect();
         if let Some(record) = record {
             for entry in &record.entries {
@@ -32,7 +32,7 @@ impl JobSummary {
             .plan
             .operands
             .iter()
-            .map(|operand| outcomes[operand.path.as_path()])
+            .map(|operand| outcomes[operand.local_path().as_path()])
             .collect();
         let groups = record.map_or_else(Vec::new, |record| record.failure_groups());
         Self {

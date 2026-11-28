@@ -161,10 +161,10 @@ impl Slot {
     }
 
     fn rebind(&mut self, pane: &crate::app::Pane, now: Duration) {
-        if self.path.as_ref() == Some(&pane.path) && self.context == pane.context {
+        if self.path.as_ref() == Some(pane.local_path()) && self.context == pane.context {
             return;
         }
-        self.path = Some(pane.path.clone());
+        self.path = Some(pane.local_path().clone());
         self.context = pane.context;
         self.signals = Arc::default();
         self.schedule = Schedule::default();
@@ -177,7 +177,7 @@ impl Slot {
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         if let Some(worker) = &self.worker {
             worker.bind(Binding {
-                path: pane.path.clone(),
+                path: pane.local_path().clone(),
                 signals: self.signals.clone(),
                 failed: Arc::default(),
             });

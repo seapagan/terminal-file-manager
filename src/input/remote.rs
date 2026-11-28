@@ -9,11 +9,10 @@ pub(super) fn blocked(app: &App, action: Action) -> Option<&'static str> {
         Copy | CopyQuick | Move | MoveQuick if remote || opposite => {
             Some("Transfers involving an SSH pane are unavailable")
         }
-        SaveQuit if remote || opposite => Some("An SSH preview cannot be saved as a session"),
-        Enter | Parent | Back | Forward | Refresh | FullPath | Metadata | ToggleSidebar | Count
-        | Viewer | Editor | PathCopy | Mkdir | CreateFile | Trash | Delete | Rename
-        | Attributes | Mark | MarkNext | SelectAll | MarkExtension | MarkFinalExtension
-        | ExtendUp | ExtendDown | PatternSelection
+        SaveQuit if remote || opposite => Some("An SSH pane cannot be saved as a session"),
+        FullPath | Metadata | ToggleSidebar | Count | Viewer | Editor | PathCopy | Mkdir
+        | CreateFile | Trash | Delete | Rename | Attributes | Mark | MarkNext | SelectAll
+        | MarkExtension | MarkFinalExtension | ExtendUp | ExtendDown | PatternSelection
             if remote =>
         {
             Some("Only listing controls are available in the read-only SSH pane")

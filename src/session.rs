@@ -64,7 +64,7 @@ impl NavigationSession {
     pub(crate) fn capture(app: &App) -> Self {
         Self {
             version: 1,
-            locations: std::array::from_fn(|i| NativePath::capture(&app.panes[i].path)),
+            locations: std::array::from_fn(|i| NativePath::capture(app.panes[i].local_path())),
             relative_path_base: Some(NativePath::capture(&app.relative_path_base)),
             active: app.active,
             dual: app.dual,

@@ -41,7 +41,12 @@ fn fixture() -> (tempfile::TempDir, Controller) {
 }
 
 fn complete(c: &mut Controller, request: Request) {
-    let snapshot = fs::list(&request.path, &IgnoreContext::isolated(), &false.into()).unwrap();
+    let snapshot = fs::list(
+        request.local_path(),
+        &IgnoreContext::isolated(),
+        &false.into(),
+    )
+    .unwrap();
     assert!(
         c.app
             .complete_listing(request.pane, request.generation, Ok(snapshot))
@@ -94,7 +99,7 @@ fn parent(c: &mut Controller, root: &Path, route: &str) {
         _ => key(c, &geometry, KeyCode::Up, KeyModifiers::ALT),
     };
     assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].path, root);
+    assert_eq!(*requests[0].local_path(), root);
     complete(c, requests.into_iter().next().unwrap());
     assert_eq!(
         c.app.panes[0].cursor.as_deref(),
@@ -286,7 +291,10 @@ fn history_round_trip_retains_the_viewport_and_cursor_selected_after_parent() {
     let cursor = c.app.panes[0].cursor.clone();
     let request = c.app.history(true).unwrap();
     complete(&mut c, request);
-    assert_eq!(c.app.panes[0].path.as_path(), selected.as_deref().unwrap());
+    assert_eq!(
+        c.app.panes[0].local_path().as_path(),
+        selected.as_deref().unwrap()
+    );
     let request = c.app.history(false).unwrap();
     complete(&mut c, request);
     let (after, geometry) = draw(&c, HEIGHT);

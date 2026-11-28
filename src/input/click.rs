@@ -1,8 +1,11 @@
 //! Entry-row clicks select and navigate independently of the displayed columns.
 use super::{Action, Controller, controller::page_height};
-use crate::{app::Request, ui::Geometry};
+use crate::{
+    app::{NavigationTarget, Request},
+    ui::Geometry,
+};
 use crossterm::event::{KeyModifiers, MouseEvent};
-use std::{path::PathBuf, time::Duration};
+use std::time::Duration;
 
 impl Controller {
     pub(super) fn click(
@@ -45,7 +48,7 @@ impl Controller {
         offset: usize,
         height: usize,
         extend: bool,
-    ) -> Option<PathBuf> {
+    ) -> Option<NavigationTarget> {
         let pane = &mut self.app.panes[id];
         let start = pane.viewport_start(height);
         let index = start + offset;
@@ -56,10 +59,10 @@ impl Controller {
             return None;
         }
         pane.scroll = start;
-        let path = pane.row_path(index);
+        let path = pane.navigation_target(index);
 
-        if extend && let Some(path) = path {
-            if Some(path.as_path()) == pane.path.parent() {
+        if extend && let Some(NavigationTarget::Native(path)) = path {
+            if Some(path.as_path()) == pane.local_path().parent() {
                 pane.focus_row(index);
                 pane.reset_range();
             } else {
@@ -69,15 +72,13 @@ impl Controller {
             return None;
         }
         pane.focus_row(index);
-        if path.is_some() {
+        if matches!(path, Some(NavigationTarget::Native(_))) {
             pane.anchor_range();
-        } else {
-            self.last_click = None;
         }
         path
     }
 
-    fn record_click(&mut self, id: usize, path: PathBuf, now: Duration) -> bool {
+    fn record_click(&mut self, id: usize, path: NavigationTarget, now: Duration) -> bool {
         let double = self
             .last_click
             .as_ref()

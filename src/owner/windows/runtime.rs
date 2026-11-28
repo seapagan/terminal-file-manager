@@ -62,12 +62,12 @@ impl Key {
             .as_ref()
             .filter(|identity| identity.object.is_some())?;
         Some(Self {
-            path: entry.path.clone(),
+            path: entry.native_path()?.clone(),
             identity: identity.clone(),
         })
     }
     fn matches(&self, entry: &Entry) -> bool {
-        entry.path == self.path
+        entry.native_path() == Some(&self.path)
             && entry.identity.as_ref().is_some_and(|identity| {
                 identity.object == self.identity.object && identity.created == self.identity.created
             })

@@ -207,11 +207,11 @@ fn long_paths_keep_both_ends_without_changing_native_operands() {
     let (_root, mut app, _) = fixture();
     let base = std::path::PathBuf::from("/home/資料/a-long-session-name/visual");
     edit(&mut app, |s, d, _| {
-        s.path = base.join(format!("source/{}/conflict.txt", "intermediate/".repeat(8)));
-        d.path = base.join(format!(
+        s.path = Some(base.join(format!("source/{}/conflict.txt", "intermediate/".repeat(8))));
+        d.path = Some(base.join(format!(
             "destination/{}/conflict.txt",
             "intermediate/".repeat(8)
-        ));
+        )));
     });
     let frozen = match &app.operations.conflicts.front().unwrap().event {
         Event::Conflict {
@@ -245,9 +245,9 @@ fn long_paths_keep_both_ends_without_changing_native_operands() {
 fn unrelated_roots_and_different_names_are_not_falsely_grouped() {
     let (_root, mut app, _) = fixture();
     edit(&mut app, |s, d, _| {
-        s.path = "/alpha/incoming.txt".into();
+        s.path = Some("/alpha/incoming.txt".into());
         s.name = "incoming.txt".into();
-        d.path = "/beta/existing.txt".into();
+        d.path = Some("/beta/existing.txt".into());
         d.name = "existing.txt".into();
     });
     let (_, _, text) = draw(&app, 120, 40, ColorLevel::NoColor);
@@ -260,10 +260,10 @@ fn unrelated_roots_and_different_names_are_not_falsely_grouped() {
 fn single_component_elision_keeps_a_recognisable_beginning_and_end() {
     let (_root, mut app, _) = fixture();
     edit(&mut app, |s, d, _| {
-        s.path = format!("/start-source/{}-tail.txt", "界e\u{301}".repeat(60)).into();
-        d.path = format!("/start-existing/{}-tail.txt", "界e\u{301}".repeat(60)).into();
-        s.name = s.path.file_name().unwrap().to_owned();
-        d.name = d.path.file_name().unwrap().to_owned();
+        s.path = Some(format!("/start-source/{}-tail.txt", "界e\u{301}".repeat(60)).into());
+        d.path = Some(format!("/start-existing/{}-tail.txt", "界e\u{301}".repeat(60)).into());
+        s.name = s.local_path().file_name().unwrap().to_owned();
+        d.name = d.local_path().file_name().unwrap().to_owned();
     });
     let (_, _, text) = draw(&app, 80, 50, ColorLevel::NoColor);
     assert!(text.contains("/start-"), "{text}");
@@ -363,8 +363,8 @@ fn native_non_utf8_names_controls_and_symlink_spelling_stay_in_the_model() {
     edit(&mut app, |s, d, _| {
         s.name = name.clone();
         d.name = name.clone();
-        s.path = std::path::PathBuf::from("/lexical/link/../source").join(&name);
-        d.path = std::path::PathBuf::from("/lexical/destination").join(&name);
+        s.path = Some(std::path::PathBuf::from("/lexical/link/../source").join(&name));
+        d.path = Some(std::path::PathBuf::from("/lexical/destination").join(&name));
     });
     let (_, _, text) = draw(&app, 120, 40, ColorLevel::NoColor);
     assert!(text.contains("bad-\\xFF"), "{text}");
@@ -379,7 +379,7 @@ fn native_non_utf8_names_controls_and_symlink_spelling_stay_in_the_model() {
         assert_eq!(destination.name, name);
         assert!(
             source
-                .path
+                .local_path()
                 .as_os_str()
                 .as_encoded_bytes()
                 .windows(2)
@@ -425,8 +425,8 @@ fn native_drive_and_unc_roots_do_not_invent_a_shared_namespace() {
         ),
     ] {
         edit(&mut app, |s, d, _| {
-            s.path = incoming.into();
-            d.path = existing.into();
+            s.path = Some(incoming.into());
+            d.path = Some(existing.into());
         });
         let (_, _, text) = draw(&app, 120, 40, ColorLevel::NoColor);
         assert_eq!(text.contains("Root:"), common, "{text}");
@@ -436,8 +436,8 @@ fn native_drive_and_unc_roots_do_not_invent_a_shared_namespace() {
             ..
         } = &app.operations.conflicts.front().unwrap().event
         {
-            assert_eq!(source.path.as_os_str(), incoming);
-            assert_eq!(destination.path.as_os_str(), existing);
+            assert_eq!(source.local_path().as_os_str(), incoming);
+            assert_eq!(destination.local_path().as_os_str(), existing);
         }
     }
 }
@@ -448,8 +448,8 @@ fn conflict_width_tracks_content_before_eliding_paths() {
     for width in [120, 160] {
         let (short, _, _) = draw(&app, width, 50, ColorLevel::NoColor);
         edit(&mut app, |s, d, _| {
-            s.path = "/visual/source/nested/incoming-folder/conflict.txt".into();
-            d.path = "/visual/destination/nested/existing-folder/conflict.txt".into();
+            s.path = Some("/visual/source/nested/incoming-folder/conflict.txt".into());
+            d.path = Some("/visual/destination/nested/existing-folder/conflict.txt".into());
         });
         let (long, _, text) = draw(&app, width, 50, ColorLevel::NoColor);
         assert!(
@@ -466,8 +466,8 @@ fn conflict_width_tracks_content_before_eliding_paths() {
         );
         assert!(!text.contains('…'), "{text}");
         edit(&mut app, |s, d, _| {
-            s.path = "/visual/source/conflict.txt".into();
-            d.path = "/visual/destination/conflict.txt".into();
+            s.path = Some("/visual/source/conflict.txt".into());
+            d.path = Some("/visual/destination/conflict.txt".into());
         });
     }
 }

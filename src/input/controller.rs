@@ -6,7 +6,7 @@ use crate::{
     ui::Geometry,
 };
 use crossterm::event::{Event, KeyCode, KeyEventKind, MouseButton, MouseEvent, MouseEventKind};
-use std::{path::PathBuf, time::Duration};
+use std::time::Duration;
 
 /// Pure input controller; emitted requests are the only route to background I/O.
 pub struct Controller {
@@ -20,7 +20,7 @@ pub struct Controller {
     pub(super) pattern_preferences: (crate::app::PatternMode, bool),
     pub(super) bindings: Bindings,
     pub(super) filter_before: Option<(usize, String)>,
-    pub(super) last_click: Option<(usize, PathBuf, Duration)>,
+    pub(super) last_click: Option<(usize, crate::app::NavigationTarget, Duration)>,
     pub(super) dragging_divider: bool,
 }
 

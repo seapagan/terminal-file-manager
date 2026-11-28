@@ -55,7 +55,7 @@ fn metadata_and_counts_use_separate_bounded_lanes() {
         pool.submit(Request {
             pane: 1,
             generation: 42,
-            path: root.path().to_path_buf(),
+            path: Some(root.path().to_path_buf()),
             kind,
         });
     }

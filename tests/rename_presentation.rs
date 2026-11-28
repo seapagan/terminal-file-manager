@@ -24,7 +24,7 @@ fn rename_selected(name: std::ffi::OsString, display_only: bool) {
         !dialog.text.is_empty(),
         "selected native name must be represented"
     );
-    assert_eq!(dialog.plan.operands[0].path, source);
+    assert_eq!(*dialog.plan.operands[0].local_path(), source);
     assert_eq!(dialog.plan.operands[0].identity, original.identity);
     if display_only {
         send(
@@ -50,7 +50,7 @@ fn rename_selected(name: std::ffi::OsString, display_only: bool) {
         panic!("deliberate rename");
     };
     assert_eq!(plan.operation, Operation::Rename);
-    assert_eq!(plan.operands[0].path, source);
+    assert_eq!(*plan.operands[0].local_path(), source);
     let record = execute(&plan, options, &false.into(), |_| Decision::Skip);
     assert_eq!(record.entries[0].outcome, Outcome::Completed, "{record:?}");
     assert!(!source.exists());

@@ -267,7 +267,7 @@ fn resizing_help_reveals_the_parent_selection_and_returns_to_ancestor_navigation
         Default::default(),
     );
     assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].path, original.1.parent().unwrap());
+    assert_eq!(*requests[0].local_path(), original.1.parent().unwrap());
     assert!(c.app.path_picker.is_none());
 }
 

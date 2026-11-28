@@ -43,10 +43,10 @@ impl LinuxTrash {
         approval: Option<&crate::operations::Preview>,
     ) -> safety::Result<Receipt> {
         crate::fs::check_cancelled(cancel)?;
-        let source_guard = Parents::capture(&entry.path)?;
+        let source_guard = Parents::capture(entry.local_path())?;
         safety::revalidate(entry, true)?;
         let mounts = fs::read("/proc/self/mountinfo")?;
-        let physical = crate::operations::locks::namespace(&entry.path)?;
+        let physical = crate::operations::locks::namespace(entry.local_path())?;
         let (files, info, original) = self.prepare(entry, &physical)?;
         let (destination, info_path) = reserve(&original, &files, &info)?;
         if let Err(error) = validate_scope(entry, cancel, approval) {
@@ -185,7 +185,7 @@ fn validate_scope(
     } else {
         let plan = crate::operations::Plan::paths(
             crate::operations::Operation::Trash,
-            vec![entry.path.clone()],
+            vec![entry.local_path().clone()],
             None,
         )?;
         crate::operations::Preview::capture(&plan, cancel)?;
@@ -200,7 +200,7 @@ fn validate_data(data: &Path, source: &Entry) -> io::Result<()> {
             "Relative XDG_DATA_HOME; Trash unavailable",
         ));
     }
-    if source.may_recurse() && data.starts_with(&source.path) {
+    if source.may_recurse() && data.starts_with(source.local_path()) {
         return Err(io::Error::other(
             "Cannot Trash an ancestor of its Trash directory",
         ));
@@ -272,7 +272,7 @@ fn commit(
     }
     safety::revalidate(info, true)?;
     safety::revalidate(source, true)?;
-    staging::rename_new(&source.path, destination)?;
+    staging::rename_new(source.local_path(), destination)?;
     let moved = crate::fs::inspect(destination);
     if source.kind != moved.kind
         || source.link_target != moved.link_target
@@ -283,7 +283,7 @@ fn commit(
             "Trash result differs from selected object; reconciliation required",
         ));
     }
-    if fs::symlink_metadata(&source.path).is_ok() {
+    if fs::symlink_metadata(source.local_path()).is_ok() {
         return Err(safety::changed(
             "Trash source still exists; completion unverified",
         ));
@@ -296,7 +296,7 @@ fn cleanup_info(source: &Entry, destination: &Path, info: &Entry) {
         && fs::symlink_metadata(destination).is_err()
         && safety::revalidate(info, true).is_ok()
     {
-        let _ = fs::remove_file(&info.path);
+        let _ = fs::remove_file(info.local_path());
     }
 }
 

@@ -152,15 +152,15 @@ impl OwnedStore {
     }
     pub fn cleanup(&self) -> io::Result<()> {
         for entry in self.directories.iter().rev() {
-            if !present(&entry.path)? {
+            if !present(entry.local_path())? {
                 continue;
             }
-            if entry.kind != EntryKind::Directory || !same_object(entry, &entry.path) {
+            if entry.kind != EntryKind::Directory || !same_object(entry, entry.local_path()) {
                 return Err(io::Error::other(
                     "Fixture-created directory identity changed",
                 ));
             }
-            fs::remove_dir(&entry.path)?;
+            fs::remove_dir(entry.local_path())?;
         }
         Ok(())
     }

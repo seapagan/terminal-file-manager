@@ -96,9 +96,9 @@ fn retry(controller: &mut Controller, queue: &mut Queue, id: u64) -> std::io::Re
     ) {
         let preview_id = queue.preview(plan.clone())?;
         let base = plan.operands[0]
-            .path
+            .local_path()
             .parent()
-            .unwrap_or(&plan.operands[0].path)
+            .unwrap_or(plan.operands[0].local_path())
             .to_owned();
         controller.app.operations.show_history = false;
         controller.app.operations.scroll = 0;

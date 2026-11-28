@@ -50,7 +50,7 @@ fn smart_copy_freezes_dual_pane_single_operand_and_empty_scope_never_submits() {
     let Intent::Submit(plan, _) = controller.app.operations.outbox.pop().unwrap() else {
         panic!("expected frozen submission");
     };
-    assert_eq!(plan.operands[0].path, root.path().join("left/one"));
+    assert_eq!(*plan.operands[0].local_path(), root.path().join("left/one"));
     assert_eq!(plan.destination, Some(root.path().join("right")));
     controller.app.panes[0].set_filter("zero matches".into());
     controller.dispatch(Action::Copy, &geometry);
@@ -120,7 +120,7 @@ fn outcome(
         entries: vec![terminal_file_manager::operations::EntryResult {
             recovery: None,
             trash: None,
-            source: source.path,
+            source: source.local_path().clone(),
             destination: None,
             kind: source.kind,
             outcome,
@@ -136,7 +136,7 @@ fn running(controller: &mut Controller) {
     let plan = terminal_file_manager::operations::Plan::capture(
         &controller.app.panes[0],
         terminal_file_manager::operations::Operation::Copy,
-        Some(controller.app.panes[1].path.clone()),
+        Some(controller.app.panes[1].local_path().clone()),
     )
     .unwrap();
     controller.register_operation(1, plan, Default::default(), None);
@@ -151,7 +151,7 @@ fn editing_an_incoming_name_keeps_an_unedited_non_utf8_target_exact() {
         .path()
         .join(OsString::from_vec(b"target-\xff".to_vec()));
     fs::create_dir(&native).unwrap();
-    controller.app.panes[1].path = native.clone();
+    controller.app.panes[1].path = Some(native.clone());
     let geometry = ui::geometry(&controller.app, Rect::new(0, 0, 120, 30));
     controller.dispatch(Action::Copy, &geometry);
     key(&mut controller, KeyCode::Tab);
@@ -237,7 +237,8 @@ fn assert_modal_navigation(controller: &mut Controller) {
         KeyCode::Up,
     ] {
         let index = usize::from(matches!(code, KeyCode::Up | KeyCode::Char('k')));
-        controller.app.panes[0].cursor = Some(controller.app.panes[0].entries[index].path.clone());
+        controller.app.panes[0].cursor =
+            Some(controller.app.panes[0].entries[index].local_path().clone());
         let before = controller.app.panes[0].cursor.clone();
         for kind in [KeyEventKind::Repeat, KeyEventKind::Release] {
             let geometry = ui::geometry(&controller.app, Rect::new(0, 0, 120, 30));

@@ -105,8 +105,8 @@ fn repeated_sid_and_two_panes_share_one_read_and_one_name_lookup() {
     assert_eq!(reads.load(Ordering::Relaxed), 1);
     assert_eq!(names.load(Ordering::Relaxed), 1);
     let request = app.request_metadata(1).unwrap();
-    std::fs::write(&request.path, "changed contents with the same owner").unwrap();
-    let fresh = fs::inspect(&request.path);
+    std::fs::write(request.local_path(), "changed contents with the same owner").unwrap();
+    let fresh = fs::inspect(request.local_path());
     app.complete_metadata(&request, fresh, None);
     app.active = 1;
     app.popup = true;
@@ -173,15 +173,18 @@ fn ownership_targets_follow_scroll_resize_and_parent_focus_without_extra_rows() 
         let pane = &mut app.panes[0];
         pane.scroll = scroll;
         pane.cursor = Some(cursor.map_or_else(
-            || pane.path.parent().unwrap().to_owned(),
-            |index| pane.entries[index].path.clone(),
+            || pane.local_path().parent().unwrap().to_owned(),
+            |index| pane.entries[index].local_path().clone(),
         ));
         let targets: Vec<_> = super::view::targets(&app, &geometry)
             .into_iter()
             .filter(|target| target.pane == 0)
             .collect();
         assert_eq!(targets.len(), count);
-        assert_eq!(targets[0].key.path, app.panes[0].entries[first].path);
+        assert_eq!(
+            targets[0].key.path,
+            *app.panes[0].entries[first].local_path()
+        );
     }
 }
 
@@ -211,7 +214,7 @@ fn held_sid_reads_bound_work_without_blocking_scroll_navigation_refresh_or_drop(
     assert!(entered.try_recv().is_err());
     assert!(app.request_refresh(0).is_some());
     runtime.poll(&mut app, &geometry);
-    app.request_listing(0, app.panes[0].path.join("next"));
+    app.request_listing(0, app.panes[0].local_path().join("next"));
     runtime.poll(&mut app, &geometry);
     let start = Instant::now();
     drop(runtime);
@@ -262,7 +265,7 @@ fn held_name_translation_keeps_numeric_sid_available_for_the_whole_viewport() {
 #[test]
 fn metadata_request_precedes_rows_and_generation_changes_reject_late_sid_reads() {
     let (root, mut app, _) = loaded(10);
-    app.panes[0].cursor = Some(app.panes[0].entries[5].path.clone());
+    app.panes[0].cursor = Some(app.panes[0].entries[5].local_path().clone());
     app.popup = true;
     app.request_metadata(0).unwrap();
     let geometry = ui::geometry(&app, Rect::new(0, 0, 240, 40));

@@ -94,7 +94,7 @@ fn floating_metadata_owns_keys_without_mutating_the_underlying_pane() {
     let mut app = App::new(root.path().into());
     app.complete_listing(0, 1, Ok(snapshot));
     app.panes[0].move_cursor(1, 20);
-    assert_eq!(app.panes[0].current().unwrap().path, child);
+    assert_eq!(app.panes[0].current().unwrap().local_path(), &child);
     app.popup = true;
     let mut controller = Controller::new(
         app,

@@ -147,12 +147,12 @@ fn unavailable_opposite_base_is_disabled_and_invalid_native_base_is_rejected() {
             1 => c.app.panes[1].pending = Some(root.path().into()),
             2 => c.app.panes[1].error = Some("unavailable".into()),
             3 => {
-                c.app.panes[1].path = root.path().join("missing");
+                c.app.panes[1].path = Some(root.path().join("missing"));
             }
             4 => {
-                c.app.panes[1].path = file.clone();
+                c.app.panes[1].path = Some(file.clone());
             }
-            _ => c.app.panes[1].path = "relative".into(),
+            _ => c.app.panes[1].path = Some("relative".into()),
         }
         sequence(&mut c, "yS");
         if matches!(case, 3 | 4) {
@@ -275,7 +275,7 @@ fn copy_path_header_and_from_stage_ignore_old_navigation_keys() {
     ] {
         send(&mut c, key);
         assert_eq!(c.app.footer_workflow.as_ref().unwrap().stage_index(), 0);
-        assert_eq!(c.app.panes[0].path, root.path());
+        assert_eq!(*c.app.panes[0].local_path(), root.path());
         assert_eq!(c.app.active, 0);
     }
     send(&mut c, KeyCode::Backspace);

@@ -114,7 +114,7 @@ fn raw_remote_names_distinguish_equal_display_text_through_sort_and_filter() {
     assert_eq!(pane.remote_path(), Some(REMOTE_PATH));
     assert_eq!(pane.entries[0].name, pane.entries[1].name);
     pane.move_cursor(1, 1);
-    assert_eq!(pane.scroll, 1);
+    assert_eq!(pane.scroll, 2);
     assert_eq!(
         pane.current().unwrap().remote_name(),
         Some(b"name-\xff".as_slice())
@@ -128,7 +128,7 @@ fn raw_remote_names_distinguish_equal_display_text_through_sort_and_filter() {
         selected.remote_path(),
         Some(b"/remote-\xff/name-\xff".as_slice())
     );
-    assert!(selected.path.as_os_str().is_empty());
+    assert!(selected.native_path().is_none());
 }
 
 #[test]
@@ -169,14 +169,12 @@ fn remote_rows_cannot_dispatch_native_work_and_local_navigation_still_works() {
     let requests = controller.dispatch(Action::Enter, &geometry);
     assert_eq!(requests.len(), 1);
     assert_eq!(requests[0].pane, 0);
-    assert_eq!(requests[0].path, child);
+    assert_eq!(*requests[0].local_path(), child);
 }
 
 fn assert_remote_actions_blocked(controller: &mut Controller, geometry: &ui::Geometry) {
     assert_eq!(controller.app.active, 1);
     for action in [
-        Action::Enter,
-        Action::Refresh,
         Action::FullPath,
         Action::Metadata,
         Action::Count,
@@ -195,4 +193,122 @@ fn assert_remote_actions_blocked(controller: &mut Controller, geometry: &ui::Geo
     assert!(!controller.quit);
     assert!(controller.app.panes[1].eligible().is_empty());
     assert!(controller.app.request_metadata(1).is_none());
+}
+
+fn remote_app() -> App {
+    let mut app = App::new("/local".into());
+    app.install_remote_rows(b"/".as_slice().into(), vec![directory()]);
+    app.active = 1;
+    app
+}
+
+fn directory() -> Entry {
+    Entry::from_sftp_metadata(
+        b"/name-\xff".as_slice().into(),
+        b"name-\xff".as_slice().into(),
+        FileAttributes {
+            permissions: Some(0o040755),
+            ..Default::default()
+        },
+        0,
+    )
+}
+
+fn controller(app: App) -> Controller {
+    Controller::new(
+        app,
+        Bindings::new(&Default::default()).unwrap(),
+        Settings::default(),
+    )
+}
+
+fn navigate(c: &mut Controller, action: Action) -> Request {
+    let geometry = ui::geometry(&c.app, Rect::new(0, 0, 140, 22));
+    let mut requests = c.dispatch(action, &geometry);
+    assert_eq!(requests.len(), 1);
+    let request = requests.pop().unwrap();
+    assert!(request.native_path().is_none());
+    request
+}
+
+#[test]
+fn navigates_raw_child_parent_and_history_with_cursor_restoration() {
+    let mut c = controller(remote_app());
+    assert!(c.app.parent().is_none());
+    let child = navigate(&mut c, Action::Enter);
+    assert_eq!(
+        child.kind,
+        RequestKind::SftpListing(b"/name-\xff".as_slice().into())
+    );
+    assert!(c.app.complete_sftp(&child, Ok(vec![])));
+    assert!(c.app.panes[1].parent_focused());
+
+    let parent = navigate(&mut c, Action::Enter);
+    assert_eq!(
+        parent.kind,
+        RequestKind::SftpListing(b"/".as_slice().into())
+    );
+    assert!(c.app.complete_sftp(&parent, Ok(vec![directory()])));
+    assert_eq!(
+        c.app.panes[1].current().unwrap().remote_name(),
+        Some(b"name-\xff".as_slice())
+    );
+
+    let back = navigate(&mut c, Action::Back);
+    assert_eq!(back.kind, child.kind);
+    assert!(c.app.complete_sftp(&back, Ok(vec![])));
+    assert!(c.app.panes[1].parent_focused());
+    let forward = navigate(&mut c, Action::Forward);
+    assert_eq!(forward.kind, parent.kind);
+    assert!(c.app.complete_sftp(&forward, Ok(vec![directory()])));
+    let refresh = navigate(&mut c, Action::Refresh);
+    assert_eq!(refresh.kind, parent.kind);
+    assert!(c.app.complete_sftp(&refresh, Ok(vec![directory()])));
+    assert_eq!(
+        c.app.panes[1].current().unwrap().remote_path(),
+        Some(b"/name-\xff".as_slice())
+    );
+}
+
+#[test]
+fn newest_navigation_wins_and_failure_retains_listing_and_notifies() {
+    let mut c = controller(remote_app());
+    let obsolete = navigate(&mut c, Action::Enter);
+    let newest = navigate(&mut c, Action::Enter);
+    assert!(!c.app.complete_sftp(&obsolete, Err("obsolete".into())));
+    assert!(c.app.notifications.history.is_empty());
+    assert!(
+        c.app
+            .complete_sftp(&newest, Err("Permission denied".into()))
+    );
+    assert_eq!(c.app.panes[1].remote_path(), Some(b"/".as_slice()));
+    assert!(c.app.panes[1].current().is_some());
+    let notice = c.app.notifications.history.last().unwrap();
+    assert!(notice.text.contains("Permission denied"));
+    assert!(c.app.history(false).is_none());
+    assert!(!c.app.complete_sftp(&newest, Ok(vec![])));
+}
+
+#[test]
+fn remote_double_click_uses_the_same_navigation_action() {
+    use crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    let mut c = controller(remote_app());
+    let geometry = ui::geometry(&c.app, Rect::new(0, 0, 140, 22));
+    let pane = geometry.panes[1].unwrap();
+    let click = Event::Mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: pane.x + 2,
+        row: pane.y + 2,
+        modifiers: KeyModifiers::NONE,
+    });
+    assert!(
+        c.handle(click.clone(), &geometry, std::time::Duration::ZERO)
+            .is_empty()
+    );
+    let requests = c.handle(click, &geometry, std::time::Duration::from_millis(1));
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        requests[0].kind,
+        RequestKind::SftpListing(b"/name-\xff".as_slice().into())
+    );
 }

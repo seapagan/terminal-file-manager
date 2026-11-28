@@ -145,7 +145,7 @@ fn rename_rejects_empty_nul_and_parent_traversal_without_queueing_or_retargeting
         };
         assert!(dialog.error.is_some());
         assert_eq!(
-            dialog.plan.operands[0].path,
+            *dialog.plan.operands[0].local_path(),
             root.path().join("left/source")
         );
         assert!(controller.app.operations.outbox.is_empty());
@@ -188,8 +188,8 @@ fn invalid_attributes_and_oversized_paste_never_submit_an_operation() {
 fn install_outcome(controller: &mut Controller, outcomes: &[Outcome]) {
     let plan = Plan::paths(
         Operation::Copy,
-        vec![controller.app.panes[0].path.join("source")],
-        Some(controller.app.panes[1].path.clone()),
+        vec![controller.app.panes[0].local_path().join("source")],
+        Some(controller.app.panes[1].local_path().clone()),
     )
     .unwrap();
     let template =

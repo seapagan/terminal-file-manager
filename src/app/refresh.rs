@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 impl Pane {
     pub(super) fn clear_navigation_filter(&mut self, path: &std::path::Path, keep: bool) {
-        if self.path != path && !keep {
+        if self.path.as_deref() != Some(path) && !keep {
             self.filter.clear();
         }
     }
@@ -14,20 +14,20 @@ impl Pane {
     pub(crate) fn cached_snapshot(&self) -> Snapshot {
         let mut ordered = vec![None; self.entries.len()];
         for entry in &self.entries {
-            ordered[self.listing_order[&entry.path]] = Some(entry.clone());
+            ordered[self.listing_order[entry.local_path()]] = Some(entry.clone());
         }
         let entries = ordered.into_iter().flatten().collect();
         Snapshot {
             directory: self.directory.clone().map(Box::new),
             entry_identity: self.entry_identity.clone(),
-            path: self.path.clone(),
+            path: self.local_path().clone(),
             entries,
             errors: self.warnings.clone(),
         }
     }
     /// Ignore access-time-only differences when deciding whether to rebuild rows and marks.
     pub(super) fn unchanged_listing(&self, fresh: &Snapshot) -> bool {
-        if self.path != fresh.path
+        if self.native_path() != Some(&fresh.path)
             || self.warnings != fresh.errors
             || self.entries.len() != fresh.entries.len()
         {
@@ -40,12 +40,12 @@ impl Pane {
         let entries: HashMap<_, _> = self
             .entries
             .iter()
-            .map(|entry| (&entry.path, entry))
+            .map(|entry| (entry.local_path(), entry))
             .collect();
         fresh.entries.iter().enumerate().all(|(index, entry)| {
-            self.listing_order.get(&entry.path) == Some(&index)
+            self.listing_order.get(entry.local_path()) == Some(&index)
                 && entries
-                    .get(&entry.path)
+                    .get(entry.local_path())
                     .is_some_and(|old| (*old).clone().same_count_inputs(entry))
         })
     }
@@ -53,10 +53,10 @@ impl Pane {
         let accessed: HashMap<_, _> = fresh
             .entries
             .into_iter()
-            .map(|e| (e.path, e.accessed))
+            .map(|e| (e.local_path().clone(), e.accessed))
             .collect();
         for entry in &mut self.entries {
-            entry.accessed = accessed[&entry.path];
+            entry.accessed = accessed[entry.local_path()];
         }
         self.directory = fresh.directory.map(|entry| *entry);
     }

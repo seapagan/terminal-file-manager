@@ -28,7 +28,7 @@ fn fixture() -> (tempfile::TempDir, App) {
             .iter()
             .enumerate()
             .map(|(i, e)| EntryResult {
-                source: e.path.clone(),
+                source: e.local_path().clone(),
                 destination: Some(root.path().join(format!("unique-trash-{i}"))),
                 kind: e.kind,
                 outcome: Outcome::Completed,
@@ -255,8 +255,8 @@ fn source_root_elision_keeps_rows_relative_and_native_identities_unchanged() {
         .iter_mut()
         .zip(&mut job.record.as_mut().unwrap().entries)
     {
-        operand.path = root.join(&operand.name);
-        result.source = operand.path.clone();
+        operand.path = Some(root.join(&operand.name));
+        result.source = operand.local_path().clone();
     }
     let (text, geometry) = draw(&app, 80, 24);
     assert!(text.contains("…"), "{text}");
@@ -383,8 +383,8 @@ fn foreign_source_roots_never_gain_a_fake_common_parent() {
     let (_root, mut app) = fixture();
     let job = &mut app.operations.history[0];
     job.plan.operands.truncate(2);
-    job.plan.operands[0].path = std::path::PathBuf::from(r"C:\one\first.txt");
-    job.plan.operands[1].path = std::path::PathBuf::from(r"D:\two\second.txt");
+    job.plan.operands[0].path = Some(std::path::PathBuf::from(r"C:\one\first.txt"));
+    job.plan.operands[1].path = Some(std::path::PathBuf::from(r"D:\two\second.txt"));
     let (text, _) = draw(&app, 120, 40);
     assert!(!text.contains("From:"), "{text}");
     assert!(text.contains(r"C:\one\first.txt"));

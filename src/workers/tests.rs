@@ -12,7 +12,7 @@ fn listing_metrics_count_only_successful_targeted_refreshes() {
         pane: 0,
         kind: RequestKind::Listing,
         generation: 1,
-        path: root.path().into(),
+        path: Some(root.path().into()),
     };
     for (paths, cancelled, targeted, scans) in [
         (vec![path.clone()], false, 1, 0),
@@ -58,7 +58,7 @@ fn recover_lane(kind: RequestKind, label: &str) {
         pane: 0,
         kind,
         generation: 1,
-        path: root.path().into(),
+        path: Some(root.path().into()),
     };
     for generation in 1..=slots {
         pool.submit(Request {

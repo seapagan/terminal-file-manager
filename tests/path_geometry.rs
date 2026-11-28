@@ -38,7 +38,7 @@ fn path() -> std::path::PathBuf {
 #[test]
 fn header_hit_regions_match_rendered_cells_and_avoid_dividers_after_resize() {
     let mut app = App::new(path());
-    app.panes[1].path = path().ancestors().last().unwrap().join("opposite");
+    app.panes[1].path = Some(path().ancestors().last().unwrap().join("opposite"));
     for dual in [false, true] {
         app.dual = dual;
         for maximized in [false, true] {

@@ -22,6 +22,22 @@ impl Session {
     /// Returns an error if the server refuses SFTP, the listing fails, or
     /// negotiation, listing or channel shutdown exceeds its deadline.
     pub async fn list_sftp(&self, path: Option<&[u8]>) -> io::Result<(SftpString, ReadDir)> {
+        self.list_sftp_path(path, false).await
+    }
+
+    /// List the initial browser location, resolving explicit relative paths on the server.
+    ///
+    /// # Errors
+    /// Returns an error if path resolution, listing, or channel shutdown fails.
+    pub async fn list_sftp_start(&self, path: Option<&[u8]>) -> io::Result<(SftpString, ReadDir)> {
+        self.list_sftp_path(path, true).await
+    }
+
+    async fn list_sftp_path(
+        &self,
+        path: Option<&[u8]>,
+        resolve: bool,
+    ) -> io::Result<(SftpString, ReadDir)> {
         let mut channel = open_channel(self).await?.into_stream();
         let (stream, mut bridge) = duplex(SFTP_STREAM_BUFFER);
         // The SFTP library's close only queues shutdown. Keep the SSH stream
@@ -34,7 +50,7 @@ impl Session {
                     io::Error::new(error.kind(), format!("SFTP channel I/O failed: {error}"))
                 })
         };
-        let listing = list_over_stream(stream, path);
+        let listing = list_over_stream(stream, path, resolve);
         tokio::pin!(forward, listing);
         let (listing, closed) = tokio::select! {
             result = &mut listing => {
@@ -52,12 +68,13 @@ impl Session {
 async fn list_over_stream(
     stream: DuplexStream,
     path: Option<&[u8]>,
+    resolve: bool,
 ) -> io::Result<(SftpString, ReadDir)> {
     let sftp = timeout(CONNECT_TIMEOUT, SftpSession::new(stream))
         .await
         .map_err(|_| timed_out("SFTP initialization timed out"))?
         .map_err(|error| sftp_error("SFTP initialization", error))?;
-    let listing = timeout(CONNECT_TIMEOUT, list_directory(&sftp, path))
+    let listing = timeout(CONNECT_TIMEOUT, list_directory(&sftp, path, resolve))
         .await
         .unwrap_or_else(|_| Err(timed_out("SFTP directory listing timed out")));
     let closed = sftp
@@ -111,11 +128,12 @@ async fn request_sftp(channel: &mut Channel<client::Msg>) -> io::Result<()> {
 async fn list_directory(
     sftp: &SftpSession,
     path: Option<&[u8]>,
+    resolve: bool,
 ) -> io::Result<(SftpString, ReadDir)> {
     let path = match path {
-        Some(path) => SftpString::from(path),
-        None => sftp
-            .canonicalize(".")
+        Some(path) if !resolve => SftpString::from(path),
+        path => sftp
+            .canonicalize(SftpString::from(path.unwrap_or(b".")))
             .await
             .map_err(|error| sftp_error("Resolving the initial SFTP directory", error))?,
     };

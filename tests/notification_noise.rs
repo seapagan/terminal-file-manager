@@ -49,6 +49,11 @@ fn assert_retained(c: &Controller) {
     assert_eq!(c.app.notifications.visible(), [0]);
 }
 
+fn leave_listing_pending(c: &mut Controller, pane: usize) {
+    let path = c.app.panes[pane].local_path().clone();
+    c.app.request_listing(pane, path);
+}
+
 #[test]
 fn unsupported_actions_and_ineligible_counts_only_change_status() {
     let (_root, mut c) = loaded();
@@ -203,7 +208,7 @@ fn pending_destination_rejects_copy_and_move_without_notifying() {
     ] {
         let (_root, mut c) = loaded();
         c.app.dual = true;
-        c.app.request_listing(1, c.app.panes[1].path.clone());
+        leave_listing_pending(&mut c, 1);
         dispatch(&mut c, action);
         assert!(c.app.status.contains("destination"));
         assert!(c.app.operations.dialog.is_none());
@@ -282,7 +287,7 @@ fn oversized_paste_keeps_form_contents_without_notifying() {
 #[test]
 fn pending_listing_waits_without_notifying_or_opening_an_operation() {
     let (_root, mut c) = loaded();
-    c.app.request_listing(0, c.app.panes[0].path.clone());
+    leave_listing_pending(&mut c, 0);
     dispatch(&mut c, Action::Rename);
     assert_retained(&c);
     assert!(c.app.operations.dialog.is_none());

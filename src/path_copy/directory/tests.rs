@@ -42,7 +42,7 @@ fn directory_validation_rejects_independent_lexical_and_physical_failures() {
 fn matching_inspection_evidence_cannot_hide_a_missing_native_directory() {
     let (root, directory) = fixture();
     let lexical = crate::fs::inspect_identity(&directory.path);
-    let physical = crate::fs::inspect_identity(&directory.physical.path);
+    let physical = crate::fs::inspect_identity(directory.physical.local_path());
     std::fs::remove_dir(root.path()).unwrap();
     let mut calls = 0;
     assert!(

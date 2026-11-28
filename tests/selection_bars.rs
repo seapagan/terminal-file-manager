@@ -93,7 +93,7 @@ fn assert_panes(app: &App, level: ColorLevel, width: u16) {
             .visible
             .iter()
             .position(|index| {
-                Some(&app.panes[id].entries[*index].path) == app.panes[id].cursor.as_ref()
+                app.panes[id].entries[*index].native_path() == app.panes[id].cursor.as_ref()
             })
             .unwrap() as u16;
         if area.width >= 10 {

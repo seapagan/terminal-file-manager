@@ -103,7 +103,7 @@ impl Plan {
         let operands = paths.iter().map(|path| crate::fs::inspect(path)).collect();
         let mut plan = Self::new(operation, operands, destination)?;
         for source in &plan.operands {
-            if let Some(parent) = source.path.parent() {
+            if let Some(parent) = source.local_path().parent() {
                 plan.source_directories
                     .push(DirectoryGuard::inspect(parent)?);
             }
@@ -172,7 +172,7 @@ impl Plan {
         );
         retry
             .operands
-            .retain(|entry| !retry.completed.contains(&entry.path));
+            .retain(|entry| !retry.completed.contains(entry.local_path()));
         Ok(retry)
     }
 
@@ -196,11 +196,9 @@ impl Plan {
             .filter(|entry| entry.outcome.successful())
             .map(|entry| &entry.source)
             .collect();
-        if !self
-            .operands
-            .iter()
-            .any(|entry| !self.completed.contains(&entry.path) && !completed.contains(&entry.path))
-        {
+        if !self.operands.iter().any(|entry| {
+            !self.completed.contains(entry.local_path()) && !completed.contains(entry.local_path())
+        }) {
             return Err(invalid("No incomplete operands to retry"));
         }
         Ok(())
@@ -223,7 +221,7 @@ impl Plan {
         for source in &mut self.operands {
             super::safety::revalidate(source, !source.may_recurse())
                 .map_err(|error| io::Error::other(error.detail))?;
-            *source = crate::fs::inspect(&source.path);
+            *source = crate::fs::inspect(source.local_path());
         }
         self.retrying = false;
         Ok(())
@@ -353,7 +351,7 @@ impl DirectoryGuard {
             invalid("Directory identity unavailable; refresh before approving mutations")
         })?;
         Ok(Self {
-            raw: pane.path.clone(),
+            raw: pane.local_path().clone(),
             entry: Box::new(entry),
         })
     }
@@ -368,7 +366,7 @@ impl DirectoryGuard {
         })
     }
     fn validate(&self) -> super::safety::Result<()> {
-        if std::fs::canonicalize(&self.raw)? != self.entry.path {
+        if &std::fs::canonicalize(&self.raw)? != self.entry.local_path() {
             return Err(super::safety::changed(
                 "Pane namespace changed after approval; refresh and review",
             ));
@@ -394,7 +392,7 @@ fn validate_marks(pane: &Pane, operands: &[Entry]) -> io::Result<()> {
             .identity
             .as_ref()
             .ok_or_else(|| invalid("Object identity unavailable"))?;
-        if let Some(mark) = pane.marks.get(&entry.path)
+        if let Some(mark) = pane.marks.get(entry.local_path())
             && !same_object(mark, identity)
         {
             return Err(invalid("Marked object changed; review the selection again"));

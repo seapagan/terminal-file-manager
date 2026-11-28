@@ -86,7 +86,7 @@ fn metadata(app: &App, geometry: &Geometry) -> Option<Target> {
     }
     let detail = &app.details[app.active];
     let entry = detail.entry.as_ref()?;
-    if detail.path.as_ref() != Some(&entry.path) || pane.cursor.as_ref() != Some(&entry.path) {
+    if detail.path.as_ref() != entry.native_path() || pane.cursor.as_ref() != entry.native_path() {
         return None;
     }
     let key = Key::new(entry)?;
@@ -129,7 +129,7 @@ fn cursor_in_rows(pane: &Pane, start: usize, height: usize) -> Option<usize> {
         .get(first..end)?
         .iter()
         .copied()
-        .find(|index| Some(&pane.entries[*index].path) == pane.cursor.as_ref())
+        .find(|index| pane.entries[*index].native_path() == pane.cursor.as_ref())
 }
 
 fn requested_names(app: &App, geometry: &Geometry) -> bool {

@@ -100,8 +100,8 @@ fn explicit_and_automatic_restore_work_from_a_deleted_cwd() {
             String::from_utf8_lossy(&output.stderr)
         );
         let restored = store.load().unwrap().restore(&Settings::default()).unwrap();
-        assert_eq!(restored.panes[0].path, root.path());
-        assert_eq!(restored.panes[1].path, root.path());
+        assert_eq!(*restored.panes[0].local_path(), root.path());
+        assert_eq!(*restored.panes[1].local_path(), root.path());
         assert_eq!(restored.relative_path_base, app.relative_path_base);
     }
 }

@@ -12,7 +12,7 @@ pub(super) fn initial_listings(app: &App, pool: &mut Pool) {
         pool.submit(Request {
             pane,
             generation: 1,
-            path: state.path.clone(),
+            path: Some(state.local_path().clone()),
             kind: RequestKind::Listing,
         });
     }
@@ -36,10 +36,7 @@ pub(super) fn dispatch_event(
     clipboard: &mut Runtime,
 ) -> io::Result<()> {
     let requests = controller.handle(crossterm::event::read()?, geometry, started.elapsed());
-    for request in requests
-        .into_iter()
-        .filter(|request| !controller.app.panes[request.pane].is_remote())
-    {
+    for request in requests {
         pool.submit(request);
     }
     config.synchronize(controller);

@@ -125,7 +125,7 @@ fn later_cursor_marks_filter_and_navigation_take_precedence_over_creation() {
 
 fn install(c: &mut Controller, request: terminal_file_manager::app::Request) {
     let snapshot = terminal_file_manager::fs::list(
-        &request.path,
+        request.local_path(),
         &terminal_file_manager::fs::IgnoreContext::isolated(),
         &false.into(),
     )

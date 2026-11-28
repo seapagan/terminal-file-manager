@@ -37,7 +37,7 @@ pub fn totals(path: &Path, cancelled: &AtomicBool) -> io::Result<Totals> {
                 let entry = inspect(&item.path(), None);
                 count_entry(&entry, &mut result);
                 if entry.may_recurse() {
-                    descend(&entry.path, &mut stack, &mut result);
+                    descend(entry.local_path(), &mut stack, &mut result);
                 }
             }
         }
@@ -69,7 +69,7 @@ fn count_entry(entry: &super::Entry, result: &mut Totals) {
         _ => {}
     }
     if let Some(error) = &entry.error {
-        record_error(result, format!("{}: {error}", entry.path.display()));
+        record_error(result, format!("{}: {error}", entry.local_path().display()));
     }
 }
 

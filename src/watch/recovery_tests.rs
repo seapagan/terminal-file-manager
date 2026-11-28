@@ -119,7 +119,7 @@ fn retry_result_cannot_override_newer_navigation_or_clear_its_error() {
     ));
     runtime.poll(&mut app, &mut pool, Duration::from_secs(2));
     finish(&mut app, &mut pool);
-    assert_eq!(app.panes[0].path, next.path());
+    assert_eq!(*app.panes[0].local_path(), next.path());
     assert!(app.panes[0].error.is_none());
 }
 

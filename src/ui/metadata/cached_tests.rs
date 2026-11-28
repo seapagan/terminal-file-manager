@@ -98,7 +98,7 @@ fn navigation_keeps_the_old_stale_view_until_success_and_reports_failure() {
         let navigation = c.app.request_listing(0, next.clone());
         for floating in [false, true] {
             let text = metadata_text(&c.app, floating);
-            assert_eq!(c.app.panes[0].path, root.path());
+            assert_eq!(*c.app.panes[0].local_path(), root.path());
             assert!(text.contains("old directory identity changed"), "{text}");
             assert!(!text.contains("new-entry"));
         }
@@ -115,13 +115,13 @@ fn navigation_keeps_the_old_stale_view_until_success_and_reports_failure() {
         for floating in [false, true] {
             let text = metadata_text(&c.app, floating);
             if success {
-                assert_eq!(c.app.panes[0].path, next);
+                assert_eq!(*c.app.panes[0].local_path(), next);
                 assert!(
                     text.contains("new-entry") && !text.contains("Stale"),
                     "{text}"
                 );
             } else {
-                assert_eq!(c.app.panes[0].path, root.path());
+                assert_eq!(*c.app.panes[0].local_path(), root.path());
                 assert!(
                     text.contains("NAVIGATION_DENIED")
                         && !text.contains("old directory identity changed"),
@@ -322,13 +322,13 @@ fn canonical_resolution_distinguishes_native_success_and_failure_in_both_views()
     let request = c.app.request_metadata(0).unwrap();
     let cached = c.app.panes[0].current().unwrap().clone();
     // The listing fixture removed the file after caching its metadata.
-    assert!(std::fs::canonicalize(&request.path).is_err());
+    assert!(std::fs::canonicalize(request.local_path()).is_err());
     for floating in [false, true] {
         let text = metadata_text(&c.app, floating);
         assert_cached_fields(&text, "alpha", "1 B");
         assert!(text.contains("Resolving…"));
     }
-    let canonical = std::fs::canonicalize(&request.path).ok();
+    let canonical = std::fs::canonicalize(request.local_path()).ok();
     assert!(c.app.complete_metadata(&request, cached, canonical));
     for floating in [false, true] {
         let text = metadata_text(&c.app, floating);
@@ -337,9 +337,9 @@ fn canonical_resolution_distinguishes_native_success_and_failure_in_both_views()
     }
     action(&mut c, Action::Down);
     let request = c.app.request_metadata(0).unwrap();
-    std::fs::write(&request.path, "22").unwrap();
-    let canonical = std::fs::canonicalize(&request.path).unwrap();
-    let entry = fs::inspect(&request.path);
+    std::fs::write(request.local_path(), "22").unwrap();
+    let canonical = std::fs::canonicalize(request.local_path()).unwrap();
+    let entry = fs::inspect(request.local_path());
     assert!(
         c.app
             .complete_metadata(&request, entry, Some(canonical.clone()))

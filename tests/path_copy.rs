@@ -90,7 +90,7 @@ fn parent_defaults_current_marks_win_and_back_does_not_navigate() {
     std::fs::write(root.path().join("file"), "").unwrap();
     let mut c = controller(root.path());
     c.app.panes[0].move_cursor(-1, 20);
-    let before = c.app.panes[0].path.clone();
+    let before = c.app.panes[0].local_path().clone();
     sequence(&mut c, "yh");
     assert_eq!(c.app.footer_workflow.as_ref().unwrap().stage_index(), 0);
     send(&mut c, KeyCode::Enter);
@@ -107,7 +107,7 @@ fn parent_defaults_current_marks_win_and_back_does_not_navigate() {
     );
     send(&mut c, KeyCode::Backspace);
     assert!(c.app.footer_workflow.is_none());
-    assert_eq!(c.app.panes[0].path, before);
+    assert_eq!(*c.app.panes[0].local_path(), before);
     assert!(c.path_copy_request.is_none());
     c.app.panes[0].select_all();
     sequence(&mut c, "y");

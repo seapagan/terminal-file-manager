@@ -189,7 +189,7 @@ fn entry_fields(
     };
     let mut fields = vec![
         ("Name", entry.name.to_string_lossy().into_owned()),
-        ("Path", entry.path.display().to_string()),
+        ("Path", entry.local_path().display().to_string()),
         (
             "Canonical",
             detail.canonical.as_ref().map_or_else(

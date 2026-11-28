@@ -9,7 +9,7 @@ use terminal_file_manager::{
 fn session_storage_round_trips_layout_and_both_native_locations() {
     let root = tempfile::tempdir().unwrap();
     let mut app = App::new(root.path().join("left"));
-    app.panes[1].path = root.path().join("other/right");
+    app.panes[1].path = Some(root.path().join("other/right"));
     app.relative_path_base = root.path().join("captured-base");
     app.active = 1;
     app.dual = true;
@@ -21,10 +21,14 @@ fn session_storage_round_trips_layout_and_both_native_locations() {
     store.save(&app).unwrap();
     let session = store.load().unwrap();
     let restored = session.restore(&Settings::default()).unwrap();
-    assert_eq!(restored.panes[0].path, app.panes[0].path);
-    assert_eq!(restored.panes[1].path, app.panes[1].path);
+    assert_eq!(restored.panes[0].local_path(), app.panes[0].local_path());
+    assert_eq!(restored.panes[1].local_path(), app.panes[1].local_path());
     for pane in &restored.panes {
-        assert!(pane.parent_focused(), "parent row in {:?}", pane.path);
+        assert!(
+            pane.parent_focused(),
+            "parent row in {:?}",
+            pane.local_path()
+        );
     }
     assert_eq!(restored.relative_path_base, app.relative_path_base);
     assert_eq!(restored.active, 1);
@@ -78,7 +82,10 @@ fn session_size_limit_accepts_the_boundary_and_rejects_one_extra_byte() {
     std::fs::write(&store.path, &text).unwrap();
     assert_eq!(
         store.load().unwrap().locations().unwrap(),
-        [app.panes[0].path.clone(), app.panes[1].path.clone()]
+        [
+            app.panes[0].local_path().clone(),
+            app.panes[1].local_path().clone()
+        ]
     );
     text.push(' ');
     std::fs::write(&store.path, &text).unwrap();
@@ -189,7 +196,7 @@ fn session_refuses_linked_storage_without_touching_its_target() {
 fn legacy_session_uses_first_pane_and_base_validation_preserves_storage() {
     let root = tempfile::tempdir().unwrap();
     let mut app = App::new(root.path().join("left"));
-    app.panes[1].path = root.path().join("right");
+    app.panes[1].path = Some(root.path().join("right"));
     app.active = 1;
     app.relative_path_base = root.path().join("base");
     let store = SessionStore {
@@ -207,7 +214,7 @@ fn legacy_session_uses_first_pane_and_base_validation_preserves_storage() {
         .unwrap()
         .restore(&Settings::default())
         .unwrap();
-    assert_eq!(restored.relative_path_base, app.panes[0].path);
+    assert_eq!(restored.relative_path_base, *app.panes[0].local_path());
     app.relative_path_base = "relative".into();
     assert!(store.save(&app).is_err());
     assert_eq!(std::fs::read_to_string(&store.path).unwrap(), text);

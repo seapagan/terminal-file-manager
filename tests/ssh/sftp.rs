@@ -27,6 +27,7 @@ enum Event {
     HandleClosed,
     SubsystemEnded,
     StalledChannelClosed,
+    ListingBlocked,
 }
 
 #[derive(Default)]
@@ -36,6 +37,7 @@ pub(super) struct Subsystem {
     refused_close_ping: Option<oneshot::Sender<()>>,
     events: Option<UnboundedSender<Event>>,
     stall_close: bool,
+    list_gate: Option<oneshot::Receiver<()>>,
     stalled: Option<(ChannelId, oneshot::Sender<()>)>,
 }
 
@@ -55,6 +57,7 @@ impl Subsystem {
                 events: events.clone(),
                 files: None,
                 ssh: session.handle(),
+                list_gate: self.list_gate.take(),
             };
             if std::mem::take(&mut self.stall_close) {
                 let (stream, peer) = io::duplex(8192);
@@ -120,6 +123,7 @@ struct Directory {
     events: UnboundedSender<Event>,
     files: Option<Vec<File>>,
     ssh: server::Handle,
+    list_gate: Option<oneshot::Receiver<()>>,
 }
 
 impl Drop for Directory {
@@ -144,6 +148,10 @@ impl sftp::Handler for Directory {
     }
 
     async fn opendir(&mut self, id: u32, path: SftpString) -> Result<Handle, Self::Error> {
+        if let Some(gate) = self.list_gate.take() {
+            self.events.send(Event::ListingBlocked).unwrap();
+            gate.await.map_err(|_| StatusCode::Failure)?;
+        }
         self.files = Some(match path.as_bytes() {
             HOME => fixture_files(),
             b"/empty-\xfe" => vec![File::dummy("."), File::dummy("..")],
@@ -415,4 +423,67 @@ async fn rejects_a_listing_when_the_ssh_connection_is_lost() {
         "expected closure of the stream without a directory status reply: {error}"
     );
     peer.server_finished().await.unwrap();
+}
+
+#[tokio::test]
+async fn delayed_sftp_listing_leaves_native_listing_lane_available() {
+    let (events, rx) = mpsc::unbounded_channel();
+    let (release, list_gate) = oneshot::channel();
+    let peer = Peer::start_with(Subsystem {
+        events: Some(events),
+        list_gate: Some(list_gate),
+        ..Subsystem::default()
+    })
+    .await;
+    let ssh = std::sync::Arc::new(peer.connect(Credentials::Password(PASSWORD)).await.unwrap());
+    let worker_session = ssh.clone();
+    tokio::task::spawn_blocking(move || drive_listing_lanes(worker_session, rx, release))
+        .await
+        .unwrap();
+    std::sync::Arc::into_inner(ssh)
+        .unwrap()
+        .disconnect()
+        .await
+        .unwrap();
+    peer.server_finished().await.unwrap();
+}
+
+fn drive_listing_lanes(
+    ssh: std::sync::Arc<terminal_file_manager::ssh::Session>,
+    mut events: UnboundedReceiver<Event>,
+    release: oneshot::Sender<()>,
+) {
+    use terminal_file_manager::{
+        app::{Request, RequestKind},
+        fs::IgnoreContext,
+        workers::{Pool, Value},
+    };
+    let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
+    pool.attach_sftp(ssh);
+    pool.submit(Request {
+        pane: 1,
+        generation: 1,
+        path: None,
+        kind: RequestKind::SftpListing(HOME.into()),
+    });
+    tokio::runtime::Handle::current().block_on(expect_event(&mut events, Event::ListingBlocked));
+    let local = tempfile::tempdir().unwrap();
+    pool.submit(Request {
+        pane: 0,
+        generation: 1,
+        path: Some(local.path().into()),
+        kind: RequestKind::Listing,
+    });
+    let completed = pool.next(LIMIT).unwrap();
+    assert_eq!(completed.request.pane, 0);
+    assert!(matches!(completed.value, Value::Listing(Ok(listing)) if listing.path == local.path()));
+
+    release.send(()).unwrap();
+    let completed = pool.next(LIMIT).unwrap();
+    assert_eq!(completed.request.pane, 1);
+    let Value::SftpListing(Ok(entries)) = completed.value else {
+        panic!("expected a successful SFTP listing");
+    };
+    assert_eq!(entries[0].remote_name(), Some(b"entry-\xff".as_slice()));
+    assert!(entries.iter().all(|entry| entry.native_path().is_none()));
 }

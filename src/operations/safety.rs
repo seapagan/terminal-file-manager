@@ -36,7 +36,7 @@ pub(super) fn changed(message: &str) -> Failure {
 }
 
 pub(super) fn revalidate(expected: &Entry, contents: bool) -> Result<()> {
-    let fresh = crate::fs::inspect(&expected.path);
+    let fresh = crate::fs::inspect(expected.local_path());
     let same = match (&expected.identity, &fresh.identity) {
         (Some(a), Some(b)) => {
             if contents {
@@ -60,7 +60,7 @@ pub(super) fn revalidate(expected: &Entry, contents: bool) -> Result<()> {
 }
 
 pub(super) fn owned_object(expected: &Entry) -> Result<()> {
-    let fresh = crate::fs::inspect(&expected.path);
+    let fresh = crate::fs::inspect(expected.local_path());
     if fresh.kind == expected.kind
         && fresh.link_target == expected.link_target
         && expected
@@ -165,10 +165,10 @@ pub(super) fn reject_overlap(source: &Entry, destination: &Path) -> Result<()> {
 }
 
 fn reject_namespace_overlap(source: &Entry, destination: &Path) -> Result<()> {
-    let source_path = super::locks::namespace(&source.path)?;
+    let source_path = super::locks::namespace(source.local_path())?;
     let destination_path = super::locks::namespace(destination)?;
     if source_path == destination_path {
-        let reason = match (source.path == destination, source.may_recurse()) {
+        let reason = match (source.local_path() == destination, source.may_recurse()) {
             (false, _) => "Source and destination refer to the same item.",
             (true, true) => "Source and destination are the same folder.",
             (true, false) => "Source and destination are the same.",
@@ -185,13 +185,14 @@ pub(super) fn same_entry_rename(source: &Entry, destination: &Path) -> Result<bo
     let Some(target) = existing(destination)? else {
         return Ok(false);
     };
-    if !native_alias(source, &target) || source.path.file_name() == destination.file_name() {
+    if !native_alias(source, &target) || source.local_path().file_name() == destination.file_name()
+    {
         return Ok(false);
     }
     let Some(parent) = rename_parent(source, destination)? else {
         return Ok(false);
     };
-    let selected = selected_name_only(&parent.path, &source.path, destination)?;
+    let selected = selected_name_only(parent.local_path(), source.local_path(), destination)?;
     for entry in [&parent, source, &target] {
         revalidate(entry, true)?;
     }
@@ -207,7 +208,7 @@ fn native_alias(a: &Entry, b: &Entry) -> bool {
 
 fn rename_parent(source: &Entry, destination: &Path) -> Result<Option<Entry>> {
     let source_parent = source
-        .path
+        .local_path()
         .parent()
         .ok_or_else(|| invalid("Rename parent required"))?;
     let target_parent = destination
@@ -236,7 +237,7 @@ pub(super) fn acknowledged_remove(
     entry: &Entry,
     remove: impl FnOnce(&Path) -> io::Result<()>,
 ) -> Result<()> {
-    if let Err(error) = remove(&entry.path) {
+    if let Err(error) = remove(entry.local_path()) {
         if revalidate(entry, false).is_ok() {
             return Err(error.into());
         }

@@ -218,7 +218,7 @@ fn metadata_fields_have_separate_rows_and_share_the_cached_entry() {
     let request = app.request_metadata(0).unwrap();
     app.complete_metadata(
         &request,
-        terminal_file_manager::fs::inspect(&request.path),
+        terminal_file_manager::fs::inspect(request.local_path()),
         None,
     );
     app.details[0].entry.as_mut().unwrap().name = "selected\nname".into();

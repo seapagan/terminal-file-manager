@@ -62,7 +62,7 @@ impl OwnedStage {
         Ok(())
     }
     pub fn finish(self, transfer: Result<Entry>) -> Result<Entry> {
-        let recovery = self.root.path.clone();
+        let recovery = self.root.local_path().clone();
         if transfer
             .as_ref()
             .is_err_and(|error| error.outcome == Outcome::OutcomeUnknown)
@@ -98,7 +98,7 @@ impl OwnedStage {
             .tempdir_in(parent)?
             .keep();
         let root = crate::fs::inspect(&root);
-        let path = root.path.join("payload");
+        let path = root.local_path().join("payload");
         let file = if let Some(source) = link {
             create_link(source, &path).map(|()| None)
         } else {
@@ -158,13 +158,13 @@ impl OwnedStage {
             safety::owned_object(&self.entry)?;
             remove_leaf(&self.path)?;
         }
-        fs::remove_dir(&self.root.path)?;
+        fs::remove_dir(self.root.local_path())?;
         Ok(())
     }
 
     pub fn committed(&self, destination: &Path) -> Result<Entry> {
         let mut expected = self.entry.clone();
-        expected.path = destination.to_owned();
+        expected.path = Some(destination.to_owned());
         safety::owned_object(&expected)?;
         safety::revalidate(&expected, true)?;
         Ok(crate::fs::inspect(destination))
@@ -175,13 +175,13 @@ fn construction_failure(root: &Entry, parents: &Parents, error: io::Error) -> sa
     let cleanup = parents
         .validate()
         .and_then(|()| safety::revalidate(root, false))
-        .and_then(|()| fs::remove_dir(&root.path).map_err(Into::into));
+        .and_then(|()| fs::remove_dir(root.local_path()).map_err(Into::into));
     if let Err(cleanup) = cleanup {
         return safety::Failure {
             outcome: Outcome::OutcomeUnknown,
             detail: format!(
                 "Stage construction failed: {error}; cleanup unverified at {}: {}",
-                root.path.display(),
+                root.local_path().display(),
                 cleanup.detail
             ),
         };
@@ -232,7 +232,7 @@ fn create_link(source: &Entry, destination: &Path) -> io::Result<()> {
     #[cfg(windows)]
     {
         use std::os::windows::fs::FileTypeExt;
-        let kind = fs::symlink_metadata(&source.path)?.file_type();
+        let kind = fs::symlink_metadata(source.local_path())?.file_type();
         if kind.is_symlink_dir() {
             std::os::windows::fs::symlink_dir(target, destination)
         } else {
@@ -298,7 +298,7 @@ mod tests {
         assert!(stage.commit(&destination, false).is_err());
         assert_eq!(fs::read(&stage.path).unwrap(), b"incoming");
         assert_eq!(fs::read(&destination).unwrap(), b"existing");
-        let directory = stage.root.path.clone();
+        let directory = stage.root.local_path().clone();
         stage.cleanup().unwrap();
         assert!(!directory.exists());
         assert_eq!(fs::read(destination).unwrap(), b"existing");

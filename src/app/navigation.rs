@@ -14,11 +14,14 @@ impl App {
     pub fn parent(&mut self) -> Option<Request> {
         let pane = self.active;
         let state = &self.panes[pane];
-        let parent = state.path.parent()?.to_path_buf();
+        if state.is_remote() {
+            return self.remote_parent();
+        }
+        let parent = state.local_path().parent()?.to_path_buf();
         let visit = state.parent_visit(parent.clone());
         // Keep an established context's original identity, including its absence.
         let waiting = state.context == 0 && visit.cursor_identity.is_none();
-        let exited = waiting.then(|| state.path.clone());
+        let exited = waiting.then(|| state.local_path().clone());
         let request = self.request_location(pane, parent, RequestKind::ParentListing(exited));
         self.panes[pane].parent_restoring = Some(ParentRestore {
             visit,
@@ -60,11 +63,9 @@ impl App {
     }
 
     pub(super) fn close_stale_path_picker(&mut self, pane: usize) {
-        if self
-            .path_picker
-            .as_ref()
-            .is_some_and(|picker| picker.pane == pane && picker.path != self.panes[pane].path)
-        {
+        if self.path_picker.as_ref().is_some_and(|picker| {
+            picker.pane == pane && Some(&picker.path) != self.panes[pane].native_path()
+        }) {
             self.path_picker = None;
             self.path_pointer = None;
             if self
@@ -97,16 +98,26 @@ impl Pane {
 
     /// A parent exists according to native lexical path semantics.
     pub fn has_parent(&self) -> bool {
-        !self.is_remote()
-            && self
-                .path
-                .parent()
-                .is_some_and(|p| !p.as_os_str().is_empty())
+        if self.is_remote() {
+            return self.remote_parent_path().is_some();
+        }
+        self.native_path()
+            .and_then(|path| path.parent())
+            .is_some_and(|p| !p.as_os_str().is_empty())
     }
 
     /// Parent focus never resolves to a filesystem Entry or operation operand.
     pub fn parent_focused(&self) -> bool {
-        self.has_parent() && self.cursor.as_deref() == self.path.parent()
+        if let Some(remote) = &self.remote {
+            return self.remote_parent_path().is_some_and(|parent| {
+                remote
+                    .cursor
+                    .as_ref()
+                    .map(russh_sftp::protocol::SftpString::as_bytes)
+                    == Some(parent)
+            });
+        }
+        self.has_parent() && self.cursor.as_deref() == self.local_path().parent()
     }
 
     /// Rendered row count includes the virtual parent, independently of filters.
@@ -120,11 +131,11 @@ impl Pane {
             return None;
         }
         if self.has_parent() && row == 0 {
-            return self.path.parent().map(PathBuf::from);
+            return self.local_path().parent().map(PathBuf::from);
         }
         self.visible
             .get(row.checked_sub(usize::from(self.has_parent()))?)
-            .map(|i| self.entries[*i].path.clone())
+            .and_then(|i| self.entries[*i].path.clone())
     }
 
     pub(crate) fn entry_focused(&self, entry: &Entry) -> bool {
@@ -134,7 +145,7 @@ impl Pane {
                 .as_ref()
                 .is_some_and(|cursor| Some(cursor.as_bytes()) == entry.remote_path())
         } else {
-            self.cursor.as_ref() == Some(&entry.path)
+            self.cursor.as_ref() == entry.native_path()
         }
     }
 
@@ -145,13 +156,22 @@ impl Pane {
                 .and_then(|e| e.remote.as_ref())
                 .map(|r| r.path.clone());
         } else {
-            self.cursor = entry.map(|e| e.path.clone());
+            self.cursor = entry.map(|e| e.local_path().clone());
+        }
+    }
+
+    pub(crate) fn navigation_target(&self, row: usize) -> Option<super::NavigationTarget> {
+        if self.is_remote() {
+            self.remote_row_path(row).map(super::NavigationTarget::Sftp)
+        } else {
+            self.row_path(row).map(super::NavigationTarget::Native)
         }
     }
 
     pub(crate) fn focus_row(&mut self, row: usize) {
         if self.is_remote() {
-            self.set_entry_focus(self.visible.get(row).copied());
+            let path = self.remote_row_path(row);
+            self.remote.as_mut().expect("remote pane").cursor = path;
         } else {
             self.cursor = self.row_path(row);
         }
@@ -164,6 +184,28 @@ impl Pane {
         } else {
             self.cursor_index()
                 .map(|i| i + usize::from(self.has_parent()))
+        }
+    }
+}
+
+pub(super) fn record_visit<T>(
+    back: &mut Vec<T>,
+    forward: &mut Vec<T>,
+    visit: T,
+    direction: Option<bool>,
+) {
+    match direction {
+        Some(true) => {
+            forward.pop();
+            back.push(visit);
+        }
+        Some(false) => {
+            back.pop();
+            forward.push(visit);
+        }
+        None => {
+            back.push(visit);
+            forward.clear();
         }
     }
 }

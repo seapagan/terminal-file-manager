@@ -6,7 +6,7 @@ use ratatui::{style::Style, text::Line};
 pub(super) fn title(pane: &crate::app::Pane, id: usize, active: bool, width: u16) -> String {
     let width = usize::from(width);
     let mut label = format!("{} Pane {}: ", if active { ">" } else { " " }, id + 1);
-    let suffix = if pane.pending.is_some() {
+    let suffix = if pane.pending.is_some() || (pane.is_remote() && pane.listing) {
         " [loading]"
     } else {
         ""
@@ -20,7 +20,7 @@ pub(super) fn title(pane: &crate::app::Pane, id: usize, active: bool, width: u16
         let path = super::clean(&String::from_utf8_lossy(remote));
         super::modal::truncate(&format!("SSH read-only {}", path), available as u16)
     } else {
-        shorten(&pane.path, available)
+        shorten(pane.local_path(), available)
     };
     format!("{label}{path}{suffix}")
 }

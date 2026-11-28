@@ -8,7 +8,7 @@ use terminal_file_manager::{
 
 fn complete(app: &mut App, request: Request) {
     let listing = fs::list(
-        &request.path,
+        request.local_path(),
         &IgnoreContext::isolated(),
         &AtomicBool::new(false),
     )
@@ -23,7 +23,7 @@ fn loaded(path: &Path) -> App {
         Request {
             pane: 0,
             generation: 1,
-            path: path.into(),
+            path: Some(path.into()),
             kind: terminal_file_manager::app::RequestKind::Listing,
         },
     );
@@ -138,16 +138,16 @@ fn direct_start_link_obeys_visibility_and_missing_identity() {
                 listing
                     .entries
                     .iter_mut()
-                    .find(|e| e.path == alias)
+                    .find(|e| e.native_path() == Some(&alias))
                     .unwrap()
                     .hidden = true
             }
-            "absent" => listing.entries.retain(|e| e.path != alias),
+            "absent" => listing.entries.retain(|e| e.native_path() != Some(&alias)),
             "identity" => {
                 listing
                     .entries
                     .iter_mut()
-                    .find(|e| e.path == alias)
+                    .find(|e| e.native_path() == Some(&alias))
                     .unwrap()
                     .identity = None
             }
@@ -222,7 +222,7 @@ fn virtual_parent_row_restores_native_symlink_or_junction_entry() {
     assert!(c.app.panes[0].parent_focused());
     assert!(c.app.panes[0].eligible().is_empty());
     let request = c.dispatch(Action::Enter, &g).remove(0);
-    assert_eq!(request.path, root.path());
+    assert_eq!(*request.local_path(), root.path());
     complete(&mut c.app, request);
     assert_eq!(c.app.panes[0].cursor, Some(alias));
 }

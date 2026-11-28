@@ -25,9 +25,9 @@ fn submission_freezes_visible_operands_and_destination() {
     let plan = Plan::capture(&app.panes[0], Operation::Copy, Some(destination.clone())).unwrap();
     app.panes[0].set_filter("beta".into());
     app.panes[0].clear_visible();
-    app.panes[0].path = PathBuf::from("elsewhere");
+    app.panes[0].path = Some(PathBuf::from("elsewhere"));
     assert_eq!(plan.operands.len(), 1);
-    assert_eq!(plan.operands[0].path, root.path().join("alpha"));
+    assert_eq!(*plan.operands[0].local_path(), root.path().join("alpha"));
     assert_eq!(plan.destination, Some(destination));
 }
 

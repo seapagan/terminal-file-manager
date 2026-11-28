@@ -11,9 +11,9 @@ fn cached_times(c: &mut Controller) {
         0,
         1,
         Ok(fs::Snapshot {
-            directory: Some(Box::new(fs::inspect(&c.app.panes[0].path))),
+            directory: Some(Box::new(fs::inspect(c.app.panes[0].local_path()))),
             entry_identity: None,
-            path: c.app.panes[0].path.clone(),
+            path: c.app.panes[0].local_path().clone(),
             entries: vec![entry.clone()],
             errors: vec![],
         }),
@@ -22,7 +22,7 @@ fn cached_times(c: &mut Controller) {
     c.app.panes[0].columns.modified = false;
     let request = c.app.request_metadata(0).unwrap();
     assert!(c.app.complete_metadata(&request, entry.clone(), None));
-    std::fs::remove_file(entry.path).unwrap();
+    std::fs::remove_file(entry.local_path()).unwrap();
     assert!(c.app.request_metadata(0).is_none());
 }
 

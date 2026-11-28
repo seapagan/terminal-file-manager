@@ -85,10 +85,10 @@ fn symlink_ancestors_navigate_lexically_and_failed_navigation_preserves_history(
             Default::default(),
         )
         .remove(0);
-    assert_eq!(request.path, alias);
+    assert_eq!(*request.local_path(), alias);
     c.app
         .complete_listing(0, request.generation, Err("denied".into()));
-    assert_eq!(c.app.panes[0].path, path);
+    assert_eq!(*c.app.panes[0].local_path(), path);
     assert!(c.app.history(false).is_none());
 }
 

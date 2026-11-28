@@ -122,16 +122,24 @@ async fn run(session: Session, listing: Listing) -> io::Result<()> {
 
 async fn preview(session: Session, path: Option<SftpString>) -> io::Result<()> {
     let listing = session
-        .list_sftp(path.as_ref().map(SftpString::as_bytes))
+        .list_sftp_start(path.as_ref().map(SftpString::as_bytes))
         .await;
-    let closed = session.disconnect().await;
-    let (path, entries) = listing?;
-    closed?;
-    tokio::task::spawn_blocking(move || {
-        terminal_file_manager::browser::run_sftp_preview(path, entries)
-    })
-    .await?
-    .map_err(io::Error::other)
+    let session = std::sync::Arc::new(session);
+    let result = match listing {
+        Ok((path, entries)) => {
+            let browser_session = session.clone();
+            tokio::task::spawn_blocking(move || {
+                terminal_file_manager::browser::run_sftp_preview(browser_session, path, entries)
+            })
+            .await
+            .map_err(io::Error::other)
+            .and_then(|result| result.map_err(io::Error::other))
+        }
+        Err(error) => Err(error),
+    };
+    let session = std::sync::Arc::into_inner(session)
+        .ok_or_else(|| io::Error::other("SSH listing worker did not release the connection"))?;
+    result.and(session.disconnect().await)
 }
 
 async fn show_listing(session: &Session, path: Option<&[u8]>) -> io::Result<()> {

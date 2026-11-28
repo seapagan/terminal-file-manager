@@ -8,7 +8,7 @@ fn finish(c: &mut Controller, plan: Plan, outcome: Outcome) {
         .operands
         .iter()
         .map(|entry| EntryResult {
-            source: entry.path.clone(),
+            source: entry.local_path().clone(),
             destination: None,
             kind: entry.kind,
             outcome,

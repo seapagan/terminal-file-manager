@@ -26,7 +26,8 @@ impl Mounts {
         if !self.enabled || !matches!(source.kind, EntryKind::File | EntryKind::Directory) {
             return Ok(());
         }
-        if self.roots.contains(&fs::canonicalize(&source.path)?) || different_volume(source)? {
+        if self.roots.contains(&fs::canonicalize(source.local_path())?) || different_volume(source)?
+        {
             return Err(safety::changed(
                 "Mounted object refused; select its contents explicitly",
             ));
@@ -39,7 +40,7 @@ impl Mounts {
 fn different_volume(source: &Entry) -> io::Result<bool> {
     use std::os::unix::fs::MetadataExt;
     let parent = source
-        .path
+        .local_path()
         .parent()
         .ok_or_else(|| io::Error::other("Root mutation refused"))?;
     let device = fs::metadata(parent)?.dev();

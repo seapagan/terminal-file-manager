@@ -98,7 +98,11 @@ fn remote_extension(name: &[u8]) -> Option<&[u8]> {
 fn extension(a: &Entry, b: &Entry) -> Ordering {
     match (a.remote_name(), b.remote_name()) {
         (Some(a), Some(b)) => remote_extension(a).cmp(&remote_extension(b)),
-        _ => a.path.extension().cmp(&b.path.extension()),
+        _ => a
+            .path
+            .as_deref()
+            .and_then(std::path::Path::extension)
+            .cmp(&b.path.as_deref().and_then(std::path::Path::extension)),
     }
 }
 

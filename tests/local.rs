@@ -203,7 +203,7 @@ fn unix_links_modes_and_identity_are_preserved() {
     )
     .unwrap();
     let entry = snapshot.entries.iter().find(|e| e.name == raw).unwrap();
-    assert_eq!(entry.path, root.path().join(&raw));
+    assert_eq!(*entry.local_path(), root.path().join(&raw));
     assert!(entry.executable);
     assert!(entry.identity.is_some());
     let broken = snapshot
@@ -241,7 +241,7 @@ fn linux_invalid_utf8_names_remain_distinct_native_paths() {
             snapshot
                 .entries
                 .iter()
-                .any(|e| e.path == root.path().join(&name))
+                .any(|e| *e.local_path() == root.path().join(&name))
         );
     }
     assert_ne!(snapshot.entries[0].path, snapshot.entries[1].path);

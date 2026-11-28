@@ -156,13 +156,15 @@ fn parent_row(pane: &Pane, width: u16, theme: &Theme, active: bool) -> Row<'stat
 fn render_empty(frame: &mut Frame, pane: &Pane, area: Rect) {
     let offset = 1 + u16::from(pane.has_parent());
     frame.render_widget(
-        Paragraph::new(if pane.pending.is_some() {
-            "Loading directory…"
-        } else if !pane.filter.is_empty() {
-            "No matches — FILTER active"
-        } else {
-            "No visible entries"
-        }),
+        Paragraph::new(
+            if pane.pending.is_some() || (pane.is_remote() && pane.listing) {
+                "Loading directory…"
+            } else if !pane.filter.is_empty() {
+                "No matches — FILTER active"
+            } else {
+                "No visible entries"
+            },
+        ),
         Rect::new(
             area.x,
             area.y.saturating_add(offset),
@@ -287,7 +289,9 @@ fn identity_cells(
             theme.name_style(entry)
         },
     );
-    let marked = pane.marks.contains_key(&entry.path);
+    let marked = entry
+        .native_path()
+        .is_some_and(|path| pane.marks.contains_key(path));
     let marker = if marked { "[*]" } else { "   " };
     let name = super::measure::name(
         entry,

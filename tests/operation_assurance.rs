@@ -131,7 +131,7 @@ fn transfer_verification_failures_preserve_move_source_and_previous_destination(
         let mut finalized = false;
         let record = execute(&plan, Options { checksum: true }, &false.into(), |event| {
             match event {
-                Event::OwnedStage { payload: entry, .. } => payload = Some(entry.path),
+                Event::OwnedStage { payload: entry, .. } => payload = entry.path,
                 Event::Progress {
                     stage: Stage::Reading,
                     ..

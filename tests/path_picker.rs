@@ -63,7 +63,7 @@ fn picker_mouse_and_keyboard_select_the_same_native_ancestor() {
         };
         let requests = c.handle(event, &g, Default::default());
         assert_eq!(requests.len(), 1);
-        assert_eq!(requests[0].path, expected);
+        assert_eq!(*requests[0].local_path(), expected);
         assert!(c.app.path_picker.is_none());
         assert_eq!(c.app.active, 0);
     }
@@ -74,7 +74,7 @@ fn title_close_and_cancel_close_without_navigation_and_modifiers_are_inert() {
     for title in [false, true] {
         let mut c = controller();
         let g = geometry(&c);
-        let original = c.app.panes[0].path.clone();
+        let original = c.app.panes[0].local_path().clone();
         for modifiers in [
             KeyModifiers::ALT,
             KeyModifiers::CONTROL,
@@ -102,7 +102,7 @@ fn title_close_and_cancel_close_without_navigation_and_modifiers_are_inert() {
                 .is_empty()
         );
         assert!(c.app.path_picker.is_none());
-        assert_eq!(c.app.panes[0].path, original);
+        assert_eq!(*c.app.panes[0].local_path(), original);
     }
 }
 
@@ -236,8 +236,10 @@ fn paging_keys_are_inert_and_hints_omit_them_while_the_wheel_still_scrolls() {
 #[test]
 fn arrow_navigation_reveals_each_segment_and_home_end_keep_their_targets() {
     let mut c = controller();
-    let path = (0..24).fold(c.app.panes[0].path.clone(), |path, _| path.join("segment"));
-    c.app.panes[0].path = path.clone();
+    let path = (0..24).fold(c.app.panes[0].local_path().clone(), |path, _| {
+        path.join("segment")
+    });
+    c.app.panes[0].path = Some(path.clone());
     c.app.path_picker.as_mut().unwrap().path = path.clone();
     let count = terminal_file_manager::navigation::path_segments(&path).len();
     for (code, indices) in [

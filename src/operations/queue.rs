@@ -479,7 +479,7 @@ pub(super) fn unsuccessful(plan: &Plan, outcome: Outcome, detail: &str) -> Recor
             .map(|source| EntryResult {
                 recovery: None,
                 trash: None,
-                source: source.path.clone(),
+                source: source.local_path().clone(),
                 destination: plan.destination.clone(),
                 kind: source.kind,
                 outcome,
