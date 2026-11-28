@@ -32,6 +32,10 @@ pkg-fmt = "zip"
 name = "tfm"
 path = "src/main.rs"
 
+[[example]]
+name = "ssh_connect"
+path = "src/examples/ssh_connect.rs"
+
 [dependencies]
 colored_text = "=0.6.0"
 crossterm = { version = "=0.29.0", default-features = false, features = ["bracketed-paste", "events", "windows"] }
