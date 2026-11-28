@@ -3,7 +3,8 @@ use std::{io::ErrorKind, time::Duration};
 use russh::{Channel, ChannelId, ChannelMsg, Disconnect, server};
 use russh_sftp::{
     protocol::{
-        File, FileAttributes, FileType, Handle, Name, SftpHandle, SftpString, Status, StatusCode,
+        Attrs, File, FileAttributes, FileType, Handle, Name, SftpHandle, SftpString, Status,
+        StatusCode,
     },
     server as sftp,
 };
@@ -28,6 +29,7 @@ enum Event {
     SubsystemEnded,
     StalledChannelClosed,
     ListingBlocked,
+    TargetStat(SftpString),
 }
 
 #[derive(Default)]
@@ -58,6 +60,7 @@ impl Subsystem {
                 files: None,
                 ssh: session.handle(),
                 list_gate: self.list_gate.take(),
+                stated_directory: false,
             };
             if std::mem::take(&mut self.stall_close) {
                 let (stream, peer) = io::duplex(8192);
@@ -124,6 +127,7 @@ struct Directory {
     files: Option<Vec<File>>,
     ssh: server::Handle,
     list_gate: Option<oneshot::Receiver<()>>,
+    stated_directory: bool,
 }
 
 impl Drop for Directory {
@@ -147,6 +151,27 @@ impl sftp::Handler for Directory {
         })
     }
 
+    async fn stat(&mut self, id: u32, path: SftpString) -> Result<Attrs, Self::Error> {
+        self.events.send(Event::TargetStat(path.clone())).unwrap();
+        let permissions = match path.as_bytes() {
+            b"/directory-link-\xff" => {
+                self.stated_directory = true;
+                Some(0o040755)
+            }
+            b"/file-link" => Some(0o100644),
+            b"/unknown" => None,
+            b"/inaccessible-link" => return Err(StatusCode::PermissionDenied.into()),
+            _ => return Err(StatusCode::NoSuchFile.into()),
+        };
+        Ok(Attrs {
+            id,
+            attrs: FileAttributes {
+                permissions,
+                ..Default::default()
+            },
+        })
+    }
+
     async fn opendir(&mut self, id: u32, path: SftpString) -> Result<Handle, Self::Error> {
         if let Some(gate) = self.list_gate.take() {
             self.events.send(Event::ListingBlocked).unwrap();
@@ -154,6 +179,13 @@ impl sftp::Handler for Directory {
         }
         self.files = Some(match path.as_bytes() {
             HOME => fixture_files(),
+            b"/directory-link-\xff" => {
+                assert!(
+                    self.stated_directory,
+                    "STAT and OPENDIR must share a channel"
+                );
+                fixture_files()
+            }
             b"/empty-\xfe" => vec![File::dummy("."), File::dummy("..")],
             b"/denied" => {
                 return Err(StatusCode::PermissionDenied.with_message("directory is restricted"));
@@ -487,3 +519,6 @@ fn drive_listing_lanes(
     assert_eq!(entries[0].remote_name(), Some(b"entry-\xff".as_slice()));
     assert!(entries.iter().all(|entry| entry.native_path().is_none()));
 }
+
+#[path = "sftp/activation.rs"]
+mod activation;

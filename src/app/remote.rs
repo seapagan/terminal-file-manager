@@ -1,6 +1,6 @@
 //! SFTP destinations and completion state for the shared pane.
 use super::{App, Pane, Request, RequestKind, navigation::record_visit};
-use crate::fs::Entry;
+use crate::fs::{Entry, EntryKind};
 use russh_sftp::{client::fs::ReadDir, protocol::SftpString};
 
 pub(super) struct Location {
@@ -53,6 +53,19 @@ impl App {
 
     pub(crate) fn request_remote_entry(&mut self, pane: usize, path: SftpString) -> Request {
         self.request_remote(pane, path, None, None)
+    }
+
+    pub(crate) fn request_remote_activation(
+        &mut self,
+        pane: usize,
+        path: SftpString,
+        kind: EntryKind,
+    ) -> Request {
+        let mut request = self.request_remote_entry(pane, path.clone());
+        if kind != EntryKind::Directory {
+            request.kind = RequestKind::SftpActivate(path);
+        }
+        request
     }
 
     pub(super) fn remote_parent(&mut self) -> Option<Request> {
@@ -124,23 +137,10 @@ impl App {
 
     /// Install a result only if it still belongs to the pane's current request.
     pub fn complete_sftp(&mut self, request: &Request, result: Result<Vec<Entry>, String>) -> bool {
-        let Some(state) = self.panes.get_mut(request.pane) else {
+        let Some((path, navigation)) = self.finish_sftp(request) else {
             return false;
         };
-        if state.generation != request.generation {
-            return false;
-        }
-        let RequestKind::SftpListing(path) = &request.kind else {
-            return false;
-        };
-        let Some(navigation) = state
-            .remote
-            .as_mut()
-            .and_then(|remote| remote.pending.take_if(|pending| &pending.target == path))
-        else {
-            return false;
-        };
-        state.listing = false;
+        let state = &mut self.panes[request.pane];
         match result {
             Ok(entries) => {
                 state.install_remote(navigation, entries, self.keep_filter_on_navigation)
@@ -148,6 +148,30 @@ impl App {
             Err(error) => self.notify_sftp_failure(request.pane, path, error),
         }
         true
+    }
+
+    /// Finish regular-file activation without changing location or history.
+    pub fn complete_sftp_file(&mut self, request: &Request) -> bool {
+        if self.finish_sftp(request).is_none() {
+            return false;
+        }
+        self.status = "The file viewer is not available yet.".into();
+        true
+    }
+
+    fn finish_sftp<'a>(&mut self, request: &'a Request) -> Option<(&'a SftpString, Navigation)> {
+        let state = self.panes.get_mut(request.pane)?;
+        if state.generation != request.generation {
+            return None;
+        }
+        let path = request.kind.sftp_path()?;
+        let navigation = state
+            .remote
+            .as_mut()?
+            .pending
+            .take_if(|pending| &pending.target == path)?;
+        state.listing = false;
+        Some((path, navigation))
     }
 
     fn notify_sftp_failure(&mut self, pane: usize, path: &SftpString, error: String) {

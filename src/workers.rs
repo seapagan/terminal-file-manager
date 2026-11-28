@@ -22,6 +22,7 @@ const WORKER_COUNT: usize = LANE_COUNT + PANE_COUNT;
 pub enum Value {
     Listing(Result<Snapshot, String>),
     SftpListing(Result<Vec<Entry>, String>),
+    SftpFile,
     ParentIdentity(Option<Identity>),
     Metadata(Box<Entry>, Option<PathBuf>),
     Totals(Result<Totals, String>),
@@ -228,8 +229,13 @@ impl Pool {
                 .as_ref()
                 .expect("live runtime")
                 .spawn(async move {
-                    let value = if let RequestKind::SftpListing(path) = &request.kind {
-                        read_sftp(sftp, path).await
+                    let value = if let Some(path) = request.kind.sftp_path() {
+                        read_sftp(
+                            sftp,
+                            path,
+                            matches!(request.kind, RequestKind::SftpActivate(_)),
+                        )
+                        .await
                     } else {
                         let work = request.clone();
                         tokio::task::spawn_blocking(move || {
@@ -274,7 +280,10 @@ fn lane_index(pane: usize, kind: &RequestKind) -> Option<usize> {
         return None;
     }
     let kind = match kind {
-        RequestKind::Listing | RequestKind::SftpListing(_) | RequestKind::ParentListing(_) => 0,
+        RequestKind::Listing
+        | RequestKind::SftpListing(_)
+        | RequestKind::SftpActivate(_)
+        | RequestKind::ParentListing(_) => 0,
         RequestKind::Metadata => 1,
         RequestKind::Totals => 2,
         RequestKind::ParentIdentity => 3,
@@ -286,7 +295,7 @@ impl RequestKind {
     fn is_listing(&self) -> bool {
         matches!(
             self,
-            Self::Listing | Self::SftpListing(_) | Self::ParentListing(_)
+            Self::Listing | Self::SftpListing(_) | Self::SftpActivate(_) | Self::ParentListing(_)
         )
     }
 
@@ -296,7 +305,7 @@ impl RequestKind {
 
     fn worker_name(&self) -> &'static str {
         match self {
-            Self::Listing | Self::SftpListing(_) => "Directory listing",
+            Self::Listing | Self::SftpListing(_) | Self::SftpActivate(_) => "Directory listing",
             Self::ParentListing(_) => "Parent listing",
             Self::ParentIdentity => "Parent identity lookup",
             Self::Metadata => "Metadata",
@@ -333,7 +342,9 @@ fn execute(request: &Request, context: &IgnoreContext, cancelled: &AtomicBool) -
         return Value::Failed("Native worker request has no native path".into());
     };
     match &request.kind {
-        RequestKind::SftpListing(_) => unreachable!("SFTP requests execute asynchronously"),
+        RequestKind::SftpListing(_) | RequestKind::SftpActivate(_) => {
+            unreachable!("SFTP requests execute asynchronously")
+        }
         RequestKind::Listing | RequestKind::ParentListing(_) => {
             Value::Listing(fs::list(path, context, cancelled).map_err(|e| e.to_string()))
         }
@@ -356,17 +367,25 @@ fn execute(request: &Request, context: &IgnoreContext, cancelled: &AtomicBool) -
 async fn read_sftp(
     session: Option<Arc<crate::ssh::Session>>,
     path: &russh_sftp::protocol::SftpString,
+    activate: bool,
 ) -> Value {
     let Some(session) = session else {
         return Value::SftpListing(Err("SSH session is unavailable".into()));
     };
-    let listing = session.list_sftp(Some(path.as_bytes())).await;
+    let listing = if activate {
+        session.activate_sftp(path.as_bytes()).await
+    } else {
+        session
+            .list_sftp(Some(path.as_bytes()))
+            .await
+            .map(|(_, entries)| Some(entries))
+    };
     drop(session);
-    Value::SftpListing(
-        listing
-            .map(|(_, entries)| crate::app::remote_entries(entries))
-            .map_err(|error| error.to_string()),
-    )
+    match listing {
+        Ok(Some(entries)) => Value::SftpListing(Ok(crate::app::remote_entries(entries))),
+        Ok(None) => Value::SftpFile,
+        Err(error) => Value::SftpListing(Err(error.to_string())),
+    }
 }
 
 #[cfg(test)]

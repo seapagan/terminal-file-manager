@@ -3,13 +3,25 @@ use std::io;
 use russh::{Channel, ChannelMsg, client};
 use russh_sftp::{
     client::{SftpSession, error::Error, fs::ReadDir},
-    protocol::{SftpString, Status, StatusCode},
+    protocol::{FileType, SftpString, Status, StatusCode},
 };
 use tokio::io::{DuplexStream, copy_bidirectional, duplex};
 
 use super::{CONNECT_TIMEOUT, DISCONNECT_TIMEOUT, Session, timed_out, timeout};
 
 const SFTP_STREAM_BUFFER: usize = 64 * 1024;
+
+enum Target<'a> {
+    List(&'a [u8]),
+    Resolve(&'a [u8]),
+    Activate(&'a [u8]),
+}
+
+type Directory = (SftpString, ReadDir);
+
+fn require_directory(result: Option<Directory>) -> io::Result<Directory> {
+    result.ok_or_else(|| io::Error::other("Expected an SFTP directory listing"))
+}
 
 impl Session {
     /// List one directory over a dedicated SFTP channel.
@@ -22,7 +34,8 @@ impl Session {
     /// Returns an error if the server refuses SFTP, the listing fails, or
     /// negotiation, listing or channel shutdown exceeds its deadline.
     pub async fn list_sftp(&self, path: Option<&[u8]>) -> io::Result<(SftpString, ReadDir)> {
-        self.list_sftp_path(path, false).await
+        let target = path.map_or(Target::Resolve(b"."), Target::List);
+        require_directory(self.list_sftp_path(target).await?)
     }
 
     /// List the initial browser location, resolving explicit relative paths on the server.
@@ -30,14 +43,19 @@ impl Session {
     /// # Errors
     /// Returns an error if path resolution, listing, or channel shutdown fails.
     pub async fn list_sftp_start(&self, path: Option<&[u8]>) -> io::Result<(SftpString, ReadDir)> {
-        self.list_sftp_path(path, true).await
+        require_directory(
+            self.list_sftp_path(Target::Resolve(path.unwrap_or(b".")))
+                .await?,
+        )
     }
 
-    async fn list_sftp_path(
-        &self,
-        path: Option<&[u8]>,
-        resolve: bool,
-    ) -> io::Result<(SftpString, ReadDir)> {
+    pub(crate) async fn activate_sftp(&self, path: &[u8]) -> io::Result<Option<ReadDir>> {
+        self.list_sftp_path(Target::Activate(path))
+            .await
+            .map(|listing| listing.map(|(_, entries)| entries))
+    }
+
+    async fn list_sftp_path(&self, target: Target<'_>) -> io::Result<Option<Directory>> {
         let mut channel = open_channel(self).await?.into_stream();
         let (stream, mut bridge) = duplex(SFTP_STREAM_BUFFER);
         // The SFTP library's close only queues shutdown. Keep the SSH stream
@@ -50,7 +68,7 @@ impl Session {
                     io::Error::new(error.kind(), format!("SFTP channel I/O failed: {error}"))
                 })
         };
-        let listing = list_over_stream(stream, path, resolve);
+        let listing = list_over_stream(stream, target);
         tokio::pin!(forward, listing);
         let (listing, closed) = tokio::select! {
             result = &mut listing => {
@@ -67,14 +85,13 @@ impl Session {
 
 async fn list_over_stream(
     stream: DuplexStream,
-    path: Option<&[u8]>,
-    resolve: bool,
-) -> io::Result<(SftpString, ReadDir)> {
+    target: Target<'_>,
+) -> io::Result<Option<Directory>> {
     let sftp = timeout(CONNECT_TIMEOUT, SftpSession::new(stream))
         .await
         .map_err(|_| timed_out("SFTP initialization timed out"))?
         .map_err(|error| sftp_error("SFTP initialization", error))?;
-    let listing = timeout(CONNECT_TIMEOUT, list_directory(&sftp, path, resolve))
+    let listing = timeout(CONNECT_TIMEOUT, list_directory(&sftp, target))
         .await
         .unwrap_or_else(|_| Err(timed_out("SFTP directory listing timed out")));
     let closed = sftp
@@ -125,23 +142,41 @@ async fn request_sftp(channel: &mut Channel<client::Msg>) -> io::Result<()> {
     ))
 }
 
-async fn list_directory(
-    sftp: &SftpSession,
-    path: Option<&[u8]>,
-    resolve: bool,
-) -> io::Result<(SftpString, ReadDir)> {
-    let path = match path {
-        Some(path) if !resolve => SftpString::from(path),
-        path => sftp
-            .canonicalize(SftpString::from(path.unwrap_or(b".")))
+async fn list_directory(sftp: &SftpSession, target: Target<'_>) -> io::Result<Option<Directory>> {
+    let path = match target {
+        Target::List(path) => SftpString::from(path),
+        Target::Resolve(path) => sftp
+            .canonicalize(SftpString::from(path))
             .await
             .map_err(|error| sftp_error("Resolving the initial SFTP directory", error))?,
+        Target::Activate(raw) => {
+            let path = SftpString::from(raw);
+            if !directory_target(sftp, &path).await? {
+                return Ok(None);
+            }
+            path
+        }
     };
     let entries = sftp
         .read_dir(path.clone())
         .await
         .map_err(|error| sftp_error("SFTP directory listing", error))?;
-    Ok((path, entries))
+    Ok(Some((path, entries)))
+}
+
+async fn directory_target(sftp: &SftpSession, path: &SftpString) -> io::Result<bool> {
+    let attributes = sftp
+        .metadata(path.clone())
+        .await
+        .map_err(|error| sftp_error("Resolving the SFTP target", error))?;
+    match attributes.file_type() {
+        FileType::Dir => Ok(true),
+        FileType::File => Ok(false),
+        _ => Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "SFTP target type is unavailable or unsupported",
+        )),
+    }
 }
 
 fn sftp_error(operation: &str, error: Error) -> io::Error {

@@ -312,3 +312,29 @@ fn remote_double_click_uses_the_same_navigation_action() {
         RequestKind::SftpListing(b"/name-\xff".as_slice().into())
     );
 }
+
+#[test]
+fn file_link_activation_finishes_like_a_local_file_without_navigating() {
+    let mut app = remote_app();
+    app.panes[1].entries[0].kind = fs::EntryKind::Link;
+    let mut c = controller(app);
+    let request = navigate(&mut c, Action::Enter);
+    assert_eq!(
+        request.kind,
+        RequestKind::SftpActivate(b"/name-\xff".as_slice().into())
+    );
+    assert!(c.app.complete_sftp_file(&request));
+    assert!(!c.app.complete_sftp_file(&request));
+    assert!(
+        c.app
+            .status
+            .contains("The file viewer is not available yet.")
+    );
+    assert_eq!(c.app.panes[1].remote_path(), Some(b"/".as_slice()));
+    assert_eq!(
+        c.app.panes[1].current().unwrap().remote_name(),
+        Some(b"name-\xff".as_slice())
+    );
+    assert!(c.app.history(false).is_none());
+    assert!(c.app.notifications.history.is_empty());
+}

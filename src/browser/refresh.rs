@@ -39,6 +39,7 @@ pub(super) fn collect(controller: &mut Controller, pool: &mut Pool) -> bool {
                 changed |= before != listing_presentation(&controller.app, pane);
             }
             Value::SftpListing(result) => changed |= controller.app.complete_sftp(&request, result),
+            Value::SftpFile => changed |= controller.app.complete_sftp_file(&request),
             Value::ParentIdentity(identity) => {
                 changed |= controller.app.complete_parent_identity(&request, identity);
             }

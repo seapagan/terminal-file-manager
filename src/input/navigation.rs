@@ -42,7 +42,10 @@ impl Controller {
                 self.app.status = "Invalid remote directory name".into();
                 return Vec::new();
             }
-            return vec![self.app.request_remote_entry(id, remote.path.clone())];
+            let request = self
+                .app
+                .request_remote_activation(id, remote.path.clone(), entry.kind);
+            return vec![request];
         }
         if !entry.enterable || entry.remote.is_some() {
             self.app.status = "The file viewer is not available yet.".into();

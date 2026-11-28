@@ -495,7 +495,9 @@ impl App {
     /// Report worker failures through the same generation checks as successful work.
     pub fn complete_failure(&mut self, request: &Request, error: String) -> bool {
         match request.kind {
-            RequestKind::SftpListing(_) => self.complete_sftp(request, Err(error)),
+            RequestKind::SftpListing(_) | RequestKind::SftpActivate(_) => {
+                self.complete_sftp(request, Err(error))
+            }
             RequestKind::Listing | RequestKind::ParentListing(_) => {
                 self.complete_listing(request.pane, request.generation, Err(error))
             }

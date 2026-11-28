@@ -15,6 +15,7 @@ pub struct Request {
 pub enum RequestKind {
     Listing,
     SftpListing(russh_sftp::protocol::SftpString),
+    SftpActivate(russh_sftp::protocol::SftpString),
     /// Parent listing with a lexical source to inspect if it has never been listed.
     ParentListing(Option<PathBuf>),
     /// Best-effort no-follow identity lookup for a pending or completed Parent request.
@@ -38,5 +39,14 @@ impl Request {
     /// A path for consumers of native-only requests.
     pub fn local_path(&self) -> &PathBuf {
         self.native_path().expect("native request")
+    }
+}
+
+impl RequestKind {
+    pub(crate) fn sftp_path(&self) -> Option<&russh_sftp::protocol::SftpString> {
+        match self {
+            Self::SftpListing(path) | Self::SftpActivate(path) => Some(path),
+            _ => None,
+        }
     }
 }
