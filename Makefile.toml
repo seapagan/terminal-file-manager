@@ -493,15 +493,49 @@ dependencies = ["_require-windows", "release-build", "windows-installer-security
 command = "pwsh"
 args = ["-NoProfile", "-File", "tests/installers/windows.ps1"]
 
+[tasks._legacy-powershell-child]
+private = true
+command = "pwsh"
+args = ["-NoProfile", "-Command", '''
+$ErrorActionPreference = 'Stop'
+$legacy = Get-Command -Name powershell -CommandType Application | Select-Object -First 1
+$start = [Diagnostics.ProcessStartInfo]::new($legacy.Source)
+$start.UseShellExecute = $false
+# Windows PowerShell reconstructs its module search path when this variable is absent.
+[void]$start.Environment.Remove('PSModulePath')
+$start.ArgumentList.Add('-NoProfile')
+$start.ArgumentList.Add($env:TFM_LEGACY_POWERSHELL_MODE)
+$start.ArgumentList.Add($env:TFM_LEGACY_POWERSHELL_INPUT)
+$child = [Diagnostics.Process]::Start($start)
+try {
+    $child.WaitForExit()
+    exit $child.ExitCode
+} finally { $child.Dispose() }
+''']
+
+[tasks._windows-powershell-legacy-version]
+extend = "_legacy-powershell-child"
+env = { TFM_LEGACY_POWERSHELL_MODE = "-Command", TFM_LEGACY_POWERSHELL_INPUT = '''$ErrorActionPreference = 'Stop'; if ($PSVersionTable.PSVersion -lt [version]'5.1') { throw 'verify-infra requires Windows PowerShell 5.1+' }; Get-Command -Name Get-FileHash | Out-Null; $PSVersionTable.PSVersion''' }
+
 [tasks.windows-installer-security-test-legacy]
-extend = "windows-installer-security-test"
-command = "powershell"
+extend = "_legacy-powershell-child"
+private = false
+description = "Test archive, checksum, destination and transaction controls using Windows PowerShell 5.1"
+dependencies = ["_require-windows"]
+env = { TFM_LEGACY_POWERSHELL_MODE = "-File", TFM_LEGACY_POWERSHELL_INPUT = "tests/installers/windows-security.ps1" }
 
 [tasks.windows-installer-test-legacy]
+extend = "_legacy-powershell-child"
+private = false
 description = "Run the complete Windows installer suites using Windows PowerShell 5.1"
 dependencies = ["_require-windows", "release-build", "windows-installer-security-test-legacy"]
-command = "powershell"
-args = ["-NoProfile", "-File", "tests/installers/windows.ps1"]
+env = { TFM_LEGACY_POWERSHELL_MODE = "-File", TFM_LEGACY_POWERSHELL_INPUT = "tests/installers/windows.ps1" }
+
+[tasks.windows-legacy-powershell-test]
+description = "Test native Windows PowerShell child isolation and task failure propagation"
+dependencies = ["_require-windows"]
+command = "pwsh"
+args = ["-NoProfile", "-File", "tests/ci/windows-legacy-powershell.ps1"]
 
 [tasks.release-assets-test]
 description = "Test exact distribution archive, sidecar and build-byte contracts"
@@ -584,7 +618,7 @@ if not equals ${host} windows
 end
 exec --fail-on-error pwsh -NoProfile -Command "if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'verify-infra requires PowerShell 7+' }; $PSVersionTable.PSVersion"
 if equals ${host} windows
-    exec --fail-on-error powershell -NoProfile -Command "if ($PSVersionTable.PSVersion -lt [version]'5.1') { throw 'verify-infra requires Windows PowerShell 5.1+' }; $PSVersionTable.PSVersion"
+    cm_run_task _windows-powershell-legacy-version
 end
 '''
 
@@ -600,6 +634,7 @@ end
 if equals ${CARGO_MAKE_RUST_TARGET_OS} windows
     cm_run_task release-verification-test
     cm_run_task windows-workflow-test
+    cm_run_task windows-legacy-powershell-test
     cm_run_task windows-installer-test
     cm_run_task windows-installer-test-legacy
 else

@@ -162,12 +162,8 @@ return error 1314 (`ERROR_PRIVILEGE_NOT_HELD`). An elevated terminal is an
 alternative; ordinary development does not require elevation.
 
 `verify-infra` exercises PowerShell 7 and Windows PowerShell 5.1. Both hosts must
-permit the local scripts under your approved execution policy. If launching
-5.1 from Store-installed PS7 resolves PS7's built-in modules instead of its own
-(for example, `Get-FileHash` is missing), remove PS7's built-in `Modules` directory
-from the parent session's `PSModulePath` before running the task. Keep the native
-Windows PowerShell and shared module directories. This is a session environment
-correction; do not change installed modules or machine policy to bypass a gate.
+permit local scripts under your execution policy. The legacy checks start with
+the default Windows PowerShell module search path.
 
 ### Linux Windows cross-verification
 
