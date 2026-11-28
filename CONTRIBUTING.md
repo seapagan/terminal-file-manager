@@ -113,8 +113,8 @@ Install-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser
 | `cargo make verify-postcommit` | Full exact-MSRV checks including packaging, then strict current-toolchain packaging, on clean committed sources before push |
 | `cargo make package` | Strict current-toolchain package build and verification |
 | `cargo make package-list` | Optional strict package inventory diagnostic; does not compile or verify the crate |
-| `cargo make verify-infra` | Tooling checks and tests, including PSScriptAnalyzer for the PowerShell SSH launcher, Python and installer checks, and CI/release harness tests |
-| `cargo make ssh-fixture-psscriptanalyzer` | Run the PowerShell launcher lint on its own |
+| `cargo make verify-infra` | Tooling checks and tests, including PSScriptAnalyzer for the PowerShell SSH launchers, Python and installer checks, and CI/release harness tests |
+| `cargo make ssh-fixture-psscriptanalyzer` | Lint the PowerShell SSH launchers |
 | `cargo make test` | Native Rust tests through Nextest |
 | `cargo make doctest` | Independent Rust documentation tests |
 | `cargo make coverage` | Instrumented Rust test coverage and LCOV |
@@ -243,6 +243,8 @@ workflow security and package checks remain ordinary CI responsibilities.
 
 ## SSH/SFTP interoperability
 
+### Container server matrix
+
 Use Docker with a Linux container engine and BuildKit (`docker buildx`).
 The Linux client image supplies Rust, OpenSSH and all build and test tools.
 On Linux, macOS or WSL2, run from the checkout with the system shell. On WSL2
@@ -286,11 +288,29 @@ Run the applicable matrix on the candidate revision before committing.
 If both tiers apply, the full run covers smoke. If Docker is unavailable,
 explicitly report which matrix verification remains outstanding.
 
-Run the interoperability matrix separately from `cargo make verify`.
-Ordinary CI runs the fast SSH regressions. The planned workflow allows
-manual selection and a weekly full run on the default branch.
-Stage A tests server interoperability with a Linux client on every host.
-Native macOS and Windows client verification belongs to Stage B.
+### Native client and server
+
+Run the shared contract with a native TFM build and a native OpenSSH server on
+loopback. From the checkout on Linux, macOS or Windows, run:
+
+```sh
+pwsh -NoProfile -File tests/fixtures/ssh/run-native.ps1
+```
+
+Use PowerShell 7.2 or newer and a native Rust toolchain. On Linux and macOS, run
+as a regular user with `sshd` at `/usr/sbin/sshd` and `ssh-keygen`, `ssh-agent`
+and `ssh-add` on `PATH`. On Windows, install the Windows OpenSSH Server
+feature and run from an elevated console under a local account. The launcher
+uses a temporary scheduled task for the daemon and leaves the installed
+service alone.
+
+The native run uses disposable keys for the current account and a separate
+agent on Unix. The Docker matrix covers password authentication. The Windows
+run leaves the shared agent pipe alone. Linux checks a non-UTF-8 filename.
+macOS and Windows check the exact bytes of a Unicode filename.
+
+Run interoperability separately from `cargo make verify`. Ordinary CI runs
+the fast SSH regressions.
 
 ## Release and installer checks
 

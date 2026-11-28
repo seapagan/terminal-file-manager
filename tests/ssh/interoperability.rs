@@ -12,24 +12,24 @@ use terminal_file_manager::ssh::{Credentials, Session};
 #[path = "../terminal_driver.rs"]
 mod terminal_driver;
 
-const USER: &str = "tfm";
-
 struct Fixture {
     root: PathBuf,
     host: String,
     port: u16,
+    user: String,
     host_key: PublicKey,
 }
 
 impl Fixture {
     fn from_env() -> Self {
         let root = PathBuf::from(
-            env::var_os("TFM_SSH_INTEROP_ROOT").expect("run tests/fixtures/ssh/run.sh"),
+            env::var_os("TFM_SSH_INTEROP_ROOT").expect("use a tests/fixtures/ssh launcher"),
         );
         Self {
             host: env::var("TFM_SSH_INTEROP_HOST").unwrap_or_else(|_| "127.0.0.1".into()),
             host_key: load_public_key(root.join("fixture/host.pub")).unwrap(),
             port: env::var("TFM_SSH_INTEROP_PORT").unwrap().parse().unwrap(),
+            user: env::var("TFM_SSH_INTEROP_USER").unwrap_or_else(|_| "tfm".into()),
             root,
         }
     }
@@ -38,7 +38,7 @@ impl Fixture {
         Session::connect(
             &self.host,
             self.port,
-            USER,
+            &self.user,
             self.host_key.clone(),
             credentials,
         )
@@ -57,18 +57,29 @@ fn key<'a>(path: &'a Path, passphrase: Option<&'a str>) -> Credentials<'a> {
 }
 
 #[tokio::test]
-#[ignore = "requires an independently provisioned server; use tests/fixtures/ssh/run.sh"]
+#[ignore = "requires an independently provisioned server; use a tests/fixtures/ssh launcher"]
 async fn authentication() {
     let fixture = Fixture::from_env();
+    let client = fixture.root.join("client");
     let encrypted = fixture.root.join("encrypted");
     let passphrase = env::var("TFM_SSH_INTEROP_PASSPHRASE").unwrap();
-    let password = fs::read_to_string(fixture.root.join("fixture/password")).unwrap();
-    for credentials in [
-        key(&fixture.root.join("client"), None),
-        key(&encrypted, Some(&passphrase)),
-        Credentials::Agent,
-        Credentials::Password(&password),
-    ] {
+    let mut credentials = vec![key(&client, None), key(&encrypted, Some(&passphrase))];
+    if enabled("AGENT") {
+        credentials.push(Credentials::Agent);
+    }
+    let password = if enabled("PASSWORD") {
+        Some(fs::read_to_string(fixture.root.join("fixture/password")).unwrap())
+    } else {
+        None
+    };
+    if let Some(password) = &password {
+        credentials.push(Credentials::Password(password));
+        assert_error(
+            fixture.connect(Credentials::Password("wrong")).await,
+            "rejected",
+        );
+    }
+    for credentials in credentials {
         fixture
             .connect(credentials)
             .await
@@ -78,10 +89,6 @@ async fn authentication() {
             .unwrap();
     }
     assert_error(
-        fixture.connect(Credentials::Password("wrong")).await,
-        "rejected",
-    );
-    assert_error(
         fixture
             .connect(key(&fixture.root.join("wrong"), None))
             .await,
@@ -89,15 +96,19 @@ async fn authentication() {
     );
 }
 
+fn enabled(capability: &str) -> bool {
+    env::var(format!("TFM_SSH_INTEROP_{capability}")).as_deref() != Ok("0")
+}
+
 #[tokio::test]
-#[ignore = "requires an independently provisioned server; use tests/fixtures/ssh/run.sh"]
+#[ignore = "requires an independently provisioned server; use a tests/fixtures/ssh launcher"]
 async fn host_identity() {
     let fixture = Fixture::from_env();
     let wrong = load_public_key(fixture.root.join("wrong.pub")).unwrap();
     let result = Session::connect(
         &fixture.host,
         fixture.port,
-        USER,
+        &fixture.user,
         wrong,
         key(&fixture.root.join("client"), None),
     )
@@ -113,7 +124,7 @@ fn assert_error<T>(result: io::Result<T>, message: &str) {
 }
 
 #[tokio::test]
-#[ignore = "requires an independently provisioned server; use tests/fixtures/ssh/run.sh"]
+#[ignore = "requires an independently provisioned server; use a tests/fixtures/ssh launcher"]
 async fn listings() {
     let fixture = Fixture::from_env();
     let ssh = fixture.key_login().await;
@@ -162,12 +173,19 @@ fn listing_metadata(entries: ReadDir) {
     let attrs = plain.metadata();
     assert_eq!(plain.file_type(), FileType::File);
     assert_eq!(attrs.size, Some(8));
-    assert_eq!(attrs.permissions.unwrap() & 0o777, 0o640);
+    if enabled("POSIX_MODE") {
+        assert_eq!(attrs.permissions.unwrap() & 0o777, 0o640);
+    }
     assert_eq!(attrs.mtime, Some(1_700_000_000));
     assert!(attrs.atime.is_some());
     assert!(attrs.uid.is_some() && attrs.gid.is_some());
 
-    assert_eq!(row(b"byte-\xff").path().as_bytes(), b"suite/byte-\xff");
+    let (name, path) = if enabled("RAW_NAME") {
+        (b"byte-\xff".as_slice(), b"suite/byte-\xff".as_slice())
+    } else {
+        ("byte-界".as_bytes(), "suite/byte-界".as_bytes())
+    };
+    assert_eq!(row(name).path().as_bytes(), path);
     for link in [b"linked-dir".as_slice(), b"linked-file", b"broken-link"] {
         assert_eq!(row(link).file_type(), FileType::Symlink);
     }
@@ -182,11 +200,11 @@ fn listing_metadata(entries: ReadDir) {
 }
 
 #[test]
-#[ignore = "requires an independently provisioned server; use tests/fixtures/ssh/run.sh"]
+#[ignore = "requires an independently provisioned server; use a tests/fixtures/ssh launcher"]
 fn browsing() {
     let fixture = Fixture::from_env();
     let mut command = CommandBuilder::new(env::var_os("TFM_SSH_INTEROP_EXAMPLE").unwrap());
-    command.args([fixture.host.as_str(), &fixture.port.to_string(), USER]);
+    command.args([&fixture.host, &fixture.port.to_string(), &fixture.user]);
     command.arg(fixture.root.join("fixture/host.pub"));
     command.arg("key");
     command.arg(fixture.root.join("client"));
@@ -194,6 +212,9 @@ fn browsing() {
     let home = fixture.root.join("local");
     command.cwd(&home);
     command.env("HOME", &home);
+    command.env("USERPROFILE", &home);
+    command.env("APPDATA", home.join("config"));
+    command.env("LOCALAPPDATA", home.join("data"));
     command.env("XDG_CONFIG_HOME", home.join("config"));
     command.env("XDG_DATA_HOME", home.join("data"));
     command.env("XDG_CACHE_HOME", home.join("cache"));
