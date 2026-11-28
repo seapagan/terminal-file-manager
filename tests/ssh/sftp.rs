@@ -1,6 +1,6 @@
-use std::io::ErrorKind;
+use std::{io::ErrorKind, time::Duration};
 
-use russh::{Channel, ChannelId, Disconnect, server};
+use russh::{Channel, ChannelId, ChannelMsg, Disconnect, server};
 use russh_sftp::{
     protocol::{
         File, FileAttributes, FileType, Handle, Name, SftpHandle, SftpString, Status, StatusCode,
@@ -20,6 +20,8 @@ use super::{Credentials, LIMIT, PASSWORD, Peer, timeout};
 const HOME: &[u8] = b"/home/user-\xff";
 const HANDLE: &[u8] = b"\xff-dir";
 
+type RefusedChannel = (Channel<server::Msg>, server::Handle);
+
 #[derive(Debug, PartialEq, Eq)]
 enum Event {
     HandleClosed,
@@ -30,6 +32,7 @@ enum Event {
 #[derive(Default)]
 pub(super) struct Subsystem {
     pub channel: Option<Channel<server::Msg>>,
+    refused_channel: Option<oneshot::Sender<RefusedChannel>>,
     events: Option<UnboundedSender<Event>>,
     stall_close: bool,
     stalled: Option<(ChannelId, oneshot::Sender<()>)>,
@@ -42,10 +45,10 @@ impl Subsystem {
         name: &str,
         session: &mut server::Session,
     ) -> Result<(), russh::Error> {
+        let channel = self.channel.take().unwrap();
         if let Some(events) = &self.events
             && name == "sftp"
         {
-            let channel = self.channel.take().unwrap();
             session.channel_success(id)?;
             let directory = Directory {
                 events: events.clone(),
@@ -63,6 +66,11 @@ impl Subsystem {
             }
         } else {
             session.channel_failure(id)?;
+            if let Some(refused) = self.refused_channel.take() {
+                assert!(refused.send((channel, session.handle())).is_ok());
+            } else {
+                session.close(id)?;
+            }
         }
         Ok(())
     }
@@ -314,7 +322,68 @@ async fn reports_a_refused_sftp_subsystem() {
     let ssh = peer.connect(Credentials::Password(PASSWORD)).await.unwrap();
     let error = ssh.list_sftp(None).await.err().unwrap();
     assert_eq!(error.kind(), ErrorKind::Unsupported);
+    assert_eq!(error.to_string(), "SSH server refused the SFTP subsystem");
     ssh.disconnect().await.unwrap();
+    peer.server_finished().await.unwrap();
+}
+
+async fn peer_with_refused_channel() -> (Peer, oneshot::Receiver<RefusedChannel>) {
+    let (refused, channel) = oneshot::channel();
+    let peer = Peer::start_with(Subsystem {
+        refused_channel: Some(refused),
+        ..Subsystem::default()
+    })
+    .await;
+    (peer, channel)
+}
+
+#[tokio::test]
+async fn reports_refusal_promptly_and_closes_a_channel_left_open_by_the_server() {
+    let (peer, channel) = peer_with_refused_channel().await;
+    let ssh = peer.connect(Credentials::Password(PASSWORD)).await.unwrap();
+    // Finish before the five-second cleanup deadline while the server sends no CLOSE.
+    let error = timeout(Duration::from_secs(3), ssh.list_sftp(None))
+        .await
+        .expect("client waited for the refusing server to close the channel")
+        .err()
+        .unwrap();
+    assert_eq!(error.kind(), ErrorKind::Unsupported);
+    assert_eq!(error.to_string(), "SSH server refused the SFTP subsystem");
+
+    let (mut channel, _) = timeout(LIMIT, channel).await.unwrap().unwrap();
+    timeout(LIMIT, async {
+        loop {
+            let message = channel.wait().await.expect("peer never sent CHANNEL_CLOSE");
+            if matches!(message, ChannelMsg::Close) {
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
+    ssh.disconnect().await.unwrap();
+    peer.server_finished().await.unwrap();
+}
+
+#[tokio::test]
+async fn preserves_the_sftp_refusal_when_the_transport_closes() {
+    let (peer, channel) = peer_with_refused_channel().await;
+    let ssh = peer.connect(Credentials::Password(PASSWORD)).await.unwrap();
+    let disconnect = async {
+        let (_channel, server) = channel.await.unwrap();
+        server
+            .disconnect(Disconnect::ByApplication, String::new(), String::new())
+            .await
+            .unwrap();
+    };
+    let (listing, ()) = timeout(LIMIT, async {
+        tokio::join!(ssh.list_sftp(None), disconnect)
+    })
+    .await
+    .unwrap();
+    let error = listing.err().unwrap();
+    assert_eq!(error.kind(), ErrorKind::Unsupported);
+    assert_eq!(error.to_string(), "SSH server refused the SFTP subsystem");
     peer.server_finished().await.unwrap();
 }
 
