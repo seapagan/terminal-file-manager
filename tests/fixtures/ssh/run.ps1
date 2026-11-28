@@ -1,3 +1,7 @@
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPositionalParameters', 'Invoke-Docker',
+    Justification = 'Invoke-Docker forwards ordered native CLI arguments unchanged.')]
+param()
+
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 
@@ -37,7 +41,11 @@ function Invoke-Docker {
     if ($LASTEXITCODE -ne 0) { throw "docker $($args[0]) exited with status $LASTEXITCODE" }
 }
 
-function Remove-RunContainer($Name) {
+function Remove-RunContainer {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '',
+        Justification = 'Run-owned containers must be removed unconditionally, including during interruption.')]
+    param($Name)
+
     $id = Invoke-Docker container ls -aq --filter "name=^/$Name$"
     if ($id) { Invoke-Docker rm -fv $id | Out-Null }
 }
@@ -48,7 +56,11 @@ function Get-ServerLog {
     & $docker logs @args $server 2>&1 | ForEach-Object { $_.ToString() }
 }
 
-function Start-RunServer($Row) {
+function Start-RunServer {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '',
+        Justification = 'This internal helper starts only the disposable server requested by the launcher.')]
+    param($Row)
+
     $image = $Row.image
     $platform = if ($Row.platform) { @('--platform', $Row.platform) }
     if ($Row.server -cne 'sftpgo') {
@@ -86,13 +98,13 @@ try {
 
     $failed = @()
     foreach ($row in $rows) {
-        Write-Host "=== $($row.server) ==="
-        Write-Host "Base image $($row.image)"
+        Write-Output "=== $($row.server) ==="
+        Write-Output "Base image $($row.image)"
         $timer = [Diagnostics.Stopwatch]::StartNew()
         try {
             Start-RunServer $row
             Invoke-Docker exec $client bash /opt/tfm-ssh/client.sh run $row.server
-            Write-Host "PASS $($row.server) ($([int]$timer.Elapsed.TotalSeconds)s)"
+            Write-Output "PASS $($row.server) ($([int]$timer.Elapsed.TotalSeconds)s)"
         } catch {
             $failed += $row.server
             [Console]::Error.WriteLine("FAIL $($row.server) ($([int]$timer.Elapsed.TotalSeconds)s): $_")
