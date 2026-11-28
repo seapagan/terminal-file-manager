@@ -1,5 +1,7 @@
 //! Direct SSH connections authenticated against a caller-supplied host public key.
 
+mod sftp;
+
 use std::{io, path::Path, sync::Arc, time::Duration};
 
 use russh::{

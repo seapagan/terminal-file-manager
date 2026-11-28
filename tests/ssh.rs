@@ -16,6 +16,9 @@ use russh::{
 use terminal_file_manager::ssh::{Credentials, Session};
 use tokio::{net::TcpListener, task::JoinHandle, time::timeout};
 
+#[path = "ssh/sftp.rs"]
+mod sftp;
+
 const USER: &str = "test-user";
 const PASSWORD: &str = "loopback-fixture-password";
 const LIMIT: Duration = Duration::from_secs(10);
@@ -23,6 +26,7 @@ const LIMIT: Duration = Duration::from_secs(10);
 struct Server {
     attempts: Arc<AtomicUsize>,
     client_key: PublicKey,
+    sftp: sftp::Subsystem,
 }
 
 impl server::Handler for Server {
@@ -50,6 +54,35 @@ impl server::Handler for Server {
             },
         )
     }
+
+    async fn channel_open_session(
+        &mut self,
+        channel: russh::Channel<server::Msg>,
+        reply: server::ChannelOpenHandle,
+        _: &mut server::Session,
+    ) -> Result<(), Self::Error> {
+        self.sftp.channel = Some(channel);
+        reply.accept().await;
+        Ok(())
+    }
+
+    async fn subsystem_request(
+        &mut self,
+        channel: russh::ChannelId,
+        name: &str,
+        session: &mut server::Session,
+    ) -> Result<(), Self::Error> {
+        self.sftp.start(channel, name, session).await
+    }
+
+    async fn channel_close(
+        &mut self,
+        channel: russh::ChannelId,
+        _: &mut server::Session,
+    ) -> Result<(), Self::Error> {
+        self.sftp.channel_closed(channel);
+        Ok(())
+    }
 }
 
 fn fixture_key(seed: u8) -> PrivateKey {
@@ -65,6 +98,10 @@ struct Peer {
 
 impl Peer {
     async fn start() -> Self {
+        Self::start_with(sftp::Subsystem::default()).await
+    }
+
+    async fn start_with(sftp: sftp::Subsystem) -> Self {
         let key = fixture_key(1);
         let host_key = key.public_key().clone();
         let config = Arc::new(server::Config {
@@ -79,6 +116,7 @@ impl Peer {
         let handler = Server {
             attempts: attempts.clone(),
             client_key: fixture_key(2).public_key().clone(),
+            sftp,
         };
         let task = tokio::spawn(async move {
             let (socket, _) = listener.accept().await.unwrap();
