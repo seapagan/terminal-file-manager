@@ -238,16 +238,24 @@ workflow security and package checks remain ordinary CI responsibilities.
 
 ## SSH/SFTP interoperability
 
-Run from a checkout on Linux, macOS or WSL2 with Docker Engine or Docker
-Desktop in Linux-container mode and BuildKit (`docker buildx`). On WSL2 with
-Docker Desktop, enable integration for your distribution and run the script
-inside it. The runner uses the host's system shell and standard utilities.
+Use Docker with a Linux container engine and BuildKit (`docker buildx`).
 The Linux client image supplies Rust, OpenSSH and all build and test tools.
+On Linux, macOS or WSL2, run from the checkout with the system shell. On WSL2
+with Docker Desktop, enable integration for your distribution first.
 
 ```sh
 tests/fixtures/ssh/run.sh smoke
 tests/fixtures/ssh/run.sh full
 tests/fixtures/ssh/run.sh debian
+```
+
+On Windows, start Docker Desktop in Linux-container mode and run from the
+checkout in PowerShell.
+
+```powershell
+.\tests\fixtures\ssh\run.ps1 smoke
+.\tests\fixtures\ssh\run.ps1 full
+.\tests\fixtures\ssh\run.ps1 debian
 ```
 
 Smoke is the default. It runs Debian OpenSSH, AsyncSSH and SFTPGo. Full adds
