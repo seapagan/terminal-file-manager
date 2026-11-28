@@ -26,6 +26,9 @@ pub(super) fn headers(app: &App, panes: &[Option<Rect>; 2]) -> Vec<PathControl> 
 }
 
 fn header(app: &App, pane: usize, area: Rect) -> Vec<PathControl> {
+    if app.panes[pane].is_remote() {
+        return Vec::new();
+    }
     let prefix = format!(
         "{} Pane {}: ",
         if pane == app.active { ">" } else { " " },

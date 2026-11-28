@@ -92,6 +92,9 @@ impl Runtime {
         }
         let mut changed = false;
         for (pane, slot) in self.slots.iter_mut().enumerate() {
+            if app.panes[pane].is_remote() {
+                continue;
+            }
             if app.panes[pane].context == 0 && app.panes[pane].listing {
                 continue;
             }

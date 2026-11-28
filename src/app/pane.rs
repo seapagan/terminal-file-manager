@@ -45,6 +45,7 @@ impl SelectionCounts {
 
 /// One independent session-only pane.
 pub struct Pane {
+    pub(super) remote: Option<super::remote::Location>,
     pub directory: Option<Entry>,
     pub(crate) entry_identity: Option<Identity>,
     pub path: PathBuf,
@@ -115,6 +116,7 @@ impl Pane {
 
     pub(super) fn new(path: PathBuf) -> Self {
         Self {
+            remote: None,
             cursor: path
                 .parent()
                 .filter(|p| !p.as_os_str().is_empty())
@@ -252,8 +254,13 @@ impl Pane {
         let previous_index = self.cursor_index().unwrap_or(0);
         self.reset_range();
         if self.sort.sort == Sort::Unsorted {
-            self.entries
-                .sort_by_key(|entry| self.listing_order.get(&entry.path).copied());
+            self.entries.sort_by_key(|entry| {
+                entry
+                    .remote
+                    .as_ref()
+                    .map(|remote| remote.order)
+                    .or_else(|| self.listing_order.get(&entry.path).copied())
+            });
         }
         self.sort.apply(&mut self.entries);
         self.refilter_at(previous_index);
@@ -279,17 +286,10 @@ impl Pane {
             self.permissions,
             self.owner_display,
         );
-        if !self.parent_focused()
-            && !self
-                .visible
-                .iter()
-                .any(|i| Some(&self.entries[*i].path) == self.cursor.as_ref())
-        {
+        if !self.parent_focused() && self.cursor_index().is_none() {
             let index = previous_index.min(self.visible.len().saturating_sub(1));
-            self.cursor = self
-                .visible
-                .get(index)
-                .map(|i| self.entries[*i].path.clone());
+            let entry = self.visible.get(index).copied();
+            self.set_entry_focus(entry);
             self.scroll = self.scroll.min(index);
         }
     }
@@ -312,7 +312,7 @@ impl Pane {
         self.visible
             .iter()
             .map(|i| &self.entries[*i])
-            .find(|e| Some(&e.path) == self.cursor.as_ref())
+            .find(|e| self.entry_focused(e))
     }
 
     /// Move within the cached working set, retaining a bounded scroll offset.
@@ -327,7 +327,7 @@ impl Pane {
         let next = index
             .saturating_add_signed(delta)
             .min(self.row_count().saturating_sub(1));
-        self.cursor = self.row_path(next);
+        self.focus_row(next);
         if next < self.scroll {
             self.scroll = next;
         }
@@ -338,11 +338,9 @@ impl Pane {
 
     /// Visible row index for rendering and paging.
     pub fn cursor_index(&self) -> Option<usize> {
-        self.visible.iter().position(|i| {
-            self.entries
-                .get(*i)
-                .is_some_and(|e| Some(&e.path) == self.cursor.as_ref())
-        })
+        self.visible
+            .iter()
+            .position(|i| self.entries.get(*i).is_some_and(|e| self.entry_focused(e)))
     }
 
     /// Shared viewport calculation for drawing and mouse row hit testing.
@@ -390,6 +388,9 @@ impl Pane {
 
     /// Read-only operand inspection; no mutation dispatcher exists in M1.
     pub fn eligible(&self) -> Vec<&Entry> {
+        if self.is_remote() {
+            return Vec::new();
+        }
         let marks: Vec<_> = self
             .visible
             .iter()

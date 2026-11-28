@@ -9,6 +9,8 @@ mod totals;
 mod windows_native;
 
 pub use rules::IgnoreContext;
+mod remote;
+pub(crate) use remote::RemoteEntry;
 use std::ffi::OsString;
 use std::fs::{self, Metadata};
 use std::io;
@@ -47,6 +49,7 @@ pub struct Identity {
 pub struct Entry {
     pub path: PathBuf,
     pub name: OsString,
+    pub(crate) remote: Option<RemoteEntry>,
     pub kind: EntryKind,
     pub identity: Option<Identity>,
     pub size: Option<u64>,
@@ -71,6 +74,16 @@ pub struct Entry {
 }
 
 impl Entry {
+    /// Full SFTP path bytes for a remote entry.
+    pub fn remote_path(&self) -> Option<&[u8]> {
+        self.remote.as_ref().map(|entry| entry.path.as_bytes())
+    }
+
+    /// Filename bytes for a remote entry, independent of its display name.
+    pub fn remote_name(&self) -> Option<&[u8]> {
+        self.remote.as_ref().map(|entry| entry.name.as_bytes())
+    }
+
     /// Windows account resolution and access-time sampling do not change count inputs.
     pub(crate) fn same_count_inputs(mut self, fresh: &Self) -> bool {
         self.accessed = fresh.accessed;
@@ -104,6 +117,9 @@ impl Entry {
 
     /// Format cached account data without resolving accounts on the render thread.
     pub fn owner_display(&self, mode: crate::owner::OwnerDisplay) -> String {
+        if let Some(remote) = &self.remote {
+            return remote.owner_display();
+        }
         #[cfg(windows)]
         if self.owner.is_none() {
             return self.windows_owner.display(mode);
@@ -235,6 +251,7 @@ fn inspect_no_follow(path: &Path, owners: Option<&mut crate::owner::Cache>) -> E
     let mut entry = Entry {
         path: path.to_path_buf(),
         name: path.file_name().unwrap_or(path.as_os_str()).to_owned(),
+        remote: None,
         kind: EntryKind::Unknown,
         identity: None,
         size: None,

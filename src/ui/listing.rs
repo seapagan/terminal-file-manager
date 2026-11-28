@@ -37,13 +37,7 @@ pub(super) fn render(
             Role::InactivePaneBorder
         }));
     let inner = block.inner(area);
-    let title = super::path_title::title(
-        &pane.path,
-        id,
-        id == app.active,
-        pane.pending.is_some(),
-        inner.width,
-    );
+    let title = super::path_title::title(pane, id, id == app.active, inner.width);
     frame.render_widget(block.title(title), area);
     super::path_navigation::render(frame, app, theme, &geometry.path_controls, id);
     let summary = super::summary::lines(
@@ -116,7 +110,7 @@ fn render_rows(
         }
         let i = pane.visible[row - usize::from(pane.has_parent())];
         let entry = &pane.entries[i];
-        let cursor = pane.cursor.as_ref() == Some(&entry.path);
+        let cursor = pane.entry_focused(entry);
         let focus = if cursor && active {
             Some(Role::Cursor)
         } else if cursor {

@@ -136,6 +136,9 @@ impl Snapshot {
     }
     fn capture(app: &App) -> Result<Self, String> {
         let pane = &app.panes[app.active];
+        if pane.is_remote() {
+            return Err("Copying paths from the read-only SSH pane is unavailable".into());
+        }
         if pane.pending.is_some() || pane.error.is_some() || !pane.path.is_absolute() {
             return Err("Wait for a valid local directory before copying paths".into());
         }

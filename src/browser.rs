@@ -2,6 +2,8 @@
 mod clipboard;
 mod operations;
 mod refresh;
+mod requests;
+mod sftp_preview;
 use crate::{
     app::{App, Request, RequestKind},
     color::Theme,
@@ -13,6 +15,7 @@ use crate::{
     workers::{Pool, Value},
 };
 use refresh::{Renderer, collect, tick};
+pub use sftp_preview::run_sftp_preview;
 use std::{
     io::{self, IsTerminal},
     path::Path,
@@ -41,10 +44,15 @@ pub fn run_startup(options: &crate::startup::Startup) -> Result<(), String> {
     if options.save_session {
         return crate::startup::session_store()?.save(&app);
     }
+    require_terminal()?;
+    browse(app, settings, &mut config)
+}
+
+fn require_terminal() -> Result<(), String> {
     if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
         return Err("interactive browsing requires a terminal on stdin and stdout".into());
     }
-    browse(app, settings, &mut config)
+    Ok(())
 }
 
 fn browse(app: App, settings: Settings, config: &mut Configuration) -> Result<(), String> {
@@ -61,14 +69,7 @@ fn browse(app: App, settings: Settings, config: &mut Configuration) -> Result<()
         .map_err(|e| e.to_string())?;
     let mut pool = Pool::new(IgnoreContext::default()).map_err(|e| e.to_string())?;
     let mut jobs = crate::operations::Queue::new().map_err(|error| error.to_string())?;
-    for pane in 0..2 {
-        pool.submit(Request {
-            pane,
-            generation: 1,
-            path: controller.app.panes[pane].path.clone(),
-            kind: RequestKind::Listing,
-        });
-    }
+    requests::initial_listings(&controller.app, &mut pool);
     run_terminal(&mut controller, &mut pool, &mut jobs, &theme, config)?;
     save_state(controller)
 }
@@ -131,7 +132,7 @@ fn drive(
         dirty |= watches.poll(&mut controller.app, pool, started.elapsed());
         dirty |= controller.reconcile_footer();
         dirty |= clipboard::collect(controller, &mut clipboard);
-        submit_deferred_listings(&mut controller.app, pool);
+        requests::deferred_listings(&mut controller.app, pool);
         dirty |= schedule_metadata(controller, pool, &mut metadata);
         #[cfg(windows)]
         {
@@ -142,28 +143,19 @@ fn drive(
             dirty = false;
         }
         if crossterm::event::poll(Duration::from_millis(16))? {
-            for request in controller.handle(
-                crossterm::event::read()?,
+            requests::dispatch_event(
+                controller,
                 &renderer.geometry,
-                started.elapsed(),
-            ) {
-                pool.submit(request);
-            }
-            config.synchronize(controller);
-            operations::submit(controller, jobs);
-            clipboard::submit(controller, &mut clipboard);
+                started,
+                pool,
+                jobs,
+                config,
+                &mut clipboard,
+            )?;
             dirty = true;
         }
     }
     clipboard::shutdown(controller, &mut clipboard)
-}
-
-fn submit_deferred_listings(app: &mut App, pool: &mut Pool) {
-    for pane in 0..2 {
-        if let Some(request) = app.take_refresh(pane) {
-            pool.submit(request);
-        }
-    }
 }
 
 fn schedule_metadata(

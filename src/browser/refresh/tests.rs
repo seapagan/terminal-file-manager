@@ -3,7 +3,7 @@ mod parent_identity;
 use super::*;
 use crate::{
     app::{PatternControl, PatternOperation, Request, RequestKind},
-    browser::{submit_deferred_listings, tests::collect_until_idle},
+    browser::{requests::deferred_listings, tests::collect_until_idle},
     fs::IgnoreContext,
     input::{Action, Bindings},
     settings::Settings,
@@ -428,7 +428,7 @@ fn parent_cancels_earlier_refresh_but_later_refresh_follows_it() {
         pool.submit(parent);
         collect_until_idle(&mut controller, &mut pool);
         assert_eq!(controller.app.panes[0].path, root.path());
-        submit_deferred_listings(&mut controller.app, &mut pool);
+        deferred_listings(&mut controller.app, &mut pool);
         assert_eq!(pool.active_count(), usize::from(refresh_after_parent));
         if refresh_after_parent {
             collect_until(&mut controller, &mut pool, |app| !app.panes[0].listing);

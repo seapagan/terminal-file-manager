@@ -1,6 +1,6 @@
 //! Virtual navigation rows and path overlays follow their owning pane.
 use super::{App, Pane, Request, RequestKind, pane::Visit};
-use crate::fs::Identity;
+use crate::fs::{Entry, Identity};
 use std::path::{Path, PathBuf};
 
 pub(super) struct ParentRestore {
@@ -97,9 +97,11 @@ impl Pane {
 
     /// A parent exists according to native lexical path semantics.
     pub fn has_parent(&self) -> bool {
-        self.path
-            .parent()
-            .is_some_and(|p| !p.as_os_str().is_empty())
+        !self.is_remote()
+            && self
+                .path
+                .parent()
+                .is_some_and(|p| !p.as_os_str().is_empty())
     }
 
     /// Parent focus never resolves to a filesystem Entry or operation operand.
@@ -114,12 +116,45 @@ impl Pane {
 
     /// Native row target shared by movement and mouse selection.
     pub fn row_path(&self, row: usize) -> Option<PathBuf> {
+        if self.is_remote() {
+            return None;
+        }
         if self.has_parent() && row == 0 {
             return self.path.parent().map(PathBuf::from);
         }
         self.visible
             .get(row.checked_sub(usize::from(self.has_parent()))?)
             .map(|i| self.entries[*i].path.clone())
+    }
+
+    pub(crate) fn entry_focused(&self, entry: &Entry) -> bool {
+        if let Some(remote) = &self.remote {
+            remote
+                .cursor
+                .as_ref()
+                .is_some_and(|cursor| Some(cursor.as_bytes()) == entry.remote_path())
+        } else {
+            self.cursor.as_ref() == Some(&entry.path)
+        }
+    }
+
+    pub(super) fn set_entry_focus(&mut self, index: Option<usize>) {
+        let entry = index.and_then(|i| self.entries.get(i));
+        if let Some(remote) = &mut self.remote {
+            remote.cursor = entry
+                .and_then(|e| e.remote.as_ref())
+                .map(|r| r.path.clone());
+        } else {
+            self.cursor = entry.map(|e| e.path.clone());
+        }
+    }
+
+    pub(crate) fn focus_row(&mut self, row: usize) {
+        if self.is_remote() {
+            self.set_entry_focus(self.visible.get(row).copied());
+        } else {
+            self.cursor = self.row_path(row);
+        }
     }
 
     /// Rendered row index; filesystem cursor_index remains entry-only.

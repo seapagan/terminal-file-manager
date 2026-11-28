@@ -3,15 +3,25 @@ use std::path::{Component, Path};
 
 use ratatui::{style::Style, text::Line};
 
-pub(super) fn title(path: &Path, id: usize, active: bool, loading: bool, width: u16) -> String {
+pub(super) fn title(pane: &crate::app::Pane, id: usize, active: bool, width: u16) -> String {
     let width = usize::from(width);
     let mut label = format!("{} Pane {}: ", if active { ">" } else { " " }, id + 1);
-    let suffix = if loading { " [loading]" } else { "" };
+    let suffix = if pane.pending.is_some() {
+        " [loading]"
+    } else {
+        ""
+    };
     if label.len() + suffix.len() > width {
         label.truncate(width.min(label.len()));
         return label;
     }
-    let path = shorten(path, width - label.len() - suffix.len());
+    let available = width - label.len() - suffix.len();
+    let path = if let Some(remote) = pane.remote_path() {
+        let path = super::clean(&String::from_utf8_lossy(remote));
+        super::modal::truncate(&format!("SSH read-only {}", path), available as u16)
+    } else {
+        shorten(&pane.path, available)
+    };
     format!("{label}{path}{suffix}")
 }
 

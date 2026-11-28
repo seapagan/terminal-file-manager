@@ -21,12 +21,13 @@ use terminal_file_manager::{
 };
 
 const USAGE: &str = "cargo run --locked --example ssh_connect -- HOST PORT USER TRUSTED_HOST_KEY \
-    (key PRIVATE_KEY | encrypted-key PRIVATE_KEY | agent | password) [--list [REMOTE_PATH]]";
+    (key PRIVATE_KEY | encrypted-key PRIVATE_KEY | agent | password) \
+    [--list [REMOTE_PATH] | --pane [REMOTE_PATH]]";
 
 enum Listing {
     Off,
-    Initial,
-    Path(SftpString),
+    List(Option<SftpString>),
+    Pane(Option<SftpString>),
 }
 
 #[tokio::main]
@@ -68,10 +69,16 @@ async fn connect() -> io::Result<(Session, Listing)> {
 }
 
 fn listing_args(args: &[OsString]) -> io::Result<Listing> {
-    match args {
-        [] => Ok(Listing::Off),
-        [flag] if flag == "--list" => Ok(Listing::Initial),
-        [flag, path] if flag == "--list" => Ok(Listing::Path(remote_path(path)?)),
+    let (flag, path) = match args {
+        [] => return Ok(Listing::Off),
+        [flag] => (flag, None),
+        [flag, path] => (flag, Some(path)),
+        _ => return Err(usage()),
+    };
+    let path = path.map(|path| remote_path(path)).transpose()?;
+    match flag.to_str() {
+        Some("--list") => Ok(Listing::List(path)),
+        Some("--pane") => Ok(Listing::Pane(path)),
         _ => Err(usage()),
     }
 }
@@ -101,14 +108,30 @@ fn remote_path(path: &OsStr) -> io::Result<SftpString> {
 async fn run(session: Session, listing: Listing) -> io::Result<()> {
     let listed = match listing {
         Listing::Off => Ok(()),
-        Listing::Initial => show_listing(&session, None).await,
-        Listing::Path(path) => show_listing(&session, Some(path.as_bytes())).await,
+        Listing::List(path) => {
+            show_listing(&session, path.as_ref().map(SftpString::as_bytes)).await
+        }
+        Listing::Pane(path) => return preview(session, path).await,
     };
     let result = listed.and_then(|()| {
         println!("Authenticated. Press Enter to disconnect.");
         io::stdin().read_line(&mut String::new()).map(|_| ())
     });
     result.and(session.disconnect().await)
+}
+
+async fn preview(session: Session, path: Option<SftpString>) -> io::Result<()> {
+    let listing = session
+        .list_sftp(path.as_ref().map(SftpString::as_bytes))
+        .await;
+    let closed = session.disconnect().await;
+    let (path, entries) = listing?;
+    closed?;
+    tokio::task::spawn_blocking(move || {
+        terminal_file_manager::browser::run_sftp_preview(path, entries)
+    })
+    .await?
+    .map_err(io::Error::other)
 }
 
 async fn show_listing(session: &Session, path: Option<&[u8]>) -> io::Result<()> {

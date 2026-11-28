@@ -9,6 +9,7 @@ pub use metadata::MetadataFormat;
 mod pattern;
 mod policy;
 mod refresh;
+mod remote;
 mod selection;
 mod status;
 use crate::fs::{Entry, Snapshot, Totals};
@@ -236,6 +237,9 @@ impl App {
     /// Failed or superseding navigation cancels that deferred intent.
     pub fn request_refresh(&mut self, pane: usize) -> Option<Request> {
         let state = self.panes.get_mut(pane)?;
+        if state.is_remote() {
+            return None;
+        }
         if let Some(path) = state.pending_navigation() {
             self.status = format!("Refresh queued for {} after navigation", path.display()).into();
             state.refresh_pending = true;
@@ -248,7 +252,7 @@ impl App {
     /// Reconcile without stealing navigation or cancelling a scan or unchanged count.
     pub(crate) fn request_reconciliation(&mut self, pane: usize) -> Option<Request> {
         let state = self.panes.get_mut(pane)?;
-        if state.pending_navigation().is_some() {
+        if state.is_remote() || state.pending_navigation().is_some() {
             return None;
         }
         state.refresh_pending = true;
@@ -285,7 +289,7 @@ impl App {
         }
         let previous = self.listing_notices(pane);
         let state = &mut self.panes[pane];
-        if generation != state.generation {
+        if state.is_remote() || generation != state.generation {
             return false;
         }
         let attempted = state.pending.take();
@@ -373,7 +377,7 @@ impl App {
 
     /// Coalesce metadata work by current native path and selection generation.
     pub fn request_metadata(&mut self, pane: usize) -> Option<Request> {
-        if self.panes[pane].error.is_some() {
+        if self.panes[pane].is_remote() || self.panes[pane].error.is_some() {
             return None;
         }
         let entry = self.panes[pane].current();
@@ -446,7 +450,7 @@ impl App {
     /// Start an explicit count using a generation independent of metadata loading.
     pub fn request_totals(&mut self) -> Option<Request> {
         let pane = self.active;
-        if self.panes[pane].error.is_some() {
+        if self.panes[pane].is_remote() || self.panes[pane].error.is_some() {
             return None;
         }
         let entry = self.panes[pane].current()?;
