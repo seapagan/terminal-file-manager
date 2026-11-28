@@ -2,7 +2,12 @@ ARG BASE=scratch
 FROM ${BASE}
 ARG SERVER
 RUN case "$SERVER" in \
-    ubuntu|debian) apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openssh-server && rm -rf /var/lib/apt/lists/* ;; \
+    ubuntu) apt-get update \
+        && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openssh-server=1:10.2p1-2ubuntu3.8 \
+        && rm -rf /var/lib/apt/lists/* ;; \
+    debian) apt-get update \
+        && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openssh-server=1:10.0p1-7+deb13u4 \
+        && rm -rf /var/lib/apt/lists/* ;; \
     fedora|almalinux) dnf install -y openssh-server shadow-utils && dnf clean all ;; \
     arch) pacman -Syu --needed --noconfirm openssh && pacman -Scc --noconfirm ;; \
     alpine) apk add --no-cache openssh-server shadow ;; \
