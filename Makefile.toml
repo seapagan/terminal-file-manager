@@ -22,8 +22,17 @@ args = ["check", "."]
 
 [tasks.python-type]
 description = "Type-check Python support code strictly"
+dependencies = ["python-type-native", "python-type-linux"]
+
+[tasks.python-type-native]
+description = "Type-check Python support code for the host platform"
 command = "mypy"
-args = ["--strict", "--python-version", "3.10", "--exclude-gitignore", "."]
+args = ["--strict", "--python-version", "3.10", "--exclude-gitignore", "--exclude", '^tests/fixtures/ssh/asyncssh_server[.]py\Z', "."]
+
+[tasks.python-type-linux]
+description = "Type-check the Linux-only AsyncSSH container fixture"
+command = "mypy"
+args = ["--strict", "--python-version", "3.10", "--platform", "linux", "tests/fixtures/ssh/asyncssh_server.py"]
 
 
 [tasks.python-test]
