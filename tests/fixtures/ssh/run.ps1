@@ -53,7 +53,7 @@ function Start-RunServer($Row) {
     $platform = if ($Row.platform) { @('--platform', $Row.platform) }
     if ($Row.server -cne 'sftpgo') {
         $iid = Join-Path $state 'server'
-        Invoke-Docker build --load --pull @platform --iidfile $iid --build-arg "BASE=$image" --build-arg "SERVER=$($Row.server)" $PSScriptRoot
+        Invoke-Docker build --load --pull --no-cache @platform --iidfile $iid --build-arg "BASE=$image" --build-arg "SERVER=$($Row.server)" $PSScriptRoot
         $image = (Get-Content -LiteralPath $iid -Raw).Trim()
         Remove-Item -LiteralPath $iid
     }

@@ -66,7 +66,7 @@ start_server() {
         *) set -- /bin/sh /usr/local/lib/tfm-ssh/openssh.sh ;;
     esac
     if [ "$name" != sftpgo ]; then
-        docker build --load --pull ${platform:+--platform="$platform"} --iidfile "$state/server" \
+        docker build --load --pull --no-cache ${platform:+--platform="$platform"} --iidfile "$state/server" \
             --build-arg "BASE=$image" --build-arg "SERVER=$name" "$fixtures" || return 1
         image=$(cat "$state/server") || return 1
         rm "$state/server" || return 1

@@ -10,4 +10,8 @@ The terminal driver enters and leaves a remote directory in the TFM pane.
 AsyncSSH omits optional metadata on one entry to test its absence.
 
 The CSV lists the server name, pinned base image and any required architecture.
-Distribution builds install OpenSSH from the distribution's package repositories.
+Both launchers rebuild the distribution and AsyncSSH images from pinned bases
+without cached install layers. SFTPGo uses its pinned upstream image.
+Distribution builds refresh their package indexes and install the current
+OpenSSH package from those repositories. Each row logs the installed daemon
+version. The Linux client keeps its Cargo caches.
