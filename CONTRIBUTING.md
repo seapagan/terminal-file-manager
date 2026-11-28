@@ -98,6 +98,13 @@ or `python3 --version` (Unix). These commands expose a base interpreter;
 project virtual environments remain separate. You do not need a repository
 `.venv` to run the support scripts. Install the listed QC tools on PATH too.
 
+`cargo make verify-infra` requires PowerShell 7 (`pwsh`) on PATH. Install the
+pinned analyser from a PowerShell 7 session:
+
+```powershell
+Install-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser
+```
+
 | Command | Purpose |
 | --- | --- |
 | `cargo make verify-fast` | Smaller development subset: native Rust formatting, checks, strict Clippy, tests, doctests, docs and builds; no packaging/MSRV |
@@ -105,7 +112,8 @@ project virtual environments remain separate. You do not need a repository
 | `cargo make verify-postcommit` | Full exact-MSRV checks including packaging, then strict current-toolchain packaging, on clean committed sources before push |
 | `cargo make package` | Strict current-toolchain package build and verification |
 | `cargo make package-list` | Optional strict package inventory diagnostic; does not compile or verify the crate |
-| `cargo make verify-infra` | Explicit tooling self-tests: Python checks/tests, installer and binary-verifier regressions, CI/release harness tests |
+| `cargo make verify-infra` | Tooling checks and tests, including PSScriptAnalyzer for the PowerShell SSH launcher, Python and installer checks, and CI/release harness tests |
+| `cargo make ssh-fixture-psscriptanalyzer` | Run the PowerShell launcher lint on its own |
 | `cargo make test` | Native Rust tests through Nextest |
 | `cargo make doctest` | Independent Rust documentation tests |
 | `cargo make coverage` | Instrumented Rust test coverage and LCOV |

@@ -410,6 +410,20 @@ dependencies = ["_require-unix", "shellcheck-present"]
 command = "shellcheck"
 args = ["tests/fixtures/ssh/run.sh", "tests/fixtures/ssh/openssh.sh", "tests/fixtures/ssh/sftpgo.sh", "tests/fixtures/ssh/client.sh", "tests/fixtures/ssh/layout.sh"]
 
+[tasks.ssh-fixture-psscriptanalyzer]
+description = "Lint the PowerShell SSH interoperability launcher"
+command = "pwsh"
+args = ["-NoProfile", "-NonInteractive", "-Command", '''
+$ErrorActionPreference = 'Stop'
+Import-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0
+Write-Output "PSScriptAnalyzer $((Get-Module -Name PSScriptAnalyzer).Version)"
+$findings = @(Invoke-ScriptAnalyzer -Path 'tests/fixtures/ssh/run.ps1')
+if ($findings.Count) {
+    $findings | Format-List RuleName, Severity, Line, Message
+    exit 1
+}
+''']
+
 [tasks.release-shellcheck]
 description = "Lint the ELF verifier and ELF/Mach-O regression harnesses"
 dependencies = ["_require-unix", "shellcheck-present"]
@@ -514,10 +528,10 @@ failed = set false
 host = get_env CARGO_MAKE_RUST_TARGET_OS
 arch = get_env CARGO_MAKE_RUST_TARGET_ARCH
 python = set python3
-tools = set "cargo rustc git ruff mypy lizard"
+tools = set "cargo rustc git ruff mypy lizard pwsh"
 if equals ${host} windows
     python = set python
-    tools = set "${tools} python pwsh powershell"
+    tools = set "${tools} python powershell"
     echo "not applicable: Unix installer/verifier/hash/hook and Linux bootstrap/inventory suites on Windows"
 elif equals ${host} linux
     tools = set "${tools} python3 shellcheck sh bash awk basename cat chmod cmp cksum cp cut date dd diff dirname env find grep gzip head install jq ln ls mkdir mktemp mv od perl pwd rm rmdir sed seq shasum sha256sum sort tail tar tee touch uname wc"
@@ -559,15 +573,15 @@ exec --fail-on-error lizard --version
 if not equals ${host} windows
     exec --fail-on-error shellcheck --version
 end
+exec --fail-on-error pwsh -NoProfile -Command "if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'verify-infra requires PowerShell 7+' }; $PSVersionTable.PSVersion"
 if equals ${host} windows
-    exec --fail-on-error pwsh -NoProfile -Command "if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'verify-infra requires PowerShell 7+' }; $PSVersionTable.PSVersion"
     exec --fail-on-error powershell -NoProfile -Command "if ($PSVersionTable.PSVersion -lt [version]'5.1') { throw 'verify-infra requires Windows PowerShell 5.1+' }; $PSVersionTable.PSVersion"
 end
 '''
 
 [tasks.verify-infra]
 description = "Preflight then run all applicable tooling self-tests; foreign-host suites are explicitly not applicable"
-dependencies = ["_infra-prerequisites", "python-format", "python-lint", "python-type", "python-test"]
+dependencies = ["_infra-prerequisites", "ssh-fixture-psscriptanalyzer", "python-format", "python-lint", "python-type", "python-test"]
 script_runner = "@duckscript"
 script = '''
 if equals ${CARGO_MAKE_RUST_TARGET_OS} linux
