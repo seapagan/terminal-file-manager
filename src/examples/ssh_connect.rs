@@ -48,6 +48,8 @@ async fn main() -> ExitCode {
 }
 
 async fn connect() -> io::Result<(Session, Listing)> {
+    // Preserve non-UTF-8 path arguments. The executable argument is discarded.
+    // nosemgrep: rust.lang.security.args-os.args-os
     let args = env::args_os().skip(1).collect::<Vec<_>>();
     let [host, port, user, trusted_key, method, extra @ ..] = args.as_slice() else {
         return Err(usage());

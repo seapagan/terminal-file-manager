@@ -270,7 +270,8 @@ mod agent {
                 .expect("the SSH agent regression requires OpenSSH ssh-agent on PATH"),
         );
 
-        // Give the child its own agent environment without changing the test process.
+        // Relaunch this test binary with the fixture's private agent socket.
+        // nosemgrep: rust.lang.security.current-exe.current-exe
         let output = Command::new(env::current_exe().unwrap())
             .args(["--ignored", "--exact", "agent::agent_child"])
             .current_dir(root.path())
