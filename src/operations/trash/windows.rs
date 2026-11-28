@@ -131,13 +131,13 @@ fn recycle_sta(entry: &Entry, cancel: &AtomicBool) -> Result<Option<Receipt>> {
 }
 
 fn preflight(entry: &Entry) -> Result<(Parents, IShellItem)> {
-    let parents = Parents::capture(&entry.path)?;
+    let parents = Parents::capture(entry.local_path())?;
     safety::revalidate(entry, true)?;
     if entry.kind == EntryKind::ReparsePoint {
         return Err(io::Error::other("Unsupported reparse object; native Trash refused").into());
     }
     // Canonicalization can add a Shell-incompatible verbatim prefix; keep the approved spelling.
-    let path = std::path::absolute(&entry.path)?;
+    let path = std::path::absolute(entry.local_path())?;
     Ok((parents, shell_item(&path)?))
 }
 
@@ -184,7 +184,7 @@ fn finish(
         retained,
         observed.refused.is_none()
             && parents.validate().is_ok()
-            && std::fs::symlink_metadata(&entry.path)
+            && std::fs::symlink_metadata(entry.local_path())
                 .is_err_and(|error| error.kind() == io::ErrorKind::NotFound),
     )
     .map_err(|mut error| {

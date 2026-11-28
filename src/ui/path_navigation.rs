@@ -26,6 +26,9 @@ pub(super) fn headers(app: &App, panes: &[Option<Rect>; 2]) -> Vec<PathControl> 
 }
 
 fn header(app: &App, pane: usize, area: Rect) -> Vec<PathControl> {
+    if app.panes[pane].is_remote() {
+        return Vec::new();
+    }
     let prefix = format!(
         "{} Pane {}: ",
         if pane == app.active { ">" } else { " " },
@@ -41,7 +44,7 @@ fn header(app: &App, pane: usize, area: Rect) -> Vec<PathControl> {
         return Vec::new();
     }
     let mut x = area.x + 1 + prefix.len() as u16;
-    pieces(&app.panes[pane].path, width)
+    pieces(app.panes[pane].local_path(), width)
         .into_iter()
         .filter_map(|(text, target)| {
             let width = super::modal::width(&text);
@@ -54,7 +57,7 @@ fn header(app: &App, pane: usize, area: Rect) -> Vec<PathControl> {
             let control = PathControl {
                 area: Rect::new(x, area.y, hit_width, 1),
                 pane,
-                source: app.panes[pane].path.clone(),
+                source: app.panes[pane].local_path().clone(),
                 target,
                 text,
             };

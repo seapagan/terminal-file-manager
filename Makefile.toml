@@ -22,8 +22,17 @@ args = ["check", "."]
 
 [tasks.python-type]
 description = "Type-check Python support code strictly"
+dependencies = ["python-type-native", "python-type-linux"]
+
+[tasks.python-type-native]
+description = "Type-check Python support code for the host platform"
 command = "mypy"
-args = ["--strict", "--python-version", "3.10", "--exclude-gitignore", "."]
+args = ["--strict", "--python-version", "3.10", "--exclude-gitignore", "--exclude", '^tests/fixtures/ssh/asyncssh_server[.]py\Z', "."]
+
+[tasks.python-type-linux]
+description = "Type-check the Linux-only AsyncSSH container fixture"
+command = "mypy"
+args = ["--strict", "--python-version", "3.10", "--platform", "linux", "tests/fixtures/ssh/asyncssh_server.py"]
 
 
 [tasks.python-test]
@@ -291,11 +300,11 @@ dependencies = ["_require-linux", "xwin-check", "xwin-clippy", "xwin-build"]
 
 [tasks.verify-linux]
 description = "Run complete native Linux and Windows MSVC cross-verification"
-dependencies = ["_require-linux", "verify-common", "verify-xwin", "release-shellcheck", "installers-shellcheck"]
+dependencies = ["_require-linux", "verify-common", "verify-xwin", "release-shellcheck", "installers-shellcheck", "ssh-fixture-shellcheck"]
 
 [tasks.verify-macos]
 description = "Run complete native macOS verification"
-dependencies = ["_require-macos", "verify-common", "release-shellcheck", "installers-shellcheck"]
+dependencies = ["_require-macos", "verify-common", "release-shellcheck", "installers-shellcheck", "ssh-fixture-shellcheck"]
 
 [tasks.verify-windows]
 description = "Run complete native Windows verification"
@@ -404,6 +413,28 @@ dependencies = ["shellcheck-present"]
 command = "shellcheck"
 args = ["tests/ci/release-inventory.sh"]
 
+[tasks.ssh-fixture-shellcheck]
+description = "Lint the SSH interoperability runner and container entrypoints"
+dependencies = ["_require-unix", "shellcheck-present"]
+command = "shellcheck"
+args = ["tests/fixtures/ssh/run.sh", "tests/fixtures/ssh/openssh.sh", "tests/fixtures/ssh/sftpgo.sh", "tests/fixtures/ssh/client.sh", "tests/fixtures/ssh/layout.sh"]
+
+[tasks.ssh-fixture-psscriptanalyzer]
+description = "Lint the PowerShell SSH interoperability launchers"
+command = "pwsh"
+args = ["-NoProfile", "-NonInteractive", "-Command", '''
+$ErrorActionPreference = 'Stop'
+Import-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0
+Write-Output "PSScriptAnalyzer $((Get-Module -Name PSScriptAnalyzer).Version)"
+$findings = @(foreach ($launcher in @('run.ps1', 'run-native.ps1')) {
+    Invoke-ScriptAnalyzer -Path "tests/fixtures/ssh/$launcher"
+})
+if ($findings.Count) {
+    $findings | Format-List RuleName, Severity, Line, Message
+    exit 1
+}
+''']
+
 [tasks.release-shellcheck]
 description = "Lint the ELF verifier and ELF/Mach-O regression harnesses"
 dependencies = ["_require-unix", "shellcheck-present"]
@@ -464,15 +495,49 @@ dependencies = ["_require-windows", "release-build", "windows-installer-security
 command = "pwsh"
 args = ["-NoProfile", "-File", "tests/installers/windows.ps1"]
 
+[tasks._legacy-powershell-child]
+private = true
+command = "pwsh"
+args = ["-NoProfile", "-Command", '''
+$ErrorActionPreference = 'Stop'
+$legacy = Get-Command -Name powershell -CommandType Application | Select-Object -First 1
+$start = [Diagnostics.ProcessStartInfo]::new($legacy.Source)
+$start.UseShellExecute = $false
+# Windows PowerShell reconstructs its module search path when this variable is absent.
+[void]$start.Environment.Remove('PSModulePath')
+$start.ArgumentList.Add('-NoProfile')
+$start.ArgumentList.Add($env:TFM_LEGACY_POWERSHELL_MODE)
+$start.ArgumentList.Add($env:TFM_LEGACY_POWERSHELL_INPUT)
+$child = [Diagnostics.Process]::Start($start)
+try {
+    $child.WaitForExit()
+    exit $child.ExitCode
+} finally { $child.Dispose() }
+''']
+
+[tasks._windows-powershell-legacy-version]
+extend = "_legacy-powershell-child"
+env = { TFM_LEGACY_POWERSHELL_MODE = "-Command", TFM_LEGACY_POWERSHELL_INPUT = '''$ErrorActionPreference = 'Stop'; if ($PSVersionTable.PSVersion -lt [version]'5.1') { throw 'verify-infra requires Windows PowerShell 5.1+' }; Get-Command -Name Get-FileHash | Out-Null; $PSVersionTable.PSVersion''' }
+
 [tasks.windows-installer-security-test-legacy]
-extend = "windows-installer-security-test"
-command = "powershell"
+extend = "_legacy-powershell-child"
+private = false
+description = "Test archive, checksum, destination and transaction controls using Windows PowerShell 5.1"
+dependencies = ["_require-windows"]
+env = { TFM_LEGACY_POWERSHELL_MODE = "-File", TFM_LEGACY_POWERSHELL_INPUT = "tests/installers/windows-security.ps1" }
 
 [tasks.windows-installer-test-legacy]
+extend = "_legacy-powershell-child"
+private = false
 description = "Run the complete Windows installer suites using Windows PowerShell 5.1"
 dependencies = ["_require-windows", "release-build", "windows-installer-security-test-legacy"]
-command = "powershell"
-args = ["-NoProfile", "-File", "tests/installers/windows.ps1"]
+env = { TFM_LEGACY_POWERSHELL_MODE = "-File", TFM_LEGACY_POWERSHELL_INPUT = "tests/installers/windows.ps1" }
+
+[tasks.windows-legacy-powershell-test]
+description = "Test native Windows PowerShell child isolation and task failure propagation"
+dependencies = ["_require-windows"]
+command = "pwsh"
+args = ["-NoProfile", "-File", "tests/ci/windows-legacy-powershell.ps1"]
 
 [tasks.release-assets-test]
 description = "Test exact distribution archive, sidecar and build-byte contracts"
@@ -508,10 +573,10 @@ failed = set false
 host = get_env CARGO_MAKE_RUST_TARGET_OS
 arch = get_env CARGO_MAKE_RUST_TARGET_ARCH
 python = set python3
-tools = set "cargo rustc git ruff mypy lizard"
+tools = set "cargo rustc git ruff mypy lizard pwsh"
 if equals ${host} windows
     python = set python
-    tools = set "${tools} python pwsh powershell"
+    tools = set "${tools} python powershell"
     echo "not applicable: Unix installer/verifier/hash/hook and Linux bootstrap/inventory suites on Windows"
 elif equals ${host} linux
     tools = set "${tools} python3 shellcheck sh bash awk basename cat chmod cmp cksum cp cut date dd diff dirname env find grep gzip head install jq ln ls mkdir mktemp mv od perl pwd rm rmdir sed seq shasum sha256sum sort tail tar tee touch uname wc"
@@ -553,15 +618,15 @@ exec --fail-on-error lizard --version
 if not equals ${host} windows
     exec --fail-on-error shellcheck --version
 end
+exec --fail-on-error pwsh -NoProfile -Command "if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'verify-infra requires PowerShell 7+' }; $PSVersionTable.PSVersion"
 if equals ${host} windows
-    exec --fail-on-error pwsh -NoProfile -Command "if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'verify-infra requires PowerShell 7+' }; $PSVersionTable.PSVersion"
-    exec --fail-on-error powershell -NoProfile -Command "if ($PSVersionTable.PSVersion -lt [version]'5.1') { throw 'verify-infra requires Windows PowerShell 5.1+' }; $PSVersionTable.PSVersion"
+    cm_run_task _windows-powershell-legacy-version
 end
 '''
 
 [tasks.verify-infra]
 description = "Preflight then run all applicable tooling self-tests; foreign-host suites are explicitly not applicable"
-dependencies = ["_infra-prerequisites", "python-format", "python-lint", "python-type", "python-test"]
+dependencies = ["_infra-prerequisites", "ssh-fixture-psscriptanalyzer", "python-format", "python-lint", "python-type", "python-test"]
 script_runner = "@duckscript"
 script = '''
 if equals ${CARGO_MAKE_RUST_TARGET_OS} linux
@@ -571,10 +636,12 @@ end
 if equals ${CARGO_MAKE_RUST_TARGET_OS} windows
     cm_run_task release-verification-test
     cm_run_task windows-workflow-test
+    cm_run_task windows-legacy-powershell-test
     cm_run_task windows-installer-test
     cm_run_task windows-installer-test-legacy
 else
     cm_run_task release-shellcheck
+    cm_run_task ssh-fixture-shellcheck
     cm_run_task release-verification-test
     cm_run_task installers-shellcheck
     cm_run_task unix-installer-test

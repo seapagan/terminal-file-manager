@@ -29,7 +29,7 @@ fn request(c: &mut Controller, action: Action) -> Request {
 }
 
 fn complete(c: &mut Controller, request: Request) {
-    let listing = snapshot(&request.path);
+    let listing = snapshot(request.local_path());
     assert!(
         c.app
             .complete_listing(request.pane, request.generation, Ok(listing))
@@ -60,7 +60,7 @@ fn fresh_directories_focus_parent_and_enter_immediately_returns_to_the_exited_ch
     }
     c.app.panes[0].move_cursor(1, 5);
     navigate(&mut c, Action::Enter);
-    assert_eq!(c.app.panes[0].path, child);
+    assert_eq!(*c.app.panes[0].local_path(), child);
     assert!(c.app.panes[0].parent_focused());
     assert_eq!(c.app.panes[0].scroll, 0);
     let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(80, 24)).unwrap();
@@ -87,7 +87,7 @@ fn fresh_directories_focus_parent_and_enter_immediately_returns_to_the_exited_ch
     navigate(&mut c, Action::Refresh);
     assert!(c.app.panes[0].parent_focused());
     navigate(&mut c, Action::Enter);
-    assert_eq!(c.app.panes[0].path, root.path());
+    assert_eq!(*c.app.panes[0].local_path(), root.path());
     assert_eq!(c.app.panes[0].cursor.as_ref(), Some(&child));
 }
 
@@ -163,9 +163,9 @@ fn nested_parent_history_and_unrelated_back_forward_remain_distinct() {
     navigate(&mut c, Action::Parent);
     assert_eq!(c.app.panes[0].cursor, Some(child.clone()));
     navigate(&mut c, Action::Back);
-    assert_eq!(c.app.panes[0].path, child);
+    assert_eq!(*c.app.panes[0].local_path(), child);
     navigate(&mut c, Action::Back);
-    assert_eq!(c.app.panes[0].path, grandchild);
+    assert_eq!(*c.app.panes[0].local_path(), grandchild);
     navigate(&mut c, Action::Forward);
     assert_eq!(c.app.panes[0].cursor, Some(grandchild));
     navigate(&mut c, Action::Forward);
@@ -175,10 +175,10 @@ fn nested_parent_history_and_unrelated_back_forward_remain_distinct() {
     let jump = c.app.request_listing(0, other.path().into());
     complete(&mut c, jump);
     navigate(&mut c, Action::Back);
-    assert_eq!(c.app.panes[0].path, root.path());
+    assert_eq!(*c.app.panes[0].local_path(), root.path());
     assert_eq!(c.app.panes[0].scroll, 27);
     navigate(&mut c, Action::Forward);
-    assert_eq!(c.app.panes[0].path, other.path());
+    assert_eq!(*c.app.panes[0].local_path(), other.path());
 }
 
 #[test]
@@ -193,7 +193,7 @@ fn failed_and_superseded_parent_completions_do_not_consume_history() {
         c.app
             .complete_listing(0, failed.generation, Err("denied".into()))
     );
-    assert_eq!(c.app.panes[0].path, root.path().join("child30"));
+    assert_eq!(*c.app.panes[0].local_path(), root.path().join("child30"));
     let stale = request(&mut c, Action::Parent);
     let back = request(&mut c, Action::Back);
     assert!(
@@ -268,12 +268,12 @@ fn parent_obeys_filters_hidden_ignore_rules_and_empty_listings() {
                 c.app.panes[0].set_filter("child00".into());
             }
             "hidden" => listing.entries.iter_mut().for_each(|entry| {
-                entry.hidden = entry.path == root.path().join("child30");
+                entry.hidden = *entry.local_path() == root.path().join("child30");
             }),
             "ignored" => {
                 c.app.panes[0].ignore = IgnoreMode::Hide;
                 listing.entries.iter_mut().for_each(|entry| {
-                    entry.ignored = Some(entry.path == root.path().join("child30"));
+                    entry.ignored = Some(*entry.local_path() == root.path().join("child30"));
                 });
             }
             _ => listing.entries.clear(),
@@ -355,7 +355,7 @@ fn mismatched_completion_cannot_leak_parent_restoration_into_refresh() {
     assert_eq!(c.app.panes[0].cursor, Some(child.parent().unwrap().into()));
     let refresh = c.app.request_refresh(0).unwrap();
     complete(&mut c, refresh);
-    assert_eq!(c.app.panes[0].path, child);
+    assert_eq!(*c.app.panes[0].local_path(), child);
     assert!(c.app.history(false).is_none());
 }
 
@@ -393,7 +393,7 @@ fn parent_restores_a_link_entry_by_its_saved_no_follow_identity() {
     let mut c = controller(root.path());
     c.app.panes[0].move_cursor(isize::MAX, 5);
     navigate(&mut c, Action::Enter);
-    assert_eq!(c.app.panes[0].path, link);
+    assert_eq!(*c.app.panes[0].local_path(), link);
     navigate(&mut c, Action::Parent);
     assert_eq!(c.app.panes[0].cursor, Some(link.clone()));
     assert_eq!(c.app.panes[0].scroll, 37);
@@ -448,7 +448,7 @@ fn back_does_not_restore_focus_to_a_replacement_child() {
     assert_eq!(c.app.panes[0].cursor, Some(root.path().join("child00")));
     assert_eq!(c.app.panes[0].scroll, 0);
     navigate(&mut c, Action::Forward);
-    assert_eq!(c.app.panes[0].path, child);
+    assert_eq!(*c.app.panes[0].local_path(), child);
 }
 
 #[test]
@@ -458,7 +458,7 @@ fn parent_and_history_navigation_clear_filters_by_default() {
     let mut c = controller(root.path());
     c.app.panes[0].move_cursor(1, 5);
     navigate(&mut c, Action::Enter);
-    assert_eq!(c.app.panes[0].path, root.path().join("child00"));
+    assert_eq!(*c.app.panes[0].local_path(), root.path().join("child00"));
     for action in [Action::Parent, Action::Back, Action::Forward] {
         c.app.panes[0].set_filter("no-match".into());
         navigate(&mut c, action);

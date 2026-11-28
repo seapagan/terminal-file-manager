@@ -64,7 +64,7 @@ fn draw(app: &App, theme: &Theme, width: u16) -> Buffer {
 fn set_state(app: &mut App, state: u8) {
     for pane in &mut app.panes {
         pane.entries[0].ignored = Some(state & 1 != 0);
-        pane.cursor = (state & 2 != 0).then(|| pane.entries[0].path.clone());
+        pane.cursor = (state & 2 != 0).then(|| pane.entries[0].local_path().clone());
         pane.marks.clear();
         if state & 4 != 0 {
             pane.select_all();

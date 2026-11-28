@@ -6,7 +6,7 @@ use crate::{
     ui::Geometry,
 };
 use crossterm::event::{Event, KeyCode, KeyEventKind, MouseButton, MouseEvent, MouseEventKind};
-use std::{path::PathBuf, time::Duration};
+use std::time::Duration;
 
 /// Pure input controller; emitted requests are the only route to background I/O.
 pub struct Controller {
@@ -20,7 +20,7 @@ pub struct Controller {
     pub(super) pattern_preferences: (crate::app::PatternMode, bool),
     pub(super) bindings: Bindings,
     pub(super) filter_before: Option<(usize, String)>,
-    pub(super) last_click: Option<(usize, PathBuf, Duration)>,
+    pub(super) last_click: Option<(usize, crate::app::NavigationTarget, Duration)>,
     pub(super) dragging_divider: bool,
 }
 
@@ -128,11 +128,11 @@ impl Controller {
         if self.app.help && !super::help::accepts(action) {
             return Vec::new();
         }
-        if super::operations::action(self, action, geometry) {
+        if let Some(reason) = unavailable(&self.app, action) {
+            self.app.status = reason.into();
             return Vec::new();
         }
-        if let Some(reason) = unavailable(action) {
-            self.app.status = reason.into();
+        if super::operations::action(self, action, geometry) {
             return Vec::new();
         }
         if super::policy_menu::action(self, action)
@@ -507,13 +507,13 @@ pub(super) fn page_height(geometry: &Geometry, pane: usize) -> usize {
     geometry.listing_rows[pane].max(1)
 }
 
-fn unavailable(action: Action) -> Option<&'static str> {
-    match action {
+fn unavailable(app: &App, action: Action) -> Option<&'static str> {
+    super::remote::blocked(app, action).or(match action {
         Action::Viewer => Some("The file viewer is not available yet."),
         Action::Editor => Some("The file editor is not available yet."),
         Action::Path | Action::Zoxide | Action::OppositeZoxide | Action::ExitDirectory => {
             Some("This navigation command is not available yet.")
         }
         _ => None,
-    }
+    })
 }

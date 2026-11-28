@@ -184,7 +184,7 @@ impl Driver {
         else {
             panic!("worker must claim its stage before writing");
         };
-        let path = payload.path.clone();
+        let path = payload.local_path().clone();
         let (permit, answer) = mpsc::sync_channel(1);
         receive(
             Message::Claim {

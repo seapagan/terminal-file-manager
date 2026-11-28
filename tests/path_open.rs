@@ -121,10 +121,10 @@ fn opened_picker_cancels_or_navigates_to_the_chosen_ancestor() {
         assert!(c.app.path_picker.is_none());
         if cancel {
             assert!(requests.is_empty());
-            assert_eq!(c.app.panes[0].path, child);
+            assert_eq!(*c.app.panes[0].local_path(), child);
         } else {
             assert_eq!(requests.len(), 1);
-            assert_eq!(requests[0].path, root.path());
+            assert_eq!(*requests[0].local_path(), root.path());
         }
     }
 }
@@ -222,7 +222,7 @@ fn immediate_enter_closes_picker_without_navigation_even_without_visible_control
         );
         assert!(c.app.path_picker.is_none());
         assert!(c.app.panes[0].pending.is_none());
-        assert_eq!(c.app.panes[0].path, path());
+        assert_eq!(*c.app.panes[0].local_path(), path());
     }
 }
 
@@ -275,7 +275,7 @@ fn alt_l_opens_untruncated_paths_and_roots_in_the_active_pane_and_enter_stays_pu
                 .is_empty()
             );
             assert!(c.app.path_picker.is_none());
-            assert_eq!(c.app.panes[active].path, path);
+            assert_eq!(*c.app.panes[active].local_path(), path);
             assert!(c.app.panes[active].pending.is_none());
         }
     }
@@ -353,7 +353,7 @@ fn assert_current_segment_visible(c: &mut Controller, path: &std::path::Path, le
         .is_empty()
     );
     assert!(c.app.path_picker.is_none());
-    assert_eq!(c.app.panes[1].path, path);
+    assert_eq!(*c.app.panes[1].local_path(), path);
 }
 
 #[test]

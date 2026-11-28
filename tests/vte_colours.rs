@@ -125,7 +125,9 @@ fn palette_names(buffer: &mut Buffer, app: &App) {
         let start = area.x + if area.width < 10 { 1 } else { 8 };
         for (row, index) in app.panes[id].visible.iter().enumerate() {
             let entry = &app.panes[id].entries[*index];
-            if entry.ignored != Some(true) || app.panes[id].cursor.as_ref() == Some(&entry.path) {
+            if entry.ignored != Some(true)
+                || app.panes[id].cursor.as_ref() == Some(entry.local_path())
+            {
                 continue;
             }
             let y = area.y + 3 + row as u16;
@@ -266,7 +268,7 @@ fn palette_hidden_markers(buffer: &mut Buffer, app: &App) {
         };
         for (row, index) in app.panes[id].visible.iter().enumerate() {
             let entry = &app.panes[id].entries[*index];
-            if entry.hidden && app.panes[id].cursor.as_ref() != Some(&entry.path) {
+            if entry.hidden && app.panes[id].cursor.as_ref() != Some(entry.local_path()) {
                 let cell = &mut buffer[(area.x + 6, area.y + 3 + row as u16)];
                 assert_eq!(cell.symbol(), "h");
                 assert_eq!(cell.fg, Color::Rgb(35, 140, 150));
@@ -281,7 +283,7 @@ fn assert_hidden_output(buffer: &Buffer, app: &App, id: usize, level: ColorLevel
     let area = ui::geometry(app, buffer.area).panes[id].unwrap();
     for (row, index) in app.panes[id].visible.iter().enumerate() {
         let entry = &app.panes[id].entries[*index];
-        if !entry.hidden || app.panes[id].cursor.as_ref() == Some(&entry.path) {
+        if !entry.hidden || app.panes[id].cursor.as_ref() == Some(entry.local_path()) {
             continue;
         }
         let (x, y) = (area.x + 6, area.y + 3 + row as u16);

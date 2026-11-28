@@ -129,14 +129,17 @@ impl Snapshot {
     pub(crate) fn matches_context(&self, app: &App) -> bool {
         let pane = &app.panes[self.pane];
         app.active == self.pane
-            && pane.path == self.path
+            && pane.native_path() == Some(&self.path)
             && pane.context == self.context
             && pane.pending.is_none()
             && pane.error.is_none()
     }
     fn capture(app: &App) -> Result<Self, String> {
         let pane = &app.panes[app.active];
-        if pane.pending.is_some() || pane.error.is_some() || !pane.path.is_absolute() {
+        if pane.is_remote() {
+            return Err("Copying paths from the read-only SSH pane is unavailable".into());
+        }
+        if pane.pending.is_some() || pane.error.is_some() || !pane.local_path().is_absolute() {
             return Err("Wait for a valid local directory before copying paths".into());
         }
         let directory = Directory::capture(pane)?;
@@ -147,14 +150,14 @@ impl Snapshot {
             .filter(|e| {
                 e.identity
                     .as_ref()
-                    .zip(pane.marks.get(&e.path))
+                    .zip(pane.marks.get(e.local_path()))
                     .is_some_and(|(fresh, marked)| same_identity(fresh, marked))
             })
             .cloned()
             .collect();
         Ok(Self {
             pane: app.active,
-            path: pane.path.clone(),
+            path: pane.local_path().clone(),
             context: pane.context,
             directory,
             highlighted: pane.current().filter(|e| e.identity.is_some()).cloned(),
@@ -204,7 +207,7 @@ impl Snapshot {
                 || !entry
                     .identity
                     .as_ref()
-                    .zip(pane.marks.get(&entry.path))
+                    .zip(pane.marks.get(entry.local_path()))
                     .is_some_and(|(a, b)| same_identity(a, b))
             {
                 return Err("Visible marked selection changed; start again".into());

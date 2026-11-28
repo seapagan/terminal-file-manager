@@ -47,7 +47,10 @@ fn directories_use_d_indicator_and_adjacent_suffix_without_changing_native_names
     let row = (8..79).map(|x| buffer[(x, 3)].symbol()).collect::<String>();
     assert_eq!(row.trim_end(), "docs/");
     assert_eq!(app.panes[0].entries[0].name, "docs");
-    assert_eq!(app.panes[0].entries[0].path, root.path().join("docs"));
+    assert_eq!(
+        *app.panes[0].entries[0].local_path(),
+        root.path().join("docs")
+    );
     app.panes[0].set_filter("docs/".into());
     assert!(app.panes[0].visible.is_empty());
     app.panes[0].set_filter("docs".into());

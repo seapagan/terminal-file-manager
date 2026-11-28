@@ -37,13 +37,7 @@ pub(super) fn render(
             Role::InactivePaneBorder
         }));
     let inner = block.inner(area);
-    let title = super::path_title::title(
-        &pane.path,
-        id,
-        id == app.active,
-        pane.pending.is_some(),
-        inner.width,
-    );
+    let title = super::path_title::title(pane, id, id == app.active, inner.width);
     frame.render_widget(block.title(title), area);
     super::path_navigation::render(frame, app, theme, &geometry.path_controls, id);
     let summary = super::summary::lines(
@@ -116,7 +110,7 @@ fn render_rows(
         }
         let i = pane.visible[row - usize::from(pane.has_parent())];
         let entry = &pane.entries[i];
-        let cursor = pane.cursor.as_ref() == Some(&entry.path);
+        let cursor = pane.entry_focused(entry);
         let focus = if cursor && active {
             Some(Role::Cursor)
         } else if cursor {
@@ -162,13 +156,15 @@ fn parent_row(pane: &Pane, width: u16, theme: &Theme, active: bool) -> Row<'stat
 fn render_empty(frame: &mut Frame, pane: &Pane, area: Rect) {
     let offset = 1 + u16::from(pane.has_parent());
     frame.render_widget(
-        Paragraph::new(if pane.pending.is_some() {
-            "Loading directory…"
-        } else if !pane.filter.is_empty() {
-            "No matches — FILTER active"
-        } else {
-            "No visible entries"
-        }),
+        Paragraph::new(
+            if pane.pending.is_some() || (pane.is_remote() && pane.listing) {
+                "Loading directory…"
+            } else if !pane.filter.is_empty() {
+                "No matches — FILTER active"
+            } else {
+                "No visible entries"
+            },
+        ),
         Rect::new(
             area.x,
             area.y.saturating_add(offset),
@@ -293,7 +289,9 @@ fn identity_cells(
             theme.name_style(entry)
         },
     );
-    let marked = pane.marks.contains_key(&entry.path);
+    let marked = entry
+        .native_path()
+        .is_some_and(|path| pane.marks.contains_key(path));
     let marker = if marked { "[*]" } else { "   " };
     let name = super::measure::name(
         entry,

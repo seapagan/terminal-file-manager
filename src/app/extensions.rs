@@ -39,7 +39,7 @@ impl Pane {
             .iter()
             .map(|i| &self.entries[*i])
             .filter(|entry| extension(entry, compounds, final_only) == Some(reference))
-            .map(|entry| (entry.path.clone(), entry.identity.clone().unwrap()))
+            .map(|entry| (entry.local_path().clone(), entry.identity.clone().unwrap()))
             .collect();
         self.reset_range();
         self.selection_revision = self.selection_revision.wrapping_add(1);

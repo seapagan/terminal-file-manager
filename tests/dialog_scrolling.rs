@@ -41,7 +41,7 @@ fn selected_roots_scroll_below_fixed_context_and_destructive_title() {
     }
     assert_eq!(positions[0], positions[1]);
     assert!(
-        matches!(&app.operations.dialog, Some(Dialog::Operation(d)) if d.plan.operands.len() == 50 && d.plan.operands.iter().map(|e| &e.path).eq(paths.iter()))
+        matches!(&app.operations.dialog, Some(Dialog::Operation(d)) if d.plan.operands.len() == 50 && d.plan.operands.iter().map(|e| e.local_path()).eq(paths.iter()))
     );
 }
 fn fixed_positions(rows: &[String]) -> (usize, usize, usize) {

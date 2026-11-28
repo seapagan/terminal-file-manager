@@ -98,6 +98,14 @@ or `python3 --version` (Unix). These commands expose a base interpreter;
 project virtual environments remain separate. You do not need a repository
 `.venv` to run the support scripts. Install the listed QC tools on PATH too.
 
+On Linux, macOS and Windows, `cargo make verify-infra` requires PowerShell 7
+(`pwsh`) on PATH and PSScriptAnalyzer 1.25.0. Install the module from a
+PowerShell 7 session:
+
+```powershell
+Install-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser
+```
+
 | Command | Purpose |
 | --- | --- |
 | `cargo make verify-fast` | Smaller development subset: native Rust formatting, checks, strict Clippy, tests, doctests, docs and builds; no packaging/MSRV |
@@ -105,7 +113,8 @@ project virtual environments remain separate. You do not need a repository
 | `cargo make verify-postcommit` | Full exact-MSRV checks including packaging, then strict current-toolchain packaging, on clean committed sources before push |
 | `cargo make package` | Strict current-toolchain package build and verification |
 | `cargo make package-list` | Optional strict package inventory diagnostic; does not compile or verify the crate |
-| `cargo make verify-infra` | Explicit tooling self-tests: Python checks/tests, installer and binary-verifier regressions, CI/release harness tests |
+| `cargo make verify-infra` | Tooling checks and tests, including PSScriptAnalyzer for the PowerShell SSH launchers, Python and installer checks, and CI/release harness tests |
+| `cargo make ssh-fixture-psscriptanalyzer` | Lint the PowerShell SSH launchers |
 | `cargo make test` | Native Rust tests through Nextest |
 | `cargo make doctest` | Independent Rust documentation tests |
 | `cargo make coverage` | Instrumented Rust test coverage and LCOV |
@@ -153,12 +162,8 @@ return error 1314 (`ERROR_PRIVILEGE_NOT_HELD`). An elevated terminal is an
 alternative; ordinary development does not require elevation.
 
 `verify-infra` exercises PowerShell 7 and Windows PowerShell 5.1. Both hosts must
-permit the local scripts under your approved execution policy. If launching
-5.1 from Store-installed PS7 resolves PS7's built-in modules instead of its own
-(for example, `Get-FileHash` is missing), remove PS7's built-in `Modules` directory
-from the parent session's `PSModulePath` before running the task. Keep the native
-Windows PowerShell and shared module directories. This is a session environment
-correction; do not change installed modules or machine policy to bypass a gate.
+permit local scripts under your execution policy. The legacy checks start with
+the default Windows PowerShell module search path.
 
 ### Linux Windows cross-verification
 
@@ -235,6 +240,77 @@ Infrastructure regressions are retained locally under `verify-infra` rather
 than executed in every routine CI run. The Python support matrix is available
 as a manually dispatched workflow. Developer-facing quality, MSRV, policy,
 workflow security and package checks remain ordinary CI responsibilities.
+
+## SSH/SFTP interoperability
+
+### Container server matrix
+
+Use Docker with a Linux container engine and BuildKit (`docker buildx`).
+The Linux client image supplies Rust, OpenSSH and all build and test tools.
+On Linux, macOS or WSL2, run from the checkout with the system shell. On WSL2
+with Docker Desktop, enable integration for your distribution first.
+
+```sh
+tests/fixtures/ssh/run.sh smoke
+tests/fixtures/ssh/run.sh full
+tests/fixtures/ssh/run.sh debian
+```
+
+On Windows, start Docker Desktop in Linux-container mode and run from the
+checkout in PowerShell.
+
+```powershell
+.\tests\fixtures\ssh\run.ps1 smoke
+.\tests\fixtures\ssh\run.ps1 full
+.\tests\fixtures\ssh\run.ps1 debian
+```
+
+Smoke is the default. It runs Debian OpenSSH, AsyncSSH and SFTPGo. Full adds
+Ubuntu, Fedora, AlmaLinux, Arch, Alpine and openSUSE. Use a server name from
+[images.csv](tests/fixtures/ssh/images.csv) to run one row. The Arch image
+requires AMD64 emulation when the Docker engine runs on ARM64.
+[Docker multi-platform builds](https://docs.docker.com/build/building/multi-platform/)
+
+The runner builds one Linux TFM client, reuses BuildKit's Cargo caches and
+runs the same SSH/SFTP and pane tests against each server. Containers create
+the credentials, agent and remote files. The runner uses an internal Docker
+network, publishes no ports and removes its containers, network and fixture
+volume on exit. The run log records server versions, image IDs and timings.
+
+Run the applicable matrix on the candidate revision before committing.
+
+| Tier | When to run it |
+| --- | --- |
+| Smoke | Shared browser, rendering or navigation changes that affect remote panes. |
+| Full | Changes to SSH/SFTP production code, dependencies, authentication, host trust, connection lifecycle or fixtures. Also run full at SSH/SFTP stage completion and for final release verification. |
+| None | Unrelated local functionality. |
+
+If both tiers apply, the full run covers smoke. If Docker is unavailable,
+explicitly report which matrix verification remains outstanding.
+
+### Native client and server
+
+Run the shared contract with a native TFM build and a native OpenSSH server on
+loopback. From the checkout on Linux, macOS or Windows, run:
+
+```sh
+pwsh -NoProfile -File tests/fixtures/ssh/run-native.ps1
+```
+
+Use PowerShell 7.2 or newer and a native Rust toolchain. On Linux and macOS, run
+as a regular user with `sshd` at `/usr/sbin/sshd` and `ssh-keygen`, `ssh-agent`
+and `ssh-add` on `PATH`. On Windows, install the Windows OpenSSH Server
+feature and run from an elevated console under a local account. The launcher
+uses a temporary scheduled task for the daemon and leaves the installed
+service alone.
+
+The native run uses disposable keys for the current account and a separate
+agent on Unix. The Docker matrix covers password authentication. The Windows
+run leaves the shared agent pipe alone. Linux checks a non-UTF-8 filename.
+macOS and Windows check the exact bytes of a Unicode filename.
+
+Run interoperability separately from `cargo make verify`. Ordinary CI runs
+the fast SSH regressions.
 
 ## Release and installer checks
 

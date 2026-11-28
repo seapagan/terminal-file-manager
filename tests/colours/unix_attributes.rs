@@ -29,7 +29,7 @@ fn unix_octal_digits_keep_the_same_style_for_different_file_types() {
         };
         pane.refilter();
         for cursor in [false, true] {
-            app.panes[0].cursor = cursor.then(|| app.panes[0].entries[0].path.clone());
+            app.panes[0].cursor = cursor.then(|| app.panes[0].entries[0].local_path().clone());
             for level in LEVELS {
                 assert_octal_cells(&app, level, octal);
             }

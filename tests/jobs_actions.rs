@@ -86,7 +86,7 @@ fn unknown_record(plan: &Plan, root: &std::path::Path) -> Record {
     let mut payload = None;
     let record = execute(plan, Default::default(), &false.into(), |event| {
         match event {
-            Event::OwnedStage { payload: entry, .. } => payload = Some(entry.path),
+            Event::OwnedStage { payload: entry, .. } => payload = Some(entry.local_path().clone()),
             Event::Progress {
                 stage: Stage::Verified,
                 ..

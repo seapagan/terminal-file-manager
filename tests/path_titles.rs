@@ -49,8 +49,8 @@ fn narrow_dual_headers_keep_the_complete_directory_tail() {
         assert!(headers[0].starts_with("> Pane 1: "));
         assert!(headers[1].starts_with("  Pane 2: "));
     }
-    assert_eq!(app.panes[0].path.as_os_str(), LONG);
-    assert_eq!(app.panes[1].path.as_os_str(), LONG);
+    assert_eq!(app.panes[0].local_path().as_os_str(), LONG);
+    assert_eq!(app.panes[1].local_path().as_os_str(), LONG);
 }
 
 #[test]
@@ -122,7 +122,7 @@ fn balanced_middle_elision_uses_whole_components_at_both_ends() {
             "{path}, budget {budget}"
         );
         assert_eq!(
-            app.panes[0].path.as_os_str().as_encoded_bytes(),
+            app.panes[0].local_path().as_os_str().as_encoded_bytes(),
             path.as_bytes()
         );
     }
@@ -216,7 +216,7 @@ fn control_escaping_precedes_width_measurement_and_elision() {
         }
     }
     assert_eq!(
-        app.panes[0].path.as_os_str(),
+        app.panes[0].local_path().as_os_str(),
         "/alpha/long-parent/a\n\u{1b}\u{202e}"
     );
 }
@@ -232,7 +232,7 @@ fn resize_maximise_and_pane_toggles_recompute_titles_without_changing_navigation
     let paths = app
         .panes
         .each_ref()
-        .map(|pane| pane.path.as_os_str().as_encoded_bytes().to_vec());
+        .map(|pane| pane.local_path().as_os_str().as_encoded_bytes().to_vec());
     let mut controller = Controller::new(
         app,
         Bindings::new(&Default::default()).unwrap(),
@@ -257,11 +257,16 @@ fn resize_maximise_and_pane_toggles_recompute_titles_without_changing_navigation
     assert!(controller.app.dual);
     assert_eq!(controller.app.active, 0);
     for (pane, original) in controller.app.panes.iter().zip(paths) {
-        assert_eq!(pane.path.as_os_str().as_encoded_bytes(), original);
+        assert_eq!(pane.local_path().as_os_str().as_encoded_bytes(), original);
         assert!(pane.pending.is_none());
     }
     assert_eq!(
-        controller.app.history(false).unwrap().path.as_os_str(),
+        controller
+            .app
+            .history(false)
+            .unwrap()
+            .local_path()
+            .as_os_str(),
         "/initial"
     );
 }
@@ -280,7 +285,7 @@ fn navigated_app() -> App {
             errors: Vec::new(),
         }),
     );
-    app.panes[1].path = "/different/pane/other".into();
+    app.panes[1].path = Some("/different/pane/other".into());
     app.dual = true;
     app
 }
@@ -344,7 +349,7 @@ fn unix_non_utf8_and_backslash_names_keep_native_bytes() {
     let app = App::new(OsStr::from_bytes(raw).into());
     let header = titles(&app, 28).remove(0);
     assert!(header.contains("/…/dir\\name-�"), "{header}");
-    assert_eq!(app.panes[0].path.as_os_str().as_bytes(), raw);
+    assert_eq!(app.panes[0].local_path().as_os_str().as_bytes(), raw);
 }
 
 #[cfg(windows)]
@@ -367,7 +372,7 @@ fn windows_drive_unc_and_extended_anchors_survive_middle_elision() {
             format!("> Pane 1: {expected}")
         );
         assert_eq!(
-            app.panes[0].path.as_os_str().as_encoded_bytes(),
+            app.panes[0].local_path().as_os_str().as_encoded_bytes(),
             path.as_bytes()
         );
     }

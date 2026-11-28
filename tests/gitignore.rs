@@ -97,7 +97,7 @@ impl Repository {
         let entry = snapshot
             .entries
             .iter()
-            .find(|entry| entry.path == path)
+            .find(|entry| *entry.local_path() == path)
             .unwrap();
         assert_eq!(
             entry.ignored,
@@ -274,7 +274,7 @@ fn assert_ignore_modes(snapshot: Snapshot, path: &Path, ignored: bool) {
         assert_eq!(
             pane.visible
                 .iter()
-                .any(|index| pane.entries[*index].path == path),
+                .any(|index| pane.entries[*index].local_path() == path),
             visible,
             "{mode:?}: {path:?}"
         );

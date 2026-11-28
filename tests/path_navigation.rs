@@ -33,7 +33,7 @@ fn parent_row_is_keyboard_accessible_and_never_a_filesystem_operand() {
     let g = ui::geometry(&c.app, Rect::new(0, 0, 100, 24));
     assert!(c.app.panes[0].parent_focused());
     c.dispatch(Action::Down, &g);
-    assert_eq!(c.app.panes[0].current().unwrap().path, file);
+    assert_eq!(c.app.panes[0].current().unwrap().local_path(), &file);
     assert!(
         c.handle(
             Event::Key(KeyEvent::new(KeyCode::Home, KeyModifiers::NONE)),
@@ -56,7 +56,7 @@ fn parent_row_is_keyboard_accessible_and_never_a_filesystem_operand() {
         &g,
         Default::default(),
     );
-    assert_eq!(requests[0].path, root.path().parent().unwrap());
+    assert_eq!(*requests[0].local_path(), root.path().parent().unwrap());
 }
 
 #[test]
@@ -179,7 +179,7 @@ fn clicking_a_header_ancestor_requests_its_native_path() {
         crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left),
     );
     assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].path, path.ancestors().last().unwrap());
+    assert_eq!(*requests[0].local_path(), path.ancestors().last().unwrap());
 }
 
 #[test]
@@ -222,7 +222,7 @@ fn ellipsis_opens_a_keyboard_picker_and_escape_captures_input() {
         Default::default(),
     );
     assert!(c.app.path_picker.is_none());
-    assert_eq!(c.app.panes[0].path, path);
+    assert_eq!(*c.app.panes[0].local_path(), path);
 }
 
 #[test]
@@ -232,7 +232,7 @@ fn parent_single_click_focuses_and_double_click_uses_existing_parent_restoration
     let child = root.path().join("child");
     std::fs::create_dir(&child).unwrap();
     let mut c = controller(&child);
-    let original = c.app.panes[1].path.clone();
+    let original = c.app.panes[1].local_path().clone();
     let g = ui::geometry(&c.app, Rect::new(0, 0, 80, 24));
     for (time, navigates) in [(0, false), (100, true)] {
         let requests = c.handle(
@@ -248,9 +248,9 @@ fn parent_single_click_focuses_and_double_click_uses_existing_parent_restoration
         assert_eq!(!requests.is_empty(), navigates);
         assert!(c.app.panes[0].current().is_none());
         if let Some(request) = requests.first() {
-            assert_eq!(request.path, root.path());
+            assert_eq!(*request.local_path(), root.path());
             let snapshot = terminal_file_manager::fs::list(
-                &request.path,
+                request.local_path(),
                 &terminal_file_manager::fs::IgnoreContext::isolated(),
                 &false.into(),
             )
@@ -259,7 +259,7 @@ fn parent_single_click_focuses_and_double_click_uses_existing_parent_restoration
             assert_eq!(c.app.panes[0].cursor.as_deref(), Some(child.as_path()));
         }
     }
-    assert_eq!(c.app.panes[1].path, original);
+    assert_eq!(*c.app.panes[1].local_path(), original);
 }
 
 #[test]
@@ -285,7 +285,7 @@ fn root_has_no_virtual_parent_and_parent_focus_survives_refresh_and_history() {
     assert!(c.app.panes[0].parent_focused());
     let request = c.dispatch(Action::Enter, &g).remove(0);
     let snapshot = terminal_file_manager::fs::list(
-        &request.path,
+        request.local_path(),
         &terminal_file_manager::fs::IgnoreContext::isolated(),
         &false.into(),
     )
@@ -293,7 +293,7 @@ fn root_has_no_virtual_parent_and_parent_focus_survives_refresh_and_history() {
     c.app.complete_listing(0, request.generation, Ok(snapshot));
     let request = c.dispatch(Action::Back, &g).remove(0);
     let snapshot = terminal_file_manager::fs::list(
-        &request.path,
+        request.local_path(),
         &terminal_file_manager::fs::IgnoreContext::isolated(),
         &false.into(),
     )

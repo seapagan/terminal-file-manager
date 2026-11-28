@@ -28,7 +28,7 @@ fn known_child_writes_update_metadata_without_repeated_directory_scans() {
             app.panes.iter().all(|p| {
                 p.entries
                     .iter()
-                    .any(|e| e.path == file && e.size == Some(size as u64))
+                    .any(|e| e.native_path() == Some(&file) && e.size == Some(size as u64))
             })
         });
         let after = pool.listing_metrics();

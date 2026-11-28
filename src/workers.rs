@@ -14,6 +14,8 @@ use std::{
     time::Duration,
 };
 
+use tokio::sync::oneshot;
+
 const PANE_COUNT: usize = 2;
 const LANE_COUNT: usize = 4 * PANE_COUNT;
 const WORKER_COUNT: usize = LANE_COUNT + PANE_COUNT;
@@ -21,6 +23,9 @@ const WORKER_COUNT: usize = LANE_COUNT + PANE_COUNT;
 /// Background values are installed only by generation-checked model transitions.
 pub enum Value {
     Listing(Result<Snapshot, String>),
+    SftpListing(Result<Vec<Entry>, String>),
+    SftpFile,
+    Cancelled,
     ParentIdentity(Option<Identity>),
     Metadata(Box<Entry>, Option<PathBuf>),
     Totals(Result<Totals, String>),
@@ -41,15 +46,33 @@ struct Finished {
 
 #[derive(Default)]
 struct Lane {
-    running: [Option<Arc<AtomicBool>>; 2],
+    running: [Option<Cancellation>; 2],
     pending: Option<Work>,
+}
+
+enum Cancellation {
+    Native(Arc<AtomicBool>),
+    Sftp(Option<oneshot::Sender<()>>),
+}
+
+impl Cancellation {
+    fn cancel(&mut self) {
+        match self {
+            Self::Native(flag) => flag.store(true, Ordering::Relaxed),
+            Self::Sftp(signal) => {
+                if let Some(signal) = signal.take() {
+                    let _ = signal.send(());
+                }
+            }
+        }
+    }
 }
 
 impl Lane {
     fn cancel(&mut self) {
         self.pending = None;
-        for cancelled in self.running.iter().flatten() {
-            cancelled.store(true, Ordering::Relaxed);
+        for cancelled in self.running.iter_mut().flatten() {
+            cancelled.cancel();
         }
     }
 
@@ -85,6 +108,7 @@ pub struct Pool {
     receiver: mpsc::Receiver<Finished>,
     context: IgnoreContext,
     metrics: Arc<Metrics>,
+    sftp: Option<Arc<crate::ssh::Session>>,
     #[cfg(test)]
     pub(crate) before_execute: Option<BeforeExecute>,
 }
@@ -101,6 +125,7 @@ impl Pool {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(1)
             .max_blocking_threads(WORKER_COUNT)
+            .enable_time()
             .build()?;
         let (sender, receiver) = mpsc::sync_channel(WORKER_COUNT);
         Ok(Self {
@@ -110,9 +135,15 @@ impl Pool {
             receiver,
             context,
             metrics: Arc::default(),
+            sftp: None,
             #[cfg(test)]
             before_execute: None,
         })
+    }
+
+    /// Attach the authenticated SFTP session for remote listing requests.
+    pub fn attach_sftp(&mut self, session: Arc<crate::ssh::Session>) {
+        self.sftp = Some(session);
     }
 
     /// Replace queued work and cooperatively cancel the old read; never block input.
@@ -148,7 +179,7 @@ impl Pool {
                     request: Request {
                         pane: *pane,
                         generation: work.request.generation,
-                        path: path.clone(),
+                        path: Some(path.clone()),
                         kind: RequestKind::ParentIdentity,
                     },
                     refresh: None,
@@ -207,39 +238,52 @@ impl Pool {
             let Some((slot, Work { request, refresh })) = lane.take_work() else {
                 continue;
             };
-            let cancelled = Arc::new(AtomicBool::new(false));
-            lane.running[slot] = Some(cancelled.clone());
-            let context = self.context.clone();
-            let metrics = self.metrics.clone();
+            let runtime = self.runtime.as_ref().expect("live runtime");
             let sender = self.sender.clone();
-            #[cfg(test)]
-            let before_execute = self.before_execute.clone();
-            self.runtime
-                .as_ref()
-                .expect("live runtime")
-                .spawn(async move {
+            if let Some(path) = request.kind.sftp_path().cloned() {
+                let (signal, cancelled) = oneshot::channel();
+                lane.running[slot] = Some(Cancellation::Sftp(Some(signal)));
+                let sftp = self.sftp.clone();
+                runtime.spawn(async move {
+                    let activate = matches!(request.kind, RequestKind::SftpActivate(_));
+                    let value = read_sftp(sftp, &path, activate, cancelled).await;
+                    let _ = sender.send(finished(index, slot, request, value));
+                });
+            } else {
+                let cancelled = Arc::new(AtomicBool::new(false));
+                lane.running[slot] = Some(Cancellation::Native(cancelled.clone()));
+                let context = self.context.clone();
+                let metrics = self.metrics.clone();
+                #[cfg(test)]
+                let before_execute = self.before_execute.clone();
+                runtime.spawn(async move {
                     let work = request.clone();
-                    let result = tokio::task::spawn_blocking(move || {
+                    let value = tokio::task::spawn_blocking(move || {
                         #[cfg(test)]
                         if let Some(before_execute) = before_execute {
                             before_execute(&work, &cancelled);
                         }
                         execute_work(&work, &context, &cancelled, refresh, &metrics)
                     })
-                    .await;
-                    let value = result.unwrap_or_else(|error| {
+                    .await
+                    .unwrap_or_else(|error| {
                         Value::Failed(format!(
                             "{} worker failed: {error}",
                             request.kind.worker_name()
                         ))
                     });
-                    let _ = sender.send(Finished {
-                        lane: index,
-                        slot,
-                        completion: Completion { request, value },
-                    });
+                    let _ = sender.send(finished(index, slot, request, value));
                 });
+            }
         }
+    }
+}
+
+fn finished(lane: usize, slot: usize, request: Request, value: Value) -> Finished {
+    Finished {
+        lane,
+        slot,
+        completion: Completion { request, value },
     }
 }
 
@@ -260,7 +304,10 @@ fn lane_index(pane: usize, kind: &RequestKind) -> Option<usize> {
         return None;
     }
     let kind = match kind {
-        RequestKind::Listing | RequestKind::ParentListing(_) => 0,
+        RequestKind::Listing
+        | RequestKind::SftpListing(_)
+        | RequestKind::SftpActivate(_)
+        | RequestKind::ParentListing(_) => 0,
         RequestKind::Metadata => 1,
         RequestKind::Totals => 2,
         RequestKind::ParentIdentity => 3,
@@ -270,7 +317,10 @@ fn lane_index(pane: usize, kind: &RequestKind) -> Option<usize> {
 
 impl RequestKind {
     fn is_listing(&self) -> bool {
-        matches!(self, Self::Listing | Self::ParentListing(_))
+        matches!(
+            self,
+            Self::Listing | Self::SftpListing(_) | Self::SftpActivate(_) | Self::ParentListing(_)
+        )
     }
 
     fn worker_capacity(&self) -> usize {
@@ -279,7 +329,7 @@ impl RequestKind {
 
     fn worker_name(&self) -> &'static str {
         match self {
-            Self::Listing => "Directory listing",
+            Self::Listing | Self::SftpListing(_) | Self::SftpActivate(_) => "Directory listing",
             Self::ParentListing(_) => "Parent listing",
             Self::ParentIdentity => "Parent identity lookup",
             Self::Metadata => "Metadata",
@@ -312,23 +362,50 @@ fn execute_work(
 }
 
 fn execute(request: &Request, context: &IgnoreContext, cancelled: &AtomicBool) -> Value {
+    let Some(path) = request.path.as_deref() else {
+        return Value::Failed("Native worker request has no native path".into());
+    };
     match &request.kind {
+        RequestKind::SftpListing(_) | RequestKind::SftpActivate(_) => {
+            unreachable!("SFTP requests execute asynchronously")
+        }
         RequestKind::Listing | RequestKind::ParentListing(_) => {
-            Value::Listing(fs::list(&request.path, context, cancelled).map_err(|e| e.to_string()))
+            Value::Listing(fs::list(path, context, cancelled).map_err(|e| e.to_string()))
         }
         RequestKind::ParentIdentity => Value::ParentIdentity(
             fs::check_cancelled(cancelled)
                 .ok()
-                .and_then(|()| fs::inspect_identity(&request.path).identity)
+                .and_then(|()| fs::inspect_identity(path).identity)
                 .filter(|identity| identity.object.is_some()),
         ),
         RequestKind::Metadata => Value::Metadata(
-            Box::new(fs::inspect(&request.path)),
-            std::fs::canonicalize(&request.path).ok(),
+            Box::new(fs::inspect(path)),
+            std::fs::canonicalize(path).ok(),
         ),
         RequestKind::Totals => {
-            Value::Totals(fs::totals(&request.path, cancelled).map_err(|e| e.to_string()))
+            Value::Totals(fs::totals(path, cancelled).map_err(|e| e.to_string()))
         }
+    }
+}
+
+async fn read_sftp(
+    session: Option<Arc<crate::ssh::Session>>,
+    path: &russh_sftp::protocol::SftpString,
+    activate: bool,
+    cancelled: oneshot::Receiver<()>,
+) -> Value {
+    let Some(session) = session else {
+        return Value::SftpListing(Err("SSH session is unavailable".into()));
+    };
+    let listing = session
+        .browse_sftp(path.as_bytes(), activate, cancelled)
+        .await;
+    drop(session);
+    match listing {
+        Ok(Some(entries)) => Value::SftpListing(Ok(crate::app::remote_entries(entries))),
+        Ok(None) => Value::SftpFile,
+        Err(error) if error.kind() == io::ErrorKind::Interrupted => Value::Cancelled,
+        Err(error) => Value::SftpListing(Err(error.to_string())),
     }
 }
 

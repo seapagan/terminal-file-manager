@@ -137,7 +137,7 @@ fn results(record: &crate::operations::Record, operands: &[crate::fs::Entry]) ->
     }
     let operands: std::collections::HashMap<_, _> = operands
         .iter()
-        .map(|entry| (entry.path.as_path(), entry))
+        .map(|entry| (entry.local_path().as_path(), entry))
         .collect();
     for entry in &record.entries {
         rows.extend(result(
@@ -166,7 +166,7 @@ fn route(app: &App, job: &Job) -> Vec<Row> {
     for operand in &job.plan.operands {
         rows.push(Row::plain(format!(
             "Planned source: {}",
-            native_path(&operand.path)
+            native_path(operand.local_path())
         )));
     }
     if let Some(destination) = &job.plan.destination {

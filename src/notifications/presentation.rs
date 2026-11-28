@@ -112,7 +112,10 @@ fn target(job: &Job) -> String {
     let path = if job.plan.operation.creates_entry() {
         job.plan.destination.as_deref()
     } else {
-        job.plan.operands.first().map(|entry| entry.path.as_path())
+        job.plan
+            .operands
+            .first()
+            .map(|entry| entry.local_path().as_path())
     };
     path.map_or_else(String::new, display_name)
 }

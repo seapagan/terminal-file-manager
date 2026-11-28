@@ -211,9 +211,9 @@ mod tests {
             Decision::Replace
         });
         assert_eq!(record.entries[0].outcome, Outcome::Cancelled);
-        assert_eq!(fs::read(&plan.operands[0].path).unwrap(), expected);
+        assert_eq!(fs::read(plan.operands[0].local_path()).unwrap(), expected);
         assert_eq!(
-            crate::fs::inspect(&plan.operands[0].path).identity,
+            crate::fs::inspect(plan.operands[0].local_path()).identity,
             plan.operands[0].identity
         );
         assert_eq!(fs::read(&target).unwrap(), b"previous");

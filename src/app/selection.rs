@@ -14,7 +14,7 @@ impl Pane {
         if let Some(range) = &mut self.range {
             range.added.retain(|path| self.marks.contains_key(path));
             if !self.entries.iter().any(|entry| {
-                entry.path == range.anchor
+                entry.native_path() == Some(&range.anchor)
                     && entry.error.is_none()
                     && range
                         .identity
@@ -65,11 +65,7 @@ impl Pane {
 
     /// Shift-click uses the same sorted/filtered working set as keyboard ranges.
     pub fn select_range_to(&mut self, path: PathBuf, height: usize) {
-        let Some(target) = self
-            .visible
-            .iter()
-            .position(|i| self.entries[*i].path == path)
-        else {
+        let Some(target) = self.visible_path_index(&path) else {
             return;
         };
         self.selection_revision = self.selection_revision.wrapping_add(1);
@@ -81,10 +77,7 @@ impl Pane {
             identity: self.entries[self.visible[target]].identity.clone(),
             added: HashSet::new(),
         });
-        let anchor = self
-            .visible
-            .iter()
-            .position(|i| self.entries[*i].path == range.anchor);
+        let anchor = self.visible_path_index(&range.anchor);
         if anchor.is_none() {
             range.anchor = path.clone();
             range.identity = self.entries[self.visible[target]].identity.clone();
@@ -94,7 +87,7 @@ impl Pane {
         let indices = &self.visible[anchor.min(target)..=anchor.max(target)];
         let selected: HashSet<_> = indices
             .iter()
-            .map(|i| self.entries[*i].path.clone())
+            .map(|i| self.entries[*i].local_path().clone())
             .collect();
         for path in range.added.difference(&selected) {
             self.marks.remove(path);
@@ -102,11 +95,12 @@ impl Pane {
         range.added.retain(|path| selected.contains(path));
         for i in indices {
             let entry = &self.entries[*i];
-            if !self.marks.contains_key(&entry.path)
+            if !self.marks.contains_key(entry.local_path())
                 && let Some(identity) = &entry.identity
             {
-                self.marks.insert(entry.path.clone(), identity.clone());
-                range.added.insert(entry.path.clone());
+                self.marks
+                    .insert(entry.local_path().clone(), identity.clone());
+                range.added.insert(entry.local_path().clone());
             }
         }
         self.range = Some(range);
@@ -114,5 +108,10 @@ impl Pane {
         self.scroll = self.viewport_start(height);
         self.cursor = Some(path);
         self.shift_cursor(0, height);
+    }
+    fn visible_path_index(&self, path: &PathBuf) -> Option<usize> {
+        self.visible
+            .iter()
+            .position(|i| self.entries[*i].native_path() == Some(path))
     }
 }

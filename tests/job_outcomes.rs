@@ -155,7 +155,7 @@ fn retry_eligibility_queries_do_not_repeat_large_preview_clones() {
     );
     assert_eq!(job.plan.preview.as_ref().unwrap().files, 2000);
     assert_eq!(
-        fs::read(job.plan.operands[0].path.join("0")).unwrap(),
+        fs::read(job.plan.operands[0].local_path().join("0")).unwrap(),
         b"retained"
     );
 }

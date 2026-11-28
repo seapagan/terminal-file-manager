@@ -64,7 +64,7 @@ fn finish_metadata(
 }
 
 fn opened(source: &Entry) -> Result<File> {
-    let file = staging::open_source(&source.path)?;
+    let file = staging::open_source(source.local_path())?;
     safety::opened_object(source, &file)?;
     safety::revalidate(source, true)?;
     let metadata = file.metadata()?;

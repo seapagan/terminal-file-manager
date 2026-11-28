@@ -82,7 +82,7 @@ fn loaded_numeric_view(
     let index = app.panes[0]
         .entries
         .iter()
-        .position(|entry| entry.path == path)
+        .position(|entry| entry.local_path() == path)
         .unwrap();
     app.panes[0].cursor = Some(path.into());
     app.request_metadata(0).unwrap();

@@ -28,11 +28,11 @@ fn assert_parent_result_while_identity_is_blocked(outcome: LookupOutcome) {
     pool.submit(parent);
     started.recv_timeout(Duration::from_secs(10)).unwrap();
     collect_until(&mut controller, &mut pool, |app| {
-        app.panes[0].path == root.path()
+        app.panes[0].local_path() == root.path()
     });
     let pane = &mut controller.app.panes[0];
     assert!(!pane.listing);
-    assert_eq!(pane.entries[0].path, child);
+    assert_eq!(pane.entries[0].native_path(), Some(&child));
     assert!(pane.parent_focused());
     assert_eq!(pool.active_count(), 1);
     match outcome {

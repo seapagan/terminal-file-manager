@@ -96,8 +96,11 @@ fn mark_and_unmark_preserve_excluded_marks_and_zero_never_marks_cursor() {
     selection.set_expression("missing".into());
     selection.apply(pane, PatternOperation::Mark).unwrap();
     assert_eq!(pane.marks.len(), 2);
-    assert!(pane.marks.contains_key(&pane.path.join(".hidden.txt")));
-    assert!(pane.marks.contains_key(&pane.path.join("keep.log")));
+    assert!(
+        pane.marks
+            .contains_key(&pane.local_path().join(".hidden.txt"))
+    );
+    assert!(pane.marks.contains_key(&pane.local_path().join("keep.log")));
     selection.set_expression("*.txt".into());
     selection.apply(pane, PatternOperation::Mark).unwrap();
     assert_eq!(pane.marks.len(), 5);
@@ -195,12 +198,12 @@ fn sort_and_unchanged_refresh_preserve_captured_identities_and_range_ownership()
     let marks = app.panes[0].marks.clone();
     assert_eq!(marks.len(), 3);
     let pane = &mut app.panes[0];
-    pane.cursor = Some(pane.path.join("alpha.txt"));
+    pane.cursor = Some(pane.local_path().join("alpha.txt"));
     pane.anchor_range();
-    pane.select_range_to(pane.path.join("keep.log"), 10);
-    assert!(pane.marks.contains_key(&pane.path.join("keep.log")));
+    pane.select_range_to(pane.local_path().join("keep.log"), 10);
+    assert!(pane.marks.contains_key(&pane.local_path().join("keep.log")));
     assert!(pane.marks.len() > marks.len());
-    pane.select_range_to(pane.path.join("alpha.txt"), 10);
+    pane.select_range_to(pane.local_path().join("alpha.txt"), 10);
     assert_eq!(pane.marks, marks);
 }
 
@@ -246,7 +249,7 @@ fn wildcard_is_whole_name_regex_is_unicode_substring_and_zero_is_a_noop() {
     selection.toggle_case();
     assert_eq!(selection.preview(pane).unwrap().matches, 1);
     selection.apply(pane, PatternOperation::Mark).unwrap();
-    assert!(pane.marks.contains_key(&pane.path.join("λ.txt")));
+    assert!(pane.marks.contains_key(&pane.local_path().join("λ.txt")));
 }
 
 #[cfg(target_os = "linux")]
@@ -343,12 +346,12 @@ fn replace_clears_excluded_marks_and_unavailable_names_are_not_selectable() {
     let pane = &mut app.panes[0];
     pane.select_all();
     let original = pane.marks.clone();
-    let unavailable = pane.path.join("alpha.txt");
-    let ignored = pane.path.join("keep.log");
+    let unavailable = pane.local_path().join("alpha.txt");
+    let ignored = pane.local_path().join("keep.log");
     assert_eq!(
         pane.entries
             .iter()
-            .find(|e| e.path == unavailable)
+            .find(|e| e.native_path() == Some(&unavailable))
             .unwrap()
             .identity
             .as_ref(),
@@ -371,7 +374,7 @@ fn replace_clears_excluded_marks_and_unavailable_names_are_not_selectable() {
     assert_eq!(selection.preview(pane).unwrap().visible, 3);
     assert_eq!(selection.preview(pane).unwrap().matches, 1);
     selection.apply(pane, PatternOperation::Replace).unwrap();
-    let matched = pane.path.join("λ.txt");
+    let matched = pane.local_path().join("λ.txt");
     assert_eq!(pane.marks.get(&matched), original.get(&matched));
     assert!(pane.marks.contains_key(&matched));
     assert!(!pane.marks.contains_key(&unavailable));
@@ -380,7 +383,7 @@ fn replace_clears_excluded_marks_and_unavailable_names_are_not_selectable() {
     assert!(
         pane.entries
             .iter()
-            .find(|e| e.path == unavailable)
+            .find(|e| e.native_path() == Some(&unavailable))
             .unwrap()
             .identity
             .is_none()

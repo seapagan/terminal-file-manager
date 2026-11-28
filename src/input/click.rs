@@ -1,6 +1,9 @@
 //! Entry-row clicks select and navigate independently of the displayed columns.
 use super::{Action, Controller, controller::page_height};
-use crate::{app::Request, ui::Geometry};
+use crate::{
+    app::{NavigationTarget, Request},
+    ui::Geometry,
+};
 use crossterm::event::{KeyModifiers, MouseEvent};
 use std::time::Duration;
 
@@ -25,33 +28,57 @@ impl Controller {
         if row < area.y + 2 || row >= area.y + 2 + geometry.listing_rows[id] as u16 {
             return Vec::new();
         }
-        let pane = &mut self.app.panes[id];
-        let start = pane.viewport_start(page_height(geometry, id));
-        let index = start + usize::from(row - area.y - 2);
-        let Some(path) = pane.row_path(index) else {
-            return Vec::new();
-        };
-        pane.scroll = start;
-        if event.modifiers.contains(KeyModifiers::SHIFT) {
-            if Some(path.as_path()) == pane.path.parent() {
-                pane.cursor = Some(path);
-                pane.reset_range();
-            } else {
-                pane.select_range_to(path, page_height(geometry, id));
-            }
-            self.last_click = None;
-            return Vec::new();
-        }
-        pane.cursor = Some(path.clone());
-        pane.anchor_range();
-        let double = self.record_click(id, path, now);
-        if double {
+        let path = self.focus_listing_row(
+            id,
+            usize::from(row - area.y - 2),
+            page_height(geometry, id),
+            event.modifiers.contains(KeyModifiers::SHIFT),
+        );
+        if path.is_some_and(|path| self.record_click(id, path, now)) {
             self.dispatch(Action::Enter, geometry)
         } else {
             Vec::new()
         }
     }
-    fn record_click(&mut self, id: usize, path: std::path::PathBuf, now: Duration) -> bool {
+
+    /// Focus a visible row and return its native path if it can be double-clicked.
+    fn focus_listing_row(
+        &mut self,
+        id: usize,
+        offset: usize,
+        height: usize,
+        extend: bool,
+    ) -> Option<NavigationTarget> {
+        let pane = &mut self.app.panes[id];
+        let start = pane.viewport_start(height);
+        let index = start + offset;
+        if index >= pane.row_count() {
+            if pane.is_remote() {
+                self.last_click = None;
+            }
+            return None;
+        }
+        pane.scroll = start;
+        let path = pane.navigation_target(index);
+
+        if extend && let Some(NavigationTarget::Native(path)) = path {
+            if Some(path.as_path()) == pane.local_path().parent() {
+                pane.focus_row(index);
+                pane.reset_range();
+            } else {
+                pane.select_range_to(path, height);
+            }
+            self.last_click = None;
+            return None;
+        }
+        pane.focus_row(index);
+        if matches!(path, Some(NavigationTarget::Native(_))) {
+            pane.anchor_range();
+        }
+        path
+    }
+
+    fn record_click(&mut self, id: usize, path: NavigationTarget, now: Duration) -> bool {
         let double = self
             .last_click
             .as_ref()

@@ -60,7 +60,7 @@ fn open(
         controller.app.status = message.into();
         return Ok(());
     }
-    let base = controller.app.panes[pane].path.clone();
+    let base = controller.app.panes[pane].local_path().clone();
     let destination = initial_destination(controller, operation);
     let mut plan = if operation == Operation::Mkdir {
         Plan::mkdir(base.clone())
@@ -116,7 +116,7 @@ fn routine_feedback(
 fn open_dialog(controller: &mut Controller, plan: Plan, native_target: std::path::PathBuf) {
     controller.app.operations.scroll = 0;
     let pane = controller.app.active;
-    let base = controller.app.panes[pane].path.clone();
+    let base = controller.app.panes[pane].local_path().clone();
     let text = initial_text(&plan, &native_target);
     let destructive = matches!(plan.operation, Operation::Delete | Operation::Trash);
     if destructive {
@@ -153,9 +153,11 @@ fn initial_destination(
 ) -> Option<std::path::PathBuf> {
     let pane = controller.app.active;
     match operation {
-        Operation::Copy | Operation::Move => Some(controller.app.panes[1 - pane].path.clone()),
+        Operation::Copy | Operation::Move => {
+            Some(controller.app.panes[1 - pane].local_path().clone())
+        }
         Operation::Mkdir | Operation::CreateFile | Operation::Rename => {
-            Some(controller.app.panes[pane].path.clone())
+            Some(controller.app.panes[pane].local_path().clone())
         }
         _ => None,
     }

@@ -25,8 +25,8 @@ fn loaded() -> (tempfile::TempDir, App) {
 fn metadata_entry_errors_stay_inline_without_notifications() {
     let (_root, mut app) = loaded();
     let request = app.request_metadata(0).unwrap();
-    fs::remove_file(&request.path).unwrap();
-    let entry = inspect(&request.path);
+    fs::remove_file(request.local_path()).unwrap();
+    let entry = inspect(request.local_path());
     let error = entry.error.clone().unwrap();
     let status = app.status.clone();
     assert!(app.complete_metadata(&request, entry, None));

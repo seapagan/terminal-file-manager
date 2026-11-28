@@ -80,7 +80,7 @@ fn transitions(mut app: terminal_file_manager::app::App, previous: Operation) {
 }
 
 fn completed_job(app: &mut terminal_file_manager::app::App, previous: Operation) {
-    let mut completed = Plan::mkdir(app.panes[0].path.clone());
+    let mut completed = Plan::mkdir(app.panes[0].local_path().clone());
     completed.operation = previous;
     app.operations.history.push(Job {
         presentation: None,

@@ -27,7 +27,7 @@ fn fixture() -> (tempfile::TempDir, Controller) {
 fn register(controller: &mut Controller, id: u64) {
     let plan = Plan::paths(
         Operation::Trash,
-        vec![controller.app.panes[0].path.join("owned")],
+        vec![controller.app.panes[0].local_path().join("owned")],
         None,
     )
     .unwrap();
@@ -40,7 +40,7 @@ fn finish(controller: &mut Controller, id: u64, outcome: Outcome) {
         id,
         record: Record {
             entries: vec![EntryResult {
-                source: source.path,
+                source: source.local_path().clone(),
                 kind: source.kind,
                 outcome,
                 destination: None,

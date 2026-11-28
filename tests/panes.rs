@@ -98,11 +98,14 @@ fn temporary_maximise_restores_split_marks_locations_cursor_and_history() {
     controller.dispatch(Action::Maximise, &geometry);
     assert_eq!(controller.app.visible_panes(160), [0, 1]);
     assert_eq!(controller.app.split_percent, 65);
-    assert_eq!(controller.app.panes[0].path, child);
+    assert_eq!(*controller.app.panes[0].local_path(), child);
     assert_eq!(controller.app.panes[1].cursor, cursor);
     assert_eq!(controller.app.panes[1].marks, marks);
     controller.app.active = 0;
-    assert_eq!(controller.app.history(false).unwrap().path, root.path());
+    assert_eq!(
+        controller.app.history(false).unwrap().local_path(),
+        root.path()
+    );
 }
 
 #[test]
@@ -125,7 +128,7 @@ fn late_listing_cannot_replace_new_navigation_or_clear_its_error() {
             .unwrap()
             .contains("selected new path denied")
     );
-    assert_eq!(app.panes[0].path, root.path());
+    assert_eq!(*app.panes[0].local_path(), root.path());
 }
 
 #[test]
@@ -171,7 +174,7 @@ fn back_forward_restore_cursor_scroll_and_failed_navigation_keeps_history() {
     app.panes[0].scroll = 1;
     let back = app.history(false).unwrap();
     assert!(app.complete_listing(0, back.generation, Err("denied".into())));
-    assert_eq!(app.panes[0].path, child);
+    assert_eq!(*app.panes[0].local_path(), child);
     assert_eq!(app.panes[0].cursor, Some(child.join("last")));
     let back = app.history(false).unwrap();
     let snapshot = list(
@@ -184,13 +187,13 @@ fn back_forward_restore_cursor_scroll_and_failed_navigation_keeps_history() {
     assert_eq!(app.panes[0].cursor, Some(root.path().join("beta")));
     assert_eq!(app.panes[0].scroll, 1);
     let forward = app.history(true).unwrap();
-    assert_eq!(forward.path, child);
+    assert_eq!(forward.local_path(), &child);
     assert!(app.complete_listing(0, forward.generation, Err("denied".into())));
-    assert_eq!(app.panes[0].path, root.path());
+    assert_eq!(*app.panes[0].local_path(), root.path());
     assert_eq!(app.panes[0].cursor, Some(root.path().join("beta")));
     let retry = app.history(true).unwrap();
     assert!(app.complete_listing(0, retry.generation, Ok(child_snapshot)));
-    assert_eq!(app.panes[0].path, child);
+    assert_eq!(*app.panes[0].local_path(), child);
     assert_eq!(app.panes[0].cursor, Some(child.join("last")));
     assert_eq!(app.panes[0].scroll, 1);
     assert!(app.history(true).is_none());
@@ -199,7 +202,7 @@ fn back_forward_restore_cursor_scroll_and_failed_navigation_keeps_history() {
     assert_eq!(app.panes[0].cursor, Some(root.path().join("beta")));
     assert_eq!(app.panes[0].scroll, 1);
     assert!(app.history(false).is_none());
-    assert_eq!(app.panes[1].path, root.path());
+    assert_eq!(*app.panes[1].local_path(), root.path());
     assert_eq!(app.panes[1].cursor, opposite_cursor);
     assert_eq!(app.panes[1].scroll, 0);
 }
@@ -211,9 +214,9 @@ fn late_metadata_cannot_replace_new_selection_or_refreshed_listing() {
     let old = app.request_metadata(0).unwrap();
     app.panes[0].cursor = Some(root.path().join("beta"));
     let new = app.request_metadata(0).unwrap();
-    let entry = terminal_file_manager::fs::inspect(&new.path);
+    let entry = terminal_file_manager::fs::inspect(new.local_path());
     assert!(app.complete_metadata(&new, entry, None));
-    let entry = terminal_file_manager::fs::inspect(&old.path);
+    let entry = terminal_file_manager::fs::inspect(old.local_path());
     assert!(!app.complete_metadata(&old, entry, None));
     assert_eq!(app.details[0].entry.as_ref().unwrap().name, "beta");
     let refresh = app.request_listing(0, root.path().to_path_buf());
@@ -224,7 +227,7 @@ fn late_metadata_cannot_replace_new_selection_or_refreshed_listing() {
     )
     .unwrap();
     app.complete_listing(0, refresh.generation, Ok(snapshot));
-    let entry = terminal_file_manager::fs::inspect(&new.path);
+    let entry = terminal_file_manager::fs::inspect(new.local_path());
     assert!(!app.complete_metadata(&new, entry, None));
 }
 
@@ -237,7 +240,7 @@ fn large_marked_refresh_preserves_only_matching_native_identities() {
         .map(|index| {
             let mut entry = template.clone();
             entry.name = format!("entry{index:05}").into();
-            entry.path = root.path().join(&entry.name);
+            entry.path = Some(root.path().join(&entry.name));
             entry.hidden = false;
             entry.identity.as_mut().unwrap().object = Some((1, index));
             entry

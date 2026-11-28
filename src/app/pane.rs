@@ -45,9 +45,10 @@ impl SelectionCounts {
 
 /// One independent session-only pane.
 pub struct Pane {
+    pub(super) remote: Option<super::remote::Location>,
     pub directory: Option<Entry>,
     pub(crate) entry_identity: Option<Identity>,
-    pub path: PathBuf,
+    pub path: Option<PathBuf>,
     pub entries: Vec<Entry>,
     pub visible: Vec<usize>,
     pub cursor: Option<PathBuf>,
@@ -87,11 +88,20 @@ pub struct Pane {
 }
 
 impl Pane {
+    /// Native directory path, absent in a remote pane.
+    pub fn native_path(&self) -> Option<&PathBuf> {
+        self.path.as_ref()
+    }
+
+    /// The native directory for code operating exclusively on local panes.
+    pub fn local_path(&self) -> &PathBuf {
+        self.native_path().expect("native pane")
+    }
     pub(super) fn accepts_refresh(&self, snapshot: &Snapshot) -> bool {
         let Some(previous) = &self.directory else {
             return self.context == 0;
         };
-        if snapshot.path != self.path {
+        if Some(&snapshot.path) != self.native_path() {
             return false;
         }
         snapshot.directory.as_ref().is_some_and(|fresh| {
@@ -113,10 +123,12 @@ impl Pane {
         }
     }
 
-    pub(super) fn new(path: PathBuf) -> Self {
+    pub(super) fn new(path: Option<PathBuf>) -> Self {
         Self {
+            remote: None,
             cursor: path
-                .parent()
+                .as_deref()
+                .and_then(Path::parent)
                 .filter(|p| !p.as_os_str().is_empty())
                 .map(PathBuf::from),
             entry_identity: None,
@@ -171,24 +183,14 @@ impl Pane {
             self.marks.clear();
         }
         self.reset_range();
-        let navigating = self.path != snapshot.path;
+        let navigating = self.native_path() != Some(&snapshot.path);
         if navigating {
-            if self.restoring.is_some() {
-                let previous = self.visit(&snapshot.path);
-                if self.history_forward {
-                    self.forward.pop();
-                    self.back.push(previous);
-                } else {
-                    self.back.pop();
-                    self.forward.push(previous);
-                }
-            } else {
-                self.back.push(self.visit(&snapshot.path));
-                self.forward.clear();
-            }
-            self.path = snapshot.path;
+            let previous = self.visit(&snapshot.path);
+            let direction = self.restoring.as_ref().map(|_| self.history_forward);
+            super::navigation::record_visit(&mut self.back, &mut self.forward, previous, direction);
+            self.path = Some(snapshot.path);
             self.marks.clear();
-            self.cursor = self.path.parent().map(PathBuf::from);
+            self.cursor = self.local_path().parent().map(PathBuf::from);
             self.scroll = 0;
         }
         self.directory = snapshot.directory.map(|entry| *entry);
@@ -196,7 +198,7 @@ impl Pane {
             .entries
             .iter()
             .enumerate()
-            .map(|(index, entry)| (entry.path.clone(), index))
+            .map(|(index, entry)| (entry.local_path().clone(), index))
             .collect();
         self.entries = snapshot.entries;
         self.warnings = snapshot.errors;
@@ -216,9 +218,9 @@ impl Pane {
             .entries
             .iter()
             .filter_map(|entry| {
-                let previous = self.marks.get(&entry.path)?;
+                let previous = self.marks.get(entry.local_path())?;
                 let fresh = entry.identity.as_ref()?;
-                same_object(previous, fresh).then(|| (entry.path.clone(), previous.clone()))
+                same_object(previous, fresh).then(|| (entry.local_path().clone(), previous.clone()))
             })
             .collect();
     }
@@ -252,8 +254,13 @@ impl Pane {
         let previous_index = self.cursor_index().unwrap_or(0);
         self.reset_range();
         if self.sort.sort == Sort::Unsorted {
-            self.entries
-                .sort_by_key(|entry| self.listing_order.get(&entry.path).copied());
+            self.entries.sort_by_key(|entry| {
+                entry
+                    .remote
+                    .as_ref()
+                    .map(|remote| remote.order)
+                    .or_else(|| self.listing_order.get(entry.local_path()).copied())
+            });
         }
         self.sort.apply(&mut self.entries);
         self.refilter_at(previous_index);
@@ -265,7 +272,7 @@ impl Pane {
         self.refilter_at(previous_index);
     }
 
-    fn refilter_at(&mut self, previous_index: usize) {
+    pub(super) fn refilter_at(&mut self, previous_index: usize) {
         self.selection_revision = self.selection_revision.wrapping_add(1);
         self.visible = self
             .entries
@@ -279,17 +286,10 @@ impl Pane {
             self.permissions,
             self.owner_display,
         );
-        if !self.parent_focused()
-            && !self
-                .visible
-                .iter()
-                .any(|i| Some(&self.entries[*i].path) == self.cursor.as_ref())
-        {
+        if !self.parent_focused() && self.cursor_index().is_none() {
             let index = previous_index.min(self.visible.len().saturating_sub(1));
-            self.cursor = self
-                .visible
-                .get(index)
-                .map(|i| self.entries[*i].path.clone());
+            let entry = self.visible.get(index).copied();
+            self.set_entry_focus(entry);
             self.scroll = self.scroll.min(index);
         }
     }
@@ -312,7 +312,7 @@ impl Pane {
         self.visible
             .iter()
             .map(|i| &self.entries[*i])
-            .find(|e| Some(&e.path) == self.cursor.as_ref())
+            .find(|e| self.entry_focused(e))
     }
 
     /// Move within the cached working set, retaining a bounded scroll offset.
@@ -327,7 +327,7 @@ impl Pane {
         let next = index
             .saturating_add_signed(delta)
             .min(self.row_count().saturating_sub(1));
-        self.cursor = self.row_path(next);
+        self.focus_row(next);
         if next < self.scroll {
             self.scroll = next;
         }
@@ -338,11 +338,9 @@ impl Pane {
 
     /// Visible row index for rendering and paging.
     pub fn cursor_index(&self) -> Option<usize> {
-        self.visible.iter().position(|i| {
-            self.entries
-                .get(*i)
-                .is_some_and(|e| Some(&e.path) == self.cursor.as_ref())
-        })
+        self.visible
+            .iter()
+            .position(|i| self.entries.get(*i).is_some_and(|e| self.entry_focused(e)))
     }
 
     /// Shared viewport calculation for drawing and mouse row hit testing.
@@ -359,7 +357,7 @@ impl Pane {
         self.reset_range();
         if let Some((path, identity)) = self
             .current()
-            .map(|entry| (entry.path.clone(), entry.identity.clone()))
+            .and_then(|entry| Some((entry.native_path()?.clone(), entry.identity.clone())))
             && self.marks.remove(&path).is_none()
             && let Some(identity) = identity
         {
@@ -374,7 +372,8 @@ impl Pane {
         for i in &self.visible {
             let entry = &self.entries[*i];
             if let Some(identity) = &entry.identity {
-                self.marks.insert(entry.path.clone(), identity.clone());
+                self.marks
+                    .insert(entry.local_path().clone(), identity.clone());
             }
         }
     }
@@ -384,17 +383,25 @@ impl Pane {
         self.selection_revision = self.selection_revision.wrapping_add(1);
         self.reset_range();
         for i in &self.visible {
-            self.marks.remove(&self.entries[*i].path);
+            if let Some(path) = self.entries[*i].native_path() {
+                self.marks.remove(path);
+            }
         }
     }
 
     /// Read-only operand inspection; no mutation dispatcher exists in M1.
     pub fn eligible(&self) -> Vec<&Entry> {
+        if self.is_remote() {
+            return Vec::new();
+        }
         let marks: Vec<_> = self
             .visible
             .iter()
             .map(|i| &self.entries[*i])
-            .filter(|e| self.marks.contains_key(&e.path))
+            .filter(|e| {
+                e.native_path()
+                    .is_some_and(|path| self.marks.contains_key(path))
+            })
             .collect();
         if marks.is_empty() {
             self.current().into_iter().collect()
@@ -406,11 +413,10 @@ impl Pane {
     /// Count exclusion reasons once, with hidden then ignore then filter precedence.
     pub fn selection_counts(&self) -> SelectionCounts {
         let mut counts = SelectionCounts::default();
-        for entry in self
-            .entries
-            .iter()
-            .filter(|e| self.marks.contains_key(&e.path))
-        {
+        for entry in self.entries.iter().filter(|e| {
+            e.native_path()
+                .is_some_and(|path| self.marks.contains_key(path))
+        }) {
             if !self.show_hidden && entry.hidden {
                 counts.hidden += 1;
             } else if self.ignore == IgnoreMode::Hide && entry.ignored == Some(true) {
@@ -426,7 +432,7 @@ impl Pane {
 
     fn visit(&self, destination: &Path) -> Visit {
         Visit {
-            path: self.path.clone(),
+            path: self.local_path().clone(),
             cursor: self.cursor.clone(),
             scroll: self.scroll,
             directory_identity: self.directory.as_ref().and_then(|e| e.identity.clone()),
@@ -434,8 +440,14 @@ impl Pane {
             entered: self
                 .entries
                 .iter()
-                .find(|entry| entry.path == destination)
-                .and_then(|entry| Some((entry.path.clone(), entry.kind, entry.identity.clone()?))),
+                .find(|entry| entry.local_path() == destination)
+                .and_then(|entry| {
+                    Some((
+                        entry.local_path().clone(),
+                        entry.kind,
+                        entry.identity.clone()?,
+                    ))
+                }),
         }
     }
 
@@ -449,13 +461,14 @@ impl Pane {
         let identity = saved
             .and_then(|visit| visit.entered.as_ref())
             .filter(|(path, kind, _)| {
-                path == &self.path && matches!(kind, EntryKind::Link | EntryKind::Junction)
+                Some(path) == self.native_path()
+                    && matches!(kind, EntryKind::Link | EntryKind::Junction)
             })
             .map(|(_, _, identity)| identity.clone())
             .or_else(|| self.directory.as_ref().and(self.entry_identity.clone()));
         Visit {
             path: parent,
-            cursor: Some(self.path.clone()),
+            cursor: Some(self.local_path().clone()),
             scroll: saved.map_or(0, |visit| visit.scroll),
             directory_identity: saved.and_then(|visit| visit.directory_identity.clone()),
             cursor_identity: identity,
@@ -479,14 +492,14 @@ impl Pane {
             .iter()
             .map(|i| &self.entries[*i])
             .find(|entry| {
-                Some(&entry.path) == visit.cursor.as_ref()
+                entry.native_path() == visit.cursor.as_ref()
                     && entry
                         .identity
                         .as_ref()
                         .zip(visit.cursor_identity.as_ref())
                         .is_some_and(|(fresh, old)| same_object(fresh, old))
             })
-            .map(|entry| entry.path.clone())
+            .map(|entry| entry.local_path().clone())
     }
 
     fn matches_visit(&self, visit: &Visit) -> bool {
@@ -501,7 +514,7 @@ impl Pane {
         if let Some(visit) = self.restoring.take()
             && self.matches_visit(&visit)
         {
-            self.cursor = if visit.cursor.as_deref() == self.path.parent() {
+            self.cursor = if visit.cursor.as_deref() == self.local_path().parent() {
                 visit.cursor.clone()
             } else {
                 self.visit_cursor(&visit)

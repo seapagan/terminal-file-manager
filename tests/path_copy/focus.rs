@@ -215,7 +215,7 @@ fn invalid_origin_context_stops_dimming_before_any_reset_or_input_event() {
     let theme = Theme::new(ColorLevel::TrueColor);
     let before = draw(&c, 180, &theme);
     sequence(&mut c, "ym");
-    c.app.panes[0].pending = Some(c.app.panes[0].path.clone());
+    c.app.panes[0].pending = Some(c.app.panes[0].local_path().clone());
     assert_normal(&c, &before, &theme);
     assert!(c.app.footer_workflow.is_some());
     assert!(c.reconcile_footer());
@@ -327,7 +327,7 @@ fn parent_navigation_is_not_a_highlighted_entry_and_scrolled_rows_align() {
             .contains(Modifier::DIM)
     );
     send(&mut c, KeyCode::Esc);
-    c.app.panes[0].cursor = Some(c.app.panes[0].path.join("beta"));
+    c.app.panes[0].cursor = Some(c.app.panes[0].local_path().join("beta"));
     c.app.panes[0].scroll = 2;
     sequence(&mut c, "yh");
     let (buffer, g) = draw(&c, 180, &theme);

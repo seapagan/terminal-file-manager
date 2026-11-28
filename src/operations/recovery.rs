@@ -30,13 +30,15 @@ pub(super) struct Staging {
 
 impl Recovery {
     pub fn staging_path(&self) -> Option<&Path> {
-        self.staging.as_ref().map(|stage| stage.root.path.as_path())
+        self.staging
+            .as_ref()
+            .map(|stage| stage.root.local_path().as_path())
     }
 
     pub(super) fn directory(source: &Entry, target: &Entry, guards: &[Parents; 2]) -> Self {
         Self {
             source: source.clone(),
-            destination: target.path.clone(),
+            destination: target.local_path().clone(),
             previous: None,
             committed: Some(target.clone()),
             staging: None,
@@ -48,15 +50,15 @@ impl Recovery {
         let Some(stage) = &self.staging else {
             return Ok(());
         };
-        if safety::existing(&stage.root.path)?.is_none() {
+        if safety::existing(stage.root.local_path())?.is_none() {
             return Ok(());
         }
         safety::revalidate(&stage.root, false)?;
-        if safety::existing(&stage.payload.path)?.is_some() {
+        if safety::existing(stage.payload.local_path())?.is_some() {
             safety::owned_object(&stage.payload)?;
-            staging::remove_leaf(&stage.payload.path)?;
+            staging::remove_leaf(stage.payload.local_path())?;
         }
-        fs::remove_dir(&stage.root.path)?;
+        fs::remove_dir(stage.root.local_path())?;
         Ok(())
     }
 
@@ -66,7 +68,7 @@ impl Recovery {
         }
         if let Some(stage) = &self.staging {
             let mut expected = stage.payload.clone();
-            expected.path = self.destination.clone();
+            expected.path = Some(self.destination.clone());
             return Ok(expected);
         }
         Err(safety::changed(
@@ -132,7 +134,7 @@ impl Recovery {
         if safety::revalidate(&self.source, true).is_ok() {
             return Ok(Outcome::CopiedSourceRetained);
         }
-        Ok(if safety::existing(&self.source.path)?.is_none() {
+        Ok(if safety::existing(self.source.local_path())?.is_none() {
             Outcome::Completed
         } else {
             Outcome::Changed
@@ -190,7 +192,7 @@ fn annotate(entry: &mut super::EntryResult, detail: &str) {
 fn waiting_on_children(evidence: &Recovery, pending: &BTreeSet<PathBuf>) -> bool {
     evidence.staging.is_none()
         && pending
-            .range(evidence.source.path.clone()..)
+            .range(evidence.source.local_path().clone()..)
             .nth(1)
-            .is_some_and(|path| path.starts_with(&evidence.source.path))
+            .is_some_and(|path| path.starts_with(evidence.source.local_path()))
 }

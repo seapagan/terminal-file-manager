@@ -24,7 +24,7 @@ impl Directory {
             .clone()
             .ok_or("Current directory identity is unavailable; refresh first")?;
         Ok(Self {
-            path: pane.path.clone(),
+            path: pane.local_path().clone(),
             lexical,
             physical: physical.clone(),
         })
@@ -32,21 +32,21 @@ impl Directory {
 
     pub(super) fn entry(&self) -> Entry {
         let mut entry = self.physical.clone();
-        entry.path = self.path.clone();
+        entry.path = Some(self.path.clone());
         entry.identity = Some(self.lexical.clone());
         entry
     }
 
     pub(super) fn validate(&self, inspect: &mut impl FnMut(&Path) -> Entry) -> Result<(), String> {
         let lexical = inspect(&self.path);
-        let physical = inspect(&self.physical.path);
+        let physical = inspect(self.physical.local_path());
         if lexical.error.is_some()
             || physical.error.is_some()
             || !lexical
                 .identity
                 .as_ref()
                 .is_some_and(|fresh| super::same_identity(&self.lexical, fresh))
-            || std::fs::canonicalize(&self.path).ok().as_ref() != Some(&self.physical.path)
+            || std::fs::canonicalize(&self.path).ok().as_ref() != Some(self.physical.local_path())
             || !super::same_entry(&self.physical, &physical)
         {
             return Err(

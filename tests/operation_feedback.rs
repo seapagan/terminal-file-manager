@@ -27,7 +27,7 @@ fn draw(app: &App) -> String {
 
 fn finish(plan: Plan, record: Record) -> Controller {
     let mut c = Controller::new(
-        App::new(plan.operands[0].path.parent().unwrap().into()),
+        App::new(plan.operands[0].local_path().parent().unwrap().into()),
         Bindings::new(&Default::default()).unwrap(),
         Default::default(),
     );

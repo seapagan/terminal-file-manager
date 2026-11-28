@@ -30,6 +30,7 @@ pub(super) fn collect(controller: &mut Controller, pool: &mut Pool) -> bool {
         };
         let request = completion.request;
         match completion.value {
+            Value::Cancelled => {}
             Value::Listing(result) => {
                 let pane = request.pane;
                 let before = listing_presentation(&controller.app, pane);
@@ -38,6 +39,8 @@ pub(super) fn collect(controller: &mut Controller, pool: &mut Pool) -> bool {
                     .complete_listing(pane, request.generation, result);
                 changed |= before != listing_presentation(&controller.app, pane);
             }
+            Value::SftpListing(result) => changed |= controller.app.complete_sftp(&request, result),
+            Value::SftpFile => changed |= controller.app.complete_sftp_file(&request),
             Value::ParentIdentity(identity) => {
                 changed |= controller.app.complete_parent_identity(&request, identity);
             }

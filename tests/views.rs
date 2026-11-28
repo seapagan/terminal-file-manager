@@ -63,7 +63,7 @@ fn profiles_apply_only_view_settings_and_edits_do_not_mutate_saved_profiles() {
     assert_eq!(controller.app.panes[0].profile.as_deref(), Some("Detailed"));
     assert!(controller.app.panes[0].fuzzy_timestamps);
     assert!(!controller.app.panes[1].fuzzy_timestamps);
-    assert_eq!(controller.app.panes[0].path, root.path());
+    assert_eq!(*controller.app.panes[0].local_path(), root.path());
     key(&mut controller, "h");
     assert!(controller.app.panes[0].profile_modified);
     assert_eq!(controller.preferences.profiles["Detailed"], saved);
@@ -83,7 +83,7 @@ fn profiles_save_explicitly_round_trip_and_apply_to_both_without_locations() {
         Bindings::new(&Default::default()).unwrap(),
         Settings::default(),
     );
-    controller.app.panes[1].path = opposite.clone();
+    controller.app.panes[1].path = Some(opposite.clone());
     key(&mut controller, "h");
     key(&mut controller, "Alt+v");
     key(&mut controller, "End");
@@ -109,8 +109,8 @@ fn profiles_save_explicitly_round_trip_and_apply_to_both_without_locations() {
     key(&mut controller, "Down");
     key(&mut controller, "Space");
     key(&mut controller, "Enter");
-    assert_eq!(controller.app.panes[0].path, root.path());
-    assert_eq!(controller.app.panes[1].path, opposite);
+    assert_eq!(*controller.app.panes[0].local_path(), root.path());
+    assert_eq!(*controller.app.panes[1].local_path(), opposite);
     for pane in &controller.app.panes {
         assert_eq!(pane.profile.as_deref(), Some("Detailed"));
         assert!(pane.fuzzy_timestamps);
@@ -237,7 +237,7 @@ fn overwriting_a_profile_reconciles_other_badges_without_changing_their_view() {
         terminal_file_manager::view::ViewSettings::capture(&controller.app.panes[1]),
         other
     );
-    assert_eq!(controller.app.panes[1].path, root.path());
+    assert_eq!(*controller.app.panes[1].local_path(), root.path());
     key(&mut controller, "h");
     for input in ["Alt+v", "End", "Enter", "Enter"] {
         key(&mut controller, input);
@@ -292,7 +292,10 @@ fn view_menu_switches_live_layout_without_changing_startup_default() {
         Settings::default(),
     );
     let default = c.preferences.two_panes;
-    let paths = [c.app.panes[0].path.clone(), c.app.panes[1].path.clone()];
+    let paths = [
+        c.app.panes[0].local_path().clone(),
+        c.app.panes[1].local_path().clone(),
+    ];
     key(&mut c, "V");
     select_option(&mut c, "Pane layout");
     key(&mut c, "Enter");
@@ -300,7 +303,10 @@ fn view_menu_switches_live_layout_without_changing_startup_default() {
     assert_eq!(c.preferences.two_panes, default);
     assert!(!c.preferences_changed);
     assert_eq!(
-        [c.app.panes[0].path.clone(), c.app.panes[1].path.clone()],
+        [
+            c.app.panes[0].local_path().clone(),
+            c.app.panes[1].local_path().clone()
+        ],
         paths
     );
     key(&mut c, "Enter");

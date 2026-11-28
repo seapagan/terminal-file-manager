@@ -45,7 +45,8 @@ jobs:
         run: |
           ruff format --check .
           ruff check .
-          mypy --strict --python-version 3.10 --exclude-gitignore .
+          mypy --strict --python-version 3.10 --exclude-gitignore --exclude '^tests/fixtures/ssh/asyncssh_server[.]py\Z' .
+          mypy --strict --python-version 3.10 --platform linux tests/fixtures/ssh/asyncssh_server.py
           python -B -m unittest discover -s tests -p 'test_*.py'
           COMPLEXITY_LIZARD_VERSION=1.24.3 \
           COMPLEXITY_MAX_CCN=10 \

@@ -52,7 +52,7 @@ fn update_known(
         .entries
         .iter()
         .enumerate()
-        .map(|(i, e)| (e.path.clone(), i))
+        .map(|(i, e)| (e.local_path().clone(), i))
         .collect();
     for path in paths {
         check_cancelled(cancelled)?;

@@ -104,7 +104,7 @@ pub(super) fn data_root() -> io::Result<PathBuf> {
 #[cfg(target_os = "linux")]
 pub(super) fn claim_roots(entry: &Entry) -> io::Result<Vec<PathBuf>> {
     let mut roots = vec![data_root()?.join("Trash")];
-    let source = super::locks::namespace(&entry.path)?;
+    let source = super::locks::namespace(entry.local_path())?;
     use std::os::unix::fs::MetadataExt;
     if volume::existing_device(&data_root()?)? == std::fs::symlink_metadata(&source)?.dev() {
         return Ok(roots);

@@ -64,11 +64,11 @@ fn refresh_defers_once_without_stealing_navigation_or_late_changes() {
     assert!(app.request_refresh(0).is_none());
     assert!(!app.complete_listing(0, final_scan.generation, Ok(snapshot(root.path()))));
     app.complete_listing(0, navigation.generation, Ok(snapshot(other.path())));
-    assert_eq!(app.panes[0].path, other.path());
+    assert_eq!(*app.panes[0].local_path(), other.path());
     let deferred = app
         .take_refresh(0)
         .expect("manual refresh follows navigation");
-    assert_eq!(deferred.path, other.path());
+    assert_eq!(deferred.local_path(), other.path());
     assert!(app.take_refresh(0).is_none());
 }
 
@@ -141,9 +141,9 @@ fn manual_refresh_cannot_replace_pending_navigation() {
             .app
             .complete_listing(0, request.generation, Ok(snapshot(next.path())))
     );
-    assert_eq!(controller.app.panes[0].path, next.path());
+    assert_eq!(*controller.app.panes[0].local_path(), next.path());
     let refresh = controller.app.take_refresh(0).unwrap();
-    assert_eq!(refresh.path, next.path());
+    assert_eq!(refresh.local_path(), next.path());
     assert!(controller.app.take_refresh(0).is_none());
 }
 
@@ -158,11 +158,11 @@ fn deferred_manual_refresh_is_cancelled_by_failed_or_superseding_navigation() {
         assert!(app.status.contains("queued"));
         if outcome == "failed" {
             app.complete_listing(0, navigation.generation, Err("denied".into()));
-            assert_eq!(app.panes[0].path, root.path());
+            assert_eq!(*app.panes[0].local_path(), root.path());
             assert!(app.panes[0].error.as_ref().unwrap().contains("denied"));
         } else if outcome == "mismatched" {
             assert!(!app.complete_listing(0, navigation.generation, Ok(snapshot(root.path()))));
-            assert_eq!(app.panes[0].path, root.path());
+            assert_eq!(*app.panes[0].local_path(), root.path());
         } else {
             let newer = app.request_listing(0, root.path().into());
             assert!(!app.complete_listing(0, navigation.generation, Ok(snapshot(next.path()))));

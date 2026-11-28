@@ -20,7 +20,7 @@ impl Bases {
     pub(super) fn capture(app: &App) -> Self {
         Self {
             selected: app.relative_path_base.clone(),
-            current: app.panes[app.active].path.clone(),
+            current: app.panes[app.active].local_path().clone(),
             opposite: Reference::capture(app),
         }
     }
@@ -70,7 +70,11 @@ impl Reference {
     fn capture(app: &App) -> Result<Self, String> {
         let id = 1 - app.active;
         let pane = &app.panes[id];
-        if !app.dual || pane.pending.is_some() || pane.error.is_some() || !pane.path.is_absolute() {
+        if !app.dual
+            || pane.pending.is_some()
+            || pane.error.is_some()
+            || !pane.native_path().is_some_and(|path| path.is_absolute())
+        {
             return Err("Other base requires a valid directory in logical two-pane mode".into());
         }
         let directory = Directory::capture(pane)?;
@@ -78,14 +82,14 @@ impl Reference {
             pane: id,
             context: pane.context,
             directory,
-            path: pane.path.clone(),
+            path: pane.local_path().clone(),
         })
     }
 
     fn validate(&self, app: &App) -> Result<PathBuf, String> {
         let pane = &app.panes[self.pane];
         if !app.dual
-            || pane.path != self.path
+            || pane.native_path() != Some(&self.path)
             || pane.context != self.context
             || pane.pending.is_some()
             || pane.error.is_some()

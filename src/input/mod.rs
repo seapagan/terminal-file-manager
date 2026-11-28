@@ -19,6 +19,7 @@ mod pattern;
 pub(crate) mod policy_menu;
 pub use policy_menu::PolicyMenu;
 mod profiles;
+mod remote;
 mod scroll;
 pub(crate) mod view;
 pub(crate) use bindings::normalize_chord;

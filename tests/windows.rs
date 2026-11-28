@@ -50,7 +50,7 @@ fn junctions_are_native_nonrecursive_and_preserve_trailing_paths() {
     let link = snapshot
         .entries
         .iter()
-        .find(|e| e.path == junction)
+        .find(|e| e.native_path() == Some(&junction))
         .unwrap();
     assert_eq!(link.kind, EntryKind::Junction);
     assert!(link.enterable);
@@ -196,5 +196,5 @@ fn assert_broken_junction_navigation_and_grouping(
     let g = ui::geometry(&c.app, ratatui::layout::Rect::new(0, 0, 120, 24));
     assert!(c.dispatch(Action::Enter, &g).is_empty());
     assert!(c.app.panes[0].pending.is_none());
-    assert_eq!(c.app.panes[0].path, root);
+    assert_eq!(*c.app.panes[0].local_path(), root);
 }

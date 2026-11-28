@@ -134,9 +134,13 @@ pub(super) fn header(app: &App) -> Vec<Row> {
                 )]
             },
         );
-        if let Some(root) =
-            crate::ui::modal::common_root(dialog.plan.operands.iter().map(|e| e.path.as_path()))
-        {
+        if let Some(root) = crate::ui::modal::common_root(
+            dialog
+                .plan
+                .operands
+                .iter()
+                .map(|e| e.local_path().as_path()),
+        ) {
             rows.push(Row::styled(
                 format!("From: {}", root.display()),
                 Role::Label,
@@ -364,7 +368,8 @@ fn destructive(dialog: &OperationDialog, frame: u8) -> Vec<Row> {
 
 /// Display-only lexical grouping; approved operands and symlink spelling stay untouched.
 pub(super) fn sources(entries: &[Entry]) -> Vec<Row> {
-    let root = crate::ui::modal::common_root(entries.iter().map(|entry| entry.path.as_path()));
+    let root =
+        crate::ui::modal::common_root(entries.iter().map(|entry| entry.local_path().as_path()));
     let mut rows = Vec::new();
     if let Some(root) = &root {
         rows.push(Row::styled(
@@ -375,8 +380,8 @@ pub(super) fn sources(entries: &[Entry]) -> Vec<Row> {
     for entry in entries {
         let path = root
             .as_ref()
-            .and_then(|root| entry.path.strip_prefix(root).ok())
-            .unwrap_or(&entry.path);
+            .and_then(|root| entry.local_path().strip_prefix(root).ok())
+            .unwrap_or(entry.local_path());
         rows.push(crate::ui::modal::entry_row(entry, path));
     }
     rows

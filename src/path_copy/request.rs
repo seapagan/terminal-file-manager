@@ -67,7 +67,7 @@ impl CopyRequest {
         if self.entries.is_empty()
             || (self.source != Source::Current
                 && self.entries.iter().any(|entry| {
-                    let fresh = inspect(&entry.path);
+                    let fresh = inspect(entry.local_path());
                     fresh.error.is_some() || !super::same_entry(entry, &fresh)
                 }))
         {

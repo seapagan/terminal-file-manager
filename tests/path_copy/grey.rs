@@ -134,7 +134,7 @@ fn invalid_context_restores_browser_before_reconciliation_or_another_input() {
         let (_root, mut c) = fixture(0, false);
         let theme = Theme::new(level);
         sequence(&mut c, "ym");
-        c.app.panes[0].pending = Some(c.app.panes[0].path.clone());
+        c.app.panes[0].pending = Some(c.app.panes[0].local_path().clone());
         let workflow = c.app.footer_workflow.take();
         let (normal, normal_g) = draw(&c, 180, &theme);
         c.app.footer_workflow = workflow;

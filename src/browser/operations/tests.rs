@@ -148,7 +148,7 @@ fn retry_copies_only_incomplete_operands_and_links_the_child_attempt() {
     assert_eq!(child.retry_of, Some(parent));
     assert!(child.options.checksum);
     assert_eq!(child.plan.operands.len(), 1);
-    assert_eq!(child.plan.operands[0].path, second);
+    assert_eq!(*child.plan.operands[0].local_path(), second);
     acknowledge(&mut controller, &mut queue, Decision::Replace);
     let child = controller.app.operations.history.last().unwrap();
     assert_eq!(child.state, JobState::Completed);
@@ -247,7 +247,7 @@ fn uncertain_stage(plan: &Plan, root: &Path) -> (Record, std::path::PathBuf) {
     let mut payload = None;
     let record = crate::operations::execute(plan, Options::default(), &false.into(), |event| {
         match event {
-            Event::OwnedStage { payload: entry, .. } => payload = Some(entry.path),
+            Event::OwnedStage { payload: entry, .. } => payload = Some(entry.local_path().clone()),
             Event::Progress {
                 stage: Stage::Verified,
                 ..

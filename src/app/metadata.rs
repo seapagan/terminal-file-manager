@@ -43,7 +43,7 @@ impl MetadataFormat {
 impl App {
     /// Effective sidebar availability preserves the requested pane preference.
     pub fn sidebar_visible(&self, width: u16) -> bool {
-        self.sidebar && !self.dual && width >= 100
+        self.sidebar && !self.dual && width >= 100 && !self.panes[self.active].is_remote()
     }
 
     /// Read shared pane formatting, falling back to listing defaults before first use.

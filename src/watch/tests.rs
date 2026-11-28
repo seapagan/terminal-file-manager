@@ -25,7 +25,7 @@ pub(super) fn prepared() -> (tempfile::TempDir, App, Pool, Runtime) {
         );
         let slot = &mut runtime.slots[pane];
         slot.worker = None;
-        slot.path = Some(app.panes[pane].path.clone());
+        slot.path = Some(app.panes[pane].local_path().clone());
         slot.context = app.panes[pane].context;
         slot.sweep = Duration::from_secs(30);
     }
@@ -183,7 +183,7 @@ fn old_subscription_cannot_dirty_a_new_context_or_override_pending_navigation() 
     old.bits.store(DIRTY | ERROR, Ordering::Release);
     runtime.poll(&mut app, &mut pool, Duration::from_secs(32));
     assert_eq!(pool.active_count(), 0);
-    assert_eq!(app.panes[0].path, next.path());
+    assert_eq!(*app.panes[0].local_path(), next.path());
 }
 
 #[test]

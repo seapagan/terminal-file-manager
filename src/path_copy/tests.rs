@@ -13,7 +13,7 @@ fn marked_app(count: usize) -> (tempfile::TempDir, App) {
     pane.entries = (0..count)
         .map(|i| {
             let mut entry = template.clone();
-            entry.path = root.path().join(format!("entry-{i}"));
+            entry.path = Some(root.path().join(format!("entry-{i}")));
             entry.identity.as_mut().unwrap().object = Some((1, i as u64));
             entry
         })
@@ -44,7 +44,7 @@ fn marked_snapshot_rejects_hidden_unmarked_replaced_and_reclassified_entries() {
                 pane.visible.pop();
             }
             1 => {
-                pane.marks.remove(&pane.entries[0].path);
+                pane.marks.remove(pane.entries[0].local_path());
             }
             2 => {
                 pane.entries[0].identity.as_mut().unwrap().object = Some((2, 0));
@@ -102,9 +102,10 @@ fn batch_text_and_provider_preflight_share_the_exact_payload_boundary() {
     let (root, app) = marked_app(1);
     for extra in [0, 1] {
         let mut entry = app.panes[0].entries[0].clone();
-        entry.path = root
-            .path()
-            .join("x".repeat(crate::clipboard::MAX_BYTES + extra));
+        entry.path = Some(
+            root.path()
+                .join("x".repeat(crate::clipboard::MAX_BYTES + extra)),
+        );
         let request = CopyRequest::new(
             vec![entry.clone()],
             Directory::capture(&app.panes[0]).unwrap(),
@@ -114,7 +115,7 @@ fn batch_text_and_provider_preflight_share_the_exact_payload_boundary() {
             "name".into(),
         );
         let result = request.prepare_using(|path| {
-            if path == entry.path {
+            if path == entry.local_path() {
                 entry.clone()
             } else {
                 crate::fs::inspect_identity(path)

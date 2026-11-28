@@ -30,12 +30,15 @@ fn display_escaping_preserves_native_names_paths_and_file_contents() {
         std::fs::write(&path, b"native identity").unwrap();
         let entry = fs::inspect(&path);
         assert_eq!(entry.name, name.as_str());
-        assert_eq!(entry.path, path);
+        assert_eq!(*entry.local_path(), path);
         assert!(entry.identity.is_some() && entry.error.is_none());
         assert_eq!(
             ui::clean(entry.name.to_str().unwrap()),
             format!("界{escaped}file")
         );
-        assert_eq!(std::fs::read(&entry.path).unwrap(), b"native identity");
+        assert_eq!(
+            std::fs::read(entry.local_path()).unwrap(),
+            b"native identity"
+        );
     }
 }

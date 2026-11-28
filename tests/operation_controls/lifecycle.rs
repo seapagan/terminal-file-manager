@@ -26,12 +26,12 @@ fn cancel_then_exit_waits_for_acknowledgement_and_return_abandons_exit_intent() 
 fn save_quit_freezes_navigation_until_safe_wait_finishes() {
     let (root, mut controller) = controller();
     running(&mut controller);
-    let before = controller.app.panes[0].path.clone();
+    let before = controller.app.panes[0].local_path().clone();
     let geometry = ui::geometry(&controller.app, Rect::new(0, 0, 120, 30));
     controller.dispatch(Action::SaveQuit, &geometry);
     key(&mut controller, KeyCode::Char('w'));
     assert!(!controller.quit);
-    controller.app.panes[0].path = root.path().join("later-navigation");
+    controller.app.panes[0].path = Some(root.path().join("later-navigation"));
     finish(&mut controller, Outcome::Completed);
     assert!(controller.quit && controller.save_session);
     let snapshot = controller.app.operations.exit_snapshot.as_ref().unwrap();

@@ -402,8 +402,8 @@ fn set_paths(app: &mut App, incoming: &str, existing: &str) {
         ..
     } = &mut app.operations.conflicts.front_mut().unwrap().event
     {
-        source.path = std::path::Path::new("/visual").join(incoming);
-        destination.path = std::path::Path::new("/visual").join(existing);
+        source.path = Some(std::path::Path::new("/visual").join(incoming));
+        destination.path = Some(std::path::Path::new("/visual").join(existing));
     }
 }
 

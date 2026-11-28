@@ -34,7 +34,7 @@ fn chatter_preserves_view() {
         );
         let state = &app.panes[pane];
         assert!(state.error.is_none());
-        assert_eq!(state.path, path);
+        assert_eq!(state.local_path(), &path);
         assert_eq!(state.entries.len(), 1);
         assert_eq!(state.current().unwrap().name, "selected");
         assert_eq!(state.cursor.as_deref(), Some(selected.as_path()));
@@ -51,7 +51,7 @@ fn observe_chatter(
     started: Instant,
     parent: &Path,
 ) -> [Vec<Duration>; 2] {
-    let path = app.panes[0].path.clone();
+    let path = app.panes[0].local_path().clone();
     let mut generations = [app.panes[0].generation, app.panes[1].generation];
     let mut starts: [Vec<Duration>; 2] = Default::default();
     for index in 0..100 {

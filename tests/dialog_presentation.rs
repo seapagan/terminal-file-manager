@@ -153,9 +153,10 @@ fn cached_file_types_and_whole_sizes_share_columns_without_changing_paths() {
             entry.enterable = *enterable;
             entry.executable = *executable;
             entry.error = error.then(|| "broken link".into());
-            entry.path = root
-                .path()
-                .join(format!("{i}資料e\u{301}{}", "long".repeat(30)));
+            entry.path = Some(
+                root.path()
+                    .join(format!("{i}資料e\u{301}{}", "long".repeat(30))),
+            );
             entry.size = Some(10240);
             entry
         })

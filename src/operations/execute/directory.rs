@@ -15,7 +15,7 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
             )
             .into());
         }
-        let source_parents = Parents::capture(&source.path)?;
+        let source_parents = Parents::capture(source.local_path())?;
         let target_parents = Parents::capture(destination)?;
         safety::destination_matches(destination, previous)?;
         if previous.is_none() {
@@ -53,7 +53,7 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
         guards: [&Parents; 2],
     ) -> Result<bool> {
         let mut complete = true;
-        let entries: std::io::Result<Vec<_>> = fs::read_dir(&source.path)?.collect();
+        let entries: std::io::Result<Vec<_>> = fs::read_dir(source.local_path())?.collect();
         for item in entries? {
             self.check_cancel()?;
             guards[0].validate()?;
@@ -61,7 +61,11 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
             guards[1].validate()?;
             safety::revalidate(target, false)?;
             let entry = crate::fs::inspect(&item.path());
-            complete &= self.entry(&entry, Some(&target.path.join(&entry.name)), depth + 1);
+            complete &= self.entry(
+                &entry,
+                Some(&target.local_path().join(&entry.name)),
+                depth + 1,
+            );
             if self.record.unresolved() {
                 return Err(Failure {
                     outcome: Outcome::OutcomeUnknown,
@@ -96,8 +100,8 @@ impl<F: FnMut(Event) -> Decision> Worker<'_, F> {
         guards: [&Parents; 2],
     ) -> Result<()> {
         (self.notify)(Event::Progress {
-            source: source.path.clone(),
-            destination: target.path.clone(),
+            source: source.local_path().clone(),
+            destination: target.local_path().clone(),
             stage: Stage::Removing,
             bytes: 0,
         });

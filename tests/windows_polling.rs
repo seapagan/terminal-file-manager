@@ -156,7 +156,7 @@ fn ancestor_rename(level: usize) {
             .app
             .panes
             .iter()
-            .all(|p| p.path == path && p.current().unwrap().name == "selected")
+            .all(|p| p.native_path() == Some(&path) && p.current().unwrap().name == "selected")
     );
     assert!(Plan::capture(&browser.app.panes[0], Operation::Trash, None).is_err());
     std::fs::rename(&moved, target).unwrap();
@@ -240,12 +240,12 @@ fn windows_manual_navigation_discards_old_results_and_refresh_still_works() {
     let navigation = browser.app.request_listing(0, next.clone());
     browser.pool.submit(navigation);
     assert!(!browser.app.complete_listing(0, old, Ok(stale)));
-    browser.until(|app| app.panes[0].path == next);
+    browser.until(|app| app.panes[0].local_path() == &next);
     std::fs::write(next.join("manual"), "manual update").unwrap();
     browser.refresh(0);
     browser.until(|app| app.panes[0].entries.iter().any(|e| e.name == "manual"));
     assert!(browser.app.panes[0].parent_focused());
-    assert_eq!(browser.app.panes[1].path, root.path());
+    assert_eq!(*browser.app.panes[1].local_path(), root.path());
     assert!(browser.app.notifications.history.is_empty());
 }
 

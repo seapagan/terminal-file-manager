@@ -18,13 +18,18 @@ pub(super) fn capture(entry: &Entry) -> io::Result<HashSet<(u64, u64)>> {
 }
 
 fn directory(entry: &Entry) -> io::Result<HashSet<(u64, u64)>> {
-    let guard =
-        safety::Parents::capture(&entry.path).map_err(|error| io::Error::other(error.detail))?;
+    let guard = safety::Parents::capture(entry.local_path())
+        .map_err(|error| io::Error::other(error.detail))?;
     #[cfg(target_os = "linux")]
     let namespace = std::fs::read("/proc/self/mountinfo")?;
     let mounts = Mounts::capture(Operation::Delete)?;
     let mut objects = HashSet::new();
-    scan(&crate::fs::inspect(&entry.path), &mut objects, &mounts, 0)?;
+    scan(
+        &crate::fs::inspect(entry.local_path()),
+        &mut objects,
+        &mounts,
+        0,
+    )?;
     guard
         .validate()
         .map_err(|error| io::Error::other(error.detail))?;
@@ -69,7 +74,7 @@ fn children(
     mounts: &Mounts,
     depth: usize,
 ) -> io::Result<()> {
-    for child in std::fs::read_dir(&entry.path)? {
+    for child in std::fs::read_dir(entry.local_path())? {
         scan(
             &crate::fs::inspect(&child?.path()),
             objects,

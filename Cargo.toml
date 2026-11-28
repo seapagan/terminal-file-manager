@@ -10,12 +10,12 @@ license = "MIT OR Apache-2.0"
 keywords = ["cli", "file-manager", "terminal"]
 categories = ["command-line-utilities"]
 include = [
-  "LICENSE-APACHE",
-  "LICENSE-MIT",
-  "README.md",
-  "THIRD_PARTY_NOTICES.md",
-  "src/**",
-  "tests/**/*.rs",
+  "/LICENSE-APACHE",
+  "/LICENSE-MIT",
+  "/README.md",
+  "/THIRD_PARTY_NOTICES.md",
+  "/src/**",
+  "/tests/**/*.rs",
 ]
 
 [package.metadata.binstall]
@@ -32,6 +32,10 @@ pkg-fmt = "zip"
 name = "tfm"
 path = "src/main.rs"
 
+[[example]]
+name = "ssh_connect"
+path = "src/examples/ssh_connect.rs"
+
 [dependencies]
 colored_text = "=0.6.0"
 crossterm = { version = "=0.29.0", default-features = false, features = ["bracketed-paste", "events", "windows"] }
@@ -39,6 +43,8 @@ globset = "=0.4.21"
 ignore = "=0.4.33"
 ratatui = { version = "=0.30.2", default-features = false, features = ["crossterm_0_29", "layout-cache"] }
 regex = "=1.13.1"
+russh = { version = "=0.65.4", default-features = false, features = ["ring", "rsa"] }
+russh-sftp = { version = "=4.0.0", default-features = false, features = ["raw-string"] }
 semver = "=1.0.28"
 serde = { version = "=1.0.229", features = ["derive"] }
 toml = { version = "=1.1.8", default-features = false, features = ["parse", "serde", "display"] }

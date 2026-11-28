@@ -257,7 +257,7 @@ fn profile_validation_is_rendered_inside_the_editor_under_status_pressure() {
     let root = tempfile::tempdir().unwrap();
     std::fs::write(root.path().join("marked"), "fixture").unwrap();
     let mut c = editor();
-    c.app.panes[0].path = root.path().into();
+    c.app.panes[0].path = Some(root.path().into());
     c.app.complete_listing(
         0,
         1,

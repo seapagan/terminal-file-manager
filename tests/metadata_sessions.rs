@@ -176,7 +176,7 @@ fn popup_and_sidebar_share_choices_across_entry_changes() {
         Ok(fs::Snapshot {
             directory: c.app.panes[0].directory.clone().map(Box::new),
             entry_identity: None,
-            path: c.app.panes[0].path.clone(),
+            path: c.app.panes[0].local_path().clone(),
             entries: vec![first, next.clone()],
             errors: vec![],
         }),

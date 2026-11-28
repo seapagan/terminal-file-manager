@@ -9,7 +9,7 @@ use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, 
 
 pub(super) fn open(c: &mut Controller, g: &Geometry) {
     let pane = c.app.active;
-    let path = c.app.panes[pane].path.clone();
+    let path = c.app.panes[pane].local_path().clone();
     let selected = path_segments(&path).len().saturating_sub(1);
     c.last_click = None;
     c.dragging_divider = false;
@@ -49,7 +49,7 @@ pub(super) fn handle(c: &mut Controller, event: &Event, g: &Geometry) -> Option<
 }
 
 fn stale_or_blocked(c: &Controller, state: &PathPicker) -> bool {
-    c.app.panes[state.pane].path != state.path
+    c.app.panes[state.pane].native_path() != Some(&state.path)
         || c.app.operations.dialog.is_some()
         || !c.app.operations.conflicts.is_empty()
 }
@@ -174,7 +174,7 @@ pub(super) fn header(
     }
     let control = g.path_controls.iter().find(|control| {
         control.area.contains((event.column, event.row).into())
-            && c.app.panes[control.pane].path == control.source
+            && c.app.panes[control.pane].native_path() == Some(&control.source)
     })?;
     c.last_click = None;
     if let Some(target) = &control.target {
@@ -191,10 +191,12 @@ fn navigate(c: &mut Controller, pane: usize, path: std::path::PathBuf) -> Vec<Re
     c.app.path_pointer = None;
     c.app.active = pane;
     c.app.sidebar = c.app.panes[pane].sidebar;
-    if path == c.app.panes[pane].path && c.app.panes[pane].pending_navigation().is_none() {
+    if Some(&path) == c.app.panes[pane].native_path()
+        && c.app.panes[pane].pending_navigation().is_none()
+    {
         return Vec::new();
     }
-    if Some(path.as_path()) == c.app.panes[pane].path.parent() {
+    if Some(path.as_path()) == c.app.panes[pane].local_path().parent() {
         return c.app.parent().into_iter().collect();
     }
     vec![c.app.request_listing(pane, path)]

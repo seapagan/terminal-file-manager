@@ -97,11 +97,11 @@ impl PatternSelection {
             editor: Default::default(),
             preview_cache: RefCell::new(None),
             matcher: Err("Enter a non-empty pattern".into()),
-            path: pane.path.clone(),
+            path: pane.local_path().clone(),
             context: pane.context,
             directory: pane.directory.as_ref().and_then(|e| e.identity.clone()),
             scope: selectable(pane)
-                .map(|e| (e.path.clone(), e.identity.clone().unwrap()))
+                .map(|e| (e.local_path().clone(), e.identity.clone().unwrap()))
                 .collect(),
             #[cfg(test)]
             preview_scans: std::cell::Cell::new(0),
@@ -216,7 +216,8 @@ impl PatternSelection {
         if pane.pending.is_some() || pane.listing || pane.error.is_some() {
             return Err("Listing unavailable or refreshing; wait before applying".into());
         }
-        if pane.path != self.path || pane.context != self.context || !same_directory {
+        if pane.native_path() != Some(&self.path) || pane.context != self.context || !same_directory
+        {
             return Err("Directory changed; cancel and reopen pattern selection".into());
         }
         let mut count = 0;
@@ -224,7 +225,7 @@ impl PatternSelection {
             count += 1;
             if !self
                 .scope
-                .get(&entry.path)
+                .get(entry.local_path())
                 .zip(entry.identity.as_ref())
                 .is_some_and(|(a, b)| same_object(a, b))
             {
@@ -261,7 +262,7 @@ impl PatternSelection {
             generation: pane.generation,
             context: pane.context,
             unavailable: pane.pending.is_some() || pane.listing || pane.error.is_some(),
-            path: pane.path.clone(),
+            path: pane.local_path().clone(),
             directory: pane.directory.as_ref().and_then(|e| e.identity.clone()),
         };
         let mut cache = self.preview_cache.borrow_mut();
@@ -298,7 +299,7 @@ impl PatternSelection {
         }
         for i in &pane.visible {
             let entry = &pane.entries[*i];
-            if self.scope.contains_key(&entry.path) {
+            if self.scope.contains_key(entry.local_path()) {
                 let matched = matcher.is_match(entry.name.as_encoded_bytes());
                 preview.matches += usize::from(matched);
                 self.apply_entry(entry, &mut pane.marks, matched, operation);
@@ -314,17 +315,17 @@ impl PatternSelection {
         matched: bool,
         operation: PatternOperation,
     ) {
-        let Some(identity) = self.scope.get(&entry.path) else {
+        let Some(identity) = self.scope.get(entry.local_path()) else {
             return;
         };
         match operation {
             PatternOperation::Mark | PatternOperation::Replace if matched => {
                 marks
-                    .entry(entry.path.clone())
+                    .entry(entry.local_path().clone())
                     .or_insert_with(|| identity.clone());
             }
             PatternOperation::Unmark if matched => {
-                marks.remove(&entry.path);
+                marks.remove(entry.local_path());
             }
             _ => {}
         }

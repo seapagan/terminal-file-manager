@@ -17,7 +17,7 @@ fn fixture() -> (tempfile::TempDir, Controller, EntryResult) {
     let native = root.path().join("file");
     std::fs::write(&native, vec![0; 1024]).unwrap();
     let mut plan = Plan::paths(Operation::Copy, vec![native], Some(root.path().into())).unwrap();
-    plan.operands[0].path = path.clone();
+    plan.operands[0].path = Some(path.clone());
     let result = EntryResult {
         source: path,
         destination: None,

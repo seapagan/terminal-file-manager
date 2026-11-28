@@ -9,7 +9,7 @@ use std::sync::atomic::AtomicBool;
 
 fn install(app: &mut crate::app::App, request: &crate::app::Request) {
     let snapshot = fs::list(
-        &request.path,
+        request.local_path(),
         &fs::IgnoreContext::isolated(),
         &AtomicBool::new(false),
     )
@@ -19,7 +19,7 @@ fn install(app: &mut crate::app::App, request: &crate::app::Request) {
 
 fn assert_initial_panes(app: &crate::app::App, paths: [&std::path::Path; 2]) {
     for (pane, path) in app.panes.iter().zip(paths) {
-        assert_eq!(pane.path, path);
+        assert_eq!(*pane.local_path(), path);
         assert_eq!(pane.cursor.as_deref(), path.parent(), "focus in {path:?}");
         assert!(pane.parent_focused(), "parent row in {path:?}");
         assert_eq!(pane.row_index(), Some(0));
@@ -88,7 +88,7 @@ fn startup_parent_and_history_use_normalized_explicit_locations() {
     let mut app = startup.prepare(&Settings::default()).unwrap();
     assert_initial_panes(&app, [&start, &start]);
     assert_eq!(app.relative_path_base, start);
-    let initial = app.request_listing(0, app.panes[0].path.clone());
+    let initial = app.request_listing(0, app.panes[0].local_path().clone());
     install(&mut app, &initial);
     let mut controller = Controller::new(
         app,
@@ -100,13 +100,13 @@ fn startup_parent_and_history_use_normalized_explicit_locations() {
         .dispatch(Action::Parent, &geometry)
         .pop()
         .unwrap();
-    assert_eq!(parent.path, root.path());
+    assert_eq!(parent.local_path(), root.path());
     install(&mut controller.app, &parent);
     let back = controller.app.history(false).unwrap();
-    assert_eq!(back.path, start);
+    assert_eq!(back.local_path(), &start);
     install(&mut controller.app, &back);
     let forward = controller.app.history(true).unwrap();
-    assert_eq!(forward.path, root.path());
+    assert_eq!(forward.local_path(), root.path());
 }
 
 #[test]

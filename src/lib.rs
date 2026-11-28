@@ -16,6 +16,7 @@ pub mod permissions;
 pub mod session;
 pub mod settings;
 pub mod size;
+pub mod ssh;
 pub mod startup;
 pub mod terminal;
 pub mod ui;

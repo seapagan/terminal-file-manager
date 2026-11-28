@@ -1,6 +1,6 @@
 //! Existing browser navigation shared by keyboard and virtual parent activation.
 use super::{Action, Controller};
-use crate::app::Request;
+use crate::{app::Request, fs::EntryKind};
 
 impl Controller {
     pub(super) fn navigate(&mut self, action: Action) -> Vec<Request> {
@@ -31,10 +31,26 @@ impl Controller {
             self.app.status = "No visible entry".into();
             return Vec::new();
         };
-        if !entry.enterable {
+        if let Some(remote) = &entry.remote
+            && matches!(
+                entry.kind,
+                EntryKind::Directory | EntryKind::Link | EntryKind::Unknown
+            )
+        {
+            let name = remote.name.as_bytes();
+            if name.is_empty() || name.contains(&b'/') || name.contains(&0) {
+                self.app.status = "Invalid remote directory name".into();
+                return Vec::new();
+            }
+            let request = self
+                .app
+                .request_remote_activation(id, remote.path.clone(), entry.kind);
+            return vec![request];
+        }
+        if !entry.enterable || entry.remote.is_some() {
             self.app.status = "The file viewer is not available yet.".into();
             return Vec::new();
         }
-        vec![self.app.request_listing(id, entry.path.clone())]
+        vec![self.app.request_listing(id, entry.local_path().clone())]
     }
 }

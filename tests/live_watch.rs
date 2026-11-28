@@ -230,7 +230,7 @@ fn native_symlink_spelling_observes_physical_directory_without_retargeting() {
     converge(&mut app, &mut pool, &mut watch, started, "ready");
     std::fs::write(physical.join("physical-write"), "data").unwrap();
     converge(&mut app, &mut pool, &mut watch, started, "physical-write");
-    assert!(app.panes.iter().all(|p| p.path == alias));
+    assert!(app.panes.iter().all(|p| p.native_path() == Some(&alias)));
 }
 
 #[test]
@@ -327,7 +327,7 @@ fn native_parent_rename_keeps_the_old_context_and_recovers_when_restored() {
     assert!(
         app.panes
             .iter()
-            .all(|p| p.path == path && p.current().unwrap().name == "selected")
+            .all(|p| p.local_path() == &path && p.current().unwrap().name == "selected")
     );
     std::fs::rename(renamed, parent).unwrap();
     until(&mut app, &mut pool, &mut watch, started, |app| {
@@ -409,8 +409,8 @@ fn await_conflict(
 fn native_external_writes_during_copy_do_not_retarget_the_frozen_job() {
     use terminal_file_manager::operations::{Decision, Outcome, Queue, Update};
     let (_root, mut app, plan) = copy_fixture();
-    let source = app.panes[0].path.clone();
-    let destination = app.panes[1].path.clone();
+    let source = app.panes[0].local_path().clone();
+    let destination = app.panes[1].local_path().clone();
     let frozen = plan.operands[0].clone();
     let mut queue = Queue::new().unwrap();
     let id = queue.submit(plan, Default::default()).unwrap();
@@ -436,7 +436,7 @@ fn native_external_writes_during_copy_do_not_retarget_the_frozen_job() {
         }
     };
     assert_eq!(record.entries.len(), 1);
-    assert_eq!(record.entries[0].source, frozen.path);
+    assert_eq!(record.entries[0].source, *frozen.local_path());
     assert_eq!(record.entries[0].outcome, Outcome::Completed);
     assert_eq!(
         std::fs::read(destination.join("external")).unwrap(),
@@ -473,7 +473,7 @@ fn native_windows_junction_and_case_spelling_remain_the_selected_context() {
     converge(&mut app, &mut pool, &mut watch, started, "ready");
     std::fs::write(physical.join("later"), "data").unwrap();
     converge(&mut app, &mut pool, &mut watch, started, "later");
-    assert!(app.panes.iter().all(|p| p.path == spelling));
+    assert!(app.panes.iter().all(|p| p.native_path() == Some(&spelling)));
     std::fs::remove_dir(alias).unwrap();
 }
 

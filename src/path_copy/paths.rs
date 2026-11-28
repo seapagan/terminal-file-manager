@@ -68,10 +68,15 @@ pub(super) fn text(
 ) -> Result<String, String> {
     let SourceIdentity::Local(entry) = identity;
     let path = match format {
-        Format::Name => PathBuf::from(entry.path.file_name().unwrap_or(entry.path.as_os_str())),
-        Format::Full => entry.path.clone(),
+        Format::Name => PathBuf::from(
+            entry
+                .local_path()
+                .file_name()
+                .unwrap_or(entry.local_path().as_os_str()),
+        ),
+        Format::Full => entry.local_path().clone(),
         Format::Relative => relative(
-            &entry.path,
+            entry.local_path(),
             base.ok_or("Relative reference is unavailable")?,
         )?,
     };
@@ -98,9 +103,10 @@ mod tests {
         use std::os::unix::ffi::OsStringExt;
         let root = tempfile::tempdir().unwrap();
         let mut entry = crate::fs::inspect(root.path());
-        entry.path = root
-            .path()
-            .join(std::ffi::OsString::from_vec(vec![b'x', 0xff]));
+        entry.path = Some(
+            root.path()
+                .join(std::ffi::OsString::from_vec(vec![b'x', 0xff])),
+        );
         let source = SourceIdentity::Local(entry);
         for format in [Format::Name, Format::Relative, Format::Full] {
             assert!(
@@ -120,7 +126,7 @@ mod tests {
         } else {
             vec!["/"]
         } {
-            entry.path = path.into();
+            entry.path = Some(path.into());
             let output = text(&SourceIdentity::Local(entry.clone()), Format::Name, None).unwrap();
             assert_eq!(output, path);
         }

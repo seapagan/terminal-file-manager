@@ -9,6 +9,8 @@ mod totals;
 mod windows_native;
 
 pub use rules::IgnoreContext;
+mod remote;
+pub(crate) use remote::RemoteEntry;
 use std::ffi::OsString;
 use std::fs::{self, Metadata};
 use std::io;
@@ -45,8 +47,9 @@ pub struct Identity {
 /// Cached entry metadata. Missing fields are unavailable, never invented.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Entry {
-    pub path: PathBuf,
+    pub path: Option<PathBuf>,
     pub name: OsString,
+    pub(crate) remote: Option<RemoteEntry>,
     pub kind: EntryKind,
     pub identity: Option<Identity>,
     pub size: Option<u64>,
@@ -71,6 +74,25 @@ pub struct Entry {
 }
 
 impl Entry {
+    /// Native operand, absent for SFTP rows.
+    pub fn native_path(&self) -> Option<&PathBuf> {
+        self.path.as_ref()
+    }
+
+    /// A path for code operating exclusively on native entries.
+    pub fn local_path(&self) -> &PathBuf {
+        self.native_path().expect("native entry")
+    }
+    /// Full SFTP path bytes for a remote entry.
+    pub fn remote_path(&self) -> Option<&[u8]> {
+        self.remote.as_ref().map(|entry| entry.path.as_bytes())
+    }
+
+    /// Filename bytes for a remote entry, independent of its display name.
+    pub fn remote_name(&self) -> Option<&[u8]> {
+        self.remote.as_ref().map(|entry| entry.name.as_bytes())
+    }
+
     /// Windows account resolution and access-time sampling do not change count inputs.
     pub(crate) fn same_count_inputs(mut self, fresh: &Self) -> bool {
         self.accessed = fresh.accessed;
@@ -104,6 +126,9 @@ impl Entry {
 
     /// Format cached account data without resolving accounts on the render thread.
     pub fn owner_display(&self, mode: crate::owner::OwnerDisplay) -> String {
+        if let Some(remote) = &self.remote {
+            return remote.owner_display();
+        }
         #[cfg(windows)]
         if self.owner.is_none() {
             return self.windows_owner.display(mode);
@@ -155,7 +180,7 @@ pub fn list(path: &Path, context: &IgnoreContext, cancelled: &AtomicBool) -> io:
         check_cancelled(cancelled)?;
         entry.ignored = rules
             .as_ref()
-            .map(|rules| rules.ignored(&entry.path, entry.may_recurse()));
+            .map(|rules| rules.ignored(entry.local_path(), entry.may_recurse()));
     }
     check_cancelled(cancelled)?;
     let directory = verified_directory(initial_directory, directory_identity(path, &mut owners));
@@ -218,8 +243,8 @@ pub fn inspect_identity(path: &Path) -> Entry {
 fn inspect_with_cache(path: &Path, owners: &mut crate::owner::Cache) -> Entry {
     let mut entry = inspect_no_follow(path, Some(owners));
     if matches!(entry.kind, EntryKind::Link | EntryKind::Junction) {
-        entry.link_target = fs::read_link(&entry.path).ok();
-        match fs::metadata(&entry.path) {
+        entry.link_target = fs::read_link(entry.local_path()).ok();
+        match fs::metadata(entry.local_path()) {
             Ok(target) => entry.enterable = target.is_dir(),
             Err(error) => {
                 entry.enterable = false;
@@ -233,8 +258,9 @@ fn inspect_with_cache(path: &Path, owners: &mut crate::owner::Cache) -> Entry {
 // Totals share no-follow classification and diagnostics without resolving accounts.
 fn inspect_no_follow(path: &Path, owners: Option<&mut crate::owner::Cache>) -> Entry {
     let mut entry = Entry {
-        path: path.to_path_buf(),
+        path: Some(path.to_path_buf()),
         name: path.file_name().unwrap_or(path.as_os_str()).to_owned(),
+        remote: None,
         kind: EntryKind::Unknown,
         identity: None,
         size: None,
@@ -270,7 +296,7 @@ fn inspect_no_follow(path: &Path, owners: Option<&mut crate::owner::Cache>) -> E
 }
 
 fn fill(entry: &mut Entry, metadata: &Metadata, owners: Option<&mut crate::owner::Cache>) {
-    entry.kind = platform::kind(&entry.path, metadata).unwrap_or_else(|error| {
+    entry.kind = platform::kind(entry.local_path(), metadata).unwrap_or_else(|error| {
         entry.error = Some(error.to_string());
         EntryKind::ReparsePoint
     });
@@ -288,7 +314,7 @@ fn fill(entry: &mut Entry, metadata: &Metadata, owners: Option<&mut crate::owner
     entry.created = metadata.created().ok();
     entry.accessed = metadata.accessed().ok();
     entry.identity = Some(Identity {
-        object: platform::object(&entry.path, metadata).unwrap_or_else(|error| {
+        object: platform::object(entry.local_path(), metadata).unwrap_or_else(|error| {
             entry.error = Some(error.to_string());
             None
         }),

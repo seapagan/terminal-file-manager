@@ -60,7 +60,8 @@ pub(super) fn summary(app: &App, width: u16) -> Vec<Row> {
     let summary = job.presentation();
     rows.push(Row::styled(heading(job, &summary), state_role(job.state)));
     rows.extend(result_rows(job, &summary));
-    let root = crate::ui::modal::common_root(job.plan.operands.iter().map(|e| e.path.as_path()));
+    let root =
+        crate::ui::modal::common_root(job.plan.operands.iter().map(|e| e.local_path().as_path()));
     if let Some(root) = &root {
         rows.push(path_row("From", root, width));
     }
@@ -149,8 +150,8 @@ fn operand_rows(
         .zip(results)
         .map(|(operand, result)| {
             let path = root
-                .and_then(|r| operand.path.strip_prefix(r).ok())
-                .unwrap_or(&operand.path);
+                .and_then(|r| operand.local_path().strip_prefix(r).ok())
+                .unwrap_or(operand.local_path());
             let mut row = crate::ui::modal::entry_row(operand, path);
             let (cue, role) = operand_status(job, *result);
             row.role = role;

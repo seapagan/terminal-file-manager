@@ -9,6 +9,11 @@ pub use metadata::MetadataFormat;
 mod pattern;
 mod policy;
 mod refresh;
+mod request;
+pub(crate) use request::NavigationTarget;
+pub use request::{Request, RequestKind};
+mod remote;
+pub(crate) use remote::remote_entries;
 mod selection;
 mod status;
 use crate::fs::{Entry, Snapshot, Totals};
@@ -20,27 +25,6 @@ pub use status::Status;
 use std::path::PathBuf;
 
 pub(crate) const WELCOME: &str = "Local files — ? for help, F9 / Alt+j for jobs";
-
-/// A bounded worker request carries identity independently of display text.
-#[derive(Clone, Debug)]
-pub struct Request {
-    pub pane: usize,
-    pub generation: u64,
-    pub path: PathBuf,
-    pub kind: RequestKind,
-}
-
-/// Independent request lanes keep slow counts from starving listings.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum RequestKind {
-    Listing,
-    /// Parent listing with a lexical source to inspect if it has never been listed.
-    ParentListing(Option<PathBuf>),
-    /// Best-effort no-follow identity lookup for a pending or completed Parent request.
-    ParentIdentity,
-    Metadata,
-    Totals,
-}
 
 /// Metadata cache shared by sidebar and popup for each pane.
 #[derive(Clone, Debug, Default)]
@@ -115,7 +99,7 @@ impl App {
             path_pointer: None,
             notifications: Default::default(),
             operations: Default::default(),
-            panes: locations.map(Pane::new),
+            panes: locations.map(|path| Pane::new(Some(path))),
             active: 0,
             dual: false,
             maximized: false,
@@ -227,7 +211,7 @@ impl App {
         Request {
             pane,
             generation: state.generation,
-            path,
+            path: Some(path),
             kind,
         }
     }
@@ -236,6 +220,9 @@ impl App {
     /// Failed or superseding navigation cancels that deferred intent.
     pub fn request_refresh(&mut self, pane: usize) -> Option<Request> {
         let state = self.panes.get_mut(pane)?;
+        if state.is_remote() {
+            return self.remote_refresh(pane);
+        }
         if let Some(path) = state.pending_navigation() {
             self.status = format!("Refresh queued for {} after navigation", path.display()).into();
             state.refresh_pending = true;
@@ -248,7 +235,7 @@ impl App {
     /// Reconcile without stealing navigation or cancelling a scan or unchanged count.
     pub(crate) fn request_reconciliation(&mut self, pane: usize) -> Option<Request> {
         let state = self.panes.get_mut(pane)?;
-        if state.pending_navigation().is_some() {
+        if state.is_remote() || state.pending_navigation().is_some() {
             return None;
         }
         state.refresh_pending = true;
@@ -262,6 +249,9 @@ impl App {
             return None;
         }
         state.refresh_pending = false;
+        if state.is_remote() {
+            return self.remote_refresh(pane);
+        }
         state.listing = true;
         state.generation += 1;
         state.parent_restoring = None;
@@ -285,7 +275,7 @@ impl App {
         }
         let previous = self.listing_notices(pane);
         let state = &mut self.panes[pane];
-        if generation != state.generation {
+        if state.is_remote() || generation != state.generation {
             return false;
         }
         let attempted = state.pending.take();
@@ -304,7 +294,7 @@ impl App {
                 state.parent_restoring = None;
                 state.error = Some(format!(
                     "{}: {error}",
-                    attempted.as_deref().unwrap_or(&state.path).display()
+                    attempted.as_deref().unwrap_or(state.local_path()).display()
                 ));
                 self.invalidate_listing_details(pane);
                 true
@@ -373,11 +363,11 @@ impl App {
 
     /// Coalesce metadata work by current native path and selection generation.
     pub fn request_metadata(&mut self, pane: usize) -> Option<Request> {
-        if self.panes[pane].error.is_some() {
+        if self.panes[pane].is_remote() || self.panes[pane].error.is_some() {
             return None;
         }
         let entry = self.panes[pane].current();
-        let path = entry.map(|entry| entry.path.clone());
+        let path = entry.and_then(|entry| entry.path.clone());
         let detail = &mut self.details[pane];
         if path == detail.path && (detail.entry.is_some() || path.is_none()) {
             return None;
@@ -396,7 +386,7 @@ impl App {
         path.map(|path| Request {
             pane,
             generation: detail.generation,
-            path,
+            path: Some(path),
             kind: RequestKind::Metadata,
         })
     }
@@ -421,7 +411,7 @@ impl App {
     pub(crate) fn detail_matches(&self, request: &Request) -> bool {
         self.details.get(request.pane).is_some_and(|detail| {
             detail.generation == request.generation
-                && detail.path.as_ref() == Some(&request.path)
+                && detail.path.as_ref() == request.native_path()
                 && self.panes[request.pane]
                     .current()
                     .is_some_and(|entry| entry.path == request.path)
@@ -431,6 +421,9 @@ impl App {
     /// Navigate session history without consuming an entry until the read succeeds.
     pub fn history(&mut self, forward: bool) -> Option<Request> {
         let pane = &self.panes[self.active];
+        if pane.is_remote() {
+            return self.remote_history(forward);
+        }
         let visit = if forward {
             pane.forward.last()
         } else {
@@ -446,7 +439,7 @@ impl App {
     /// Start an explicit count using a generation independent of metadata loading.
     pub fn request_totals(&mut self) -> Option<Request> {
         let pane = self.active;
-        if self.panes[pane].error.is_some() {
+        if self.panes[pane].is_remote() || self.panes[pane].error.is_some() {
             return None;
         }
         let entry = self.panes[pane].current()?;
@@ -477,16 +470,16 @@ impl App {
             return false;
         };
         if detail.totals_generation != request.generation
-            || detail.path.as_ref() != Some(&request.path)
+            || detail.path.as_ref() != request.native_path()
         {
             return false;
         }
         detail.counting = false;
         let message = match &result {
-            Err(error) => Some(format!("{}: {error}", request.path.display())),
+            Err(error) => Some(format!("{}: {error}", request.local_path().display())),
             Ok(totals) if !totals.errors.is_empty() => Some(format!(
                 "{}: incomplete totals: {}",
-                request.path.display(),
+                request.local_path().display(),
                 totals.errors.join("; ")
             )),
             _ => None,
@@ -502,6 +495,9 @@ impl App {
     /// Report worker failures through the same generation checks as successful work.
     pub fn complete_failure(&mut self, request: &Request, error: String) -> bool {
         match request.kind {
+            RequestKind::SftpListing(_) | RequestKind::SftpActivate(_) => {
+                self.complete_sftp(request, Err(error))
+            }
             RequestKind::Listing | RequestKind::ParentListing(_) => {
                 self.complete_listing(request.pane, request.generation, Err(error))
             }
@@ -514,7 +510,7 @@ impl App {
                 // Ordinary inspection diagnostics arrive in Entry.error via complete_metadata.
                 let mut entry = self.panes[request.pane].current().unwrap().clone();
                 self.notifications.notify(
-                    format!("{}: {error}", request.path.display()),
+                    format!("{}: {error}", request.local_path().display()),
                     self.now,
                     crate::notifications::Severity::Error,
                 );

@@ -1,7 +1,7 @@
 //! Deterministic pane sorting, independent of directory grouping.
 
 use crate::fs::Entry;
-use std::{cmp::Ordering, ffi::OsStr};
+use std::cmp::Ordering;
 
 /// Sort order; missing metadata sorts last.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -61,30 +61,60 @@ impl SortPolicy {
 fn compare(a: &Entry, b: &Entry, sort: Sort) -> Ordering {
     let ordering = match sort {
         Sort::Unsorted => return Ordering::Equal,
-        Sort::Natural => natural(a.name.as_encoded_bytes(), b.name.as_encoded_bytes()),
-        Sort::Name => name(&a.name, &b.name),
-        Sort::Extension => a.path.extension().cmp(&b.path.extension()),
+        Sort::Natural => natural(name_bytes(a), name_bytes(b)),
+        Sort::Name => name(a, b),
+        Sort::Extension => extension(a, b),
         Sort::Size => b.size.cmp(&a.size),
         Sort::Modified => b.modified.cmp(&a.modified),
         Sort::Created => b.created.cmp(&a.created),
         Sort::Kind => a.kind.cmp(&b.kind),
         Sort::Version => version(a, b),
     };
-    ordering.then_with(|| name(&a.name, &b.name))
+    ordering.then_with(|| name(a, b))
 }
 
 fn version(a: &Entry, b: &Entry) -> Ordering {
-    a.name
-        .to_str()
-        .zip(b.name.to_str())
-        .map_or_else(|| name(&a.name, &b.name), |(a, b)| vsort::compare(a, b))
+    utf8_name(a)
+        .zip(utf8_name(b))
+        .map_or_else(|| name(a, b), |(a, b)| vsort::compare(a, b))
 }
 
-fn name(a: &OsStr, b: &OsStr) -> Ordering {
-    a.to_string_lossy()
+fn utf8_name(entry: &Entry) -> Option<&str> {
+    match entry.remote_name() {
+        Some(bytes) => std::str::from_utf8(bytes).ok(),
+        None => entry.name.to_str(),
+    }
+}
+
+fn name_bytes(entry: &Entry) -> &[u8] {
+    entry.remote_name().unwrap_or(entry.name.as_encoded_bytes())
+}
+
+fn remote_extension(name: &[u8]) -> Option<&[u8]> {
+    let dot = name.iter().rposition(|b| *b == b'.')?;
+    (dot != 0).then(|| &name[dot + 1..])
+}
+
+fn extension(a: &Entry, b: &Entry) -> Ordering {
+    match (a.remote_name(), b.remote_name()) {
+        (Some(a), Some(b)) => remote_extension(a).cmp(&remote_extension(b)),
+        _ => a
+            .path
+            .as_deref()
+            .and_then(std::path::Path::extension)
+            .cmp(&b.path.as_deref().and_then(std::path::Path::extension)),
+    }
+}
+
+fn name(a: &Entry, b: &Entry) -> Ordering {
+    a.name
+        .to_string_lossy()
         .to_lowercase()
-        .cmp(&b.to_string_lossy().to_lowercase())
-        .then_with(|| a.cmp(b))
+        .cmp(&b.name.to_string_lossy().to_lowercase())
+        .then_with(|| match (a.remote_name(), b.remote_name()) {
+            (Some(a), Some(b)) => a.cmp(b),
+            _ => a.name.cmp(&b.name),
+        })
 }
 
 fn natural(mut a: &[u8], mut b: &[u8]) -> Ordering {
