@@ -10,12 +10,12 @@ license = "MIT OR Apache-2.0"
 keywords = ["cli", "file-manager", "terminal"]
 categories = ["command-line-utilities"]
 include = [
-  "LICENSE-APACHE",
-  "LICENSE-MIT",
-  "README.md",
-  "THIRD_PARTY_NOTICES.md",
-  "src/**",
-  "tests/**/*.rs",
+  "/LICENSE-APACHE",
+  "/LICENSE-MIT",
+  "/README.md",
+  "/THIRD_PARTY_NOTICES.md",
+  "/src/**",
+  "/tests/**/*.rs",
 ]
 
 [package.metadata.binstall]
