@@ -98,8 +98,9 @@ or `python3 --version` (Unix). These commands expose a base interpreter;
 project virtual environments remain separate. You do not need a repository
 `.venv` to run the support scripts. Install the listed QC tools on PATH too.
 
-`cargo make verify-infra` requires PowerShell 7 (`pwsh`) on PATH. Install the
-pinned analyser from a PowerShell 7 session:
+On Linux, macOS and Windows, `cargo make verify-infra` requires PowerShell 7
+(`pwsh`) on PATH and PSScriptAnalyzer 1.25.0. Install the module from a
+PowerShell 7 session:
 
 ```powershell
 Install-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser
