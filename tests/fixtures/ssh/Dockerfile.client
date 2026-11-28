@@ -1,0 +1,24 @@
+FROM rust:1.100.0-trixie@sha256:e84068000361bf3d4a5ba2b7647f62893528b1eb9f847d7a23b493f5ce8ea254 AS tools
+RUN apt-get update && apt-get install -y --no-install-recommends jq openssh-client \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM tools AS build
+ARG TARGETARCH
+ENV CARGO_TARGET_DIR=/cargo-target CARGO_PROFILE_DEV_DEBUG=0
+WORKDIR /work
+COPY Cargo.toml Cargo.lock ./
+COPY src src
+COPY tests tests
+RUN --mount=type=cache,id=tfm-ssh-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=tfm-ssh-target-${TARGETARCH},target=/cargo-target,sharing=locked \
+    find src tests -type f -exec touch {} + \
+    && mkdir /out \
+    && timeout -k 5s 1800s cargo build --locked --example ssh_connect \
+    && timeout -k 5s 1800s cargo test --locked --no-run --test ssh --message-format=json >/tmp/artifacts \
+    && binary=$(jq -er 'select(.reason == "compiler-artifact" and .target.name == "ssh" and .executable != null) | .executable' /tmp/artifacts) \
+    && install "$binary" /out/contract \
+    && install "$CARGO_TARGET_DIR/debug/examples/ssh_connect" /out/ssh_connect
+
+FROM tools
+COPY --from=build /out/ /opt/tfm-ssh/
+COPY tests/fixtures/ssh/client.sh tests/fixtures/ssh/layout.sh tests/fixtures/ssh/sftpgo.sh /opt/tfm-ssh/

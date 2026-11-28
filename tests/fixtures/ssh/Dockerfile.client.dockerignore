@@ -1,0 +1,17 @@
+**
+!Cargo.toml
+!Cargo.lock
+!src/
+!src/**
+!tests/
+!tests/ssh.rs
+!tests/ssh/
+!tests/ssh/**
+!tests/terminal_driver.rs
+!tests/terminal_driver/
+!tests/terminal_driver/**
+!tests/fixtures/
+!tests/fixtures/ssh/
+!tests/fixtures/ssh/client.sh
+!tests/fixtures/ssh/layout.sh
+!tests/fixtures/ssh/sftpgo.sh

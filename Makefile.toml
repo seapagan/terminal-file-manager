@@ -291,11 +291,11 @@ dependencies = ["_require-linux", "xwin-check", "xwin-clippy", "xwin-build"]
 
 [tasks.verify-linux]
 description = "Run complete native Linux and Windows MSVC cross-verification"
-dependencies = ["_require-linux", "verify-common", "verify-xwin", "release-shellcheck", "installers-shellcheck"]
+dependencies = ["_require-linux", "verify-common", "verify-xwin", "release-shellcheck", "installers-shellcheck", "ssh-fixture-shellcheck"]
 
 [tasks.verify-macos]
 description = "Run complete native macOS verification"
-dependencies = ["_require-macos", "verify-common", "release-shellcheck", "installers-shellcheck"]
+dependencies = ["_require-macos", "verify-common", "release-shellcheck", "installers-shellcheck", "ssh-fixture-shellcheck"]
 
 [tasks.verify-windows]
 description = "Run complete native Windows verification"
@@ -403,6 +403,12 @@ description = "Lint the release inventory regression harness"
 dependencies = ["shellcheck-present"]
 command = "shellcheck"
 args = ["tests/ci/release-inventory.sh"]
+
+[tasks.ssh-fixture-shellcheck]
+description = "Lint the SSH interoperability runner and container entrypoints"
+dependencies = ["_require-unix", "shellcheck-present"]
+command = "shellcheck"
+args = ["tests/fixtures/ssh/run.sh", "tests/fixtures/ssh/openssh.sh", "tests/fixtures/ssh/sftpgo.sh", "tests/fixtures/ssh/client.sh", "tests/fixtures/ssh/layout.sh"]
 
 [tasks.release-shellcheck]
 description = "Lint the ELF verifier and ELF/Mach-O regression harnesses"
@@ -575,6 +581,7 @@ if equals ${CARGO_MAKE_RUST_TARGET_OS} windows
     cm_run_task windows-installer-test-legacy
 else
     cm_run_task release-shellcheck
+    cm_run_task ssh-fixture-shellcheck
     cm_run_task release-verification-test
     cm_run_task installers-shellcheck
     cm_run_task unix-installer-test

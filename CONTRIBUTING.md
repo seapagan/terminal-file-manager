@@ -236,6 +236,49 @@ than executed in every routine CI run. The Python support matrix is available
 as a manually dispatched workflow. Developer-facing quality, MSRV, policy,
 workflow security and package checks remain ordinary CI responsibilities.
 
+## SSH/SFTP interoperability
+
+Run from a checkout on Linux, macOS or WSL2 with Docker Engine or Docker
+Desktop in Linux-container mode and BuildKit (`docker buildx`). On WSL2 with
+Docker Desktop, enable integration for your distribution and run the script
+inside it. The runner uses the host's system shell and standard utilities.
+The Linux client image supplies Rust, OpenSSH and all build and test tools.
+
+```sh
+tests/fixtures/ssh/run.sh smoke
+tests/fixtures/ssh/run.sh full
+tests/fixtures/ssh/run.sh debian
+```
+
+Smoke is the default. It runs Debian OpenSSH, AsyncSSH and SFTPGo. Full adds
+Ubuntu, Fedora, AlmaLinux, Arch, Alpine and openSUSE. Use a server name from
+[images.csv](tests/fixtures/ssh/images.csv) to run one row. The Arch image
+requires AMD64 emulation when the Docker engine runs on ARM64.
+[Docker multi-platform builds](https://docs.docker.com/build/building/multi-platform/)
+
+The runner builds one Linux TFM client, reuses BuildKit's Cargo caches and
+runs the same SSH/SFTP and pane tests against each server. Containers create
+the credentials, agent and remote files. The runner uses an internal Docker
+network, publishes no ports and removes its containers, network and fixture
+volume on exit. The run log records server versions, image IDs and timings.
+
+Run the applicable matrix on the candidate revision before committing.
+
+| Tier | When to run it |
+| --- | --- |
+| Smoke | Shared browser, rendering or navigation changes that affect remote panes. |
+| Full | Changes to SSH/SFTP production code, dependencies, authentication, host trust, connection lifecycle or fixtures. Also run full at SSH/SFTP stage completion and for final release verification. |
+| None | Unrelated local functionality. |
+
+If both tiers apply, the full run covers smoke. If Docker is unavailable,
+explicitly report which matrix verification remains outstanding.
+
+Run the interoperability matrix separately from `cargo make verify`.
+Ordinary CI runs the fast SSH regressions. The planned workflow allows
+manual selection and a weekly full run on the default branch.
+Stage A tests server interoperability with a Linux client on every host.
+Native macOS and Windows client verification belongs to Stage B.
+
 ## Release and installer checks
 
 Release archives are named `terminal-file-manager-vX.Y.Z-<target>.tar.gz` on
