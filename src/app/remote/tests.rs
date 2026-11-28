@@ -338,3 +338,18 @@ fn file_link_activation_finishes_like_a_local_file_without_navigating() {
     assert!(c.app.history(false).is_none());
     assert!(c.app.notifications.history.is_empty());
 }
+
+#[test]
+fn latest_listing_installs_after_two_requests_are_superseded() {
+    let mut c = controller(remote_app());
+    let first = navigate(&mut c, Action::Enter);
+    let second = navigate(&mut c, Action::Enter);
+    let latest = navigate(&mut c, Action::Enter);
+
+    assert!(!c.app.complete_sftp(&first, Err("obsolete".into())));
+    assert!(c.app.complete_sftp(&latest, Ok(vec![])));
+    assert!(!c.app.complete_sftp(&second, Ok(vec![directory()])));
+    assert_eq!(c.app.panes[1].remote_path(), Some(b"/name-\xff".as_slice()));
+    assert!(c.app.panes[1].entries.is_empty());
+    assert!(c.app.notifications.history.is_empty());
+}

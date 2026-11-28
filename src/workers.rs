@@ -14,6 +14,8 @@ use std::{
     time::Duration,
 };
 
+use tokio::sync::oneshot;
+
 const PANE_COUNT: usize = 2;
 const LANE_COUNT: usize = 4 * PANE_COUNT;
 const WORKER_COUNT: usize = LANE_COUNT + PANE_COUNT;
@@ -23,6 +25,7 @@ pub enum Value {
     Listing(Result<Snapshot, String>),
     SftpListing(Result<Vec<Entry>, String>),
     SftpFile,
+    Cancelled,
     ParentIdentity(Option<Identity>),
     Metadata(Box<Entry>, Option<PathBuf>),
     Totals(Result<Totals, String>),
@@ -43,15 +46,33 @@ struct Finished {
 
 #[derive(Default)]
 struct Lane {
-    running: [Option<Arc<AtomicBool>>; 2],
+    running: [Option<Cancellation>; 2],
     pending: Option<Work>,
+}
+
+enum Cancellation {
+    Native(Arc<AtomicBool>),
+    Sftp(Option<oneshot::Sender<()>>),
+}
+
+impl Cancellation {
+    fn cancel(&mut self) {
+        match self {
+            Self::Native(flag) => flag.store(true, Ordering::Relaxed),
+            Self::Sftp(signal) => {
+                if let Some(signal) = signal.take() {
+                    let _ = signal.send(());
+                }
+            }
+        }
+    }
 }
 
 impl Lane {
     fn cancel(&mut self) {
         self.pending = None;
-        for cancelled in self.running.iter().flatten() {
-            cancelled.store(true, Ordering::Relaxed);
+        for cancelled in self.running.iter_mut().flatten() {
+            cancelled.cancel();
         }
     }
 
@@ -217,49 +238,52 @@ impl Pool {
             let Some((slot, Work { request, refresh })) = lane.take_work() else {
                 continue;
             };
-            let cancelled = Arc::new(AtomicBool::new(false));
-            lane.running[slot] = Some(cancelled.clone());
-            let context = self.context.clone();
-            let metrics = self.metrics.clone();
+            let runtime = self.runtime.as_ref().expect("live runtime");
             let sender = self.sender.clone();
-            let sftp = self.sftp.clone();
-            #[cfg(test)]
-            let before_execute = self.before_execute.clone();
-            self.runtime
-                .as_ref()
-                .expect("live runtime")
-                .spawn(async move {
-                    let value = if let Some(path) = request.kind.sftp_path() {
-                        read_sftp(
-                            sftp,
-                            path,
-                            matches!(request.kind, RequestKind::SftpActivate(_)),
-                        )
-                        .await
-                    } else {
-                        let work = request.clone();
-                        tokio::task::spawn_blocking(move || {
-                            #[cfg(test)]
-                            if let Some(before_execute) = before_execute {
-                                before_execute(&work, &cancelled);
-                            }
-                            execute_work(&work, &context, &cancelled, refresh, &metrics)
-                        })
-                        .await
-                        .unwrap_or_else(|error| {
-                            Value::Failed(format!(
-                                "{} worker failed: {error}",
-                                request.kind.worker_name()
-                            ))
-                        })
-                    };
-                    let _ = sender.send(Finished {
-                        lane: index,
-                        slot,
-                        completion: Completion { request, value },
-                    });
+            if let Some(path) = request.kind.sftp_path().cloned() {
+                let (signal, cancelled) = oneshot::channel();
+                lane.running[slot] = Some(Cancellation::Sftp(Some(signal)));
+                let sftp = self.sftp.clone();
+                runtime.spawn(async move {
+                    let activate = matches!(request.kind, RequestKind::SftpActivate(_));
+                    let value = read_sftp(sftp, &path, activate, cancelled).await;
+                    let _ = sender.send(finished(index, slot, request, value));
                 });
+            } else {
+                let cancelled = Arc::new(AtomicBool::new(false));
+                lane.running[slot] = Some(Cancellation::Native(cancelled.clone()));
+                let context = self.context.clone();
+                let metrics = self.metrics.clone();
+                #[cfg(test)]
+                let before_execute = self.before_execute.clone();
+                runtime.spawn(async move {
+                    let work = request.clone();
+                    let value = tokio::task::spawn_blocking(move || {
+                        #[cfg(test)]
+                        if let Some(before_execute) = before_execute {
+                            before_execute(&work, &cancelled);
+                        }
+                        execute_work(&work, &context, &cancelled, refresh, &metrics)
+                    })
+                    .await
+                    .unwrap_or_else(|error| {
+                        Value::Failed(format!(
+                            "{} worker failed: {error}",
+                            request.kind.worker_name()
+                        ))
+                    });
+                    let _ = sender.send(finished(index, slot, request, value));
+                });
+            }
         }
+    }
+}
+
+fn finished(lane: usize, slot: usize, request: Request, value: Value) -> Finished {
+    Finished {
+        lane,
+        slot,
+        completion: Completion { request, value },
     }
 }
 
@@ -368,22 +392,19 @@ async fn read_sftp(
     session: Option<Arc<crate::ssh::Session>>,
     path: &russh_sftp::protocol::SftpString,
     activate: bool,
+    cancelled: oneshot::Receiver<()>,
 ) -> Value {
     let Some(session) = session else {
         return Value::SftpListing(Err("SSH session is unavailable".into()));
     };
-    let listing = if activate {
-        session.activate_sftp(path.as_bytes()).await
-    } else {
-        session
-            .list_sftp(Some(path.as_bytes()))
-            .await
-            .map(|(_, entries)| Some(entries))
-    };
+    let listing = session
+        .browse_sftp(path.as_bytes(), activate, cancelled)
+        .await;
     drop(session);
     match listing {
         Ok(Some(entries)) => Value::SftpListing(Ok(crate::app::remote_entries(entries))),
         Ok(None) => Value::SftpFile,
+        Err(error) if error.kind() == io::ErrorKind::Interrupted => Value::Cancelled,
         Err(error) => Value::SftpListing(Err(error.to_string())),
     }
 }

@@ -5,7 +5,10 @@ use russh_sftp::{
     client::{SftpSession, error::Error, fs::ReadDir},
     protocol::{FileType, SftpString, Status, StatusCode},
 };
-use tokio::io::{DuplexStream, copy_bidirectional, duplex};
+use tokio::{
+    io::{DuplexStream, copy_bidirectional, duplex},
+    sync::oneshot,
+};
 
 use super::{CONNECT_TIMEOUT, DISCONNECT_TIMEOUT, Session, timed_out, timeout};
 
@@ -35,7 +38,7 @@ impl Session {
     /// negotiation, listing or channel shutdown exceeds its deadline.
     pub async fn list_sftp(&self, path: Option<&[u8]>) -> io::Result<(SftpString, ReadDir)> {
         let target = path.map_or(Target::Resolve(b"."), Target::List);
-        require_directory(self.list_sftp_path(target).await?)
+        require_directory(self.list_sftp_path(target, None).await?)
     }
 
     /// List the initial browser location, resolving explicit relative paths on the server.
@@ -44,19 +47,33 @@ impl Session {
     /// Returns an error if path resolution, listing, or channel shutdown fails.
     pub async fn list_sftp_start(&self, path: Option<&[u8]>) -> io::Result<(SftpString, ReadDir)> {
         require_directory(
-            self.list_sftp_path(Target::Resolve(path.unwrap_or(b".")))
+            self.list_sftp_path(Target::Resolve(path.unwrap_or(b".")), None)
                 .await?,
         )
     }
 
-    pub(crate) async fn activate_sftp(&self, path: &[u8]) -> io::Result<Option<ReadDir>> {
-        self.list_sftp_path(Target::Activate(path))
+    pub(crate) async fn browse_sftp(
+        &self,
+        path: &[u8],
+        activate: bool,
+        cancelled: oneshot::Receiver<()>,
+    ) -> io::Result<Option<ReadDir>> {
+        let target = if activate {
+            Target::Activate(path)
+        } else {
+            Target::List(path)
+        };
+        self.list_sftp_path(target, Some(cancelled))
             .await
             .map(|listing| listing.map(|(_, entries)| entries))
     }
 
-    async fn list_sftp_path(&self, target: Target<'_>) -> io::Result<Option<Directory>> {
-        let mut channel = open_channel(self).await?.into_stream();
+    async fn list_sftp_path(
+        &self,
+        target: Target<'_>,
+        mut cancelled: Option<oneshot::Receiver<()>>,
+    ) -> io::Result<Option<Directory>> {
+        let mut channel = open_channel(self, &mut cancelled).await?.into_stream();
         let (stream, mut bridge) = duplex(SFTP_STREAM_BUFFER);
         // The SFTP library's close only queues shutdown. Keep the SSH stream
         // owned here so a stalled bridge can be dropped, closing the channel.
@@ -70,16 +87,24 @@ impl Session {
         };
         let listing = list_over_stream(stream, target);
         tokio::pin!(forward, listing);
-        let (listing, closed) = tokio::select! {
-            result = &mut listing => {
-                let closed = timeout(DISCONNECT_TIMEOUT, &mut forward)
-                    .await
-                    .unwrap_or_else(|_| Err(timed_out("SFTP channel closure timed out")));
-                (result, closed)
-            }
-            closed = &mut forward => (listing.await, closed),
+        let finish = async {
+            let (listing, closed) = tokio::select! {
+                result = &mut listing => {
+                    let closed = timeout(DISCONNECT_TIMEOUT, &mut forward)
+                        .await
+                        .unwrap_or_else(|_| Err(timed_out("SFTP channel closure timed out")));
+                    (result, closed)
+                }
+                closed = &mut forward => (listing.await, closed),
+            };
+            listing.and_then(|listing| closed.map(|()| listing))
         };
-        listing.and_then(|listing| closed.map(|()| listing))
+        // Dropping the bridge on cancellation drops the russh stream, which queues CLOSE.
+        tokio::select! {
+            biased;
+            () = cancellation(&mut cancelled) => Err(interrupted()),
+            result = finish => result,
+        }
     }
 }
 
@@ -101,21 +126,49 @@ async fn list_over_stream(
     listing.and_then(|listing| closed.map(|()| listing))
 }
 
-async fn open_channel(ssh: &Session) -> io::Result<Channel<client::Msg>> {
+async fn open_channel(
+    ssh: &Session,
+    cancelled: &mut Option<oneshot::Receiver<()>>,
+) -> io::Result<Channel<client::Msg>> {
+    if cancelled
+        .as_mut()
+        .is_some_and(|signal| signal.try_recv().is_ok())
+    {
+        return Err(interrupted());
+    }
+    // russh requires the open confirmation to obtain a Channel we can close.
     let mut channel = timeout(CONNECT_TIMEOUT, ssh.0.channel_open_session())
         .await
         .map_err(|_| timed_out("Opening the SSH channel for SFTP timed out"))?
         .map_err(|error| {
             io::Error::other(format!("Could not open SSH channel for SFTP: {error}"))
         })?;
-    let requested = timeout(CONNECT_TIMEOUT, request_sftp(&mut channel))
-        .await
-        .unwrap_or_else(|_| Err(timed_out("SFTP subsystem request timed out")));
+    let requested = tokio::select! {
+        biased;
+        () = cancellation(cancelled) => Err(interrupted()),
+        result = timeout(CONNECT_TIMEOUT, request_sftp(&mut channel)) => {
+            result.unwrap_or_else(|_| Err(timed_out("SFTP subsystem request timed out")))
+        }
+    };
     if let Err(error) = requested {
-        let _ = timeout(DISCONNECT_TIMEOUT, channel.close()).await;
+        if timeout(DISCONNECT_TIMEOUT, channel.close()).await.is_err() {
+            drop(channel.into_stream());
+        }
         return Err(error);
     }
     Ok(channel)
+}
+
+async fn cancellation(signal: &mut Option<oneshot::Receiver<()>>) {
+    if let Some(signal) = signal {
+        let _ = signal.await;
+    } else {
+        std::future::pending().await
+    }
+}
+
+fn interrupted() -> io::Error {
+    io::Error::new(io::ErrorKind::Interrupted, "SFTP request was superseded")
 }
 
 async fn request_sftp(channel: &mut Channel<client::Msg>) -> io::Result<()> {

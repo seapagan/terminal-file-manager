@@ -30,6 +30,7 @@ pub(super) fn collect(controller: &mut Controller, pool: &mut Pool) -> bool {
         };
         let request = completion.request;
         match completion.value {
+            Value::Cancelled => {}
             Value::Listing(result) => {
                 let pane = request.pane;
                 let before = listing_presentation(&controller.app, pane);

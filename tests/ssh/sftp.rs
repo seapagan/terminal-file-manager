@@ -1,4 +1,4 @@
-use std::{io::ErrorKind, time::Duration};
+use std::{collections::VecDeque, io::ErrorKind, time::Duration};
 
 use russh::{Channel, ChannelId, ChannelMsg, Disconnect, server};
 use russh_sftp::{
@@ -39,7 +39,9 @@ pub(super) struct Subsystem {
     refused_close_ping: Option<oneshot::Sender<()>>,
     events: Option<UnboundedSender<Event>>,
     stall_close: bool,
-    list_gate: Option<oneshot::Receiver<()>>,
+    list_gates: VecDeque<oneshot::Receiver<()>>,
+    listing_closes: Option<UnboundedSender<ChannelId>>,
+    gated_channels: Vec<ChannelId>,
     stalled: Option<(ChannelId, oneshot::Sender<()>)>,
 }
 
@@ -55,11 +57,15 @@ impl Subsystem {
             && name == "sftp"
         {
             session.channel_success(id)?;
+            let list_gate = self.list_gates.pop_front();
+            if list_gate.is_some() {
+                self.gated_channels.push(id);
+            }
             let directory = Directory {
                 events: events.clone(),
                 files: None,
                 ssh: session.handle(),
-                list_gate: self.list_gate.take(),
+                list_gate,
                 stated_directory: false,
             };
             if std::mem::take(&mut self.stall_close) {
@@ -87,6 +93,16 @@ impl Subsystem {
         id: ChannelId,
         session: &mut server::Session,
     ) -> Result<(), russh::Error> {
+        if let Some(index) = self
+            .gated_channels
+            .iter()
+            .position(|&channel| channel == id)
+        {
+            self.gated_channels.swap_remove(index);
+            if let Some(closes) = &self.listing_closes {
+                let _ = closes.send(id);
+            }
+        }
         if let Some(reply) = self.refused_close_ping.take() {
             // russh queues its CHANNEL_CLOSE reply before invoking this callback.
             session.send_ping(reply)?;
@@ -457,68 +473,8 @@ async fn rejects_a_listing_when_the_ssh_connection_is_lost() {
     peer.server_finished().await.unwrap();
 }
 
-#[tokio::test]
-async fn delayed_sftp_listing_leaves_native_listing_lane_available() {
-    let (events, rx) = mpsc::unbounded_channel();
-    let (release, list_gate) = oneshot::channel();
-    let peer = Peer::start_with(Subsystem {
-        events: Some(events),
-        list_gate: Some(list_gate),
-        ..Subsystem::default()
-    })
-    .await;
-    let ssh = std::sync::Arc::new(peer.connect(Credentials::Password(PASSWORD)).await.unwrap());
-    let worker_session = ssh.clone();
-    tokio::task::spawn_blocking(move || drive_listing_lanes(worker_session, rx, release))
-        .await
-        .unwrap();
-    std::sync::Arc::into_inner(ssh)
-        .unwrap()
-        .disconnect()
-        .await
-        .unwrap();
-    peer.server_finished().await.unwrap();
-}
-
-fn drive_listing_lanes(
-    ssh: std::sync::Arc<terminal_file_manager::ssh::Session>,
-    mut events: UnboundedReceiver<Event>,
-    release: oneshot::Sender<()>,
-) {
-    use terminal_file_manager::{
-        app::{Request, RequestKind},
-        fs::IgnoreContext,
-        workers::{Pool, Value},
-    };
-    let mut pool = Pool::new(IgnoreContext::isolated()).unwrap();
-    pool.attach_sftp(ssh);
-    pool.submit(Request {
-        pane: 1,
-        generation: 1,
-        path: None,
-        kind: RequestKind::SftpListing(HOME.into()),
-    });
-    tokio::runtime::Handle::current().block_on(expect_event(&mut events, Event::ListingBlocked));
-    let local = tempfile::tempdir().unwrap();
-    pool.submit(Request {
-        pane: 0,
-        generation: 1,
-        path: Some(local.path().into()),
-        kind: RequestKind::Listing,
-    });
-    let completed = pool.next(LIMIT).unwrap();
-    assert_eq!(completed.request.pane, 0);
-    assert!(matches!(completed.value, Value::Listing(Ok(listing)) if listing.path == local.path()));
-
-    release.send(()).unwrap();
-    let completed = pool.next(LIMIT).unwrap();
-    assert_eq!(completed.request.pane, 1);
-    let Value::SftpListing(Ok(entries)) = completed.value else {
-        panic!("expected a successful SFTP listing");
-    };
-    assert_eq!(entries[0].remote_name(), Some(b"entry-\xff".as_slice()));
-    assert!(entries.iter().all(|entry| entry.native_path().is_none()));
-}
-
 #[path = "sftp/activation.rs"]
 mod activation;
+
+#[path = "sftp/cancellation.rs"]
+mod cancellation;
