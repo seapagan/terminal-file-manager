@@ -78,10 +78,9 @@ impl server::Handler for Server {
     async fn channel_close(
         &mut self,
         channel: russh::ChannelId,
-        _: &mut server::Session,
+        session: &mut server::Session,
     ) -> Result<(), Self::Error> {
-        self.sftp.channel_closed(channel);
-        Ok(())
+        self.sftp.channel_closed(channel, session)
     }
 }
 

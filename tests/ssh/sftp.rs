@@ -33,6 +33,7 @@ enum Event {
 pub(super) struct Subsystem {
     pub channel: Option<Channel<server::Msg>>,
     refused_channel: Option<oneshot::Sender<RefusedChannel>>,
+    refused_close_ping: Option<oneshot::Sender<()>>,
     events: Option<UnboundedSender<Event>>,
     stall_close: bool,
     stalled: Option<(ChannelId, oneshot::Sender<()>)>,
@@ -75,7 +76,15 @@ impl Subsystem {
         Ok(())
     }
 
-    pub fn channel_closed(&mut self, id: ChannelId) {
+    pub fn channel_closed(
+        &mut self,
+        id: ChannelId,
+        session: &mut server::Session,
+    ) -> Result<(), russh::Error> {
+        if let Some(reply) = self.refused_close_ping.take() {
+            // russh queues its CHANNEL_CLOSE reply before invoking this callback.
+            session.send_ping(reply)?;
+        }
         if self
             .stalled
             .as_ref()
@@ -86,6 +95,7 @@ impl Subsystem {
                 let _ = events.send(Event::StalledChannelClosed);
             }
         }
+        Ok(())
     }
 }
 
@@ -327,10 +337,13 @@ async fn reports_a_refused_sftp_subsystem() {
     peer.server_finished().await.unwrap();
 }
 
-async fn peer_with_refused_channel() -> (Peer, oneshot::Receiver<RefusedChannel>) {
+async fn peer_with_refused_channel(
+    refused_close_ping: Option<oneshot::Sender<()>>,
+) -> (Peer, oneshot::Receiver<RefusedChannel>) {
     let (refused, channel) = oneshot::channel();
     let peer = Peer::start_with(Subsystem {
         refused_channel: Some(refused),
+        refused_close_ping,
         ..Subsystem::default()
     })
     .await;
@@ -339,7 +352,8 @@ async fn peer_with_refused_channel() -> (Peer, oneshot::Receiver<RefusedChannel>
 
 #[tokio::test]
 async fn reports_refusal_promptly_and_closes_a_channel_left_open_by_the_server() {
-    let (peer, channel) = peer_with_refused_channel().await;
+    let (reply, close_drained) = oneshot::channel();
+    let (peer, channel) = peer_with_refused_channel(Some(reply)).await;
     let ssh = peer.connect(Credentials::Password(PASSWORD)).await.unwrap();
     // Finish before the five-second cleanup deadline while the server sends no CLOSE.
     let error = timeout(Duration::from_secs(3), ssh.list_sftp(None))
@@ -361,13 +375,15 @@ async fn reports_refusal_promptly_and_closes_a_channel_left_open_by_the_server()
     })
     .await
     .unwrap();
+    // The ping reply proves the client read the preceding CLOSE before disconnect.
+    timeout(LIMIT, close_drained).await.unwrap().unwrap();
     ssh.disconnect().await.unwrap();
     peer.server_finished().await.unwrap();
 }
 
 #[tokio::test]
 async fn preserves_the_sftp_refusal_when_the_transport_closes() {
-    let (peer, channel) = peer_with_refused_channel().await;
+    let (peer, channel) = peer_with_refused_channel(None).await;
     let ssh = peer.connect(Credentials::Password(PASSWORD)).await.unwrap();
     let disconnect = async {
         let (_channel, server) = channel.await.unwrap();
